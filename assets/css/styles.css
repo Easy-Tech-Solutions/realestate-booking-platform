@@ -8320,7 +8320,6 @@ label {
 }
 .flat-account .form-account .ip-field .icon {
   position: absolute;
-  left: 18px;
   top: 50%;
   transform: translateY(-50%);
 }
