@@ -21,10 +21,61 @@
    <link rel="stylesheet" href="../assets/css/swiper-bundle.min.css">
    <link rel="stylesheet" href="../assets/css/animate.css">
    <link rel="stylesheet" type="text/css" href="../assets/css/styles.css"/>
+   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
 
     <!-- Favicon and Touch Icons  -->
     <link rel="shortcut icon" href="../assets/images/logo/favicon.png">
     <link rel="apple-touch-icon-precomposed" href="../assets/images/logo/favicon.png">
+
+
+<style>
+    /* Professional Styling for the Map */
+    .wrap-map {
+        width: 100%;
+        max-width: 1200px; /* Optional: Keeps layout balanced */
+        margin: 0 auto; /* Centers the map */
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .top-map {
+        width: 100%;
+        height: 450px; /* Adjust height as needed */
+        border-radius: 12px;
+    }
+
+    /* Make Leaflet Controls More Professional */
+    .leaflet-control-zoom {
+        border-radius: 8px !important;
+        overflow: hidden;
+    }
+
+    .leaflet-popup-content {
+        font-weight: bold;
+        text-align: center;
+    }
+
+    /* Fullscreen button styling */
+    .leaflet-control-zoom-in,
+    .leaflet-control-zoom-out {
+        background-color: #007BFF !important;
+        color: white !important;
+        border-radius: 5px;
+    }
+
+    .leaflet-control-zoom-in:hover,
+    .leaflet-control-zoom-out:hover {
+        background-color: #0056b3 !important;
+    }
+
+    #map {
+    width: 900px;
+    height: 400px; /* Adjust as needed */
+}
+</style>
 
 </head>
 
@@ -1101,22 +1152,16 @@
                                         </div>
                                     </div>
                                 </div>
-                                </div>
                             </div>
                         </div>
+                </div></div>
+                <div class="flat-map text-center">
+                    <!-- <h3 class="title mt-10">📍 Our Location in Liberia</h3> -->
+                    <div class="wrap-map">
+                        <div id="map" class="top-map" data-map-zoom="16" data-map-scroll="true"></div>
                     </div>
-                    
-
-
                 </div>
-                <div class="wrap-right">
-                    <div id="map" class="top-map" data-map-zoom="16" data-map-scroll="true"></div>
-                </div>
-            </section>
-        </div>
-        <!-- /#page -->
-
-    </div>
+                </div></section>
 
     <!-- go top -->
     <div class="progress-wrap">
@@ -1269,10 +1314,30 @@
     <script type="text/javascript" src="../assets/js/rangle-slider.js"></script>
     <script type="text/javascript" src="../assets/js/shortcodes.js"></script>
     <script type="text/javascript" src="../assets/js/main.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAuSiPhoDaOJ7aqtJVtQhYhLzwwJ7rQlmA"></script>
     <script src="../assets/js/map.js"></script>
     <script src="../assets/js/marker.js"></script>
     <script src="../assets/js/infobox.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Get zoom level from data attribute (default to 16 if not set)
+        var zoomLevel = document.getElementById("map").getAttribute("data-map-zoom") || 16;
+    
+        // Initialize Leaflet map centered in Monrovia, Liberia
+        var map = L.map('map', {
+            scrollWheelZoom: true, // Enables scrolling
+        }).setView([6.2907, -10.7605], zoomLevel); // Monrovia Coordinates
+    
+        // Add Tile Layer (Professional Styled Map)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(map);
+    
+        // Add Custom Marker (Your Business Location or Any Key Spot)
+        var marker = L.marker([6.2907, -10.7605]).addTo(map)
+            .bindPopup("<b>📍 Our Office in Monrovia, Liberia</b><br>Come visit us!")
+            .openPopup();
+    </script>
   
 </body>
 
