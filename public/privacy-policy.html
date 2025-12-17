@@ -6,11 +6,11 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Homelengo - Real Estate HTML Template</title>
+    <title>Easy Real Estate </title>
     <meta name="keywords" content="HTML, CSS, JavaScript, Bootstrap">
     <meta name="description" content="Real Estate HTML Template">
 
-    <meta name="author" content="themesflat.com">
+    <meta name="author" content="easyrealestate.com">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
    <!-- font -->
@@ -19,18 +19,31 @@
    <link rel="stylesheet" href="../assets/fonts/font-icons.css">
    <link rel="stylesheet" href="../assets/css/bootstrap.min.css">
    <link rel="stylesheet" href="../assets/css/swiper-bundle.min.css">
+   <link rel="stylesheet" href="../assets/css/animate.css">
    <link rel="stylesheet" type="text/css" href="../assets/css/styles.css"/>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 
-    <!-- Favicon and Touch Icons  -->
-    <link rel="shortcut icon" href="../assets/images/logo/favicon.png">
-    <link rel="apple-touch-icon-precomposed" href="../assets/images/logo/favicon.png">
+
+     <!-- Favicon and Touch Icons  -->
+     <link rel="shortcut icon" href="../assets/images/logo/Easy.jpeg">
+     <link rel="apple-touch-icon-precomposed" href="../assets/images/logo/Easy.jpeg">
+
+    <style>
+        #liberia-map {
+        width: 100%;
+        height: 500px;
+        border-radius: 10px;
+    }
+    </style>
 
 </head>
 
 <body class="body">
 
-    <!-- RTL -->
-   <!-- <a href="./javascript:void(0);" id="toggle-rtl" class="tf-btn primary">RTL</a> -->
+   <!-- RTL -->
+   <!-- <a href="javascript:void(0);" id="toggle-rtl" class="tf-btn primary">RTL</a> -->
    <!-- /RTL  -->
 
     <!-- preload -->
@@ -54,7 +67,7 @@
                             <div class="inner-header">
                                 <div class="inner-header-left">
                                     <div class="logo-box flex">
-                                        <div class="logo"><a src="../index.html"><img src="../assets/images/logo/logo@2x.png" alt="logo" width="166" height="48"></a></div>
+                                        <div class="logo"><a href="../index.html"><img src="../assets/images/logo/Easy.jpeg" alt="logo" width="166" height="48"></a></div>
                                     </div>
                                     <div class="nav-outer flex align-center">
                                          <!-- Main Menu -->
@@ -78,22 +91,22 @@
                                                     </li>
                                                     <li class="dropdown2 current"><a href="#">Pages</a>
                                                         <ul>
-                                                            <li><a href="./about-us.html">About Us</a></li>
+                                                            <li class="current"><a href="about-us.html">About Us</a></li>
                                                             <li><a href="./our-service.html">Our Services</a></li>
                                                             <li><a href="./pricing.html">Pricing</a></li>
                                                             <li><a href="./contact.html">Contact Us</a></li>
                                                             <li><a href="./faq.html">FAQs</a></li>
-                                                            <li class="current"><a href="./privacy-policy.html">Privacy Policy</a></li>
+                                                            <li><a href="./privacy-policy.html">Privacy Policy</a></li>
                                                             
                                                         </ul>
                                                     </li>
-                                                    <li class="dropdown2"><a href="#">Blog</a>
+                                                    <!-- <li class="dropdown2"><a href="#">Blog</a>
                                                         <ul>
                                                             <li><a href="./blog.html">Blog Default</a></li>
                                                             <li><a href="./blog-grid.html">Blog Grid</a></li>
                                                             <li><a href="./blog-detail.html">Blog Post Details</a></li>
                                                         </ul>
-                                                    </li>
+                                                    </li> -->
                                                     
                                                     <li class="dropdown2"><a href="#">Dashboard</a>
                                                         <ul>
@@ -142,7 +155,7 @@
                 <div class="mobile-menu">
                     <div class="menu-backdrop"></div>                            
                     <nav class="menu-box">
-                        <div class="nav-logo"><a src="../index.html"><img src="../assets/images/logo/logo@2x.png" alt="nav-logo" width="174" height="44"></a></div>
+                        <div class="nav-logo"><a href="../index.html"><img src="../assets/images/logo/logo@2x.png" alt="nav-logo" width="174" height="44"></a></div>
                         <div class="bottom-canvas">
                             <div class="login-box flex align-center">
                                 <a href="#modalLogin" data-bs-toggle="modal">Login</a>
@@ -160,7 +173,7 @@
                                 </div>
                                 <div class="box d-flex align-items-center">
                                     <span class="icon icon-mail"></span>
-                                    <div>themesflat@gmail.com</div>
+                                    <div>easyrealestate@gmail.com</div>
                                 </div>
                             </div>
                         </div>
@@ -171,7 +184,7 @@
             <!-- End Main Header -->
 
             <!-- Page Title -->
-            <section class="flat-title-page" style="background-image: url(images/page-title/page-title-7.jpg);">
+            <section class="flat-title-page" style="background-image: url(../assets/images/home/Bedroom12.jpeg);">
                 <div class="container">
                     <div class="breadcrumb-content">
                         <ul class="breadcrumb">
@@ -303,7 +316,7 @@
                                         Visit Help Centre
                                     </a>
                                     <h6 class="mb-20">You can also email</h6>
-                                    <a href="#" class="text-mail">Realestatecp@gmail.com</a>
+                                    <a href="#" class="text-mail">easyrealestate@gmail.com</a>
                                 </div>
                             </div>
                         </div>
@@ -317,7 +330,7 @@
                 <div class="top-footer">
                   <div class="container">
                     <div class="content-footer-top">
-                        <div class="footer-logo"><a src="../index.html"><img src="../assets/images/logo/logo-footer@2x.png" alt="logo" width="166" height="48"></a></div>
+                        <div class="footer-logo"><a href="../index.html"><img src="../assets/images/logo/Easy.jpeg" alt="logo" width="166" height="48"></a></div>
                         <div class="wd-social">
                           <span>Follow Us:</span>
                           <ul class="list-social d-flex align-items-center">
@@ -368,19 +381,19 @@
                     <div class="row">
                       <div class="col-lg-4 col-md-6">
                         <div class="footer-cl-1">
-                          <p class="text-variant-2">Specializes in providing high-class tours for those in need. Contact Us</p>
+                          <p class="text-variant-2">Specializes in providing high-class housing for those in need. Contact Us</p>
                           <ul class="mt-12">
                             <li class="mt-12 d-flex align-items-center gap-8">
                                 <i class="icon icon-mapPinLine fs-20 text-variant-2"></i>
-                                <p class="text-white">101 E 129th St, East Chicago, IN 46312, US</p>
+                                <p class="text-white">Rehab Community, Manitamba, Liberia</p>
                             </li>
                             <li class="mt-12 d-flex align-items-center gap-8">
                                 <i class="icon icon-phone2 fs-20 text-variant-2"></i>
-                                <a href="tel:1-333-345-6868" class="text-white caption-1">1-333-345-6868</a>
+                                <a href="tel:1-333-345-6868" class="text-white caption-1">+231-888-098-674</a>
                             </li>
                             <li class="mt-12 d-flex align-items-center gap-8">
                                 <i class="icon icon-mail fs-20 text-variant-2"></i>
-                                <p class="text-white">themesflat@gmail.com</p>
+                                <p class="text-white">easyrealestate@gmail.com</p>
                             </li>
                           </ul>
                         </div>
@@ -442,7 +455,7 @@
                 <div class="bottom-footer">
                   <div class="container">
                     <div class="content-footer-bottom">
-                        <div class="copyright">©2024 Homelengo. All Rights Reserved.</div>
+                        <div class="copyright">©2025 Easy Real Estate. All Rights Reserved.</div>
                           
                         <ul class="menu-bottom">
                           <li><a href="./our-service.html">Terms Of Services</a> </li>
@@ -559,7 +572,6 @@
                                     <svg class="icon" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M16.3125 5.0625V12.9375C16.3125 13.3851 16.1347 13.8143 15.8182 14.1307C15.5018 14.4472 15.0726 14.625 14.625 14.625H3.375C2.92745 14.625 2.49822 14.4472 2.18176 14.1307C1.86529 13.8143 1.6875 13.3851 1.6875 12.9375V5.0625M16.3125 5.0625C16.3125 4.61495 16.1347 4.18573 15.8182 3.86926C15.5018 3.55279 15.0726 3.375 14.625 3.375H3.375C2.92745 3.375 2.49822 3.55279 2.18176 3.86926C1.86529 4.18573 1.6875 4.61495 1.6875 5.0625M16.3125 5.0625V5.24475C16.3125 5.53286 16.2388 5.81618 16.0983 6.06772C15.9578 6.31926 15.7553 6.53065 15.51 6.68175L9.885 10.143C9.61891 10.3069 9.31252 10.3937 9 10.3937C8.68748 10.3937 8.38109 10.3069 8.115 10.143L2.49 6.6825C2.24469 6.5314 2.04215 6.32001 1.90168 6.06847C1.7612 5.81693 1.68747 5.53361 1.6875 5.2455V5.0625" stroke="#A3ABB0" stroke-linecap="round" stroke-linejoin="round"/>
                                     </svg>
-                                    
                                     <input type="text" class="form-control" placeholder="Email address">   
                                 </div>
 
@@ -606,12 +618,14 @@
             </div> 
         </div>
     </div>
-
+    
     <!-- Javascript -->
     <script type="text/javascript" src="../assets/js/bootstrap.min.js"></script>
     <script type="text/javascript" src="../assets/js/jquery.min.js"></script>
     <script type="text/javascript" src="../assets/js/plugin.js"></script>
     <script type="text/javascript" src="../assets/js/jquery.nice-select.min.js"></script>
+    <script type="text/javascript" src="../assets/js/swiper-bundle.min.js"></script>
+    <script type="text/javascript" src="../assets/js/carousel.js"></script>
     <script type="text/javascript" src="../assets/js/shortcodes.js"></script>
     <script type="text/javascript" src="../assets/js/main.js"></script>
 

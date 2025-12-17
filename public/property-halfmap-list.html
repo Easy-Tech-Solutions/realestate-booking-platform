@@ -6,11 +6,11 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Homelengo - Real Estate HTML Template</title>
+    <title>Easy Real Estate </title>
     <meta name="keywords" content="HTML, CSS, JavaScript, Bootstrap">
     <meta name="description" content="Real Estate HTML Template">
 
-    <meta name="author" content="themesflat.com">
+    <meta name="author" content="easyrealestate.com">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
    <!-- font -->
@@ -21,17 +21,62 @@
    <link rel="stylesheet" href="../assets/css/swiper-bundle.min.css">
    <link rel="stylesheet" href="../assets/css/animate.css">
    <link rel="stylesheet" type="text/css" href="../assets/css/styles.css"/>
+   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-    <!-- Favicon and Touch Icons  -->
-    <link rel="shortcut icon" href="../assets/images/logo/favicon.png">
-<link rel="apple-touch-icon-precomposed" href="../assets/images/logo/favicon.png">
+
+     <!-- Favicon and Touch Icons  -->
+     <link rel="shortcut icon" href="../assets/images/logo/Easy.jpeg">
+     <link rel="apple-touch-icon-precomposed" href="../assets/images/logo/Easy.jpeg">
+    
+    <style>
+        /* Professional Styling for the Map */
+    .wrap-map {
+        width: 100%;
+        max-width: 1200px; /* Optional: Keeps layout balanced */
+        margin: 0 auto; /* Centers the map */
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .top-map {
+        width: 100%;
+        height: 450px; /* Adjust height as needed */
+        border-radius: 12px;
+    }
+
+    /* Make Leaflet Controls More Professional */
+    .leaflet-control-zoom {
+        border-radius: 8px !important;
+        overflow: hidden;
+    }
+
+    .leaflet-popup-content {
+        font-weight: bold;
+        text-align: center;
+    }
+
+    /* Fullscreen button styling */
+    .leaflet-control-zoom-in,
+    .leaflet-control-zoom-out {
+        background-color: #007BFF !important;
+        color: white !important;
+        border-radius: 5px;
+    }
+
+    .leaflet-control-zoom-in:hover,
+    .leaflet-control-zoom-out:hover {
+        background-color: #0056b3 !important;
+    }
+    </style>
 
 </head>
 
 <body class="body">
 
-    <!-- RTL -->
-   <!-- <a href="./javascript:void(0);" id="toggle-rtl" class="tf-btn primary">RTL</a> -->
+   <!-- RTL -->
+   <!-- <a href="javascript:void(0);" id="toggle-rtl" class="tf-btn primary">RTL</a> -->
    <!-- /RTL  -->
 
     <!-- preload -->
@@ -45,6 +90,7 @@
 
     <div id="wrapper">
         <div id="pagee" class="clearfix">
+
             <!-- Main Header -->
             <header class="main-header fixed-header">
                 <!-- Header Lower -->
@@ -54,7 +100,7 @@
                             <div class="inner-header">
                                 <div class="inner-header-left">
                                     <div class="logo-box flex">
-                                        <div class="logo"><a href="../index.html"><img src="../assets/images/logo/logo@2x.png" alt="logo" width="166" height="48"></a></div>
+                                        <div class="logo"><a href="../index.html"><img src="../assets/images/logo/Easy.jpeg" alt="logo" width="166" height="48"></a></div>
                                     </div>
                                     <div class="nav-outer flex align-center">
                                          <!-- Main Menu -->
@@ -63,10 +109,10 @@
                                                 <ul class="navigation clearfix">
                                                     <li class="home"><a href="../index.html">Home</a>
                                                     </li>
-                                                    <li class="dropdown2 current"><a href="#">Listing</a>
+                                                    <li class="dropdown2"><a href="#">Listing</a>
                                                         <ul>
                                                             <li><a href="./property-halfmap-grid.html">Property Half Map Grid</a></li>
-                                                            <li  class="current"><a href="./property-halfmap-list.html">Property Half Map List</a></li>
+                                                            <li><a href="./property-halfmap-list.html">Property Half Map List</a></li>
                                                             <li><a href="./topmap-grid.html">Find Topmap Grid</a></li>
                                                             <li><a href="./topmap-list.html">Find Topmap List</a></li>
                                                             <li><a href="./sidebar-grid.html">Find Sidebar Grid</a></li>
@@ -76,9 +122,9 @@
                                                     </li>
                                                     <li><a href="./property-details.html">Properties</a>
                                                     </li>
-                                                    <li class="dropdown2"><a href="#">Pages</a>
+                                                    <li class="dropdown2 current"><a href="#">Pages</a>
                                                         <ul>
-                                                            <li><a href="./about-us.html">About Us</a></li>
+                                                            <li class="current"><a href="about-us.html">About Us</a></li>
                                                             <li><a href="./our-service.html">Our Services</a></li>
                                                             <li><a href="./pricing.html">Pricing</a></li>
                                                             <li><a href="./contact.html">Contact Us</a></li>
@@ -87,13 +133,13 @@
                                                             
                                                         </ul>
                                                     </li>
-                                                    <li class="dropdown2"><a href="#">Blog</a>
+                                                    <!-- <li class="dropdown2"><a href="#">Blog</a>
                                                         <ul>
                                                             <li><a href="./blog.html">Blog Default</a></li>
                                                             <li><a href="./blog-grid.html">Blog Grid</a></li>
                                                             <li><a href="./blog-detail.html">Blog Post Details</a></li>
                                                         </ul>
-                                                    </li>
+                                                    </li> -->
                                                     
                                                     <li class="dropdown2"><a href="#">Dashboard</a>
                                                         <ul>
@@ -160,7 +206,7 @@
                                 </div>
                                 <div class="box d-flex align-items-center">
                                     <span class="icon icon-mail"></span>
-                                    <div>themesflat@gmail.com</div>
+                                    <div>easyrealestate@gmail.com</div>
                                 </div>
                             </div>
                         </div>
@@ -463,14 +509,14 @@
                                     <div class="col-md-6">
                                         <div class="homelengo-box">
                                             <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
+                                                <a href="../public/property-details-v1.html" class="images-group">
                                                     <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-7.jpg" src="../assets/images/home/house-7.jpg" alt="img">
+                                                        <img class="lazyload" data-src="../assets/images/home/apartment6.jpeg" src="../assets/images/home/apartment6.jpeg" alt="img">
                                                     </div>
                                                     <div class="top">
-                                                        <ul class="d-flex gap-6">
+                                                        <ul class="d-flex gap-6 flex-wrap">
                                                             <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
                                                         </ul>
                                                         
                                                     </div>
@@ -479,19 +525,137 @@
                                                             <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                             <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                         </svg>
-                                                        145 Brooklyn Ave, Califonia, New York   
+                                                        ELWA, Rehab Community, Manitamba Road   
                                                     </div>
                                                 </a>
                                                 
                                             </div>
                                             <div class="archive-bottom">
                                                 <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link"> Casa Lomas de Machalí Machas</a></h6>
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
                                                         <ul class="meta-list">
                                                             <li class="item">
                                                                 <i class="icon icon-bed"></i>
                                                                 <span class="text-variant-1">Beds:</span>
                                                                 <span class="fw-6">3</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-bath"></i>
+                                                                <span class="text-variant-1">Baths:</span>
+                                                                <span class="fw-6">2</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-sqft"></i>
+                                                                <span class="text-variant-1">Sqft:</span>
+                                                                <span class="fw-6">1150</span>
+                                                            </li>
+                                                        </ul>
+                                                    
+                                                </div>
+                                                
+                                                <div class="content-bottom">
+                                                    <div class="d-flex gap-8 align-items-center">
+                                                        <div class="avatar avt-40 round">
+                                                            <img src="../assets/images/avatar/apartment6.jpeg" alt="avt">
+                                                        </div>
+                                                        <span>John Gibson</span>
+                                                    </div>
+                                                    <h6 class="price">$2400,00</h6>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="homelengo-box">
+                                            <div class="archive-top">
+                                                <a href="../public/property-details-v1.html" class="images-group">
+                                                    <div class="images-style">
+                                                        <img class="lazyload" data-src="../assets/images/home/apartment3.jpeg" src="../assets/images/home/apartment3.jpeg" alt="img">
+                                                    </div>
+                                                    <div class="top">
+                                                        <ul class="d-flex gap-6 flex-wrap">
+                                                            <li class="flag-tag primary">Featured</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
+                                                        </ul>
+                                                        
+                                                    </div>
+                                                    <div class="bottom">
+                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                        </svg>
+                                                       Paynesville, Zubah Town, Duport Road   
+                                                    </div>
+                                                </a>
+                                                
+                                            </div>
+                                            <div class="archive-bottom">
+                                                <div class="content-top">
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
+                                                        <ul class="meta-list">
+                                                            <li class="item">
+                                                                <i class="icon icon-bed"></i>
+                                                                <span class="text-variant-1">Beds:</span>
+                                                                <span class="fw-6">2</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-bath"></i>
+                                                                <span class="text-variant-1">Baths:</span>
+                                                                <span class="fw-6">2</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-sqft"></i>
+                                                                <span class="text-variant-1">Sqft:</span>
+                                                                <span class="fw-6">1150</span>
+                                                            </li>
+                                                        </ul>
+                                                    
+                                                </div>
+                                                
+                                                <div class="content-bottom">
+                                                    <div class="d-flex gap-8 align-items-center">
+                                                        <div class="avatar avt-40 round">
+                                                            <img src="../assets/images/avatar/apartment3.jpeg" alt="avt">
+                                                        </div>
+                                                        <span>Maka Armah</span>
+                                                    </div>
+                                                    <h6 class="price">$1800,00</h6>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="homelengo-box">
+                                            <div class="archive-top">
+                                                <a href="../public/property-details-v1.html" class="images-group">
+                                                    <div class="images-style">
+                                                        <img class="lazyload" data-src="../assets/images/home/Bedroom.jpeg" src="../assets/images/home/Bedroom.jpeg" alt="img">
+                                                    </div>
+                                                    <div class="top">
+                                                        <ul class="d-flex gap-6 flex-wrap">
+                                                            <li class="flag-tag primary">Featured</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
+                                                        </ul>
+                                                        
+                                                    </div>
+                                                    <div class="bottom">
+                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                        </svg>
+                                                        Duazon , RobertField, HighWay   
+                                                    </div>
+                                                </a>
+                                                
+                                            </div>
+                                            <div class="archive-bottom">
+                                                <div class="content-top">
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
+                                                        <ul class="meta-list">
+                                                            <li class="item">
+                                                                <i class="icon icon-bed"></i>
+                                                                <span class="text-variant-1">Beds:</span>
+                                                                <span class="fw-6">2</span>
                                                             </li>
                                                             <li class="item">
                                                                 <i class="icon icon-bath"></i>
@@ -512,9 +676,9 @@
                                                         <div class="avatar avt-40 round">
                                                             <img src="../assets/images/avatar/avt-png1.png" alt="avt">
                                                         </div>
-                                                        <span>Arlene McCoy</span>
+                                                        <span>Maka Armah</span>
                                                     </div>
-                                                    <h6 class="price">$7250,00</h6>
+                                                    <h6 class="price">$2400,00</h6>
                                                 </div>
                                             </div>
                                         </div>
@@ -522,14 +686,14 @@
                                     <div class="col-md-6">
                                         <div class="homelengo-box">
                                             <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
+                                                <a href="../public/property-details-v1.html" class="images-group">
                                                     <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-8.jpg" src="../assets/images/home/house-8.jpg" alt="img">
+                                                        <img class="lazyload" data-src="../assets/images/home/bedroom1.jpeg" src="../assets/images/home/Bedroom1.jpeg" alt="img">
                                                     </div>
                                                     <div class="top">
-                                                        <ul class="d-flex gap-6">
+                                                        <ul class="d-flex gap-6 flex-wrap">
                                                             <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
                                                         </ul>
                                                         
                                                     </div>
@@ -538,24 +702,24 @@
                                                             <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                             <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                         </svg>
-                                                        145 Brooklyn Ave, Califonia, New York   
+                                                        10th street Sinkor Monrovia   
                                                     </div>
                                                 </a>
                                                 
                                             </div>
                                             <div class="archive-bottom">
                                                 <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link"> Casa Lomas de Machalí Machas</a></h6>
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
                                                         <ul class="meta-list">
                                                             <li class="item">
                                                                 <i class="icon icon-bed"></i>
                                                                 <span class="text-variant-1">Beds:</span>
-                                                                <span class="fw-6">3</span>
+                                                                <span class="fw-6">2</span>
                                                             </li>
                                                             <li class="item">
                                                                 <i class="icon icon-bath"></i>
                                                                 <span class="text-variant-1">Baths:</span>
-                                                                <span class="fw-6">2</span>
+                                                                <span class="fw-6">1</span>
                                                             </li>
                                                             <li class="item">
                                                                 <i class="icon icon-sqft"></i>
@@ -571,9 +735,9 @@
                                                         <div class="avatar avt-40 round">
                                                             <img src="../assets/images/avatar/avt-png2.png" alt="avt">
                                                         </div>
-                                                        <span>Arlene McCoy</span>
+                                                        <span>Maka Armah</span>
                                                     </div>
-                                                    <h6 class="price">$7250,00</h6>
+                                                    <h6 class="price">$3300,00</h6>
                                                 </div>
                                             </div>
                                         </div>
@@ -581,14 +745,14 @@
                                     <div class="col-md-6">
                                         <div class="homelengo-box">
                                             <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
+                                                <a href="../public/property-details-v1.html" class="images-group">
                                                     <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-11.jpg" src="../assets/images/home/house-11.jpg" alt="img">
+                                                        <img class="lazyload" data-src="../assets/images/home/Bedroom3.png" src="../assets/images/home/Bedroom3.png" alt="img">
                                                     </div>
                                                     <div class="top">
-                                                        <ul class="d-flex gap-6">
+                                                        <ul class="d-flex gap-6 flex-wrap">
                                                             <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
                                                         </ul>
                                                         
                                                     </div>
@@ -597,24 +761,24 @@
                                                             <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                             <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                         </svg>
-                                                        145 Brooklyn Ave, Califonia, New York   
+                                                        VOA, RobertField, HighWay  
                                                     </div>
                                                 </a>
                                                 
                                             </div>
                                             <div class="archive-bottom">
                                                 <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link"> Casa Lomas de Machalí Machas</a></h6>
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link">House</a></h6>
                                                         <ul class="meta-list">
                                                             <li class="item">
                                                                 <i class="icon icon-bed"></i>
                                                                 <span class="text-variant-1">Beds:</span>
-                                                                <span class="fw-6">3</span>
+                                                                <span class="fw-6">2</span>
                                                             </li>
                                                             <li class="item">
                                                                 <i class="icon icon-bath"></i>
                                                                 <span class="text-variant-1">Baths:</span>
-                                                                <span class="fw-6">2</span>
+                                                                <span class="fw-6">1</span>
                                                             </li>
                                                             <li class="item">
                                                                 <i class="icon icon-sqft"></i>
@@ -630,9 +794,9 @@
                                                         <div class="avatar avt-40 round">
                                                             <img src="../assets/images/avatar/avt-png3.png" alt="avt">
                                                         </div>
-                                                        <span>Arlene McCoy</span>
+                                                        <span>Maka Armah</span>
                                                     </div>
-                                                    <h6 class="price">$7250,00</h6>
+                                                    <h6 class="price">$1800,00</h6>
                                                 </div>
                                             </div>
                                         </div>
@@ -640,14 +804,14 @@
                                     <div class="col-md-6">
                                         <div class="homelengo-box">
                                             <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
+                                                <a href="./public/property-details-v1.html" class="images-group">
                                                     <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-9.jpg" src="../assets/images/home/house-9.jpg" alt="img">
+                                                        <img class="lazyload" data-src="../assets/images/home/bedroom7.jpeg" src="../assets/images/home/Bedroom7.jpeg" alt="img">
                                                     </div>
                                                     <div class="top">
-                                                        <ul class="d-flex gap-6">
+                                                        <ul class="d-flex gap-6 flex-wrap">
                                                             <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
                                                         </ul>
                                                         
                                                     </div>
@@ -656,19 +820,19 @@
                                                             <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                             <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                         </svg>
-                                                        145 Brooklyn Ave, Califonia, New York   
+                                                        ELWA, Rehab Community, Junction   
                                                     </div>
                                                 </a>
                                                 
                                             </div>
                                             <div class="archive-bottom">
                                                 <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link"> Casa Lomas de Machalí Machas</a></h6>
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
                                                         <ul class="meta-list">
                                                             <li class="item">
                                                                 <i class="icon icon-bed"></i>
                                                                 <span class="text-variant-1">Beds:</span>
-                                                                <span class="fw-6">3</span>
+                                                                <span class="fw-6">2</span>
                                                             </li>
                                                             <li class="item">
                                                                 <i class="icon icon-bath"></i>
@@ -689,24 +853,29 @@
                                                         <div class="avatar avt-40 round">
                                                             <img src="../assets/images/avatar/avt-png4.png" alt="avt">
                                                         </div>
-                                                        <span>Arlene McCoy</span>
+                                                        <span>Maka Armah</span>
                                                     </div>
-                                                    <h6 class="price">$7250,00</h6>
+                                                    <h6 class="price">$2400,00</h6>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
-                                        <div class="homelengo-box">
+                                </div>
+                                
+                            </div>
+                            <div class="tab-pane active show" id="listLayout" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="homelengo-box list-style-1 list-style-2 line">
                                             <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
+                                                <a href="../public/property-details-v1.html" class="images-group">
                                                     <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-3.jpg" src="../assets/images/home/house-3.jpg" alt="img">
+                                                        <img class="lazyload" data-src="../assets/images/home/bedroom11.jpeg" src="../assets/images/home/Bedroom11.jpeg" alt="img">
                                                     </div>
                                                     <div class="top">
-                                                        <ul class="d-flex gap-6">
+                                                        <ul class="d-flex gap-6 flex-wrap">
                                                             <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
                                                         </ul>
                                                         
                                                     </div>
@@ -715,19 +884,19 @@
                                                             <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                             <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                         </svg>
-                                                        145 Brooklyn Ave, Califonia, New York   
+                                                        Duport Road, Paynesville   
                                                     </div>
                                                 </a>
                                                 
                                             </div>
                                             <div class="archive-bottom">
                                                 <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link"> Casa Lomas de Machalí Machas</a></h6>
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
                                                         <ul class="meta-list">
                                                             <li class="item">
                                                                 <i class="icon icon-bed"></i>
                                                                 <span class="text-variant-1">Beds:</span>
-                                                                <span class="fw-6">3</span>
+                                                                <span class="fw-6">2</span>
                                                             </li>
                                                             <li class="item">
                                                                 <i class="icon icon-bath"></i>
@@ -748,24 +917,24 @@
                                                         <div class="avatar avt-40 round">
                                                             <img src="../assets/images/avatar/avt-png5.png" alt="avt">
                                                         </div>
-                                                        <span>Arlene McCoy</span>
+                                                        <span>Maka Armah</span>
                                                     </div>
-                                                    <h6 class="price">$7250,00</h6>
+                                                    <h6 class="price">$3600,00</h6>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
-                                        <div class="homelengo-box">
+                                    <div class="col-md-12">
+                                        <div class="homelengo-box list-style-1 list-style-2 line">
                                             <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
+                                                <a href="./public/property-details-v1.html" class="images-group">
                                                     <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-30.jpg" src="../assets/images/home/house-30.jpg" alt="img">
+                                                        <img class="lazyload" data-src="../assets/images/home/bedroom7.jpeg" src="../assets/images/home/Bedroom7.jpeg" alt="img">
                                                     </div>
                                                     <div class="top">
-                                                        <ul class="d-flex gap-6">
+                                                        <ul class="d-flex gap-6 flex-wrap">
                                                             <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
                                                         </ul>
                                                         
                                                     </div>
@@ -774,14 +943,191 @@
                                                             <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                             <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                                         </svg>
-                                                        145 Brooklyn Ave, Califonia, New York   
+                                                        ELWA, Rehab Community, Junction   
                                                     </div>
                                                 </a>
                                                 
                                             </div>
                                             <div class="archive-bottom">
                                                 <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link"> Casa Lomas de Machalí Machas</a></h6>
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
+                                                        <ul class="meta-list">
+                                                            <li class="item">
+                                                                <i class="icon icon-bed"></i>
+                                                                <span class="text-variant-1">Beds:</span>
+                                                                <span class="fw-6">2</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-bath"></i>
+                                                                <span class="text-variant-1">Baths:</span>
+                                                                <span class="fw-6">2</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-sqft"></i>
+                                                                <span class="text-variant-1">Sqft:</span>
+                                                                <span class="fw-6">1150</span>
+                                                            </li>
+                                                        </ul>
+                                                    
+                                                </div>
+                                                
+                                                <div class="content-bottom">
+                                                    <div class="d-flex gap-8 align-items-center">
+                                                        <div class="avatar avt-40 round">
+                                                            <img src="../assets/images/avatar/avt-png4.png" alt="avt">
+                                                        </div>
+                                                        <span>Maka Armah</span>
+                                                    </div>
+                                                    <h6 class="price">$2400,00</h6>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <div class="homelengo-box list-style-1 list-style-2 line">
+                                            <div class="archive-top">
+                                                <a href="../public/property-details-v1.html" class="images-group">
+                                                    <div class="images-style">
+                                                        <img class="lazyload" data-src="../assets/images/home/bedroom1.jpeg" src="../assets/images/home/Bedroom1.jpeg" alt="img">
+                                                    </div>
+                                                    <div class="top">
+                                                        <ul class="d-flex gap-6 flex-wrap">
+                                                            <li class="flag-tag primary">Featured</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
+                                                        </ul>
+                                                        
+                                                    </div>
+                                                    <div class="bottom">
+                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                        </svg>
+                                                        10th street Sinkor Monrovia   
+                                                    </div>
+                                                </a>
+                                                
+                                            </div>
+                                            <div class="archive-bottom">
+                                                <div class="content-top">
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
+                                                        <ul class="meta-list">
+                                                            <li class="item">
+                                                                <i class="icon icon-bed"></i>
+                                                                <span class="text-variant-1">Beds:</span>
+                                                                <span class="fw-6">2</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-bath"></i>
+                                                                <span class="text-variant-1">Baths:</span>
+                                                                <span class="fw-6">1</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-sqft"></i>
+                                                                <span class="text-variant-1">Sqft:</span>
+                                                                <span class="fw-6">1150</span>
+                                                            </li>
+                                                        </ul>
+                                                    
+                                                </div>
+                                                
+                                                <div class="content-bottom">
+                                                    <div class="d-flex gap-8 align-items-center">
+                                                        <div class="avatar avt-40 round">
+                                                            <img src="../assets/images/avatar/avt-png2.png" alt="avt">
+                                                        </div>
+                                                        <span>Maka Armah</span>
+                                                    </div>
+                                                    <h6 class="price">$3300,00</h6>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <div class="homelengo-box list-style-1 list-style-2 line">
+                                            <div class="archive-top">
+                                                <a href="../public/property-details-v1.html" class="images-group">
+                                                    <div class="images-style">
+                                                        <img class="lazyload" data-src="../assets/images/home/apartment3.jpeg" src="../assets/images/home/apartment3.jpeg" alt="img">
+                                                    </div>
+                                                    <div class="top">
+                                                        <ul class="d-flex gap-6 flex-wrap">
+                                                            <li class="flag-tag primary">Featured</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
+                                                        </ul>
+                                                        
+                                                    </div>
+                                                    <div class="bottom">
+                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                        </svg>
+                                                       Paynesville, Zubah Town, Duport Road   
+                                                    </div>
+                                                </a>
+                                                
+                                            </div>
+                                            <div class="archive-bottom">
+                                                <div class="content-top">
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
+                                                        <ul class="meta-list">
+                                                            <li class="item">
+                                                                <i class="icon icon-bed"></i>
+                                                                <span class="text-variant-1">Beds:</span>
+                                                                <span class="fw-6">2</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-bath"></i>
+                                                                <span class="text-variant-1">Baths:</span>
+                                                                <span class="fw-6">2</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-sqft"></i>
+                                                                <span class="text-variant-1">Sqft:</span>
+                                                                <span class="fw-6">1150</span>
+                                                            </li>
+                                                        </ul>
+                                                    
+                                                </div>
+                                                
+                                                <div class="content-bottom">
+                                                    <div class="d-flex gap-8 align-items-center">
+                                                        <div class="avatar avt-40 round">
+                                                            <img src="../assets/images/avatar/apartment3.jpeg" alt="avt">
+                                                        </div>
+                                                        <span>Maka Armah</span>
+                                                    </div>
+                                                    <h6 class="price">$1800,00</h6>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <div class="homelengo-box list-style-1 list-style-2 line">
+                                            <div class="archive-top">
+                                                <a href="../public/property-details-v1.html" class="images-group">
+                                                    <div class="images-style">
+                                                        <img class="lazyload" data-src="../assets/images/home/bedroom8.jpeg" src="../assets/images/home/Bedroom8.jpeg" alt="img">
+                                                    </div>
+                                                    <div class="top">
+                                                        <ul class="d-flex gap-6 flex-wrap">
+                                                            <li class="flag-tag primary">Featured</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
+                                                        </ul>
+                                                        
+                                                    </div>
+                                                    <div class="bottom">
+                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                        </svg>
+                                                        GSA Road, Paynesville   
+                                                    </div>
+                                                </a>
+                                                
+                                            </div>
+                                            <div class="archive-bottom">
+                                                <div class="content-top">
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
                                                         <ul class="meta-list">
                                                             <li class="item">
                                                                 <i class="icon icon-bed"></i>
@@ -807,363 +1153,70 @@
                                                         <div class="avatar avt-40 round">
                                                             <img src="../assets/images/avatar/avt-png6.png" alt="avt">
                                                         </div>
-                                                        <span>Arlene McCoy</span>
+                                                        <span>Maka Armah</span>
                                                     </div>
-                                                    <h6 class="price">$7250,00</h6>
+                                                    <h6 class="price">$3600,00</h6>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                            </div>
-                            <div class="tab-pane active show" id="listLayout" role="tabpanel">
-                                <div class="row">
-                                    <div class="col-md-12">
-                                        <div class="homelengo-box list-style-1 list-style-2 line">
-                                            <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
-                                                    <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-sm-11.jpg" src="../assets/images/home/house-sm-11.jpg" alt="img-property">
-                                                    </div>
-                                                    <div class="top">
-                                                        <ul class="d-flex gap-6 flex-wrap">
-                                                            <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
-                                                        </ul>
-                                                    </div>
-                                                </a>
-                                            </div>
-                                            <div class="archive-bottom">
-                                                <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link text-line-clamp-1"> Ritma Perdana (Townhouse), LBS Alam Perdana</a></h6>
-                                                    <ul class="meta-list">
-                                                        <li class="item">
-                                                            <i class="icon icon-bed"></i>
-                                                            <span class="text-variant-1">Beds:</span>
-                                                            <span class="fw-6">3</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-bath"></i>
-                                                            <span class="text-variant-1">Baths:</span>
-                                                            <span class="fw-6">2</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-sqft"></i>
-                                                            <span class="text-variant-1">Sqft:</span>
-                                                            <span class="fw-6">1150</span>
-                                                        </li>
-                                                    </ul>
-                                                    <div class="location">
-                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                        </svg>
-                                                        <span class="text-line-clamp-1"> 145 Brooklyn Ave, Califonia, New York </span>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="content-bottom">
-                                                    <div class="d-flex gap-8 align-items-center">
-                                                        <div class="avatar avt-40 round">
-                                                            <img src="../assets/images/avatar/avt-png3.png" alt="avt">
-                                                        </div>
-                                                        <span>Arlene McCoy</span>
-                                                    </div>
-                                                    <h6 class="price">$7250,00</h6>
-                                                </div>
-                                            </div>
-                                            
                                         </div>
                                     </div>
                                     <div class="col-md-12">
                                         <div class="homelengo-box list-style-1 list-style-2 line">
                                             <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
+                                                <a href="../public/property-details-v1.html" class="images-group">
                                                     <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-sm-12.jpg" src="../assets/images/home/house-sm-12.jpg" alt="img-property">
+                                                        <img class="lazyload" data-src="../assets/images/home/bedroom11.jpeg" src="../assets/images/home/Bedroom11.jpeg" alt="img">
                                                     </div>
                                                     <div class="top">
                                                         <ul class="d-flex gap-6 flex-wrap">
                                                             <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
+                                                            <li class="flag-tag style-1">For Rent</li>
                                                         </ul>
+                                                        
+                                                    </div>
+                                                    <div class="bottom">
+                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                                        </svg>
+                                                        Duport Road, Paynesville   
                                                     </div>
                                                 </a>
+                                                
                                             </div>
                                             <div class="archive-bottom">
                                                 <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link text-line-clamp-1"> Casa Lomas de Machalí Machas</a></h6>
-                                                    <ul class="meta-list">
-                                                        <li class="item">
-                                                            <i class="icon icon-bed"></i>
-                                                            <span class="text-variant-1">Beds:</span>
-                                                            <span class="fw-6">3</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-bath"></i>
-                                                            <span class="text-variant-1">Baths:</span>
-                                                            <span class="fw-6">2</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-sqft"></i>
-                                                            <span class="text-variant-1">Sqft:</span>
-                                                            <span class="fw-6">1150</span>
-                                                        </li>
-                                                    </ul>
-                                                    <div class="location">
-                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                        </svg>
-                                                        <span class="text-line-clamp-1"> 145 Brooklyn Ave, Califonia, New York </span>
-                                                    </div>
-
+                                                    <h6 class="text-capitalize"><a href="../public/property-details-v1.html" class="link"> House</a></h6>
+                                                        <ul class="meta-list">
+                                                            <li class="item">
+                                                                <i class="icon icon-bed"></i>
+                                                                <span class="text-variant-1">Beds:</span>
+                                                                <span class="fw-6">2</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-bath"></i>
+                                                                <span class="text-variant-1">Baths:</span>
+                                                                <span class="fw-6">2</span>
+                                                            </li>
+                                                            <li class="item">
+                                                                <i class="icon icon-sqft"></i>
+                                                                <span class="text-variant-1">Sqft:</span>
+                                                                <span class="fw-6">1150</span>
+                                                            </li>
+                                                        </ul>
+                                                    
                                                 </div>
                                                 
                                                 <div class="content-bottom">
                                                     <div class="d-flex gap-8 align-items-center">
                                                         <div class="avatar avt-40 round">
-                                                            <img src="../assets/images/avatar/avt-png3.png" alt="avt">
+                                                            <img src="../assets/images/avatar/avt-png5.png" alt="avt">
                                                         </div>
-                                                        <span>Arlene McCoy</span>
+                                                        <span>Maka Armah</span>
                                                     </div>
-                                                    <h6 class="price">$7250,00</h6>
+                                                    <h6 class="price">$3600,00</h6>
                                                 </div>
                                             </div>
-                                            
-                                        </div>
-                                    </div>
-                                    <div class="col-md-12">
-                                        <div class="homelengo-box list-style-1 list-style-2 line">
-                                            <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
-                                                    <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-sm-13.jpg" src="../assets/images/home/house-sm-13.jpg" alt="img-property">
-                                                    </div>
-                                                    <div class="top">
-                                                        <ul class="d-flex gap-6 flex-wrap">
-                                                            <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
-                                                        </ul>
-                                                    </div>
-                                                </a>
-                                            </div>
-                                            <div class="archive-bottom">
-                                                <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link text-line-clamp-1"> Casa Lomas de Machalí Machas</a></h6>
-                                                    <ul class="meta-list">
-                                                        <li class="item">
-                                                            <i class="icon icon-bed"></i>
-                                                            <span class="text-variant-1">Beds:</span>
-                                                            <span class="fw-6">3</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-bath"></i>
-                                                            <span class="text-variant-1">Baths:</span>
-                                                            <span class="fw-6">2</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-sqft"></i>
-                                                            <span class="text-variant-1">Sqft:</span>
-                                                            <span class="fw-6">1150</span>
-                                                        </li>
-                                                    </ul>
-                                                    <div class="location">
-                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                        </svg>
-                                                        <span class="text-line-clamp-1"> 145 Brooklyn Ave, Califonia, New York </span>
-                                                    </div>
-
-                                                </div>
-                                                
-                                                <div class="content-bottom">
-                                                    <div class="d-flex gap-8 align-items-center">
-                                                        <div class="avatar avt-40 round">
-                                                            <img src="../assets/images/avatar/avt-png3.png" alt="avt">
-                                                        </div>
-                                                        <span>Arlene McCoy</span>
-                                                    </div>
-                                                    <h6 class="price">$7250,00</h6>
-                                                </div>
-                                            </div>
-                                            
-                                        </div>
-                                    </div>
-                                    <div class="col-md-12">
-                                        <div class="homelengo-box list-style-1 list-style-2 line">
-                                            <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
-                                                    <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-sm-14.jpg" src="../assets/images/home/house-sm-14.jpg" alt="img-property">
-                                                    </div>
-                                                    <div class="top">
-                                                        <ul class="d-flex gap-6 flex-wrap">
-                                                            <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
-                                                        </ul>
-                                                    </div>
-                                                </a>
-                                            </div>
-                                            <div class="archive-bottom">
-                                                <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link text-line-clamp-1"> Casa Lomas de Machalí Machas</a></h6>
-                                                    <ul class="meta-list">
-                                                        <li class="item">
-                                                            <i class="icon icon-bed"></i>
-                                                            <span class="text-variant-1">Beds:</span>
-                                                            <span class="fw-6">3</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-bath"></i>
-                                                            <span class="text-variant-1">Baths:</span>
-                                                            <span class="fw-6">2</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-sqft"></i>
-                                                            <span class="text-variant-1">Sqft:</span>
-                                                            <span class="fw-6">1150</span>
-                                                        </li>
-                                                    </ul>
-                                                    <div class="location">
-                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                        </svg>
-                                                        <span class="text-line-clamp-1"> 145 Brooklyn Ave, Califonia, New York </span>
-                                                    </div>
-
-                                                </div>
-                                                
-                                                <div class="content-bottom">
-                                                    <div class="d-flex gap-8 align-items-center">
-                                                        <div class="avatar avt-40 round">
-                                                            <img src="../assets/images/avatar/avt-png3.png" alt="avt">
-                                                        </div>
-                                                        <span>Arlene McCoy</span>
-                                                    </div>
-                                                    <h6 class="price">$7250,00</h6>
-                                                </div>
-                                            </div>
-                                            
-                                        </div>
-                                    </div>
-                                    <div class="col-md-12">
-                                        <div class="homelengo-box list-style-1 list-style-2 line">
-                                            <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
-                                                    <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-sm-15.jpg" src="../assets/images/home/house-sm-15.jpg" alt="img-property">
-                                                    </div>
-                                                    <div class="top">
-                                                        <ul class="d-flex gap-6 flex-wrap">
-                                                            <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
-                                                        </ul>
-                                                    </div>
-                                                </a>
-                                            </div>
-                                            <div class="archive-bottom">
-                                                <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link text-line-clamp-1"> Casa Lomas de Machalí Machas</a></h6>
-                                                    <ul class="meta-list">
-                                                        <li class="item">
-                                                            <i class="icon icon-bed"></i>
-                                                            <span class="text-variant-1">Beds:</span>
-                                                            <span class="fw-6">3</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-bath"></i>
-                                                            <span class="text-variant-1">Baths:</span>
-                                                            <span class="fw-6">2</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-sqft"></i>
-                                                            <span class="text-variant-1">Sqft:</span>
-                                                            <span class="fw-6">1150</span>
-                                                        </li>
-                                                    </ul>
-                                                    <div class="location">
-                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                        </svg>
-                                                        <span class="text-line-clamp-1"> 145 Brooklyn Ave, Califonia, New York </span>
-                                                    </div>
-
-                                                </div>
-                                                
-                                                <div class="content-bottom">
-                                                    <div class="d-flex gap-8 align-items-center">
-                                                        <div class="avatar avt-40 round">
-                                                            <img src="../assets/images/avatar/avt-png3.png" alt="avt">
-                                                        </div>
-                                                        <span>Arlene McCoy</span>
-                                                    </div>
-                                                    <h6 class="price">$7250,00</h6>
-                                                </div>
-                                            </div>
-                                            
-                                        </div>
-                                    </div>
-                                    <div class="col-md-12">
-                                        <div class="homelengo-box list-style-1 list-style-2 line">
-                                            <div class="archive-top">
-                                                <a href="./property-details-v1.html" class="images-group">
-                                                    <div class="images-style">
-                                                        <img class="lazyload" data-src="../assets/images/home/house-sm-16.jpg" src="../assets/images/home/house-sm-16.jpg" alt="img-property">
-                                                    </div>
-                                                    <div class="top">
-                                                        <ul class="d-flex gap-6 flex-wrap">
-                                                            <li class="flag-tag primary">Featured</li>
-                                                            <li class="flag-tag style-1">For Sale</li>
-                                                        </ul>
-                                                    </div>
-                                                </a>
-                                            </div>
-                                            <div class="archive-bottom">
-                                                <div class="content-top">
-                                                    <h6 class="text-capitalize"><a href="./property-details-v1.html" class="link text-line-clamp-1"> Casa Lomas de Machalí Machas</a></h6>
-                                                    <ul class="meta-list">
-                                                        <li class="item">
-                                                            <i class="icon icon-bed"></i>
-                                                            <span class="text-variant-1">Beds:</span>
-                                                            <span class="fw-6">3</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-bath"></i>
-                                                            <span class="text-variant-1">Baths:</span>
-                                                            <span class="fw-6">2</span>
-                                                        </li>
-                                                        <li class="item">
-                                                            <i class="icon icon-sqft"></i>
-                                                            <span class="text-variant-1">Sqft:</span>
-                                                            <span class="fw-6">1150</span>
-                                                        </li>
-                                                    </ul>
-                                                    <div class="location">
-                                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                            <path d="M10 7C10 7.53043 9.78929 8.03914 9.41421 8.41421C9.03914 8.78929 8.53043 9 8 9C7.46957 9 6.96086 8.78929 6.58579 8.41421C6.21071 8.03914 6 7.53043 6 7C6 6.46957 6.21071 5.96086 6.58579 5.58579C6.96086 5.21071 7.46957 5 8 5C8.53043 5 9.03914 5.21071 9.41421 5.58579C9.78929 5.96086 10 6.46957 10 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                            <path d="M13 7C13 11.7613 8 14.5 8 14.5C8 14.5 3 11.7613 3 7C3 5.67392 3.52678 4.40215 4.46447 3.46447C5.40215 2.52678 6.67392 2 8 2C9.32608 2 10.5979 2.52678 11.5355 3.46447C12.4732 4.40215 13 5.67392 13 7Z" stroke="#A3ABB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                                        </svg>
-                                                        <span class="text-line-clamp-1"> 145 Brooklyn Ave, Califonia, New York </span>
-                                                    </div>
-
-                                                </div>
-                                                
-                                                <div class="content-bottom">
-                                                    <div class="d-flex gap-8 align-items-center">
-                                                        <div class="avatar avt-40 round">
-                                                            <img src="../assets/images/avatar/avt-png3.png" alt="avt">
-                                                        </div>
-                                                        <span>Arlene McCoy</span>
-                                                    </div>
-                                                    <h6 class="price">$7250,00</h6>
-                                                </div>
-                                            </div>
-                                            
                                         </div>
                                     </div>
                                 </div>
@@ -1171,8 +1224,11 @@
                         </div>
                     </div>
                 </div>
-                <div class="wrap-map">
-                    <div id="map" class="top-map" data-map-zoom="16" data-map-scroll="true"></div>
+                <div class="flat-map text-center">
+                    <h3 class="title mt-4">📍 Our Location in Liberia</h3>
+                    <div class="wrap-map">
+                        <div id="map" class="top-map" data-map-zoom="16" data-map-scroll="true"></div>
+                    </div>
                 </div>
             </section>
         </div>
@@ -1334,11 +1390,31 @@
     <script type="text/javascript" src="../assets/js/rangle-slider.js"></script>
     <script type="text/javascript" src="../assets/js/shortcodes.js"></script>
     <script type="text/javascript" src="../assets/js/main.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAuSiPhoDaOJ7aqtJVtQhYhLzwwJ7rQlmA"></script>
     <script src="../assets/js/map.js"></script>
     <script src="../assets/js/marker.js"></script>
     <script src="../assets/js/infobox.min.js"></script>
-  
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // Get zoom level from data attribute (default to 16 if not set)
+    var zoomLevel = document.getElementById("map").getAttribute("data-map-zoom") || 16;
+
+    // Initialize Leaflet map centered in Monrovia, Liberia
+    var map = L.map('map', {
+        scrollWheelZoom: true, // Enables scrolling
+    }).setView([6.2907, -10.7605], zoomLevel); // Monrovia Coordinates
+
+    // Add Tile Layer (Professional Styled Map)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+
+    // Add Custom Marker (Your Business Location or Any Key Spot)
+    var marker = L.marker([6.2907, -10.7605]).addTo(map)
+        .bindPopup("<b>📍 Our Office in Monrovia, Liberia</b><br>Come visit us!")
+        .openPopup();
+</script>
 </body>
 
 </html>
