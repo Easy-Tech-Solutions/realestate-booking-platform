@@ -8,4 +8,4 @@ db.sqlite3
 **/migrations/
 *.pyc
 # Ignore __pycache__ directories
-__pycache__/    
+python-backend/users/__pycache__/    
