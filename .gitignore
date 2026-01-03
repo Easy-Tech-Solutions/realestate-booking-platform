@@ -1,11 +1,8 @@
-python-backend/.venv/
+*.venv/
 # Ignore environment variable files
 .env    
 .env.local
-# Ignore database files 
-db.sqlite3
 # Ignore Django migration files
 **/migrations/
 *.pyc
 # Ignore __pycache__ directories
-python-backend/users/__pycache__/    
