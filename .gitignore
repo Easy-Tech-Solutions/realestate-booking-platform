@@ -1,8 +1,0 @@
-*.venv/
-# Ignore environment variable files
-.env    
-.env.local
-# Ignore Django migration files
-**/migrations/
-*.pyc
-# Ignore __pycache__ directories
