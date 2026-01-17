@@ -42,3 +42,28 @@ The service layer uses a shared REST shape (see `src/services/endpoints.js`). Im
 
 Configure the API origin via `VITE_API_BASE_URL`.
 
+<<<<<<< HEAD
+=======
+### Use Django backend
+
+1. Copy env and set API base URL:
+
+	```bash
+	cd react-frontend
+	cp .env.example .env
+	# ensure .env contains: VITE_API_BASE_URL=http://localhost:8000
+	```
+
+2. Start the React dev server:
+
+	```bash
+	npm run dev
+	```
+
+3. Backend endpoints expected:
+	- `/api/auth/login`, `/api/auth/register`, `/api/auth/me`
+	- `/api/listings`, `/api/listings/:id`, `/api/listings/:id/favorite`
+	- `/api/bookings`, `/api/bookings/:id`
+	- `/api/users`, `/api/users/:id`
+
+>>>>>>> main

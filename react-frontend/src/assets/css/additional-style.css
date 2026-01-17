@@ -1,2 +1,6 @@
 /* Additional legacy overrides (if any) */
+<<<<<<< HEAD
 @import url("../../../../frontend/assets/css/additional-style.css");
+=======
+@import "@legacyCss/additional-style.css";
+>>>>>>> main
