@@ -48,7 +48,8 @@
         "ignore": [
           "-webkit-overflow-scrolling",
           "text-wrap",
-          "text-wrap: nowrap"
+          "text-wrap: nowrap",
+          "user-select"
         ]
       }
     ]
@@ -57,6 +58,8 @@
     "defaults",
     "not ie 11",
     "not ios_saf <= 17.4",
-    "not safari <= 17.4"
+    "not safari <= 17.4",
+    "not ios_saf <= 26",
+    "not safari <= 26"
   ]
 }
