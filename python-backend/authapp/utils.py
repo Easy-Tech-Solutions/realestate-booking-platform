@@ -9,8 +9,16 @@ def send_verification_email(user):
     user.email_verification_token = token
     user.save()
 
+    # For testing: print token to console instead of sending email
+    print(f"\n=== EMAIL VERIFICATION TOKEN FOR {user.username} ===")
+    print(f"Token: {token}")
+    print(f"Use this token in Postman at: POST /api/auth/verify-email/")
+    print("=" * 50)
+
+    # Uncomment below for production email sending
+    """
     subject = "Verify your Email Address"
-    verification_url = f"http://{settings.LOCAL_DOMAIN}/api/auth/verify-email/{token}/"
+    verification_url = f"http://{settings.LOCAL_DOMAIN}/api/auth/verify-email/?token={token}"
 
     html_message = render_to_string("auth/verification_email.html", {
         "user": user,
@@ -27,3 +35,4 @@ def send_verification_email(user):
         [user.email],
         html_message=html_message,
     )
+    """

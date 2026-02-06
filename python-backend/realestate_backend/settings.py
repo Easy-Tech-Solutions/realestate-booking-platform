@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
     #"django_ratelimit",
     # Local apps
     "authapp",
@@ -92,8 +93,6 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "static"
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
 # Cache configuration for django-ratelimit
 CACHES = {
     'default': {
@@ -112,6 +111,9 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_FILTER_BACKENDS": (
+        "django_filters.rest_framework.DjangoFilterBackend",
+    )
 }
 
 CORS_ALLOWED_ORIGINS = [
@@ -162,7 +164,7 @@ SITE_NAME = os.environ.get("SITE_NAME", "Real Estate Booking Platform")
 #Allauth Settings
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
-    "allauth.account.auth_backends.AuthenticationBackend",
+    # "allauth.account.auth_backends.AuthenticationBackend",  # Commented out since allauth is not installed
 ]
 
 #2FA Settings
@@ -173,3 +175,8 @@ TWO_FACTOR_REMEMBER_COOKIE_AGE = 60 * 60 * 24 * 30  #30 days
 #Allauth 2FA Settings
 ACCOUNT_ADAPTER = "allauth_2fa.adapter.OTPAdapter"
 AUTH_USER_MODEL = "users.User"
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+os.makedirs(MEDIA_ROOT, exist_ok=True)
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

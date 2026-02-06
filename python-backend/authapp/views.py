@@ -2,7 +2,6 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
@@ -20,10 +19,17 @@ def register(request):
     username = request.data.get("username")
     email = request.data.get("email")
     password = request.data.get("password")
+    password2 = request.data.get("password2")
+    first_name = request.data.get("first_name")
+    last_name = request.data.get("last_name")
 
     # Input validation
-    if not all([username, password, email]):
-        return Response({"error": "username, email, and password required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not all([username, password, email, password2]):
+        return Response({"error": "username, email, password, and password2 required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Password confirmation check
+    if password != password2:
+        return Response({"error": "Passwords do not match"}, status=status.HTTP_400_BAD_REQUEST)
     
     # Email validation
     try:
@@ -52,10 +58,14 @@ def register(request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(["GET"])
+@api_view(["POST"])
 @permission_classes([AllowAny])
 #Handles email verification
-def verify_email(request, token):
+def verify_email(request):
+    token = request.data.get("token")
+    if not token:
+        return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
     try:
         user = User.objects.get(email_verification_token=token)
         user.email_verified = True
