@@ -4,10 +4,10 @@ from .models import Booking
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ['listing', 'customer', 'start_date', 'end_date', 'status', 'created_at']
-    list_filter = ['status', 'created_at', 'start_date', 'listing', 'customer']
+    list_display = ['listing', 'customer', 'start_date', 'end_date', 'status', 'requested_at']
+    list_filter = ['status', 'requested_at', 'start_date', 'listing', 'customer']
     search_fields = ['listing__title', 'customer__username', 'notes']
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['requested_at', 'confirmed_at']
     
     fieldsets = (
         ('Booking Details', {
@@ -17,7 +17,7 @@ class BookingAdmin(admin.ModelAdmin):
             'fields': ('status', 'notes')
         }),
         ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
+            'fields': ('requested_at', 'confirmed_at'),
             'classes': ('collapse',)
         }),
     )

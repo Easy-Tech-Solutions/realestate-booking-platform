@@ -48,6 +48,7 @@ MIDDLEWARE = [
     # "django.contrib.allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "listings.middleware.ViewTrackingMiddleware",
 ]
 
 ROOT_URLCONF = "realestate_backend.urls"
