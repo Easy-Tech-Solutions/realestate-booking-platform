@@ -6,6 +6,7 @@ import { Property } from '../../core/types';
 import { formatCurrency } from '../../core/utils';
 import { useApp } from '../../core/context';
 import { cn } from '../../core/utils';
+import { ImageWithFallback } from './figma/ImageWithFallback';
 
 interface PropertyCardProps {
   property: Property;
@@ -45,7 +46,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
       >
         {/* Image Carousel */}
         <div className="relative aspect-square rounded-xl overflow-hidden mb-3">
-          <img
+          <ImageWithFallback
             src={property.images[currentImageIndex]}
             alt={property.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

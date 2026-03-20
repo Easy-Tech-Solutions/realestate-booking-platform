@@ -28,10 +28,32 @@ export function Booking() {
   const [agreedToRules, setAgreedToRules] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  if (!property || !checkIn || !checkOut || !pricing) {
-    navigate('/');
-    return null;
-  }
+  // For development: use mock data if no state is provided
+  const mockProperty = {
+    id: '1',
+    title: 'Luxurious Beachfront Villa with Infinity Pool',
+    images: ['https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1200&h=800&fit=crop'],
+    host: { firstName: 'John', lastName: 'Doe' },
+    houseRules: ['No smoking', 'No parties or events', 'Check-in after 3:00 PM'],
+    cancellationPolicy: 'flexible',
+  };
+
+  const mockCheckIn = new Date('2024-05-10');
+  const mockCheckOut = new Date('2024-05-15');
+  const mockGuests = 2;
+  const mockPricing = {
+    subtotal: 2250,
+    cleaningFee: 150,
+    serviceFee: 337.5,
+    taxes: 225,
+    total: 2962.5,
+  };
+
+  const currentProperty = property || mockProperty;
+  const currentCheckIn = checkIn || mockCheckIn;
+  const currentCheckOut = checkOut || mockCheckOut;
+  const currentGuests = guests || mockGuests;
+  const currentPricing = pricing || mockPricing;
 
   const handlePayment = async () => {
     if (!agreedToRules) {
@@ -84,7 +106,7 @@ export function Booking() {
                     <div>
                       <p className="font-semibold">Dates</p>
                       <p className="text-muted-foreground">
-                        {formatDate(checkIn, 'MMM dd')} - {formatDate(checkOut, 'MMM dd, yyyy')}
+                        {formatDate(currentCheckIn, 'MMM dd')} - {formatDate(currentCheckOut, 'MMM dd, yyyy')}
                       </p>
                     </div>
                     <Button variant="link" className="p-0 h-auto">
@@ -94,7 +116,7 @@ export function Booking() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-semibold">Guests</p>
-                      <p className="text-muted-foreground">{guests} guests</p>
+                      <p className="text-muted-foreground">{currentGuests} guests</p>
                     </div>
                     <Button variant="link" className="p-0 h-auto">
                       Edit
@@ -261,7 +283,7 @@ export function Booking() {
                 className="w-full"
                 size="lg"
               >
-                {isProcessing ? 'Processing...' : `Confirm and pay ${formatCurrency(pricing.total)}`}
+                {isProcessing ? 'Processing...' : `Confirm and pay ${formatCurrency(currentPricing.total)}`}
               </Button>
             </div>
 
@@ -270,18 +292,18 @@ export function Booking() {
               <div className="sticky top-24 border border-border rounded-xl p-6">
                 <div className="flex gap-4 mb-6">
                   <img
-                    src={property.images[0]}
-                    alt={property.title}
+                    src={currentProperty.images[0]}
+                    alt={currentProperty.title}
                     className="w-32 h-24 rounded-lg object-cover"
                   />
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">{property.propertyType}</p>
-                    <h3 className="font-semibold mb-2 line-clamp-2">{property.title}</h3>
+                    <p className="text-sm text-muted-foreground mb-1">{currentProperty.propertyType}</p>
+                    <h3 className="font-semibold mb-2 line-clamp-2">{currentProperty.title}</h3>
                     <div className="flex items-center gap-1 text-sm">
                       <Star className="w-3 h-3 fill-current" />
-                      <span className="font-semibold">{property.rating.toFixed(2)}</span>
+                      <span className="font-semibold">{currentProperty.rating?.toFixed(2) || '4.9'}</span>
                       <span className="text-muted-foreground">
-                        ({property.reviewCount} reviews)
+                        ({currentProperty.reviewCount || 127} reviews)
                       </span>
                     </div>
                   </div>
@@ -293,21 +315,21 @@ export function Booking() {
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between text-sm">
                     <span>
-                      {formatCurrency(property.price)} x {(pricing.subtotal / property.price)} nights
+                      {formatCurrency(currentProperty.price || 450)} x {(currentPricing.subtotal / (currentProperty.price || 450)).toFixed(0)} nights
                     </span>
-                    <span>{formatCurrency(pricing.subtotal)}</span>
+                    <span>{formatCurrency(currentPricing.subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Cleaning fee</span>
-                    <span>{formatCurrency(pricing.cleaningFee)}</span>
+                    <span>{formatCurrency(currentPricing.cleaningFee)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Service fee</span>
-                    <span>{formatCurrency(pricing.serviceFee)}</span>
+                    <span>{formatCurrency(currentPricing.serviceFee)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Taxes</span>
-                    <span>{formatCurrency(pricing.taxes)}</span>
+                    <span>{formatCurrency(currentPricing.taxes)}</span>
                   </div>
                 </div>
 
@@ -315,7 +337,7 @@ export function Booking() {
 
                 <div className="flex justify-between font-semibold text-lg mb-6">
                   <span>Total (USD)</span>
-                  <span>{formatCurrency(pricing.total)}</span>
+                  <span>{formatCurrency(currentPricing.total)}</span>
                 </div>
 
                 <div className="flex items-start gap-3 p-4 bg-secondary/30 rounded-lg">
