@@ -34,6 +34,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .catch(() => authAPI.logout())
         .finally(() => setIsLoading(false));
     } else {
+      // For development: set a default mock user
+      setUser({
+        id: '1',
+        email: 'user@example.com',
+        firstName: 'John',
+        lastName: 'Doe',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop',
+        isHost: true,
+        isAdmin: false,
+        verified: true,
+        createdAt: new Date().toISOString(),
+      });
       setIsLoading(false);
     }
 
