@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
 import {
   Star,
   Share,
@@ -14,6 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Minus,
+  Plus,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
@@ -60,6 +64,14 @@ export function PropertyDetails() {
   const isWishlisted = wishlistIds.includes(property.id);
   const nights = dateRange?.from && dateRange?.to ? calculateNights(dateRange.from, dateRange.to) : 0;
   const pricing = nights > 0 ? calculateTotalPrice(property.price, nights, 50) : null;
+
+  // Build set of booked dates for the calendar
+  const bookedDateSet = new Set(property.bookedDates ?? []);
+  const isDateBlocked = (date: Date) => {
+    if (date < new Date()) return true;
+    const iso = date.toISOString().split('T')[0];
+    return bookedDateSet.has(iso);
+  };
 
   const handleReserve = () => {
     if (!isAuthenticated) {
@@ -123,13 +135,10 @@ export function PropertyDetails() {
           </div>
 
           {/* Image Gallery */}
-          <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[400px] rounded-xl overflow-hidden mb-8 cursor-pointer">
+          <div className="relative grid grid-cols-4 grid-rows-2 gap-2 h-[400px] rounded-xl overflow-hidden mb-8 cursor-pointer">
             <div
               className="col-span-2 row-span-2 relative group"
-              onClick={() => {
-                setSelectedImageIndex(0);
-                setShowImageGallery(true);
-              }}
+              onClick={() => { setSelectedImageIndex(0); setShowImageGallery(true); }}
             >
               <img
                 src={property.images[0]}
@@ -141,10 +150,7 @@ export function PropertyDetails() {
               <div
                 key={index}
                 className="relative group"
-                onClick={() => {
-                  setSelectedImageIndex(index + 1);
-                  setShowImageGallery(true);
-                }}
+                onClick={() => { setSelectedImageIndex(index + 1); setShowImageGallery(true); }}
               >
                 <img
                   src={image}
@@ -153,9 +159,7 @@ export function PropertyDetails() {
                 />
                 {index === 3 && property.images.length > 5 && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <span className="text-white font-semibold">
-                      +{property.images.length - 5} photos
-                    </span>
+                    <span className="text-white font-semibold">+{property.images.length - 5} photos</span>
                   </div>
                 )}
               </div>
@@ -163,7 +167,7 @@ export function PropertyDetails() {
             <Button
               variant="outline"
               size="sm"
-              className="absolute bottom-4 right-4 bg-white"
+              className="absolute bottom-4 right-4 bg-white z-10"
               onClick={() => setShowImageGallery(true)}
             >
               Show all photos
@@ -279,7 +283,7 @@ export function PropertyDetails() {
                     selected={dateRange}
                     onSelect={setDateRange}
                     numberOfMonths={2}
-                    disabled={(date) => date < new Date()}
+                    disabled={isDateBlocked}
                     className="border rounded-xl p-4"
                   />
                 </div>
@@ -362,8 +366,21 @@ export function PropertyDetails() {
                 <p className="text-muted-foreground mb-4">
                   {property.location.city}, {property.location.state}, {property.location.country}
                 </p>
-                <div className="h-[400px] bg-muted rounded-xl flex items-center justify-center">
-                  <p className="text-muted-foreground">Map would be displayed here</p>
+                <div className="h-[400px] rounded-xl overflow-hidden">
+                  <MapContainer
+                    center={L.latLng(property.location.lat, property.location.lng)}
+                    zoom={13}
+                    style={{ height: '100%', width: '100%' }}
+                    scrollWheelZoom={false}
+                  >
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    />
+                    <Marker position={L.latLng(property.location.lat, property.location.lng)}>
+                      <Popup>{property.title}</Popup>
+                    </Marker>
+                  </MapContainer>
                 </div>
               </div>
 
@@ -429,7 +446,27 @@ export function PropertyDetails() {
 
                     <div className="border border-border rounded-xl p-3">
                       <label className="text-xs font-semibold block mb-1">GUESTS</label>
-                      <p className="text-sm">{guests} guests</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">{guests} guest{guests > 1 ? 's' : ''}</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            aria-label="Decrease guests"
+                            onClick={() => setGuests(g => Math.max(1, g - 1))}
+                            className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
+                            disabled={guests <= 1}
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <button
+                            aria-label="Increase guests"
+                            onClick={() => setGuests(g => Math.min(property.guests, g + 1))}
+                            className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
+                            disabled={guests >= property.guests}
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -479,6 +516,18 @@ export function PropertyDetails() {
         </div>
       </div>
 
+      {/* Mobile sticky CTA */}
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-white border-t border-border px-4 py-3 flex items-center justify-between shadow-lg">
+        <div>
+          <span className="text-lg font-semibold">{formatCurrency(property.price)}</span>
+          <span className="text-muted-foreground text-sm"> / night</span>
+          {nights > 0 && (
+            <p className="text-xs text-muted-foreground">{nights} nights · {formatCurrency(pricing!.total)} total</p>
+          )}
+        </div>
+        <Button onClick={handleReserve} size="lg">Reserve</Button>
+      </div>
+
       {/* Image Gallery Modal */}
       <AnimatePresence>
         {showImageGallery && (
@@ -491,6 +540,7 @@ export function PropertyDetails() {
             <div className="h-full flex flex-col">
               <div className="flex items-center justify-between p-6">
                 <button
+                  aria-label="Close gallery"
                   onClick={() => setShowImageGallery(false)}
                   className="p-2 rounded-full hover:bg-white/10 transition-colors"
                 >
@@ -503,6 +553,7 @@ export function PropertyDetails() {
 
               <div className="flex-1 flex items-center justify-center relative">
                 <button
+                  aria-label="Previous image"
                   onClick={() =>
                     setSelectedImageIndex((prev) =>
                       prev === 0 ? property.images.length - 1 : prev - 1
@@ -520,6 +571,7 @@ export function PropertyDetails() {
                 />
 
                 <button
+                  aria-label="Next image"
                   onClick={() =>
                     setSelectedImageIndex((prev) =>
                       prev === property.images.length - 1 ? 0 : prev + 1

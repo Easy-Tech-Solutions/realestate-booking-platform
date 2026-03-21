@@ -1,5 +1,6 @@
 import React from 'react';
 import { Globe } from 'lucide-react';
+import { Link } from 'react-router';
 import { Separator } from './ui/separator';
 
 export function Footer() {
@@ -10,10 +11,10 @@ export function Footer() {
           <div>
             <h3 className="font-semibold mb-4">Support</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><a href="#" className="hover:text-foreground">Help Center</a></li>
-              <li><a href="#" className="hover:text-foreground">Safety information</a></li>
-              <li><a href="#" className="hover:text-foreground">Cancellation options</a></li>
-              <li><a href="#" className="hover:text-foreground">Our COVID-19 Response</a></li>
+              <li><Link to="/help" className="hover:text-foreground">Help Center</Link></li>
+              <li><Link to="/help" className="hover:text-foreground">Safety information</Link></li>
+              <li><Link to="/help" className="hover:text-foreground">Cancellation options</Link></li>
+              <li><Link to="/help" className="hover:text-foreground">Our COVID-19 Response</Link></li>
             </ul>
           </div>
           <div>
@@ -27,10 +28,10 @@ export function Footer() {
           <div>
             <h3 className="font-semibold mb-4">Hosting</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><a href="#" className="hover:text-foreground">Try hosting</a></li>
-              <li><a href="#" className="hover:text-foreground">Explore hosting resources</a></li>
+              <li><Link to="/host/new" className="hover:text-foreground">Try hosting</Link></li>
+              <li><Link to="/help" className="hover:text-foreground">Explore hosting resources</Link></li>
               <li><a href="#" className="hover:text-foreground">Visit our community forum</a></li>
-              <li><a href="#" className="hover:text-foreground">How to host responsibly</a></li>
+              <li><Link to="/help" className="hover:text-foreground">How to host responsibly</Link></li>
             </ul>
           </div>
           <div>
@@ -50,9 +51,9 @@ export function Footer() {
           <div className="flex items-center gap-4">
             <p>© 2026 staybnb, Inc.</p>
             <span>·</span>
-            <a href="#" className="hover:text-foreground">Privacy</a>
+            <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
             <span>·</span>
-            <a href="#" className="hover:text-foreground">Terms</a>
+            <Link to="/terms" className="hover:text-foreground">Terms</Link>
             <span>·</span>
             <a href="#" className="hover:text-foreground">Sitemap</a>
           </div>

@@ -10,10 +10,12 @@ import { Textarea } from '../components/ui/textarea';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import { PaymentMethod } from '../../core/types';
+import { useApp } from '../../core/context';
 
 export function Booking() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { addBooking } = useApp();
   const { property, checkIn, checkOut, guests, pricing } = location.state || {};
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
@@ -73,10 +75,34 @@ export function Booking() {
 
     setIsProcessing(true);
 
-    // Simulate payment processing
     setTimeout(() => {
-      toast.success('Booking confirmed! Check your email for details.');
-      navigate('/trips');
+      const booking = {
+        id: `BK${Date.now()}`,
+        propertyId: currentProperty.id,
+        property: currentProperty,
+        userId: '1',
+        user: { id: '1', email: 'user@example.com', firstName: 'John', lastName: 'Doe', isHost: true, verified: true, createdAt: new Date().toISOString() },
+        checkIn: currentCheckIn instanceof Date ? currentCheckIn.toISOString() : currentCheckIn,
+        checkOut: currentCheckOut instanceof Date ? currentCheckOut.toISOString() : currentCheckOut,
+        guests: currentGuests,
+        adults: currentGuests,
+        children: 0,
+        infants: 0,
+        pets: 0,
+        totalPrice: currentPricing.total,
+        basePrice: currentPricing.subtotal,
+        cleaningFee: currentPricing.cleaningFee,
+        serviceFee: currentPricing.serviceFee,
+        taxes: currentPricing.taxes,
+        status: 'confirmed' as const,
+        paymentStatus: 'paid' as const,
+        paymentMethod,
+        specialRequests,
+        createdAt: new Date().toISOString(),
+      };
+      addBooking(booking);
+      toast.success('Booking confirmed!');
+      navigate('/booking/confirmed', { state: { booking } });
     }, 2000);
   };
 

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { User, SearchFilters, Property } from './types';
+import type { User, SearchFilters, Property, Booking } from './types';
 import { authAPI } from '../services/api.service';
 
 interface AppContextType {
@@ -15,6 +15,9 @@ interface AppContextType {
   wishlistIds: string[];
   toggleWishlist: (propertyId: string) => void;
   isLoading: boolean;
+  bookings: Booking[];
+  addBooking: (booking: Booking) => void;
+  cancelBooking: (bookingId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -24,6 +27,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [bookings, setBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
     // Check for existing session
@@ -81,10 +85,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newWishlist = prev.includes(propertyId)
         ? prev.filter((id) => id !== propertyId)
         : [...prev, propertyId];
-      
       localStorage.setItem('wishlist', JSON.stringify(newWishlist));
       return newWishlist;
     });
+  };
+
+  const addBooking = (booking: Booking) => {
+    setBookings(prev => [booking, ...prev]);
+  };
+
+  const cancelBooking = (bookingId: string) => {
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' as const } : b));
   };
 
   return (
@@ -102,6 +113,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         wishlistIds,
         toggleWishlist,
         isLoading,
+        bookings,
+        addBooking,
+        cancelBooking,
       }}
     >
       {children}

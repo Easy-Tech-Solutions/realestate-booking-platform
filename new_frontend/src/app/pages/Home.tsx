@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import { PropertyCard } from '../components/PropertyCard';
 import { PROPERTY_CATEGORIES } from '../../core/constants';
 import { mockProperties } from '../../services/mock-data';
 import { cn } from '../../core/utils';
 
 export function Home() {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [properties, setProperties] = useState(mockProperties);
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -117,18 +119,52 @@ export function Home() {
         )}
       </div>
 
+      {/* Host CTA Banner */}
+      {!selectedCategory && (
+        <div className="bg-gradient-to-r from-primary to-primary/80 text-white">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-16 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div>
+              <h2 className="text-3xl font-semibold mb-3">Become a host</h2>
+              <p className="text-white/80 text-lg max-w-md">
+                Earn extra income and unlock new opportunities by sharing your space.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/host/new')}
+              className="flex-shrink-0 px-8 py-4 bg-white text-primary font-semibold rounded-xl hover:bg-white/90 transition-colors"
+            >
+              Try hosting
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Inspiration Section */}
       {!selectedCategory && (
         <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-16 border-t border-border">
           <h2 className="text-2xl font-semibold mb-6">Inspiration for future getaways</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {['Popular', 'Arts & culture', 'Outdoors', 'Mountains'].map((category) => (
-              <div key={category} className="space-y-2">
-                <h3 className="font-semibold">{category}</h3>
+            {[
+              { label: 'Popular', ids: ['1', '5', '12', '8'] },
+              { label: 'Arts & culture', ids: ['3', '13', '7', '11'] },
+              { label: 'Outdoors', ids: ['2', '14', '16', '20'] },
+              { label: 'Mountains', ids: ['2', '6', '18', '19'] },
+            ].map(({ label, ids }) => (
+              <div key={label} className="space-y-2">
+                <h3 className="font-semibold">{label}</h3>
                 <div className="space-y-1 text-sm text-muted-foreground">
-                  <p>Destination 1</p>
-                  <p>Destination 2</p>
-                  <p>Destination 3</p>
+                  {ids.map(id => {
+                    const p = mockProperties.find(mp => mp.id === id);
+                    return p ? (
+                      <button
+                        key={id}
+                        onClick={() => navigate(`/rooms/${id}`)}
+                        className="block hover:text-foreground hover:underline text-left"
+                      >
+                        {p.location.city}, {p.location.state}
+                      </button>
+                    ) : null;
+                  })}
                 </div>
               </div>
             ))}

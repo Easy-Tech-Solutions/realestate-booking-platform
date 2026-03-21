@@ -156,6 +156,7 @@ const menuItems = [
   { id: 'users', label: 'User Management', icon: Users },
   { id: 'properties', label: 'Property Management', icon: Building2 },
   { id: 'bookings', label: 'Bookings', icon: Calendar },
+  { id: 'messages', label: 'Messages & Communication', icon: MessageSquare },
   { id: 'reviews', label: 'Reviews', icon: MessageSquare },
   { id: 'payments', label: 'Payments', icon: CreditCard },
   { id: 'security', label: 'Security', icon: Shield },
@@ -558,6 +559,135 @@ export function AdminDashboard() {
     </div>
   );
 
+  const renderMessages = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold">Messages & Communication</h2>
+        <div className="flex items-center gap-4">
+          <Button>
+            <Mail className="w-4 h-4 mr-2" />
+            Send Email Campaign
+          </Button>
+          <Button variant="outline">
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Broadcast Message
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Email Campaigns</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <p className="font-medium">Welcome Email</p>
+                <p className="text-sm text-muted-foreground">Sent to new users</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="default">Active</Badge>
+                <Button variant="outline" size="sm">Edit</Button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <p className="font-medium">Booking Confirmation</p>
+                <p className="text-sm text-muted-foreground">Sent after booking</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="default">Active</Badge>
+                <Button variant="outline" size="sm">Edit</Button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <p className="font-medium">Monthly Newsletter</p>
+                <p className="text-sm text-muted-foreground">Marketing updates</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">Draft</Badge>
+                <Button variant="outline" size="sm">Edit</Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Message Templates</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <p className="font-medium">Booking Inquiry Response</p>
+                <p className="text-sm text-muted-foreground">Auto-response template</p>
+              </div>
+              <Button variant="outline" size="sm">Edit</Button>
+            </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <p className="font-medium">Cancellation Policy</p>
+                <p className="text-sm text-muted-foreground">Policy reminder</p>
+              </div>
+              <Button variant="outline" size="sm">Edit</Button>
+            </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <p className="font-medium">Check-in Instructions</p>
+                <p className="text-sm text-muted-foreground">Pre-arrival message</p>
+              </div>
+              <Button variant="outline" size="sm">Edit</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Messages</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarImage src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=40&h=40&fit=crop" />
+                  <AvatarFallback>SS</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">Sarah Smith</p>
+                  <p className="text-sm text-muted-foreground">Question about booking process</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="destructive">New</Badge>
+                <Button variant="outline" size="sm">View</Button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarImage src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop" />
+                  <AvatarFallback>MJ</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">Mike Johnson</p>
+                  <p className="text-sm text-muted-foreground">Property listing issue</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">2h ago</span>
+                <Button variant="outline" size="sm">View</Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   const renderPayments = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -787,6 +917,7 @@ export function AdminDashboard() {
       case 'properties': return renderPropertyManagement();
       case 'bookings': return renderBookings();
       case 'reviews': return renderReviews();
+      case 'messages': return renderMessages();
       case 'payments': return renderPayments();
       case 'security': return renderSecurity();
       case 'settings': return renderSettings();

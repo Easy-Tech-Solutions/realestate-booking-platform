@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle } from 'lucide-react';
+import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard } from 'lucide-react';
 import { Button } from './ui/button';
 import {
   DropdownMenu,
@@ -79,6 +79,15 @@ export function Header() {
                 </Button>
               )}
 
+              {isAuthenticated && (
+                <button
+                  onClick={() => navigate('/notifications')}
+                  className="hidden sm:flex p-2 rounded-full hover:bg-muted relative"
+                >
+                  <Bell className="w-5 h-5" />
+                </button>
+              )}
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-3 px-3 py-2 border border-border rounded-full hover:shadow-md transition-shadow">
@@ -116,6 +125,14 @@ export function Header() {
                       <DropdownMenuItem onClick={() => navigate('/messages')}>
                         <MessageSquare className="w-4 h-4 mr-2" />
                         Messages
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/notifications')}>
+                        <Bell className="w-4 h-4 mr-2" />
+                        Notifications
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        Dashboard
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       {user?.isHost && (

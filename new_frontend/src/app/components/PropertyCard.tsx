@@ -7,6 +7,7 @@ import { formatCurrency } from '../../core/utils';
 import { useApp } from '../../core/context';
 import { cn } from '../../core/utils';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { toast } from 'sonner';
 
 interface PropertyCardProps {
   property: Property;
@@ -33,7 +34,15 @@ export function PropertyCard({ property }: PropertyCardProps) {
 
   const handleWishlistToggle = (e: React.MouseEvent) => {
     e.preventDefault();
+    const adding = !isWishlisted;
     toggleWishlist(property.id);
+    if (adding) {
+      toast.success('Saved to Favorites', {
+        action: { label: 'View wishlist', onClick: () => window.location.href = '/wishlists' },
+      });
+    } else {
+      toast('Removed from Favorites');
+    }
   };
 
   return (
@@ -54,6 +63,8 @@ export function PropertyCard({ property }: PropertyCardProps) {
           
           {/* Wishlist Button */}
           <button
+            type="button"
+            aria-label={isWishlisted ? 'Remove from wishlist' : 'Save to wishlist'}
             onClick={handleWishlistToggle}
             className="absolute top-3 right-3 p-2 rounded-full bg-white/90 hover:bg-white hover:scale-110 transition-all z-10"
           >
