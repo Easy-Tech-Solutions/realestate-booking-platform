@@ -92,7 +92,7 @@ def listing_images(request, listing_id):
         if serializer.is_valid():
             #Auto-set the order if not provided
             if not serializer.validated_data.get('order'):
-                max_order = listing.gallery.images.aggregate(models.Max('order'))['order__max'] or 0
+                max_order = listing.gallery_images.aggregate(models.Max('order'))['order__max'] or 0
                 serializer.validated_data['order'] = max_order + 1
             image = serializer.save(listing=listing)
             return Response(ListingImageCreateSerializer(image).data, status=status.HTTP_201_CREATED)
@@ -190,7 +190,7 @@ def review_detail(request, id):
     if not request.user.is_authenticated:
         return Response({'error':'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
     
-    review = get_object_or_404(pk=id)
+    review = get_object_or_404(Review, pk=id)
 
     if request.method == 'GET':
         serializer = ReviewSerializer(review, context={'request':request})
@@ -201,8 +201,8 @@ def review_detail(request, id):
         return Response({'error':'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
     
     if request.method == 'PUT':
-        serializer = ReviewSerializer(review, data=request.data, partial=True, context={'reuest':request})
-        if serializer.is_valid:
+        serializer = ReviewSerializer(review, data=request.data, partial=True, context={'request':request})
+        if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         
@@ -239,7 +239,7 @@ def listing_stats(request, listing_id):
     unique_views = PropertyView.objects.filter(listing=listing).values('ip_address').distinct().count()
     total_favorites = Favorite.objects.filter(listing=listing).count()
     total_bookings = Booking.objects.filter(listing=listing).count()
-    total_revenue = Booking.objects.filter(listing=listing, status='comfirmed').aggregate(total=Sum('listing__price'))['total'] or 0
+    total_revenue = Booking.objects.filter(listing=listing, status='confirmed').aggregate(total=Sum('listing__price'))['total'] or 0
 
     #Daily stats
     daily_stats = PropertyStats.objects.filter(listing=listing, date__gte=start_date, date__lte = end_date).order_by('date')
@@ -305,7 +305,7 @@ def agent_analytics(request):
     total_views = PropertyView.objects.filter(listing__in=listings).count()
     total_favorites = Favorite.objects.filter(listing__in=listings).count()
     total_bookings = Booking.objects.filter(listing__in=listings).count()
-    total_revenue = Booking.objects.filter(listing__in=listings,status='comfirmed').aggregate(total=Sum('listing__price'))['total'] or 0
+    total_revenue = Booking.objects.filter(listing__in=listings,status='confirmed').aggregate(total=Sum('listing__price'))['total'] or 0
 
     #Per-property stats
     property_stats = []
@@ -313,7 +313,7 @@ def agent_analytics(request):
         views = PropertyView.objects.filter(listing=listing).count()
         favorites = Favorite.objects.filter(listing=listing).count()
         bookings = Booking.objects.filter(listing=listing).count()
-        revenue = Booking.objects.filter(listing=listing, status='comfirmed').aggregate(total=Sum('listing__price'))['total'] or 0
+        revenue = Booking.objects.filter(listing=listing, status='confirmed').aggregate(total=Sum('listing__price'))['total'] or 0
 
         property_stats.append({
             'id': listing.id,

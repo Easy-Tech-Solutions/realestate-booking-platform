@@ -1,0 +1,21 @@
+{% extends "emails/base_email.html" %}
+
+{% block subject %}Stay Complete — Leave a Review for {{ data.listing_title }}{% endblock %}
+
+{% block content %}
+  <h2 style="color:#27ae60;">Your Stay is Complete!</h2>
+  <p>Hi {{ user.get_full_name|default:user.username }},</p>
+  <p>
+    We hope you had a wonderful stay at <strong>{{ data.listing_title }}</strong>.
+    Your experience matters — leaving a review helps other guests and supports great property owners.
+  </p>
+
+  <a class="cta-btn" href="http://{{ site_url }}/listings/{{ data.listing_id }}/review">
+    Leave a Review
+  </a>
+
+  <hr class="divider"/>
+  <p style="font-size:13px; color:#888;">
+    Booking #{{ data.booking_id }} &mdash; {{ site_name }}
+  </p>
+{% endblock %}

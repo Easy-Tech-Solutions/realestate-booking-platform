@@ -1,0 +1,30 @@
+{% extends "emails/base_email.html" %}
+
+{% block subject %}New Booking Request — {{ data.listing_title }}{% endblock %}
+
+{% block content %}
+  <h2>New Booking Request</h2>
+  <p>Hi {{ user.get_full_name|default:user.username }},</p>
+  <p>
+    <strong>{{ data.customer_name }}</strong> has requested to book one of your properties.
+  </p>
+
+  <div class="info-box">
+    <p><strong>Property:</strong> {{ data.listing_title }}</p>
+    <p><strong>Guest:</strong> {{ data.customer_name }}</p>
+    <p><strong>Check-in:</strong> {{ data.start_date }}</p>
+    <p><strong>Check-out:</strong> {{ data.end_date }}</p>
+    <p><strong>Total Amount:</strong> {{ data.total_amount }}</p>
+  </div>
+
+  <p>Log in to your dashboard to confirm or decline this request.</p>
+
+  <a class="cta-btn" href="http://{{ site_url }}/bookings/{{ data.booking_id }}">
+    Review Request
+  </a>
+
+  <hr class="divider"/>
+  <p style="font-size:13px; color:#888;">
+    Booking #{{ data.booking_id }} &mdash; {{ site_name }}
+  </p>
+{% endblock %}

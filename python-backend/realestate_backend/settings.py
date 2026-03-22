@@ -13,6 +13,9 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    #Channels (must come before local apps)
+    "daphne",
+    "channels",
     "django.contrib.staticfiles",
     #Auth
     "django.contrib.sites",
@@ -35,6 +38,9 @@ INSTALLED_APPS = [
     "listings",
     "bookings",
     "users",
+    "payments",
+    "messaging",
+    "notifications",
 ]
 
 MIDDLEWARE = [
@@ -108,6 +114,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PARSER_CLASSES": [
         "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.MultiPartParser",
+        "rest_framework.parsers.FormParser",
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -181,3 +189,73 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 os.makedirs(MEDIA_ROOT, exist_ok=True)
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+#Payment Settings
+PAYMENT_GATEWAYS = {
+    'flutterwave': {
+        'public_key': os.environ.get('FLUTTERWAVE_PUBLIC_KEY'),
+        'secret_key': os.environ.get('FLUTTERWAVE_SECRET_KEY'),
+        'webhook_key': os.environ.get('FLUTTERWAVE_WEBHOOK_KEY'),
+        'sandbox_url': 'https://rave-api-v2.herokuapp.com',  #Not the real sandbox url
+        'live_url': 'https://api.flutterwave.com',           #Not the real live url
+    },
+    'mtn_momo': {
+        'api_key': os.environ.get('MTN_MOMO_API_KEY'),
+        'user_id': os.environ.get('MTN_MOMO_USER_ID'),
+        'api_secret': os.environ.get('MTN_MOMO_API_SECRET'),
+        'sandbox_url': 'https://sandbox.momodeveloper.mtn.com',    #Not the real url
+        'live_url': 'https://api.momodeveloper.mtn.com',           #Not the real url
+    },
+    'orange_money': {
+        'api_key': os.environ.get('ORANGE_MONEY_API_KEY'),
+        'api_secret': os.environ.get('ORANGE_MONEY_API_SECRET'),
+        'sandbox_url': 'https://api.orange.com/orange-money',      #Not the real url
+        'live_url': 'https://api.orange.com/orange-money',         #Not the real ur
+    }
+}
+
+#Currency settings
+DEFAULT_CURRENCY = 'LRD'
+SUPPORTED_CURRENCIES = ['LRD','USD']
+
+# ─── Django Channels / Real-time Messaging ────────────────────────────────────
+# Development: InMemoryChannelLayer needs no external services — works out of
+# the box. Messages are only delivered within the same process, which is fine
+# for a single dev server.
+#
+# Production: Switch to RedisChannelLayer so messages are shared across all
+# server processes/workers. Set REDIS_URL in your environment to activate it.
+if os.environ.get('REDIS_URL'):
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [os.environ.get('REDIS_URL')],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+
+# Maximum allowed size for a single file attachment (10 MB)
+MESSAGE_ATTACHMENT_MAX_SIZE = 10 * 1024 * 1024  # 10 MB in bytes
+
+# ─── Celery ────────────────────────────────────────────────────────────────────
+# Production: set REDIS_URL (e.g. redis://localhost:6379/0) in your environment.
+# Development fallback: CELERY_TASK_ALWAYS_EAGER runs tasks synchronously in the
+# same process — no broker needed, emails send inline.  Set to False in prod.
+CELERY_BROKER_URL        = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND    = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT    = ['json']
+CELERY_TASK_SERIALIZER   = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE          = TIME_ZONE
+
+# In development (no Redis running) tasks run synchronously — flip to False in prod
+CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_ALWAYS_EAGER', 'true').lower() == 'true'
+CELERY_TASK_EAGER_PROPAGATES = True  # surface task exceptions during development

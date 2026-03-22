@@ -218,7 +218,7 @@ def saved_search_detail(request, id):
 def search_alerts(request):
     #Get search alerts for current user
     alerts = SearchAlert.objects.filter(saved_search__user=request.user)
-    serializer = SearchAlertSerializer(alerts, many=True, context={'reuqest':request})
+    serializer = SearchAlertSerializer(alerts, many=True, context={'request':request})
     return Response(serializer.data)
 
 

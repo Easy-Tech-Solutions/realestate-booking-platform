@@ -1,0 +1,89 @@
+Collecting channels
+  Downloading channels-4.3.2-py3-none-any.whl.metadata (4.7 kB)
+Collecting channels-redis
+  Downloading channels_redis-4.3.0-py3-none-any.whl.metadata (13 kB)
+Collecting daphne
+  Downloading daphne-4.2.1-py3-none-any.whl.metadata (1.7 kB)
+Requirement already satisfied: Django>=4.2 in C:\Users\jaket\AppData\Local\Programs\Python\Python313\Lib\site-packages (from channels) (5.2.8)
+Requirement already satisfied: asgiref<4,>=3.9.0 in C:\Users\jaket\AppData\Local\Programs\Python\Python313\Lib\site-packages (from channels) (3.11.0)
+Requirement already satisfied: redis>=4.6 in C:\Users\jaket\AppData\Local\Programs\Python\Python313\Lib\site-packages (from channels-redis) (7.1.1)
+Collecting msgpack~=1.0 (from channels-redis)
+  Downloading msgpack-1.1.2-cp313-cp313-win_amd64.whl.metadata (8.4 kB)
+Collecting autobahn>=22.4.2 (from daphne)
+  Downloading autobahn-25.12.2-cp313-cp313-win_amd64.whl.metadata (32 kB)
+Collecting twisted>=22.4 (from twisted[tls]>=22.4->daphne)
+  Downloading twisted-25.5.0-py3-none-any.whl.metadata (22 kB)
+Collecting cbor2>=5.2.0 (from autobahn>=22.4.2->daphne)
+  Downloading cbor2-5.8.0-cp313-cp313-win_amd64.whl.metadata (5.6 kB)
+Requirement already satisfied: cffi>=2.0.0 in C:\Users\jaket\AppData\Local\Programs\Python\Python313\Lib\site-packages (from autobahn>=22.4.2->daphne) (2.0.0)
+Requirement already satisfied: cryptography>=3.4.6 in C:\Users\jaket\AppData\Local\Programs\Python\Python313\Lib\site-packages (from autobahn>=22.4.2->daphne) (46.0.3)
+Collecting hyperlink>=21.0.0 (from autobahn>=22.4.2->daphne)
+  Downloading hyperlink-21.0.0-py2.py3-none-any.whl.metadata (1.5 kB)
+Collecting py-ubjson>=0.16.1 (from autobahn>=22.4.2->daphne)
+  Downloading py-ubjson-0.16.1.tar.gz (50 kB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting txaio>=25.12.2 (from autobahn>=22.4.2->daphne)
+  Downloading txaio-25.12.2-py3-none-any.whl.metadata (7.0 kB)
+Collecting ujson>=4.0.2 (from autobahn>=22.4.2->daphne)
+  Downloading ujson-5.12.0-cp313-cp313-win_amd64.whl.metadata (9.8 kB)
+Requirement already satisfied: pycparser in C:\Users\jaket\AppData\Local\Programs\Python\Python313\Lib\site-packages (from cffi>=2.0.0->autobahn>=22.4.2->daphne) (2.23)
+Requirement already satisfied: sqlparse>=0.3.1 in C:\Users\jaket\AppData\Local\Programs\Python\Python313\Lib\site-packages (from Django>=4.2->channels) (0.5.4)
+Requirement already satisfied: tzdata in C:\Users\jaket\AppData\Local\Programs\Python\Python313\Lib\site-packages (from Django>=4.2->channels) (2025.2)
+Requirement already satisfied: idna>=2.5 in C:\Users\jaket\AppData\Local\Programs\Python\Python313\Lib\site-packages (from hyperlink>=21.0.0->autobahn>=22.4.2->daphne) (3.11)
+Collecting attrs>=22.2.0 (from twisted>=22.4->twisted[tls]>=22.4->daphne)
+  Downloading attrs-25.4.0-py3-none-any.whl.metadata (10 kB)
+Collecting automat>=24.8.0 (from twisted>=22.4->twisted[tls]>=22.4->daphne)
+  Downloading automat-25.4.16-py3-none-any.whl.metadata (8.4 kB)
+Collecting constantly>=15.1 (from twisted>=22.4->twisted[tls]>=22.4->daphne)
+  Downloading constantly-23.10.4-py3-none-any.whl.metadata (1.8 kB)
+Collecting incremental>=24.7.0 (from twisted>=22.4->twisted[tls]>=22.4->daphne)
+  Downloading incremental-24.11.0-py3-none-any.whl.metadata (9.5 kB)
+Collecting typing-extensions>=4.2.0 (from twisted>=22.4->twisted[tls]>=22.4->daphne)
+  Downloading typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting zope-interface>=5 (from twisted>=22.4->twisted[tls]>=22.4->daphne)
+  Downloading zope_interface-8.2-cp313-cp313-win_amd64.whl.metadata (46 kB)
+Requirement already satisfied: packaging>=17.0 in C:\Users\jaket\AppData\Local\Programs\Python\Python313\Lib\site-packages (from incremental>=24.7.0->twisted>=22.4->twisted[tls]>=22.4->daphne) (25.0)
+Collecting pyopenssl>=21.0.0 (from twisted[tls]>=22.4->daphne)
+  Downloading pyopenssl-26.0.0-py3-none-any.whl.metadata (18 kB)
+Collecting service-identity>=18.1.0 (from twisted[tls]>=22.4->daphne)
+  Downloading service_identity-24.2.0-py3-none-any.whl.metadata (5.1 kB)
+Collecting pyasn1 (from service-identity>=18.1.0->twisted[tls]>=22.4->daphne)
+  Downloading pyasn1-0.6.2-py3-none-any.whl.metadata (8.4 kB)
+Collecting pyasn1-modules (from service-identity>=18.1.0->twisted[tls]>=22.4->daphne)
+  Downloading pyasn1_modules-0.4.2-py3-none-any.whl.metadata (3.5 kB)
+Downloading channels-4.3.2-py3-none-any.whl (31 kB)
+Downloading channels_redis-4.3.0-py3-none-any.whl (20 kB)
+Downloading msgpack-1.1.2-cp313-cp313-win_amd64.whl (72 kB)
+Downloading daphne-4.2.1-py3-none-any.whl (29 kB)
+Downloading autobahn-25.12.2-cp313-cp313-win_amd64.whl (2.2 MB)
+   ---------------------------------------- 2.2/2.2 MB 4.0 MB/s  0:00:00
+Downloading cbor2-5.8.0-cp313-cp313-win_amd64.whl (69 kB)
+Downloading hyperlink-21.0.0-py2.py3-none-any.whl (74 kB)
+Downloading twisted-25.5.0-py3-none-any.whl (3.2 MB)
+   ---------------------------------------- 3.2/3.2 MB 5.3 MB/s  0:00:00
+Downloading attrs-25.4.0-py3-none-any.whl (67 kB)
+Downloading automat-25.4.16-py3-none-any.whl (42 kB)
+Downloading constantly-23.10.4-py3-none-any.whl (13 kB)
+Downloading incremental-24.11.0-py3-none-any.whl (21 kB)
+Downloading pyopenssl-26.0.0-py3-none-any.whl (57 kB)
+Downloading service_identity-24.2.0-py3-none-any.whl (11 kB)
+Downloading txaio-25.12.2-py3-none-any.whl (31 kB)
+Downloading typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+Downloading ujson-5.12.0-cp313-cp313-win_amd64.whl (44 kB)
+Downloading zope_interface-8.2-cp313-cp313-win_amd64.whl (212 kB)
+Downloading pyasn1-0.6.2-py3-none-any.whl (83 kB)
+Downloading pyasn1_modules-0.4.2-py3-none-any.whl (181 kB)
+Building wheels for collected packages: py-ubjson
+  Building wheel for py-ubjson (pyproject.toml): started
+  Building wheel for py-ubjson (pyproject.toml): finished with status 'done'
+  Created wheel for py-ubjson: filename=py_ubjson-0.16.1-cp313-cp313-win_amd64.whl size=19356 sha256=b1e1b4ff67b89d938c74d5ba49a83e4df614a9ee946be8b1c28ad55950670544
+  Stored in directory: c:\users\jaket\appdata\local\pip\cache\wheels\14\a0\25\eb722ee8b90832ddd807a43c878817096ed4c65227a63011e5
+Successfully built py-ubjson
+Installing collected packages: py-ubjson, zope-interface, ujson, typing-extensions, txaio, pyasn1, msgpack, incremental, hyperlink, constantly, cbor2, automat, attrs, twisted, pyasn1-modules, channels, service-identity, pyopenssl, channels-redis, autobahn, daphne
+
+Successfully installed attrs-25.4.0 autobahn-25.12.2 automat-25.4.16 cbor2-5.8.0 channels-4.3.2 channels-redis-4.3.0 constantly-23.10.4 daphne-4.2.1 hyperlink-21.0.0 incremental-24.11.0 msgpack-1.1.2 py-ubjson-0.16.1 pyasn1-0.6.2 pyasn1-modules-0.4.2 pyopenssl-26.0.0 service-identity-24.2.0 twisted-25.5.0 txaio-25.12.2 typing-extensions-4.15.0 ujson-5.12.0 zope-interface-8.2

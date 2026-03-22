@@ -1,0 +1,24 @@
+{% extends "emails/base_email.html" %}
+
+{% block subject %}Refund Processed — {{ data.listing_title }}{% endblock %}
+
+{% block content %}
+  <h2>Refund Processed</h2>
+  <p>Hi {{ user.get_full_name|default:user.username }},</p>
+  <p>
+    A refund of <strong>{{ data.amount }} {{ data.currency }}</strong>
+    for <strong>{{ data.listing_title }}</strong> has been processed.
+    Please allow 3–5 business days for the amount to appear in your account.
+  </p>
+
+  <div class="info-box">
+    <p><strong>Property:</strong> {{ data.listing_title }}</p>
+    <p><strong>Refund Amount:</strong> {{ data.amount }} {{ data.currency }}</p>
+    <p><strong>Original Transaction:</strong> {{ data.payment_id }}</p>
+  </div>
+
+  <hr class="divider"/>
+  <p style="font-size:13px; color:#888;">
+    {{ site_name }}
+  </p>
+{% endblock %}

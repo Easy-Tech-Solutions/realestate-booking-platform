@@ -27,8 +27,15 @@ class Booking(models.Model):
     class Meta:
         unique_together = ['customer', 'listing', 'start_date', 'end_date']  #Prevent double bookings
         ordering = ['-requested_at']
+
     def __str__(self):
         return f"{self.customer.username} - {self.listing.title} ({self.status})"
+
+    @property
+    def total_amount(self):
+        """Listing price × number of days booked."""
+        days = (self.end_date - self.start_date).days
+        return self.listing.price * max(days, 1)
 
 
 class SavedSearch(models.Model):
