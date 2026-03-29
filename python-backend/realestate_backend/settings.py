@@ -122,7 +122,17 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_FILTER_BACKENDS": (
         "django_filters.rest_framework.DjangoFilterBackend",
-    )
+    ),
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "user": "1000/day",
+        "login": "5/min",
+        "register": "5/hour",
+        "password_reset": "3/hour",
+        "verify_email": "10/hour",
+    },
 }
 
 CORS_ALLOWED_ORIGINS = [

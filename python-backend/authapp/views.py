@@ -1,4 +1,4 @@
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -8,13 +8,13 @@ from django.core.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from .serializers import UserSerializer
-#from django_ratelimit.decorators import ratelimit
+from .throttles import LoginRateThrottle, RegisterRateThrottle, PasswordResetRateThrottle, VerifyEmailRateThrottle
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-#@ratelimit(key="ip", rate="5/hour")  #Basic rate limiting to prevent abuse
+@throttle_classes([RegisterRateThrottle])
 def register(request):
     username = request.data.get("username")
     email = request.data.get("email")
@@ -49,7 +49,7 @@ def register(request):
         return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        user = User.objects.create_user(username=username, email=email, password=password, is_active=False)  #User needs to verify email
+        user = User.objects.create_user(username=username, email=email, password=password, first_name=first_name or "", last_name=last_name or "", is_active=False)  #User needs to verify email
         # Send verification email (pseudo-code)
         from . utils import send_verification_email
         send_verification_email(user)
@@ -60,7 +60,7 @@ def register(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-#Handles email verification
+@throttle_classes([VerifyEmailRateThrottle])
 def verify_email(request):
     token = request.data.get("token")
     if not token:
@@ -78,8 +78,7 @@ def verify_email(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-#@ratelimit(key="ip", rate="5/minute")
-#Handles Login functionality
+@throttle_classes([LoginRateThrottle])
 def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")
@@ -142,3 +141,50 @@ def refresh_token_view(request):
 @permission_classes([IsAuthenticated])
 def me(request):
     return Response(UserSerializer(request.user).data)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@throttle_classes([PasswordResetRateThrottle])
+def password_reset_request(request):
+    email = request.data.get("email")
+    if not email:
+        return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        # Return success regardless to avoid exposing whether an email exists
+        return Response({"message": "If an account with that email exists, a password reset link has been sent."}, status=status.HTTP_200_OK)
+
+    from .utils import send_password_reset_email
+    send_password_reset_email(user)
+    return Response({"message": "If an account with that email exists, a password reset link has been sent."}, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@throttle_classes([PasswordResetRateThrottle])
+def password_reset_confirm(request):
+    token = request.data.get("token")
+    password = request.data.get("password")
+    password2 = request.data.get("password2")
+
+    if not all([token, password, password2]):
+        return Response({"error": "token, password, and password2 are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if password != password2:
+        return Response({"error": "Passwords do not match"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if len(password) < 8:
+        return Response({"error": "Password must be at least 8 characters long"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(password_reset_token=token)
+    except User.DoesNotExist:
+        return Response({"error": "Invalid or expired reset token"}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(password)
+    user.password_reset_token = None
+    user.save()
+    return Response({"message": "Password reset successfully. You can now log in with your new password."}, status=status.HTTP_200_OK)
