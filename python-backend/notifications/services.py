@@ -403,3 +403,60 @@ def notify_listing_available(listing):
                 'listing_title': listing.title,
             },
         )
+
+
+# ---- Report helpers ----------------------------------------------------------
+
+def notify_report_submitted(report):
+    """
+    Notify every admin user that a new report has been filed.
+    Called immediately after a Report is saved.
+    """
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    reporter_name = report.reporter.get_full_name() or report.reporter.username
+    admins = User.objects.filter(role='admin')
+
+    for admin in admins:
+        create_notification(
+            user=admin,
+            notification_type='report_submitted',
+            title='New Report Filed',
+            message=(
+                f'{reporter_name} filed a "{report.get_report_type_display()}" report '
+                f'on a {report.get_content_type_display()}.'
+            ),
+            data={
+                'report_id':     report.id,
+                'report_type':   report.report_type,
+                'content_type':  report.content_type,
+                'reporter_name': reporter_name,
+            },
+        )
+
+
+def notify_report_updated(report):
+    """
+    Notify the reporter that the status of their report has changed.
+    Called by the admin update endpoint whenever status changes.
+    """
+    status_labels = {
+        'under_review': 'is now under review',
+        'resolved':     'has been resolved',
+        'dismissed':    'has been dismissed',
+    }
+    label = status_labels.get(report.status, f'was updated to "{report.get_status_display()}"')
+
+    create_notification(
+        user=report.reporter,
+        notification_type='report_updated',
+        title='Your Report Was Updated',
+        message=f'Your report (#{report.id}) {label}.',
+        data={
+            'report_id':   report.id,
+            'report_type': report.report_type,
+            'new_status':  report.status,
+            'admin_notes': report.admin_notes,
+        },
+    )

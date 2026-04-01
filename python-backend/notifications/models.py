@@ -23,6 +23,9 @@ class NotificationType(models.TextChoices):
     SEARCH_ALERT       = 'search_alert',       'Search Alert'
     # Reviews
     NEW_REVIEW         = 'new_review',         'New Review'
+    # Reports
+    REPORT_SUBMITTED   = 'report_submitted',   'Report Submitted'
+    REPORT_UPDATED     = 'report_updated',     'Report Updated'
 
 
 class Notification(models.Model):
@@ -103,6 +106,10 @@ class NotificationPreference(models.Model):
     listing_available_email  = models.BooleanField(default=True)
     search_alert_email       = models.BooleanField(default=True)
     new_review_email         = models.BooleanField(default=True)
+
+    # Reports
+    report_submitted_email = models.BooleanField(default=True)  # admins
+    report_updated_email   = models.BooleanField(default=True)  # reporters
 
     # Master switch — set False to silence ALL in-app notifications
     in_app_enabled = models.BooleanField(default=True)
