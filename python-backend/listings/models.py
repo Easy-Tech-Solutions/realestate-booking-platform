@@ -1,4 +1,5 @@
 from django.db import models
+<<<<<<< HEAD
 from django.conf import settings
 
 class Listing(models.Model):
@@ -134,3 +135,14 @@ class PropertyStats(models.Model):
     
     def __str__(self):
         return f'Stats for {self.listing.title} on {self.date}'
+=======
+
+class Listing(models.Model):
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+>>>>>>> dalton

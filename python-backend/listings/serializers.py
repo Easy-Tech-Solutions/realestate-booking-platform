@@ -1,4 +1,5 @@
 from rest_framework import serializers
+<<<<<<< HEAD
 from .models import Listing, ListingImage, Favorite, Review, ReviewImage
 from bookings.models import Booking
 
@@ -109,3 +110,11 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
             ReviewImage.objects.create(review=review, image=image_data)
             
         return review
+=======
+from .models import Listing
+
+class ListingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Listing
+        fields = ["id", "title", "description", "price", "created_at"]
+>>>>>>> dalton

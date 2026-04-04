@@ -1,4 +1,5 @@
 from django.db import models
+<<<<<<< HEAD
 from django.conf import settings
 # Placeholder model(s) if needed later
 
@@ -9,3 +10,7 @@ class BlacklistedToken(models.Model):
 
     def __str__(self):
         return f"Token blacklisted at {self.blacklisted_at}"
+=======
+
+# Placeholder model(s) if needed later
+>>>>>>> dalton

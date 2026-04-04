@@ -43,7 +43,10 @@ The service layer uses a shared REST shape (see `src/services/endpoints.js`). Im
 Configure the API origin via `VITE_API_BASE_URL`.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> dalton
 ### Use Django backend
 
 1. Copy env and set API base URL:
@@ -66,4 +69,7 @@ Configure the API origin via `VITE_API_BASE_URL`.
 	- `/api/bookings`, `/api/bookings/:id`
 	- `/api/users`, `/api/users/:id`
 
+<<<<<<< HEAD
 >>>>>>> main
+=======
+>>>>>>> dalton

@@ -1,10 +1,15 @@
 from rest_framework import serializers
+<<<<<<< HEAD
 from .models import User, Profile
+=======
+from django.contrib.auth.models import User
+>>>>>>> dalton
 
 class PublicUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username"]
+<<<<<<< HEAD
 
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -22,3 +27,5 @@ class UserSerializer(serializers.ModelSerializer):
             'role', 'email_verified', 'profile'
         ]
         read_only_fields = ['id','email_verified']
+=======
+>>>>>>> dalton

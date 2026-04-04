@@ -3,10 +3,13 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
 =======
+=======
+>>>>>>> dalton
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 
@@ -17,7 +20,10 @@ const __dirname = dirname(__filename)
 export default defineConfig({
   plugins: [react()],
   publicDir: path.resolve(__dirname, '../html-frontend'),
+<<<<<<< HEAD
 >>>>>>> main
+=======
+>>>>>>> dalton
   resolve: {
     alias: {
       '@assets': path.resolve(__dirname, './src/assets'),
@@ -29,9 +35,13 @@ export default defineConfig({
       '@services': path.resolve(__dirname, './src/services'),
       '@utils': path.resolve(__dirname, './src/utils'),
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
       '@legacyCss': path.resolve(__dirname, '../html-frontend/assets/css'),
 >>>>>>> main
+=======
+      '@legacyCss': path.resolve(__dirname, '../html-frontend/assets/css'),
+>>>>>>> dalton
     },
   },
   test: {
@@ -45,10 +55,14 @@ export default defineConfig({
         path.resolve(__dirname),
         path.resolve(__dirname, '..'),
 <<<<<<< HEAD
+<<<<<<< HEAD
         path.resolve(__dirname, '../frontend'),
 =======
         path.resolve(__dirname, '../html-frontend'),
 >>>>>>> main
+=======
+        path.resolve(__dirname, '../html-frontend'),
+>>>>>>> dalton
       ],
     },
   },

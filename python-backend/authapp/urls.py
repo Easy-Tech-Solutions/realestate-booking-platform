@@ -1,4 +1,5 @@
 from django.urls import path
+<<<<<<< HEAD
 from .views import register, verify_email, login_view, logout_view, me, refresh_token_view
 
 urlpatterns = [
@@ -9,3 +10,12 @@ urlpatterns = [
     path('refresh-token/', refresh_token_view, name='refresh_token'),
     path('me/', me, name='me'),
 ]
+=======
+from .views import login_view, register, me
+
+urlpatterns = [
+    path('login', login_view, name='login'),
+    path('register', register, name='register'),
+    path('me', me, name='me'),
+]
+>>>>>>> dalton

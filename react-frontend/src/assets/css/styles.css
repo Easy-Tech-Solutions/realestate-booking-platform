@@ -1,5 +1,6 @@
 /* Aggregates legacy site styles during migration.
 <<<<<<< HEAD
+<<<<<<< HEAD
    We import the original CSS from the static frontend so the React app
    visually matches the current HTML site. Once migration completes,
    move styles into component-scoped CSS or keep as global as needed. */
@@ -8,3 +9,7 @@
    Import via Vite alias so paths resolve cross-platform. */
 @import "@legacyCss/styles.css";
 >>>>>>> main
+=======
+   Import via Vite alias so paths resolve cross-platform. */
+@import "@legacyCss/styles.css";
+>>>>>>> dalton

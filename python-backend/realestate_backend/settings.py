@@ -14,6 +14,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+<<<<<<< HEAD
     #Auth
     "django.contrib.sites",
     # "allauth",
@@ -30,6 +31,11 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     #"django_ratelimit",
+=======
+    # Third-party
+    "rest_framework",
+    "corsheaders",
+>>>>>>> dalton
     # Local apps
     "authapp",
     "listings",
@@ -44,11 +50,16 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+<<<<<<< HEAD
     # "django_otp.middleware.OTPMiddleware",
     # "django.contrib.allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "listings.middleware.ViewTrackingMiddleware",
+=======
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+>>>>>>> dalton
 ]
 
 ROOT_URLCONF = "realestate_backend.urls"
@@ -56,7 +67,11 @@ ROOT_URLCONF = "realestate_backend.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
+<<<<<<< HEAD
         "DIRS": [BASE_DIR / "templates"],
+=======
+        "DIRS": [],
+>>>>>>> dalton
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -94,6 +109,7 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "static"
 
+<<<<<<< HEAD
 # Cache configuration for django-ratelimit
 CACHES = {
     'default': {
@@ -101,6 +117,9 @@ CACHES = {
         'LOCATION': 'rate_limit_cache',
     }
 }
+=======
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+>>>>>>> dalton
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
@@ -109,6 +128,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": [
         "rest_framework.parsers.JSONParser",
     ],
+<<<<<<< HEAD
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
@@ -181,3 +201,10 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 os.makedirs(MEDIA_ROOT, exist_ok=True)
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+=======
+}
+
+CORS_ALLOWED_ORIGINS = [
+    os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173"),
+]
+>>>>>>> dalton
