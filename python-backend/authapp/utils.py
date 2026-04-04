@@ -4,6 +4,43 @@ from django.utils.html import strip_tags
 from django.conf import settings
 import uuid
 
+<<<<<<< HEAD
+=======
+def send_password_reset_email(user):
+    token = str(uuid.uuid4())
+    user.password_reset_token = token
+    user.save()
+
+    # For testing: print token to console instead of sending email
+    print(f"\n=== PASSWORD RESET TOKEN FOR {user.username} ===")
+    print(f"Token: {token}")
+    print(f"Use this token in Postman at: POST /api/auth/password-reset-confirm/")
+    print("=" * 50)
+
+    # Uncomment below for production email sending
+    """
+    subject = "Reset your Password"
+    reset_url = f"http://{settings.LOCAL_DOMAIN}/api/auth/password-reset-confirm/?token={token}"
+
+    html_message = render_to_string("auth/password_reset_email.html", {
+        "user": user,
+        "reset_url": reset_url,
+        "site_name": settings.SITE_NAME,
+    })
+
+    plain_message = strip_tags(html_message)
+
+    send_mail(
+        subject,
+        plain_message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        html_message=html_message,
+    )
+    """
+
+
+>>>>>>> origin/jake
 def send_verification_email(user):
     token = str(uuid.uuid4())
     user.email_verification_token = token

@@ -8,11 +8,17 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import '@assets/css/styles.css'
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 import '@assets/css/additional-style.css'
 =======
 >>>>>>> main
 =======
 >>>>>>> dalton
+=======
+import '@assets/css/additional-style.css'
+=======
+>>>>>>> main
+>>>>>>> origin/jake
 import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(

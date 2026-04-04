@@ -4,12 +4,18 @@ import path from 'path'
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> origin/jake
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
 =======
+<<<<<<< HEAD
 =======
 >>>>>>> dalton
+=======
+>>>>>>> origin/jake
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 
@@ -21,9 +27,13 @@ export default defineConfig({
   plugins: [react()],
   publicDir: path.resolve(__dirname, '../html-frontend'),
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> main
 =======
 >>>>>>> dalton
+=======
+>>>>>>> main
+>>>>>>> origin/jake
   resolve: {
     alias: {
       '@assets': path.resolve(__dirname, './src/assets'),
@@ -36,12 +46,18 @@ export default defineConfig({
       '@utils': path.resolve(__dirname, './src/utils'),
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
       '@legacyCss': path.resolve(__dirname, '../html-frontend/assets/css'),
 >>>>>>> main
 =======
       '@legacyCss': path.resolve(__dirname, '../html-frontend/assets/css'),
 >>>>>>> dalton
+=======
+=======
+      '@legacyCss': path.resolve(__dirname, '../html-frontend/assets/css'),
+>>>>>>> main
+>>>>>>> origin/jake
     },
   },
   test: {
@@ -56,13 +72,19 @@ export default defineConfig({
         path.resolve(__dirname, '..'),
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> origin/jake
         path.resolve(__dirname, '../frontend'),
 =======
         path.resolve(__dirname, '../html-frontend'),
 >>>>>>> main
+<<<<<<< HEAD
 =======
         path.resolve(__dirname, '../html-frontend'),
 >>>>>>> dalton
+=======
+>>>>>>> origin/jake
       ],
     },
   },

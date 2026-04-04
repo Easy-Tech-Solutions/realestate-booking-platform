@@ -44,9 +44,13 @@ Configure the API origin via `VITE_API_BASE_URL`.
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 =======
 >>>>>>> dalton
+=======
+=======
+>>>>>>> origin/jake
 ### Use Django backend
 
 1. Copy env and set API base URL:
@@ -70,6 +74,10 @@ Configure the API origin via `VITE_API_BASE_URL`.
 	- `/api/users`, `/api/users/:id`
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> main
 =======
 >>>>>>> dalton
+=======
+>>>>>>> main
+>>>>>>> origin/jake

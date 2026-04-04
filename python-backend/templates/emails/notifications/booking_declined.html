@@ -1,0 +1,31 @@
+{% extends "emails/base_email.html" %}
+
+{% block subject %}Booking Declined — {{ data.listing_title }}{% endblock %}
+
+{% block content %}
+  <h2 style="color:#e74c3c;">Booking Request Declined</h2>
+  <p>Hi {{ user.get_full_name|default:user.username }},</p>
+  <p>
+    Unfortunately, your booking request for <strong>{{ data.listing_title }}</strong>
+    has been declined by the property owner.
+  </p>
+
+  {% if data.decline_reason %}
+  <div class="info-box">
+    <p><strong>Reason:</strong> {{ data.decline_reason }}</p>
+  </div>
+  {% endif %}
+
+  <p>
+    Don't be discouraged — browse our other available properties and find your perfect stay.
+  </p>
+
+  <a class="cta-btn" href="http://{{ site_url }}/listings">
+    Browse Properties
+  </a>
+
+  <hr class="divider"/>
+  <p style="font-size:13px; color:#888;">
+    Booking #{{ data.booking_id }} &mdash; {{ site_name }}
+  </p>
+{% endblock %}
