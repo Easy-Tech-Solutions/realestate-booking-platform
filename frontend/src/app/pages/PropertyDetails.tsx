@@ -3,44 +3,31 @@ import { useParams, useNavigate } from 'react-router';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import {
-  Star,
-  Share,
-  Heart,
-  MapPin,
-  Users,
-  Bed,
-  Bath,
-  Award,
-  Shield,
-  Calendar as CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  Minus,
-  Plus,
+  Star, Share, Heart, MapPin, Users, Bed, Bath, Award, Shield,
+  ChevronLeft, ChevronRight, X, Minus, Plus,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
 import { Calendar } from '../components/ui/calendar';
-import { Avatar } from '../components/ui/avatar';
-import { Badge } from '../components/ui/badge';
 import { motion, AnimatePresence } from 'motion/react';
-import { mockProperties, mockReviews } from '../../services/mock-data';
+import { propertiesAPI, reviewsAPI } from '../../services/api.service';
 import { AMENITIES } from '../../core/constants';
 import { formatCurrency, calculateNights, calculateTotalPrice, formatDate, getInitials } from '../../core/utils';
 import { useApp } from '../../core/context';
 import { toast } from 'sonner';
 import { DateRange } from 'react-day-picker';
 import * as Icons from 'lucide-react';
+import type { Property, Review } from '../../core/types';
 
 export function PropertyDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, wishlistIds, toggleWishlist } = useApp();
-  
-  const property = mockProperties.find(p => p.id === id);
-  const reviews = mockReviews.filter(r => r.propertyId === id);
-  
+
+  const [property, setProperty] = useState<Property | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -48,9 +35,27 @@ export function PropertyDetails() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    if (!id) return;
+    setIsLoading(true);
+    setFetchError(false);
+    propertiesAPI.getById(id)
+      .then(setProperty)
+      .catch(() => setFetchError(true))
+      .finally(() => setIsLoading(false));
+    reviewsAPI.getByProperty(id)
+      .then(setReviews)
+      .catch(() => {});
   }, [id]);
 
-  if (!property) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Loading property...</p>
+      </div>
+    );
+  }
+
+  if (fetchError || !property) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -65,7 +70,6 @@ export function PropertyDetails() {
   const nights = dateRange?.from && dateRange?.to ? calculateNights(dateRange.from, dateRange.to) : 0;
   const pricing = nights > 0 ? calculateTotalPrice(property.price, nights, 50) : null;
 
-  // Build set of booked dates for the calendar
   const bookedDateSet = new Set(property.bookedDates ?? []);
   const isDateBlocked = (date: Date) => {
     if (date < new Date()) return true;
@@ -82,14 +86,8 @@ export function PropertyDetails() {
       toast.error('Please select check-in and check-out dates');
       return;
     }
-    navigate('/book', { 
-      state: { 
-        property, 
-        checkIn: dateRange.from, 
-        checkOut: dateRange.to, 
-        guests,
-        pricing 
-      } 
+    navigate('/book', {
+      state: { property, checkIn: dateRange.from, checkOut: dateRange.to, guests, pricing },
     });
   };
 
@@ -106,9 +104,7 @@ export function PropertyDetails() {
                   <Star className="w-4 h-4 fill-current" />
                   <span className="font-semibold">{property.rating.toFixed(2)}</span>
                   <span className="text-muted-foreground">·</span>
-                  <button className="underline font-semibold">
-                    {property.reviewCount} reviews
-                  </button>
+                  <button className="underline font-semibold">{property.reviewCount} reviews</button>
                 </div>
                 <span className="text-muted-foreground">·</span>
                 <button className="underline font-semibold">
@@ -120,14 +116,8 @@ export function PropertyDetails() {
                   <Share className="w-4 h-4 mr-2" />
                   Share
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleWishlist(property.id)}
-                >
-                  <Heart
-                    className={`w-4 h-4 mr-2 ${isWishlisted ? 'fill-destructive text-destructive' : ''}`}
-                  />
+                <Button variant="ghost" size="sm" onClick={() => toggleWishlist(property.id)}>
+                  <Heart className={`w-4 h-4 mr-2 ${isWishlisted ? 'fill-destructive text-destructive' : ''}`} />
                   Save
                 </Button>
               </div>
@@ -209,38 +199,29 @@ export function PropertyDetails() {
 
                 <Separator className="my-6" />
 
-                {/* Features */}
                 <div className="space-y-6">
                   {property.isSuperhost && (
                     <div className="flex gap-4">
                       <Award className="w-6 h-6 flex-shrink-0" />
                       <div>
                         <h3 className="font-semibold">{property.host.firstName} is a Superhost</h3>
-                        <p className="text-muted-foreground text-sm">
-                          Superhosts are experienced, highly rated hosts
-                        </p>
+                        <p className="text-muted-foreground text-sm">Superhosts are experienced, highly rated hosts</p>
                       </div>
                     </div>
                   )}
-                  
                   <div className="flex gap-4">
                     <MapPin className="w-6 h-6 flex-shrink-0" />
                     <div>
                       <h3 className="font-semibold">Great location</h3>
-                      <p className="text-muted-foreground text-sm">
-                        95% of recent guests gave the location a 5-star rating
-                      </p>
+                      <p className="text-muted-foreground text-sm">95% of recent guests gave the location a 5-star rating</p>
                     </div>
                   </div>
-
                   {property.instantBook && (
                     <div className="flex gap-4">
                       <Shield className="w-6 h-6 flex-shrink-0" />
                       <div>
                         <h3 className="font-semibold">Self check-in</h3>
-                        <p className="text-muted-foreground text-sm">
-                          Check yourself in with the smartlock
-                        </p>
+                        <p className="text-muted-foreground text-sm">Check yourself in with the smartlock</p>
                       </div>
                     </div>
                   )}
@@ -257,22 +238,25 @@ export function PropertyDetails() {
               <Separator />
 
               {/* Amenities */}
-              <div>
-                <h2 className="text-2xl font-semibold mb-6">What this place offers</h2>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {property.amenities.map((amenity) => {
-                    const IconComponent = Icons[amenity.icon as keyof typeof Icons] as React.ComponentType<{ className?: string }>;
-                    return (
-                      <div key={amenity.id} className="flex items-center gap-4">
-                        {IconComponent && <IconComponent className="w-6 h-6" />}
-                        <span>{amenity.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <Separator />
+              {property.amenities.length > 0 && (
+                <>
+                  <div>
+                    <h2 className="text-2xl font-semibold mb-6">What this place offers</h2>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {property.amenities.map((amenity) => {
+                        const IconComponent = Icons[amenity.icon as keyof typeof Icons] as React.ComponentType<{ className?: string }>;
+                        return (
+                          <div key={amenity.id} className="flex items-center gap-4">
+                            {IconComponent && <IconComponent className="w-6 h-6" />}
+                            <span>{amenity.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <Separator />
+                </>
+              )}
 
               {/* Calendar */}
               <div>
@@ -300,50 +284,20 @@ export function PropertyDetails() {
                   </h2>
                 </div>
 
-                {/* Review Stats */}
-                <div className="grid sm:grid-cols-2 gap-4 mb-8">
-                  {[
-                    { label: 'Cleanliness', rating: 4.9 },
-                    { label: 'Accuracy', rating: 4.95 },
-                    { label: 'Check-in', rating: 5.0 },
-                    { label: 'Communication', rating: 4.98 },
-                    { label: 'Location', rating: 4.92 },
-                    { label: 'Value', rating: 4.88 },
-                  ].map((item) => (
-                    <div key={item.label} className="flex items-center justify-between">
-                      <span className="text-sm">{item.label}</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-32 h-1 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-foreground"
-                            style={{ width: `${(item.rating / 5) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-semibold w-8 text-right">
-                          {item.rating.toFixed(1)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Review List */}
                 <div className="grid sm:grid-cols-2 gap-8">
                   {reviews.map((review) => (
                     <div key={review.id} className="space-y-3">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={review.user.avatar}
-                          alt={review.user.firstName}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
+                        {review.user.avatar ? (
+                          <img src={review.user.avatar} alt={review.user.firstName} className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center text-sm font-semibold">
+                            {getInitials(review.user.firstName, review.user.lastName)}
+                          </div>
+                        )}
                         <div>
-                          <p className="font-semibold">
-                            {review.user.firstName} {review.user.lastName}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatDate(review.createdAt, 'MMMM yyyy')}
-                          </p>
+                          <p className="font-semibold">{review.user.firstName} {review.user.lastName}</p>
+                          <p className="text-sm text-muted-foreground">{formatDate(review.createdAt, 'MMMM yyyy')}</p>
                         </div>
                       </div>
                       <p className="text-sm leading-relaxed">{review.comment}</p>
@@ -351,38 +305,38 @@ export function PropertyDetails() {
                   ))}
                 </div>
 
-                {reviews.length < property.reviewCount && (
-                  <Button variant="outline" className="mt-6">
-                    Show all {property.reviewCount} reviews
-                  </Button>
+                {reviews.length === 0 && (
+                  <p className="text-muted-foreground text-sm">No reviews yet.</p>
                 )}
               </div>
 
               <Separator />
 
               {/* Location */}
-              <div>
-                <h2 className="text-2xl font-semibold mb-6">Where you'll be</h2>
-                <p className="text-muted-foreground mb-4">
-                  {property.location.city}, {property.location.state}, {property.location.country}
-                </p>
-                <div className="h-[400px] rounded-xl overflow-hidden">
-                  <MapContainer
-                    center={L.latLng(property.location.lat, property.location.lng)}
-                    zoom={13}
-                    style={{ height: '100%', width: '100%' }}
-                    scrollWheelZoom={false}
-                  >
-                    <TileLayer
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    />
-                    <Marker position={L.latLng(property.location.lat, property.location.lng)}>
-                      <Popup>{property.title}</Popup>
-                    </Marker>
-                  </MapContainer>
+              {property.location.lat !== 0 && property.location.lng !== 0 && (
+                <div>
+                  <h2 className="text-2xl font-semibold mb-6">Where you'll be</h2>
+                  <p className="text-muted-foreground mb-4">
+                    {property.location.city}, {property.location.state}, {property.location.country}
+                  </p>
+                  <div className="h-[400px] rounded-xl overflow-hidden">
+                    <MapContainer
+                      center={L.latLng(property.location.lat, property.location.lng)}
+                      zoom={13}
+                      style={{ height: '100%', width: '100%' }}
+                      scrollWheelZoom={false}
+                    >
+                      <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      />
+                      <Marker position={L.latLng(property.location.lat, property.location.lng)}>
+                        <Popup>{property.title}</Popup>
+                      </Marker>
+                    </MapContainer>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <Separator />
 
@@ -395,7 +349,7 @@ export function PropertyDetails() {
                     <div className="space-y-2 text-sm">
                       <p>Check-in: After {property.checkIn}</p>
                       <p>Checkout: Before {property.checkOut}</p>
-                      <p>{property.guests} guests maximum</p>
+                      {property.guests > 0 && <p>{property.guests} guests maximum</p>}
                     </div>
                   </div>
                   <div>
@@ -410,9 +364,6 @@ export function PropertyDetails() {
                     <h3 className="font-semibold mb-3">Cancellation policy</h3>
                     <div className="space-y-2 text-sm text-muted-foreground">
                       <p className="capitalize">{property.cancellationPolicy}</p>
-                      <Button variant="link" className="p-0 h-auto">
-                        Learn more
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -459,9 +410,9 @@ export function PropertyDetails() {
                           </button>
                           <button
                             aria-label="Increase guests"
-                            onClick={() => setGuests(g => Math.min(property.guests, g + 1))}
+                            onClick={() => setGuests(g => Math.min(property.guests || 10, g + 1))}
                             className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
-                            disabled={guests >= property.guests}
+                            disabled={property.guests > 0 && guests >= property.guests}
                           >
                             <Plus className="w-3 h-3" />
                           </button>
@@ -482,9 +433,7 @@ export function PropertyDetails() {
                     <>
                       <div className="space-y-3 mb-4">
                         <div className="flex justify-between text-sm">
-                          <span className="underline">
-                            {formatCurrency(property.price)} x {nights} nights
-                          </span>
+                          <span className="underline">{formatCurrency(property.price)} x {nights} nights</span>
                           <span>{formatCurrency(pricing.subtotal)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
@@ -500,9 +449,7 @@ export function PropertyDetails() {
                           <span>{formatCurrency(pricing.taxes)}</span>
                         </div>
                       </div>
-
                       <Separator className="my-4" />
-
                       <div className="flex justify-between font-semibold">
                         <span>Total</span>
                         <span>{formatCurrency(pricing.total)}</span>
@@ -521,8 +468,8 @@ export function PropertyDetails() {
         <div>
           <span className="text-lg font-semibold">{formatCurrency(property.price)}</span>
           <span className="text-muted-foreground text-sm"> / night</span>
-          {nights > 0 && (
-            <p className="text-xs text-muted-foreground">{nights} nights · {formatCurrency(pricing!.total)} total</p>
+          {nights > 0 && pricing && (
+            <p className="text-xs text-muted-foreground">{nights} nights · {formatCurrency(pricing.total)} total</p>
           )}
         </div>
         <Button onClick={handleReserve} size="lg">Reserve</Button>
@@ -546,19 +493,13 @@ export function PropertyDetails() {
                 >
                   <X className="w-6 h-6 text-white" />
                 </button>
-                <p className="text-white">
-                  {selectedImageIndex + 1} / {property.images.length}
-                </p>
+                <p className="text-white">{selectedImageIndex + 1} / {property.images.length}</p>
               </div>
 
               <div className="flex-1 flex items-center justify-center relative">
                 <button
                   aria-label="Previous image"
-                  onClick={() =>
-                    setSelectedImageIndex((prev) =>
-                      prev === 0 ? property.images.length - 1 : prev - 1
-                    )
-                  }
+                  onClick={() => setSelectedImageIndex(prev => prev === 0 ? property.images.length - 1 : prev - 1)}
                   className="absolute left-6 p-3 rounded-full bg-white hover:bg-white/90 transition-colors"
                 >
                   <ChevronLeft className="w-6 h-6" />
@@ -572,11 +513,7 @@ export function PropertyDetails() {
 
                 <button
                   aria-label="Next image"
-                  onClick={() =>
-                    setSelectedImageIndex((prev) =>
-                      prev === property.images.length - 1 ? 0 : prev + 1
-                    )
-                  }
+                  onClick={() => setSelectedImageIndex(prev => prev === property.images.length - 1 ? 0 : prev + 1)}
                   className="absolute right-6 p-3 rounded-full bg-white hover:bg-white/90 transition-colors"
                 >
                   <ChevronRight className="w-6 h-6" />

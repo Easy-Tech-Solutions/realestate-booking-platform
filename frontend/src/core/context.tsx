@@ -1,15 +1,21 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { User, SearchFilters, Property, Booking } from './types';
-import { authAPI } from '../services/api.service';
+import type { User, SearchFilters, Booking } from './types';
+import { authAPI, setTokens, clearTokens, getAccessToken } from '../services/api.service';
 
 interface AppContextType {
   user: User | null;
   setUser: (user: User | null) => void;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (data: any) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  logout: () => void;
+  login: (username: string, password: string) => Promise<void>;
+  register: (data: {
+    username: string;
+    email: string;
+    password: string;
+    password2: string;
+    first_name?: string;
+    last_name?: string;
+  }) => Promise<{ message: string }>;
+  logout: () => Promise<void>;
   searchFilters: SearchFilters;
   setSearchFilters: (filters: SearchFilters) => void;
   wishlistIds: string[];
@@ -30,54 +36,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
-    // Check for existing session
-    const token = localStorage.getItem('authToken');
+    const token = getAccessToken();
     if (token) {
       authAPI.getCurrentUser()
         .then(setUser)
-        .catch(() => authAPI.logout())
+        .catch(() => clearTokens())
         .finally(() => setIsLoading(false));
     } else {
-      // For development: set a default mock user
-      setUser({
-        id: '1',
-        email: 'user@example.com',
-        firstName: 'John',
-        lastName: 'Doe',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop',
-        isHost: true,
-        isAdmin: false,
-        verified: true,
-        createdAt: new Date().toISOString(),
-      });
       setIsLoading(false);
     }
 
-    // Load wishlist from localStorage
     const savedWishlist = localStorage.getItem('wishlist');
     if (savedWishlist) {
-      setWishlistIds(JSON.parse(savedWishlist));
+      try {
+        setWishlistIds(JSON.parse(savedWishlist));
+      } catch {}
     }
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const { user, token } = await authAPI.login(email, password);
+  const login = async (username: string, password: string) => {
+    const { user } = await authAPI.login(username, password);
     setUser(user);
   };
 
-  const register = async (data: any) => {
-    const { user, token } = await authAPI.register(data);
-    setUser(user);
+  const register = async (data: {
+    username: string;
+    email: string;
+    password: string;
+    password2: string;
+    first_name?: string;
+    last_name?: string;
+  }) => {
+    return authAPI.register(data);
   };
 
-  const loginWithGoogle = async () => {
-    const { user, token } = await authAPI.loginWithGoogle();
-    setUser(user);
-  };
-
-  const logout = () => {
-    authAPI.logout();
+  const logout = async () => {
+    await authAPI.logout();
     setUser(null);
+    setBookings([]);
   };
 
   const toggleWishlist = (propertyId: string) => {
@@ -106,7 +102,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         register,
-        loginWithGoogle,
         logout,
         searchFilters,
         setSearchFilters,

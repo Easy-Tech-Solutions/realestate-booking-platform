@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import { PaymentMethod } from '../../core/types';
 import { useApp } from '../../core/context';
+import { bookingsAPI } from '../../services/api.service';
 
 export function Booking() {
   const location = useLocation();
@@ -19,98 +20,73 @@ export function Booking() {
   const { property, checkIn, checkOut, guests, pricing } = location.state || {};
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
-  const [cardDetails, setCardDetails] = useState({
-    number: '',
-    expiry: '',
-    cvc: '',
-    name: '',
-  });
+  const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvc: '', name: '' });
   const [phoneNumber, setPhoneNumber] = useState('');
   const [specialRequests, setSpecialRequests] = useState('');
   const [agreedToRules, setAgreedToRules] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // For development: use mock data if no state is provided
-  const mockProperty = {
-    id: '1',
-    title: 'Luxurious Beachfront Villa with Infinity Pool',
-    images: ['https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1200&h=800&fit=crop'],
-    host: { firstName: 'John', lastName: 'Doe' },
-    houseRules: ['No smoking', 'No parties or events', 'Check-in after 3:00 PM'],
-    cancellationPolicy: 'flexible',
-  };
+  const currentProperty = property;
+  const currentCheckIn = checkIn;
+  const currentCheckOut = checkOut;
+  const currentGuests = guests || 1;
+  const currentPricing = pricing || { subtotal: 0, cleaningFee: 0, serviceFee: 0, taxes: 0, total: 0 };
 
-  const mockCheckIn = new Date('2024-05-10');
-  const mockCheckOut = new Date('2024-05-15');
-  const mockGuests = 2;
-  const mockPricing = {
-    subtotal: 2250,
-    cleaningFee: 150,
-    serviceFee: 337.5,
-    taxes: 225,
-    total: 2962.5,
-  };
-
-  const currentProperty = property || mockProperty;
-  const currentCheckIn = checkIn || mockCheckIn;
-  const currentCheckOut = checkOut || mockCheckOut;
-  const currentGuests = guests || mockGuests;
-  const currentPricing = pricing || mockPricing;
+  if (!currentProperty) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-2">No booking details found</h2>
+          <Button onClick={() => navigate('/')}>Back to Home</Button>
+        </div>
+      </div>
+    );
+  }
 
   const handlePayment = async () => {
     if (!agreedToRules) {
       toast.error('Please agree to the house rules and cancellation policy');
       return;
     }
-
     if (paymentMethod === 'stripe' && (!cardDetails.number || !cardDetails.expiry || !cardDetails.cvc)) {
       toast.error('Please enter valid card details');
       return;
     }
-
     if (paymentMethod === 'mtn_momo' && !phoneNumber) {
       toast.error('Please enter your phone number');
       return;
     }
 
     setIsProcessing(true);
+    try {
+      const startDate = currentCheckIn instanceof Date
+        ? currentCheckIn.toISOString().split('T')[0]
+        : currentCheckIn;
+      const endDate = currentCheckOut instanceof Date
+        ? currentCheckOut.toISOString().split('T')[0]
+        : currentCheckOut;
 
-    setTimeout(() => {
-      const booking = {
-        id: `BK${Date.now()}`,
-        propertyId: currentProperty.id,
-        property: currentProperty,
-        userId: '1',
-        user: { id: '1', email: 'user@example.com', firstName: 'John', lastName: 'Doe', isHost: true, verified: true, createdAt: new Date().toISOString() },
-        checkIn: currentCheckIn instanceof Date ? currentCheckIn.toISOString() : currentCheckIn,
-        checkOut: currentCheckOut instanceof Date ? currentCheckOut.toISOString() : currentCheckOut,
-        guests: currentGuests,
-        adults: currentGuests,
-        children: 0,
-        infants: 0,
-        pets: 0,
-        totalPrice: currentPricing.total,
-        basePrice: currentPricing.subtotal,
-        cleaningFee: currentPricing.cleaningFee,
-        serviceFee: currentPricing.serviceFee,
-        taxes: currentPricing.taxes,
-        status: 'confirmed' as const,
-        paymentStatus: 'paid' as const,
-        paymentMethod,
-        specialRequests,
-        createdAt: new Date().toISOString(),
-      };
-      addBooking(booking);
+      const booking = await bookingsAPI.create({
+        listing: currentProperty.id,
+        start_date: startDate,
+        end_date: endDate,
+        notes: specialRequests,
+      });
+
+      addBooking({ ...booking, totalPrice: currentPricing.total, paymentMethod });
       toast.success('Booking confirmed!');
       navigate('/booking/confirmed', { state: { booking } });
-    }, 2000);
+    } catch (err: any) {
+      toast.error(err.message || 'Booking failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-background py-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-20">
         <div className="max-w-6xl mx-auto">
-          {/* Header */}
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-sm mb-6 hover:text-primary"
@@ -135,7 +111,7 @@ export function Booking() {
                         {formatDate(currentCheckIn, 'MMM dd')} - {formatDate(currentCheckOut, 'MMM dd, yyyy')}
                       </p>
                     </div>
-                    <Button variant="link" className="p-0 h-auto">
+                    <Button variant="link" className="p-0 h-auto" onClick={() => navigate(-1)}>
                       Edit
                     </Button>
                   </div>
@@ -144,7 +120,7 @@ export function Booking() {
                       <p className="font-semibold">Guests</p>
                       <p className="text-muted-foreground">{currentGuests} guests</p>
                     </div>
-                    <Button variant="link" className="p-0 h-auto">
+                    <Button variant="link" className="p-0 h-auto" onClick={() => navigate(-1)}>
                       Edit
                     </Button>
                   </div>
@@ -246,7 +222,7 @@ export function Booking() {
                   <Label htmlFor="phone">Phone number</Label>
                   <Input
                     id="phone"
-                    placeholder="+1 234 567 8900"
+                    placeholder="0880123456"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                   />
@@ -286,7 +262,6 @@ export function Booking() {
                   <li>Follow the house rules</li>
                   <li>Treat your Host's home like your own</li>
                 </ul>
-
                 <div className="mt-6">
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
@@ -302,7 +277,6 @@ export function Booking() {
                 </div>
               </div>
 
-              {/* Payment Button */}
               <Button
                 onClick={handlePayment}
                 disabled={isProcessing || !agreedToRules}
@@ -318,7 +292,7 @@ export function Booking() {
               <div className="sticky top-24 border border-border rounded-xl p-6">
                 <div className="flex gap-4 mb-6">
                   <img
-                    src={currentProperty.images[0]}
+                    src={currentProperty.images?.[0]}
                     alt={currentProperty.title}
                     className="w-32 h-24 rounded-lg object-cover"
                   />
@@ -327,9 +301,9 @@ export function Booking() {
                     <h3 className="font-semibold mb-2 line-clamp-2">{currentProperty.title}</h3>
                     <div className="flex items-center gap-1 text-sm">
                       <Star className="w-3 h-3 fill-current" />
-                      <span className="font-semibold">{currentProperty.rating?.toFixed(2) || '4.9'}</span>
+                      <span className="font-semibold">{currentProperty.rating?.toFixed(2) || '—'}</span>
                       <span className="text-muted-foreground">
-                        ({currentProperty.reviewCount || 127} reviews)
+                        ({currentProperty.reviewCount || 0} reviews)
                       </span>
                     </div>
                   </div>
@@ -341,7 +315,11 @@ export function Booking() {
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between text-sm">
                     <span>
-                      {formatCurrency(currentProperty.price || 450)} x {(currentPricing.subtotal / (currentProperty.price || 450)).toFixed(0)} nights
+                      {formatCurrency(currentProperty.price || 0)} x{' '}
+                      {currentPricing.subtotal && currentProperty.price
+                        ? Math.round(currentPricing.subtotal / currentProperty.price)
+                        : 0}{' '}
+                      nights
                     </span>
                     <span>{formatCurrency(currentPricing.subtotal)}</span>
                   </div>

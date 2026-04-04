@@ -1,76 +1,12 @@
 from rest_framework import serializers
-<<<<<<< HEAD
-from .models import Booking
-<<<<<<< HEAD
-from django.utils import timezone
-
-#For owner to confirm/decline bookings
-class BookingConfrimationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Booking
-        fields = ['status', 'owner_notes', 'decline_reason']
-
-
-class BookingSerializer(serializers.ModelSerializer):
-    customer_username = serializers.CharField(source='customer.username', read_only=True)
-    listing_title = serializers.CharField(source='listing.title', read_only=True)
-    listing_owner = serializers.CharField(source='listing.owner.username', read_only=True)
-    days_until_expiry = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = Booking
-        fields = [
-            'id', 'customer', 'customer_username', 'listing', 'listing_title', 
-            'listing_owner', 'start_date', 'end_date', 'status', 'notes', 
-            'requested_at', 'confirmed_at', 'declined_at', 'owner_notes', 
-            'decline_reason', 'days_until_expiry' 
-        ]
-        read_only_fields = ['customer', 'requested_at', 'confirmed_at', 'declined_at']
-
-    
-    def get_days_until_expiry(self, obj):
-        if obj.status == 'requested' and obj.requested_at:
-            from datetime import timedelta
-            from django.utils import timezone
-            expiry_time = obj.requested_at + timedelta(hours=48)
-            remaining = expiry_time - timezone.now()
-            return max(0, remaining.days)
-        
-        return 0
-
-class BookingCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Booking
-        fields = ['listing', 'start_date', 'end_date', 'notes']
-
-    def validate(self, data):
-        from django.utils import timezone
-
-        #Check date validity 
-        if data['start_date'] >= data['end_date']:
-            raise serializers.ValidationError('End date must be after start date')
-        
-        #Check if dates are in the past
-        if data['start_date'] < timezone.now().date():
-            raise serializers.ValidationError('Start date cannot be in the past')
-        
-        return data
-
-=======
-=======
 from .models import Booking, SavedSearch, SearchAlert, ComparisonItem, PropertyComparison
 from listings.serializers import ListingSerializer
 from django.utils import timezone
->>>>>>> origin/jake
 
-#For owner to confirm/decline bookings
+
 class BookingConfrimationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
-<<<<<<< HEAD
-        fields = ["id", "listing_title", "customer_name", "start_date", "end_date", "created_at"]
->>>>>>> dalton
-=======
         fields = ['status', 'owner_notes', 'decline_reason']
 
 
@@ -79,27 +15,25 @@ class BookingSerializer(serializers.ModelSerializer):
     listing_title = serializers.CharField(source='listing.title', read_only=True)
     listing_owner = serializers.CharField(source='listing.owner.username', read_only=True)
     days_until_expiry = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Booking
         fields = [
-            'id', 'customer', 'customer_username', 'listing', 'listing_title', 
-            'listing_owner', 'start_date', 'end_date', 'status', 'notes', 
-            'requested_at', 'confirmed_at', 'declined_at', 'owner_notes', 
-            'decline_reason', 'days_until_expiry' 
+            'id', 'customer', 'customer_username', 'listing', 'listing_title',
+            'listing_owner', 'start_date', 'end_date', 'status', 'notes',
+            'requested_at', 'confirmed_at', 'declined_at', 'owner_notes',
+            'decline_reason', 'days_until_expiry'
         ]
         read_only_fields = ['customer', 'requested_at', 'confirmed_at', 'declined_at']
 
-    
     def get_days_until_expiry(self, obj):
         if obj.status == 'requested' and obj.requested_at:
             from datetime import timedelta
-            from django.utils import timezone
             expiry_time = obj.requested_at + timedelta(hours=48)
             remaining = expiry_time - timezone.now()
             return max(0, remaining.days)
-        
         return 0
+
 
 class BookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -107,16 +41,10 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         fields = ['listing', 'start_date', 'end_date', 'notes']
 
     def validate(self, data):
-        from django.utils import timezone
-
-        #Check date validity 
         if data['start_date'] >= data['end_date']:
             raise serializers.ValidationError('End date must be after start date')
-        
-        #Check if dates are in the past
         if data['start_date'] < timezone.now().date():
             raise serializers.ValidationError('Start date cannot be in the past')
-        
         return data
 
 
@@ -127,13 +55,15 @@ class SavedSearchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SavedSearch
-        fields = ['id', 'name', 'user', 'user_username', 'min_price', 'max_price',
-            'property_type', 'min_bedrooms', 'max_bedrooms', 'min_square_footage', 'max_square_footage',
-            'address', 'keywords', 'is_available', 'email_frequency', 'email_frequency_display',
-            'is_active', 'created_at', 'updated_at', 'listing_count']
-        
+        fields = [
+            'id', 'name', 'user', 'user_username', 'min_price', 'max_price',
+            'property_type', 'min_bedrooms', 'max_bedrooms', 'min_square_footage',
+            'max_square_footage', 'address', 'keywords', 'is_available',
+            'email_frequency', 'email_frequency_display', 'is_active',
+            'created_at', 'updated_at', 'listing_count'
+        ]
         read_only_fields = ['user', 'created_at', 'updated_at']
-    
+
     def get_listing_count(self, obj):
         return obj.alerts.count()
 
@@ -147,45 +77,40 @@ class SearchAlertSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SearchAlert
-        field = ['id', 'saved_search', 'listing', 'listing_title', 'listing_price', 
-            'listing_address', 'listing_image', 'saved_search_name', 'sent_at']
-        
+        fields = [
+            'id', 'saved_search', 'listing', 'listing_title', 'listing_price',
+            'listing_address', 'listing_image', 'saved_search_name', 'sent_at'
+        ]
         read_only_fields = ['sent_at']
-    
-    def get_listing_image(self,obj):
-        request = self.context.get('request')
 
-        if obj.lising.main_image and request:
+    def get_listing_image(self, obj):
+        request = self.context.get('request')
+        if obj.listing.main_image and request:
             return request.build_absolute_uri(obj.listing.main_image.url)
-        return obj.listing.main_image.url if obj.listing.main_image.url else None
-    
+        return obj.listing.main_image.url if obj.listing.main_image else None
+
 
 class SavedSearchCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SavedSearch
-        fields = ['name', 'min_price', 'max_price', 'property_type', 'min_bedrooms', 
-            'max_bedrooms', 'min_square_footage', 'max_square_footage', 
-            'address', 'keywords', 'is_available', 'email_frequency']
+        fields = [
+            'name', 'min_price', 'max_price', 'property_type', 'min_bedrooms',
+            'max_bedrooms', 'min_square_footage', 'max_square_footage',
+            'address', 'keywords', 'is_available', 'email_frequency'
+        ]
 
-       
-    def validate(self,data):
-        #Validate price range
+    def validate(self, data):
         if data.get('min_price') and data.get('max_price'):
             if data['min_price'] >= data['max_price']:
                 raise serializers.ValidationError('Min price must be less than max price')
-        
-        #Validate bedroom range
         if data.get('min_bedrooms') and data.get('max_bedrooms'):
             if data['min_bedrooms'] >= data['max_bedrooms']:
                 raise serializers.ValidationError('Min bedrooms must be less than max bedrooms')
-            
-        # Validate square footage range
         if data.get('min_square_footage') and data.get('max_square_footage'):
             if data['min_square_footage'] >= data['max_square_footage']:
                 raise serializers.ValidationError('Min square footage must be less than max square footage')
-            
         return data
-    
+
 
 class ComparisonItemSerializer(serializers.ModelSerializer):
     listing = ListingSerializer(read_only=True)
@@ -198,59 +123,39 @@ class ComparisonItemSerializer(serializers.ModelSerializer):
         model = ComparisonItem
         fields = ['id', 'listing', 'listing_title', 'order', 'notes', 'score', 'advantages', 'disadvantages']
 
-    
-    def get_score(self,obj):
-        #Calculates a simple score based on price, bedrooms, square footage
+    def get_score(self, obj):
         score = 0
-
-        #Price score(lower is better)
         if obj.listing.price:
-            avg_price = 1500   #Could calculate this from all listings
-            price_score = max(0, 100 - (obj.listing.price / avg_price * 100))
+            avg_price = 1500
+            price_score = max(0, 100 - (float(obj.listing.price) / avg_price * 100))
             score += price_score * 0.3
-
-        #Bedroom score
         if obj.listing.bedrooms:
-            bedroom_score = min(100, obj.listing.bedrooms * 20)
-            score += bedroom_score * 0.3
-        
-        # Square footage score
+            score += min(100, obj.listing.bedrooms * 20) * 0.3
         if obj.listing.square_footage:
-            sqft_score = min(100, obj.listing.square_footage / 10)
-            score += sqft_score * 0.4
-        
+            score += min(100, obj.listing.square_footage / 10) * 0.4
         return round(score, 1)
 
-
-    def get_advantages(self,obj):
-        #Generate advantages based on property features
+    def get_advantages(self, obj):
         advantages = []
-
         if obj.listing.bedrooms >= 3:
             advantages.append(f'{obj.listing.bedrooms} bedrooms - great for families')
-
         if obj.listing.square_footage >= 1000:
             advantages.append(f'Spacious {obj.listing.square_footage} sq ft')
-        
-        if obj.listing.price <= 1500:
+        if float(obj.listing.price) <= 1500:
             advantages.append('Affordable pricing')
-        
         return advantages
-    
-    def get_disadvantages(self,obj):
-        disadvantages = []
 
+    def get_disadvantages(self, obj):
+        disadvantages = []
         if obj.listing.bedrooms <= 1:
             disadvantages.append('Only 1 bedroom')
-        
         if obj.listing.square_footage <= 500:
             disadvantages.append(f'Small {obj.listing.square_footage} sq ft')
-
-        if obj.listing.price >= 2500:
+        if float(obj.listing.price) >= 2500:
             disadvantages.append('Higher price point')
-        
         return disadvantages
-    
+
+
 class PropertyComparisonSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
     items = ComparisonItemSerializer(many=True, read_only=True)
@@ -262,68 +167,58 @@ class PropertyComparisonSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyComparison
-        fields = ['id', 'name', 'user', 'user_username', 'items', 'total_properties',
+        fields = [
+            'id', 'name', 'user', 'user_username', 'items', 'total_properties',
             'share_url', 'average_price', 'average_bedrooms', 'average_square_footage',
-            'is_public', 'share_token', 'created_at', 'updated_at']
-        
+            'is_public', 'share_token', 'created_at', 'updated_at'
+        ]
         read_only_fields = ['user', 'created_at', 'updated_at', 'share_token']
 
-    def get_total_properties(self,obj):
+    def get_total_properties(self, obj):
         return obj.items.count()
-    
 
-    def get_share_url(self,obj):
+    def get_share_url(self, obj):
         if obj.is_public and obj.share_token:
             request = self.context.get('request')
             if request:
                 return f"{request.build_absolute_uri('/')}comparisons/{obj.share_token}/"
-            
         return None
-    
 
     def get_average_price(self, obj):
-        items = obj.items.all()
+        items = list(obj.items.all())
         if items:
-            total_price = sum(item.listing.price for item in items)
-            return round(total_price / len(items), 2)
+            return round(sum(float(item.listing.price) for item in items) / len(items), 2)
         return 0
-    
 
     def get_average_bedrooms(self, obj):
-        items = obj.items.all()
+        items = list(obj.items.all())
         if items:
-            total_bedrooms = sum(item.listing.bedrooms for item in items)
-            return round(total_bedrooms / len(items), 1)
+            return round(sum(item.listing.bedrooms for item in items) / len(items), 1)
         return 0
-    
 
     def get_average_square_footage(self, obj):
-        items = obj.items.all()
+        items = list(obj.items.all())
         if items:
-            total_sqft = sum(item.listing.square_footage for item in items)
-            return round(total_sqft / len(items), 0)
+            return round(sum(item.listing.square_footage for item in items) / len(items), 0)
         return 0
-    
+
 
 class ComparisonCreateSerializer(serializers.ModelSerializer):
     listing_ids = serializers.ListField(
-            child=serializers.IntegerField(),
-            write_only = True,
-            help_text='List of Listing IDs to compare'
-        )
+        child=serializers.IntegerField(),
+        write_only=True,
+        help_text='List of Listing IDs to compare'
+    )
     name = serializers.CharField(max_length=100, required=True)
     is_public = serializers.BooleanField(default=False, required=False)
 
     class Meta:
         model = PropertyComparison
         fields = ['listing_ids', 'name', 'is_public']
-    
 
-    def validate_listing_ids(self,value):
+    def validate_listing_ids(self, value):
         if len(value) < 2:
             raise serializers.ValidationError('At least two properties required for comparison')
         if len(value) > 4:
             raise serializers.ValidationError('Maximum 4 properties allowed for comparison')
-        
         return value
->>>>>>> origin/jake

@@ -1,28 +1,14 @@
 from django.urls import path
-<<<<<<< HEAD
-<<<<<<< HEAD
-from .views import bookings_collection, booking_detail, pending_bookings, confirm_booking, decline_booking
-=======
-from .views import bookings_collection, booking_detail
->>>>>>> dalton
-=======
-from .views import (bookings_collection, booking_detail, pending_bookings, 
-                    confirm_booking, decline_booking, search_alerts, saved_search_detail, 
-                    saved_searches,test_search,property_comparisons, comparison_detail,shared_comparison,
-                    add_to_comparison, remove_from_comparison)
->>>>>>> origin/jake
+from .views import (
+    bookings_collection, booking_detail, pending_bookings,
+    confirm_booking, decline_booking, search_alerts, saved_search_detail,
+    saved_searches, test_search, property_comparisons, comparison_detail,
+    shared_comparison, add_to_comparison, remove_from_comparison
+)
 
 urlpatterns = [
     path('', bookings_collection, name='bookings_collection'),
-    path('<int:id>', booking_detail, name='booking_detail'),
-<<<<<<< HEAD
-<<<<<<< HEAD
-    path('pending/', pending_bookings, name='pending_bookings'),
-    path('<int:id>/confirm/', confirm_booking, name='confirm_booking'),
-    path('<int:id>/decline/', decline_booking, name='decline_booking'),
-=======
->>>>>>> dalton
-=======
+    path('<int:id>/', booking_detail, name='booking_detail'),
     path('pending/', pending_bookings, name='pending_bookings'),
     path('<int:id>/confirm/', confirm_booking, name='confirm_booking'),
     path('<int:id>/decline/', decline_booking, name='decline_booking'),
@@ -33,7 +19,6 @@ urlpatterns = [
     path('comparisons/', property_comparisons, name='property_comparison'),
     path('comparisons/<int:id>/', comparison_detail, name='comparison_detail'),
     path('comparisons/shared/<str:token>/', shared_comparison, name='shared_comparison'),
-    path('comparisons/add/', add_to_comparison,name='add_to_comparison'),
+    path('comparisons/add/', add_to_comparison, name='add_to_comparison'),
     path('comparisons/remove/', remove_from_comparison, name='remove_from_comparison'),
->>>>>>> origin/jake
 ]

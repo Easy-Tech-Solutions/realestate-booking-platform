@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Users, Star, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -7,12 +7,18 @@ import { Textarea } from '../components/ui/textarea';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { useNavigate } from 'react-router';
 import { useApp } from '../../core/context';
+import { bookingsAPI, reviewsAPI } from '../../services/api.service';
 import { toast } from 'sonner';
 import { Booking } from '../../core/types';
 
 export function Trips() {
   const navigate = useNavigate();
-  const { bookings, cancelBooking } = useApp();
+  const { bookings, cancelBooking, isAuthenticated } = useApp();
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    bookingsAPI.getUserBookings().catch(() => {});
+  }, [isAuthenticated]);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [reviewTarget, setReviewTarget] = useState<Booking | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
@@ -21,19 +27,33 @@ export function Trips() {
   const upcoming = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
   const past = bookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!cancelTarget) return;
-    cancelBooking(cancelTarget.id);
-    toast.success('Booking cancelled successfully');
+    try {
+      await bookingsAPI.cancel(cancelTarget.id);
+      cancelBooking(cancelTarget.id);
+      toast.success('Booking cancelled successfully');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to cancel booking');
+    }
     setCancelTarget(null);
   };
 
-  const handleSubmitReview = () => {
+  const handleSubmitReview = async () => {
     if (!reviewText.trim()) {
       toast.error('Please write a review');
       return;
     }
-    toast.success('Review submitted — thank you!');
+    try {
+      await reviewsAPI.create({
+        listing: reviewTarget!.propertyId,
+        rating: reviewRating,
+        content: reviewText,
+      });
+      toast.success('Review submitted — thank you!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to submit review');
+    }
     setReviewTarget(null);
     setReviewText('');
     setReviewRating(5);

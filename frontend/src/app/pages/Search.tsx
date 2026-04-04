@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Filter, Map as MapIcon } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -6,10 +6,11 @@ import { Button } from '../components/ui/button';
 import { PropertyCard } from '../components/PropertyCard';
 import { FiltersDialog, ActiveFilters } from '../components/FiltersDialog';
 import { PropertyGridSkeleton } from '../components/Skeletons';
-import { mockProperties } from '../../services/mock-data';
+import { propertiesAPI } from '../../services/api.service';
 import { useApp } from '../../core/context';
 import { useNavigate } from 'react-router';
 import { formatCurrency } from '../../core/utils';
+import type { Property } from '../../core/types';
 
 function createPriceIcon(price: number, hovered: boolean) {
   return L.divIcon({
@@ -33,12 +34,13 @@ function createPriceIcon(price: number, hovered: boolean) {
 export function Search() {
   const { searchFilters } = useApp();
   const navigate = useNavigate();
+  const [allProperties, setAllProperties] = useState<Property[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showMap, setShowMap] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [isLoading] = useState(false);
   const [activeFilters, setActiveFilters] = useState<ActiveFilters>({
-    priceRange: [50, 1000],
+    priceRange: [0, 10000],
     propertyTypes: [],
     amenities: [],
     bedrooms: null,
@@ -48,8 +50,16 @@ export function Search() {
     superhost: false,
   });
 
+  useEffect(() => {
+    setIsLoading(true);
+    propertiesAPI.search(searchFilters)
+      .then(setAllProperties)
+      .catch(() => setAllProperties([]))
+      .finally(() => setIsLoading(false));
+  }, [searchFilters]);
+
   const filtered = useMemo(() => {
-    return mockProperties.filter(p => {
+    return allProperties.filter(p => {
       if (p.price < activeFilters.priceRange[0] || p.price > activeFilters.priceRange[1]) return false;
       if (activeFilters.propertyTypes.length > 0 && !activeFilters.propertyTypes.includes(p.propertyType)) return false;
       if (activeFilters.amenities.length > 0 && !activeFilters.amenities.every(a => p.amenities.some(pa => pa.id === a))) return false;
@@ -58,32 +68,27 @@ export function Search() {
       if (activeFilters.bathrooms !== null && p.bathrooms < activeFilters.bathrooms) return false;
       if (activeFilters.instantBook && !p.instantBook) return false;
       if (activeFilters.superhost && !p.isSuperhost) return false;
-      if (searchFilters.location && !`${p.location.city} ${p.location.state} ${p.location.country}`.toLowerCase().includes(searchFilters.location.toLowerCase())) return false;
-      if (searchFilters.guests && p.guests < searchFilters.guests) return false;
       return true;
     });
-  }, [activeFilters, searchFilters]);
+  }, [allProperties, activeFilters]);
 
-  const hasActiveFilters = activeFilters.propertyTypes.length > 0 ||
+  const hasActiveFilters =
+    activeFilters.propertyTypes.length > 0 ||
     activeFilters.amenities.length > 0 ||
     activeFilters.bedrooms !== null ||
     activeFilters.beds !== null ||
     activeFilters.bathrooms !== null ||
     activeFilters.instantBook ||
-    activeFilters.superhost ||
-    activeFilters.priceRange[0] !== 50 ||
-    activeFilters.priceRange[1] !== 1000;
+    activeFilters.superhost;
 
   return (
     <>
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-6">
-          {/* Filters Bar */}
           <div className="flex items-center justify-between mb-6">
             <div>
               <p className="text-sm text-muted-foreground mb-1">
                 {searchFilters.location && `${searchFilters.location} · `}
-                {searchFilters.checkIn && searchFilters.checkOut && 'Selected dates · '}
                 {searchFilters.guests && `${searchFilters.guests} guests`}
               </p>
               <h1 className="text-2xl font-semibold">
@@ -107,7 +112,6 @@ export function Search() {
             </div>
           </div>
 
-          {/* Results */}
           <div className={showMap ? 'grid lg:grid-cols-2 gap-6' : ''}>
             <div className={showMap ? '' : 'w-full'}>
               {isLoading ? (
@@ -121,7 +125,7 @@ export function Search() {
                   </p>
                   <Button
                     onClick={() => setActiveFilters({
-                      priceRange: [50, 1000],
+                      priceRange: [0, 10000],
                       propertyTypes: [],
                       amenities: [],
                       bedrooms: null,
@@ -149,12 +153,11 @@ export function Search() {
               )}
             </div>
 
-            {/* Map with price pins */}
             {showMap && (
               <div className="sticky top-24 h-[calc(100vh-8rem)] rounded-xl overflow-hidden">
                 <MapContainer
-                  center={[39.5, -98.35]}
-                  zoom={4}
+                  center={[6.3, -10.8]}
+                  zoom={7}
                   style={{ height: '100%', width: '100%' }}
                   scrollWheelZoom={false}
                 >
