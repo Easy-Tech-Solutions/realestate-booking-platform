@@ -1,6 +1,4 @@
 Django>=5.0,<6.0
-<<<<<<< HEAD
-<<<<<<< HEAD
 djangorestframework>=3.14,<4.0   
 django-cors-headers>=4.3,<5.0
 djangorestframework-simplejwt>=5.3,<6.0
@@ -8,11 +6,8 @@ django-filter>=24.3,<26.0    #For filtering and searching
 redis>=4.5, <5.0             #For caching and sessions
 pillow>=10.0,<11.0           #For image processing
 celery>=5.3,<6.0             #Background tasks
-=======
 djangorestframework>=3.14,<4.0
 django-cors-headers>=4.3,<5.0
->>>>>>> dalton
-=======
 djangorestframework>=3.14,<4.0   
 django-cors-headers>=4.3,<5.0
 djangorestframework-simplejwt>=5.3,<6.0
@@ -23,4 +18,3 @@ celery>=5.3,<6.0             #Background tasks
 channels>=4.0,<5.0           #WebSocket / real-time support
 channels-redis>=4.0,<5.0     #Redis channel layer backend for Django Channels
 daphne>=4.0,<5.0             #ASGI server that serves Django Channels
->>>>>>> origin/jake
