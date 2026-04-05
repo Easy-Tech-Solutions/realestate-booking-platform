@@ -9,7 +9,7 @@ class PublicUserSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        fields = ['image','bio']
+        fields = ['image','bio','momo_number']
         read_only_fields = ['user']
 
 class UserSerializer(serializers.ModelSerializer):

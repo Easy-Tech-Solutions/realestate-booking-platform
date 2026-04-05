@@ -26,6 +26,8 @@ class NotificationType(models.TextChoices):
     # Reports
     REPORT_SUBMITTED   = 'report_submitted',   'Report Submitted'
     REPORT_UPDATED     = 'report_updated',     'Report Updated'
+    # Account security
+    PHONE_NUMBER_CHANGED = 'phone_number_changed', 'Phone Number Changed'
 
 
 class Notification(models.Model):
@@ -110,6 +112,9 @@ class NotificationPreference(models.Model):
     # Reports
     report_submitted_email = models.BooleanField(default=True)  # admins
     report_updated_email   = models.BooleanField(default=True)  # reporters
+
+    # Account security
+    phone_number_changed_email = models.BooleanField(default=True)
 
     # Master switch — set False to silence ALL in-app notifications
     in_app_enabled = models.BooleanField(default=True)

@@ -133,6 +133,7 @@ REST_FRAMEWORK = {
         "register": "5/hour",
         "password_reset": "3/hour",
         "verify_email": "10/hour",
+        "phone_change": "5/hour",
     },
 }
 
@@ -229,6 +230,21 @@ PAYMENT_GATEWAYS = {
 #Currency settings
 DEFAULT_CURRENCY = 'LRD'
 SUPPORTED_CURRENCIES = ['LRD','USD']
+
+# ─── SMS Settings (phone number change OTP) ───────────────────────────────────
+# Development: OTPs are printed to the console (no external service needed).
+# Production:  Choose one provider and set its env vars.
+#
+# Option A — Twilio (global coverage, supports Liberia +231)
+#   pip install twilio
+TWILIO_ACCOUNT_SID  = os.environ.get('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN   = os.environ.get('TWILIO_AUTH_TOKEN')
+TWILIO_FROM_NUMBER  = os.environ.get('TWILIO_FROM_NUMBER')   # e.g. +12015551234
+#
+# Option B — Africa's Talking (strong LR coverage, MTN & Orange networks)
+#   pip install africastalking
+AT_USERNAME = os.environ.get('AT_USERNAME', 'sandbox')
+AT_API_KEY  = os.environ.get('AT_API_KEY')
 
 # ─── Django Channels / Real-time Messaging ────────────────────────────────────
 # Development: InMemoryChannelLayer needs no external services — works out of

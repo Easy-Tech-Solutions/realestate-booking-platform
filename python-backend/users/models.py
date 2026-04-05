@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
 
-# Placeholder custom user-related models could go here later
 
 class User(AbstractUser):
     ROLE_CHOICES = [
@@ -36,3 +36,57 @@ class Profile(models.Model):
 
     def __str__(self):
         return f'{self.user.username} Profile'
+
+
+class PhoneChangeRequest(models.Model):
+    """
+    Tracks a pending phone number change through the 3-step verification flow:
+      Step 1 — Password re-entry    (password_verified = True)
+      Step 2 — Email OTP            (email_otp_verified = True  → SMS sent to new number)
+      Step 3 — SMS OTP on new number (sms_otp_verified = True   → phone updated)
+
+    One active request per user at a time (OneToOneField).  The row is deleted
+    after the change is committed or if the user cancels.
+    """
+    NETWORK_MTN    = 'mtn'
+    NETWORK_ORANGE = 'orange'
+    NETWORK_CHOICES = [
+        (NETWORK_MTN,    'MTN Mobile Money'),
+        (NETWORK_ORANGE, 'Orange Money'),
+    ]
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='phone_change_request',
+    )
+    new_phone_number = models.CharField(max_length=20)
+    network_provider = models.CharField(
+        max_length=10,
+        choices=NETWORK_CHOICES,
+        help_text='Which wallet this number belongs to',
+    )
+
+    # Step 1
+    password_verified = models.BooleanField(default=False)
+
+    # Step 2 — email OTP
+    email_otp         = models.CharField(max_length=6)
+    email_otp_expiry  = models.DateTimeField()
+    email_otp_verified = models.BooleanField(default=False)
+
+    # Step 3 — SMS OTP sent to the new number
+    sms_otp           = models.CharField(max_length=6, blank=True)
+    sms_otp_expiry    = models.DateTimeField(null=True, blank=True)
+    sms_otp_verified  = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_email_otp_expired(self):
+        return timezone.now() > self.email_otp_expiry
+
+    def is_sms_otp_expired(self):
+        return self.sms_otp_expiry is None or timezone.now() > self.sms_otp_expiry
+
+    def __str__(self):
+        return f'{self.user.username} → {self.new_phone_number} ({self.get_network_provider_display()})'

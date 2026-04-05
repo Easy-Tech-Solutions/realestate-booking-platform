@@ -460,3 +460,30 @@ def notify_report_updated(report):
             'admin_notes': report.admin_notes,
         },
     )
+
+
+def notify_phone_number_changed(user, old_number, new_number, network_provider):
+    """
+    Notify the user that their mobile wallet number was successfully changed.
+    Sent as both an in-app notification and an email so the user has a paper
+    trail — important for a security-sensitive account change.
+    """
+    network_label = 'MTN Mobile Money' if network_provider == 'mtn' else 'Orange Money'
+    masked_old = f"{'*' * (len(old_number) - 4)}{old_number[-4:]}" if len(old_number) >= 4 else old_number
+    masked_new = f"{'*' * (len(new_number) - 4)}{new_number[-4:]}" if len(new_number) >= 4 else new_number
+
+    create_notification(
+        user=user,
+        notification_type='phone_number_changed',
+        title=f'{network_label} Number Updated',
+        message=(
+            f'Your {network_label} wallet number has been changed from '
+            f'{masked_old} to {masked_new}. '
+            f'If you did not make this change, contact support immediately.'
+        ),
+        data={
+            'network_provider': network_provider,
+            'old_number_masked': masked_old,
+            'new_number_masked': masked_new,
+        },
+    )

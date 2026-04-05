@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils import timezone
 from django.utils.html import format_html
 from .models import Report
 
@@ -34,6 +35,27 @@ class ReportAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+    def save_model(self, request, obj, form, change):
+        """
+        When an admin changes the status to resolved or dismissed through the
+        admin form, automatically stamp resolved_by and resolved_at so those
+        fields are never left blank.
+        """
+        if change:
+            original_status = Report.objects.filter(pk=obj.pk).values_list('status', flat=True).first()
+            terminal = {Report.Status.RESOLVED, Report.Status.DISMISSED}
+
+            if obj.status in terminal and original_status not in terminal:
+                # Status is transitioning into a terminal state — stamp the fields
+                obj.resolved_by = request.user
+                obj.resolved_at = timezone.now()
+            elif obj.status not in terminal:
+                # Status moved back out of terminal (e.g. re-opened) — clear the fields
+                obj.resolved_by = None
+                obj.resolved_at = None
+
+        super().save_model(request, obj, form, change)
 
     def reporter_link(self, obj):
         return format_html('<a href="/admin/users/user/{}/change/">{}</a>', obj.reporter_id, obj.reporter.username)
