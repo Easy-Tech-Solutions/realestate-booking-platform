@@ -26,6 +26,9 @@ class NotificationType(models.TextChoices):
     # Reports
     REPORT_SUBMITTED   = 'report_submitted',   'Report Submitted'
     REPORT_UPDATED     = 'report_updated',     'Report Updated'
+    # Account actions
+    ACCOUNT_SUSPENDED  = 'account_suspended',  'Account Suspended'
+    ACCOUNT_REINSTATED = 'account_reinstated', 'Account Reinstated'
     # Account security
     PHONE_NUMBER_CHANGED = 'phone_number_changed', 'Phone Number Changed'
 
@@ -110,8 +113,11 @@ class NotificationPreference(models.Model):
     new_review_email         = models.BooleanField(default=True)
 
     # Reports
-    report_submitted_email = models.BooleanField(default=True)  # admins
-    report_updated_email   = models.BooleanField(default=True)  # reporters
+    report_submitted_email   = models.BooleanField(default=True)  # admins
+    report_updated_email     = models.BooleanField(default=True)  # reporters
+    # Account actions
+    account_suspended_email  = models.BooleanField(default=True)
+    account_reinstated_email = models.BooleanField(default=True)
 
     # Account security
     phone_number_changed_email = models.BooleanField(default=True)

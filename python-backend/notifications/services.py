@@ -436,6 +436,56 @@ def notify_report_submitted(report):
         )
 
 
+def notify_account_suspended(suspension):
+    """
+    Notify the suspended user that their account has been actioned.
+    Called immediately after a Suspension record is created.
+    """
+    type_labels = {
+        'temporary':  'temporarily',
+        'indefinite': 'indefinitely',
+        'permanent':  'permanently',
+    }
+    adverb  = type_labels.get(suspension.suspension_type, '')
+    message = f'Your account has been {adverb} suspended.'
+    if suspension.ends_at:
+        message += f' The suspension will be lifted on {suspension.ends_at.strftime("%Y-%m-%d %H:%M UTC")}.'
+
+    create_notification(
+        user=suspension.user,
+        notification_type='account_suspended',
+        title='Account Suspended',
+        message=message,
+        data={
+            'suspension_id':   suspension.pk,
+            'suspension_type': suspension.suspension_type,
+            'reason':          suspension.reason,
+            'ends_at':         suspension.ends_at.isoformat() if suspension.ends_at else None,
+        },
+    )
+
+
+def notify_account_reinstated(suspension):
+    """
+    Notify the user that their suspension has been lifted (revoked or expired).
+    """
+    if suspension.status == 'revoked':
+        message = 'Your account suspension has been lifted by an administrator. You can now log in again.'
+    else:
+        message = 'Your temporary suspension has expired. You can now log in again.'
+
+    create_notification(
+        user=suspension.user,
+        notification_type='account_reinstated',
+        title='Account Reinstated',
+        message=message,
+        data={
+            'suspension_id': suspension.pk,
+            'status':        suspension.status,
+        },
+    )
+
+
 def notify_report_updated(report):
     """
     Notify the reporter that the status of their report has changed.

@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/messaging/', include('messaging.urls')),
     path('api/notifications/', include('notifications.urls')),
     path('api/reports/', include('reports.urls')),
+    path('api/suspensions/', include('suspensions.urls')),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) #Only for development server

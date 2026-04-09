@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "messaging",
     "notifications",
     "reports",
+    "suspensions",
 ]
 
 MIDDLEWARE = [
@@ -55,6 +56,7 @@ MIDDLEWARE = [
     # "django.contrib.allauth.account.middleware.AccountMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "suspensions.middleware.SuspensionMiddleware",
     "listings.middleware.ViewTrackingMiddleware",
 ]
 

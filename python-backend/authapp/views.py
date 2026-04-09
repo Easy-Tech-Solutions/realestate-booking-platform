@@ -10,7 +10,29 @@ from rest_framework_simplejwt.exceptions import TokenError
 from .serializers import UserSerializer
 from .throttles import LoginRateThrottle, RegisterRateThrottle, PasswordResetRateThrottle, VerifyEmailRateThrottle
 from django.contrib.auth import get_user_model
+from django.db.models import Q
+from django.utils import timezone
 User = get_user_model()
+
+
+def _get_active_suspension(user):
+    from suspensions.models import Suspension
+    return (
+        Suspension.objects
+        .filter(user=user, status=Suspension.Status.ACTIVE)
+        .filter(Q(ends_at__isnull=True) | Q(ends_at__gt=timezone.now()))
+        .first()
+    )
+
+
+def _suspension_response(suspension):
+    return {
+        "error": "Your account has been suspended.",
+        "code": "account_suspended",
+        "reason": suspension.reason,
+        "suspension_type": suspension.suspension_type,
+        "ends_at": suspension.ends_at.isoformat() if suspension.ends_at else None,
+    }
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -96,7 +118,12 @@ def login_view(request):
 
     if not user.is_active:
         return Response({"error": "This account has been deactivated."}, status=status.HTTP_403_FORBIDDEN)
-    
+
+    # Check for an active suspension before issuing tokens
+    suspension = _get_active_suspension(user)
+    if suspension:
+        return Response(_suspension_response(suspension), status=status.HTTP_403_FORBIDDEN)
+
     #Geneate JWT tokens
     refresh = RefreshToken.for_user(user)
     return Response({
@@ -133,6 +160,18 @@ def refresh_token_view(request):
         return Response({"error": "Refresh token is required"}, status=status.HTTP_400_BAD_REQUEST)
     try:
         refresh = RefreshToken(refresh_token)
+
+        # Block suspended users from minting new access tokens
+        user_id = refresh.get("user_id")
+        if user_id:
+            try:
+                user = User.objects.get(pk=user_id)
+                suspension = _get_active_suspension(user)
+                if suspension:
+                    return Response(_suspension_response(suspension), status=status.HTTP_403_FORBIDDEN)
+            except User.DoesNotExist:
+                pass
+
         access_token = str(refresh.access_token)
         return Response({"access_token": access_token})
     except Exception:
