@@ -1,7 +1,0 @@
-/* Keep this file minimal; rely on legacy theme CSS and Bootstrap. */
-html, body, #root {
-  height: 100%;
-}
-body {
-  margin: 0;
-}
