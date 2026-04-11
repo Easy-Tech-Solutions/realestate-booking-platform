@@ -1,4 +1,5 @@
 from rest_framework import serializers
+import json
 from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyCategory
 
 
@@ -74,6 +75,27 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def get_review_count(self, obj):
         return obj.reviews.count()
+
+    def _normalize_list_field(self, value, field_name):
+        if value is None or value == '':
+            return []
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise serializers.ValidationError(f"{field_name} must be a valid JSON array.") from exc
+            if isinstance(parsed, list):
+                return parsed
+            raise serializers.ValidationError(f"{field_name} must be a list.")
+        raise serializers.ValidationError(f"{field_name} must be a list.")
+
+    def validate_amenities(self, value):
+        return self._normalize_list_field(value, 'amenities')
+
+    def validate_highlights(self, value):
+        return self._normalize_list_field(value, 'highlights')
 
     def validate_property_type(self, value):
         category_slug = (value or 'homes').strip().lower()

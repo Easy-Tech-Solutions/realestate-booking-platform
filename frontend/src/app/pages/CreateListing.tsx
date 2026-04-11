@@ -281,7 +281,20 @@ export function CreateListing() {
       toast.success('Listing created successfully');
       navigate('/host');
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to create listing');
+      if (error?.status === 401) {
+        toast.error('Your session has expired. Please log in again.');
+      } else if (error?.status === 400 && error?.data && typeof error.data === 'object') {
+        const firstEntry = Object.entries(error.data)[0] as [string, any] | undefined;
+        if (firstEntry) {
+          const [field, value] = firstEntry;
+          const detail = Array.isArray(value) ? value[0] : String(value);
+          toast.error(`${field}: ${detail}`);
+        } else {
+          toast.error('Invalid listing data. Please review all required fields.');
+        }
+      } else {
+        toast.error(error?.message || 'Failed to create listing');
+      }
     } finally {
       setIsSubmitting(false);
     }
