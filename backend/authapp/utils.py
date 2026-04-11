@@ -19,7 +19,7 @@ def send_verification_email(user):
 
     """
     subject = "Verify your Email Address"
-    verification_url = f"http://{settings.LOCAL_DOMAIN}/verify-email?token={token}"
+    verification_url = f"https://{settings.LOCAL_DOMAIN}/verify-email?token={token}"
     html_message = render_to_string("auth/verification_email.html", {
         "user": user,
         "verification_url": verification_url,
@@ -42,7 +42,7 @@ def send_password_reset_email(user):
 
     """
     subject = "Reset your Password"
-    reset_url = f"http://{settings.LOCAL_DOMAIN}/reset-password?token={token}"
+    reset_url = f"https://{settings.LOCAL_DOMAIN}/reset-password?token={token}"
     html_message = render_to_string("auth/password_reset_email.html", {
         "user": user,
         "reset_url": reset_url,
