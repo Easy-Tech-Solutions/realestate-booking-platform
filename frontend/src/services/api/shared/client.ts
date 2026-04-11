@@ -20,6 +20,26 @@ export const clearTokens = () => {
 
 export const getAccessToken = () => accessToken;
 
+export async function fetchPublicJson<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    ...(!(options.body instanceof FormData) && { 'Content-Type': 'application/json' }),
+    ...(options.headers as Record<string, string>),
+  };
+
+  const response = await fetch(`${API_BASE_URL}${url}`, { ...options, headers });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new ApiError(error.error || response.statusText, response.status, error);
+  }
+
+  if (response.status === 204) {
+    return null as T;
+  }
+
+  return response.json() as Promise<T>;
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
 
