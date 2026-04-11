@@ -12,6 +12,7 @@ from .throttles import LoginRateThrottle, RegisterRateThrottle, PasswordResetRat
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
+from django.conf import settings
 User = get_user_model()
 
 
@@ -71,7 +72,14 @@ def register(request):
         return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        user = User.objects.create_user(username=username, email=email, password=password, first_name=first_name or "", last_name=last_name or "", is_active=False)  #User needs to verify email
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name or "",
+            last_name=last_name or "",
+            is_active=not settings.AUTH_REQUIRE_EMAIL_VERIFICATION,
+        )
         # Send verification email (pseudo-code)
         from . utils import send_verification_email
         send_verification_email(user)
@@ -112,8 +120,7 @@ def login_view(request):
     if user is None:
         return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    # Temporarily disabled for testing
-    if not user.email_verified:
+    if settings.AUTH_REQUIRE_EMAIL_VERIFICATION and not user.email_verified:
         return Response({"error": "Please verify your email before logging in. Check your email for the verification link."}, status=status.HTTP_403_FORBIDDEN)
 
     if not user.is_active:
