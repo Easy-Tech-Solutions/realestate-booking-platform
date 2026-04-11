@@ -6,32 +6,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import { Textarea } from '../components/ui/textarea';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { useNavigate } from 'react-router';
-import { useApp } from '../../core/context';
-import { bookingsAPI, reviewsAPI } from '../../services/api.service';
+import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { Booking } from '../../core/types';
+import { useUserTrips } from '../../hooks/queries/useTrips';
 
 export function Trips() {
   const navigate = useNavigate();
-  const { bookings, cancelBooking, isAuthenticated } = useApp();
+  const { isAuthenticated } = useApp();
+  const { upcomingTrips, pastTrips, isLoading, isError, cancelMutation, reviewMutation } = useUserTrips(isAuthenticated);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    bookingsAPI.getUserBookings().catch(() => {});
-  }, [isAuthenticated]);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [reviewTarget, setReviewTarget] = useState<Booking | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
 
-  const upcoming = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
-  const past = bookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
+  useEffect(() => {
+    if (isError) {
+      toast.error('Failed to load your trips');
+    }
+  }, [isError]);
 
   const handleCancel = async () => {
     if (!cancelTarget) return;
     try {
-      await bookingsAPI.cancel(cancelTarget.id);
-      cancelBooking(cancelTarget.id);
+      await cancelMutation.mutateAsync(cancelTarget.id);
       toast.success('Booking cancelled successfully');
     } catch (err: any) {
       toast.error(err.message || 'Failed to cancel booking');
@@ -45,11 +44,7 @@ export function Trips() {
       return;
     }
     try {
-      await reviewsAPI.create({
-        listing: reviewTarget!.propertyId,
-        rating: reviewRating,
-        content: reviewText,
-      });
+      await reviewMutation.mutateAsync({ listingId: reviewTarget!.propertyId, rating: reviewRating, content: reviewText });
       toast.success('Review submitted — thank you!');
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit review');
@@ -59,7 +54,7 @@ export function Trips() {
     setReviewRating(5);
   };
 
-  const TripCard = ({ trip, isPast }: { trip: Booking; isPast?: boolean }) => (
+  const TripCard = ({ trip, isPast }: { trip: (typeof upcomingTrips)[number]; isPast?: boolean }) => (
     <div className="border border-border rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
       <div className="grid md:grid-cols-3 gap-6 p-6">
         <img
@@ -71,12 +66,12 @@ export function Trips() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${
-                trip.status === 'confirmed' ? 'bg-primary/10 text-primary' :
-                trip.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                trip.status === 'cancelled' ? 'bg-red-100 text-red-600' :
+                trip.booking.status === 'confirmed' ? 'bg-primary/10 text-primary' :
+                trip.booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                trip.booking.status === 'cancelled' ? 'bg-red-100 text-red-600' :
                 'bg-gray-100 text-gray-600'
               }`}>
-                {trip.status}
+                {trip.booking.status}
               </span>
             </div>
             <h3 className="text-xl font-semibold mb-2">{trip.property.title}</h3>
@@ -87,7 +82,7 @@ export function Trips() {
               </div>
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                {trip.guests} guest{trip.guests > 1 ? 's' : ''}
+                {trip.booking.guests} guest{trip.booking.guests > 1 ? 's' : ''}
               </div>
             </div>
           </div>
@@ -95,23 +90,23 @@ export function Trips() {
           <div className="flex items-center gap-2 text-sm">
             <Calendar className="w-4 h-4" />
             <span>
-              {formatDate(trip.checkIn, 'MMM dd')} – {formatDate(trip.checkOut, 'MMM dd, yyyy')}
+              {formatDate(trip.booking.checkIn, 'MMM dd')} – {formatDate(trip.booking.checkOut, 'MMM dd, yyyy')}
             </span>
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-border">
             <div>
               <p className="text-sm text-muted-foreground">Total price</p>
-              <p className="text-xl font-semibold">{formatCurrency(trip.totalPrice)}</p>
+              <p className="text-xl font-semibold">{formatCurrency(trip.estimatedTotal)}</p>
             </div>
             <div className="flex gap-2">
-              {!isPast && trip.status !== 'cancelled' && (
-                <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setCancelTarget(trip)}>
+              {!isPast && trip.booking.status !== 'cancelled' && (
+                <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setCancelTarget(trip.booking)}>
                   Cancel
                 </Button>
               )}
-              {isPast && trip.status === 'completed' && (
-                <Button variant="outline" onClick={() => setReviewTarget(trip)}>
+              {isPast && trip.booking.status === 'completed' && (
+                <Button variant="outline" onClick={() => setReviewTarget(trip.booking)}>
                   <Star className="w-4 h-4 mr-1" /> Review
                 </Button>
               )}
@@ -138,17 +133,19 @@ export function Trips() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-20">
         <h1 className="text-3xl font-semibold mb-8">Trips</h1>
 
+        {isLoading && <p className="text-muted-foreground mb-6">Loading your trips...</p>}
+
         <Tabs defaultValue="upcoming" className="w-full">
           <TabsList className="mb-8">
             <TabsTrigger value="upcoming">
-              Upcoming {upcoming.length > 0 && `(${upcoming.length})`}
+              Upcoming {upcomingTrips.length > 0 && `(${upcomingTrips.length})`}
             </TabsTrigger>
             <TabsTrigger value="past">Past</TabsTrigger>
           </TabsList>
 
           <TabsContent value="upcoming" className="space-y-6">
-            {upcoming.length > 0 ? (
-              upcoming.map(trip => <TripCard key={trip.id} trip={trip} />)
+            {upcomingTrips.length > 0 ? (
+              upcomingTrips.map(trip => <TripCard key={trip.booking.id} trip={trip} />)
             ) : (
               <EmptyState
                 message="No trips booked...yet!"
@@ -158,8 +155,8 @@ export function Trips() {
           </TabsContent>
 
           <TabsContent value="past" className="space-y-6">
-            {past.length > 0 ? (
-              past.map(trip => <TripCard key={trip.id} trip={trip} isPast />)
+            {pastTrips.length > 0 ? (
+              pastTrips.map(trip => <TripCard key={trip.booking.id} trip={trip} isPast />)
             ) : (
               <EmptyState
                 message="No past trips"
@@ -204,7 +201,12 @@ export function Trips() {
               <p className="text-sm font-medium mb-2">Rating</p>
               <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map(n => (
-                  <button key={n} onClick={() => setReviewRating(n)}>
+                  <button
+                    key={n}
+                    onClick={() => setReviewRating(n)}
+                    aria-label={`Rate ${n} star${n > 1 ? 's' : ''}`}
+                    title={`Rate ${n} star${n > 1 ? 's' : ''}`}
+                  >
                     <Star className={`w-7 h-7 transition-colors ${n <= reviewRating ? 'fill-primary text-primary' : 'text-muted-foreground'}`} />
                   </button>
                 ))}

@@ -29,6 +29,7 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     image = models.ImageField(upload_to='uploads/', null=True, blank=True)
     bio = models.TextField(blank=True)
+    is_superhost = models.BooleanField(default=False)
     momo_number = models.CharField(
         max_length=20, blank=True,
         help_text='MTN Mobile Money number for receiving payouts (Liberian format, e.g. 0880123456)'

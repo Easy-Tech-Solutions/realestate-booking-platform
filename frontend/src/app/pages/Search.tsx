@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Filter, Map as MapIcon } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -6,11 +6,10 @@ import { Button } from '../components/ui/button';
 import { PropertyCard } from '../components/PropertyCard';
 import { FiltersDialog, ActiveFilters } from '../components/FiltersDialog';
 import { PropertyGridSkeleton } from '../components/Skeletons';
-import { propertiesAPI } from '../../services/api.service';
-import { useApp } from '../../core/context';
+import { useApp } from '../../hooks/useApp';
 import { useNavigate } from 'react-router';
 import { formatCurrency } from '../../core/utils';
-import type { Property } from '../../core/types';
+import { useSearchProperties } from '../../hooks/queries/useSearchProperties';
 
 function createPriceIcon(price: number, hovered: boolean) {
   return L.divIcon({
@@ -34,11 +33,12 @@ function createPriceIcon(price: number, hovered: boolean) {
 export function Search() {
   const { searchFilters } = useApp();
   const navigate = useNavigate();
-  const [allProperties, setAllProperties] = useState<Property[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [showMap, setShowMap] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const searchQuery = useSearchProperties(searchFilters);
+  const allProperties = useMemo(() => searchQuery.data || [], [searchQuery.data]);
+  const isLoading = searchQuery.isLoading;
   const [activeFilters, setActiveFilters] = useState<ActiveFilters>({
     priceRange: [0, 10000],
     propertyTypes: [],
@@ -49,14 +49,6 @@ export function Search() {
     instantBook: false,
     superhost: false,
   });
-
-  useEffect(() => {
-    setIsLoading(true);
-    propertiesAPI.search(searchFilters)
-      .then(setAllProperties)
-      .catch(() => setAllProperties([]))
-      .finally(() => setIsLoading(false));
-  }, [searchFilters]);
 
   const filtered = useMemo(() => {
     return allProperties.filter(p => {
@@ -158,7 +150,7 @@ export function Search() {
                 <MapContainer
                   center={[6.3, -10.8]}
                   zoom={7}
-                  style={{ height: '100%', width: '100%' }}
+                  style={{ blockSize: '100%', inlineSize: '100%' }}
                   scrollWheelZoom={false}
                 >
                   <TileLayer

@@ -9,6 +9,7 @@ class ListingFilter(filters.FilterSet):
     max_bedrooms = filters.NumberFilter(field_name='bedrooms', lookup_expr='lte')
     min_square_footage = filters.NumberFilter(field_name='square_footage', lookup_expr='gte')
     max_square_footage = filters.NumberFilter(field_name='square_footage', lookup_expr='lte')
+    owner_id = filters.NumberFilter(field_name='owner__id', lookup_expr='exact')
 
     # Exact match filters for choice fields
     property_type_exact = filters.ChoiceFilter(field_name='property_type', choices=Listing.PROPERTY_TYPES)

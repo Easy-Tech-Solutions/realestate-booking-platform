@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Ban,
   Building2,
@@ -8,34 +9,26 @@ import {
   TrendingUp,
   Users,
   Search,
-  Filter,
   Eye,
   X,
   Flag,
   Shield,
   Settings,
   BarChart3,
-  UserCheck,
   Calendar,
   MessageSquare,
+  Mail,
   CreditCard,
-  Lock,
-  Key,
   AlertTriangle,
-  FileText,
-  Percent,
-  Globe,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { formatCurrency } from '../../core/utils';
-import { mockUsers, mockProperties, mockReviews } from '../../services/mock-data';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import {
   Sidebar,
@@ -50,12 +43,127 @@ import {
   SidebarTrigger,
 } from '../components/ui/sidebar';
 
+const adminUsers = [
+  {
+    id: '1',
+    email: 'john.doe@example.com',
+    firstName: 'John',
+    lastName: 'Doe',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&h=120&fit=crop',
+    isHost: true,
+    verified: true,
+    createdAt: '2023-01-12T00:00:00Z',
+  },
+  {
+    id: '2',
+    email: 'sarah.smith@example.com',
+    firstName: 'Sarah',
+    lastName: 'Smith',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop',
+    isHost: true,
+    verified: true,
+    createdAt: '2022-10-08T00:00:00Z',
+  },
+  {
+    id: '3',
+    email: 'mike.johnson@example.com',
+    firstName: 'Mike',
+    lastName: 'Johnson',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop',
+    isHost: false,
+    verified: false,
+    createdAt: '2024-02-19T00:00:00Z',
+  },
+];
+
+const adminProperties = [
+  {
+    id: '1',
+    title: 'Luxurious Beachfront Villa',
+    images: ['https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1000&h=700&fit=crop'],
+    location: { city: 'Kigali' },
+    host: { firstName: 'John', lastName: 'Doe' },
+    price: 495,
+  },
+  {
+    id: '2',
+    title: 'Modern Apartment Downtown',
+    images: ['https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=1000&h=700&fit=crop'],
+    location: { city: 'Nairobi' },
+    host: { firstName: 'Sarah', lastName: 'Smith' },
+    price: 185,
+  },
+  {
+    id: '3',
+    title: 'Cozy Forest Cabin',
+    images: ['https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=1000&h=700&fit=crop'],
+    location: { city: 'Musanze' },
+    host: { firstName: 'Liam', lastName: 'Ncube' },
+    price: 260,
+  },
+  {
+    id: '4',
+    title: 'Urban Loft with City View',
+    images: ['https://images.unsplash.com/photo-1494526585095-c41746248156?w=1000&h=700&fit=crop'],
+    location: { city: 'Kampala' },
+    host: { firstName: 'Amina', lastName: 'Okello' },
+    price: 210,
+  },
+  {
+    id: '5',
+    title: 'Lakefront Family Retreat',
+    images: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1000&h=700&fit=crop'],
+    location: { city: 'Entebbe' },
+    host: { firstName: 'Grace', lastName: 'Irene' },
+    price: 430,
+  },
+];
+
+const adminReviews = [
+  {
+    id: 'R1',
+    user: {
+      firstName: 'Noah',
+      lastName: 'Kimani',
+      avatar: 'https://images.unsplash.com/photo-1521119989659-a83eee488004?w=100&h=100&fit=crop',
+    },
+    rating: 5,
+    comment: 'Absolutely amazing stay with top-tier hospitality.',
+    createdAt: '2024-05-14T00:00:00Z',
+    propertyId: '1',
+  },
+  {
+    id: 'R2',
+    user: {
+      firstName: 'Sophia',
+      lastName: 'Nyongesa',
+      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop',
+    },
+    rating: 4,
+    comment: 'Great place and smooth communication, would book again.',
+    createdAt: '2024-05-08T00:00:00Z',
+    propertyId: '2',
+  },
+  {
+    id: 'R3',
+    user: {
+      firstName: 'Daniel',
+      lastName: 'Moyo',
+      avatar: 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100&h=100&fit=crop',
+    },
+    rating: 3,
+    comment: 'Nice location, but check-in instructions could be clearer.',
+    createdAt: '2024-04-28T00:00:00Z',
+    propertyId: '5',
+  },
+];
+
 // Mock data for additional sections
 const mockBookings = [
   {
     id: 'BK001',
     guest: { name: 'Mike Johnson', email: 'mike@example.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop' },
-    property: mockProperties[0].title,
+    property: adminProperties[0].title,
     checkIn: '2024-05-10',
     checkOut: '2024-05-15',
     total: 2475,
@@ -66,7 +174,7 @@ const mockBookings = [
   {
     id: 'BK002',
     guest: { name: 'Emma Wilson', email: 'emma@example.com', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop' },
-    property: mockProperties[1].title,
+    property: adminProperties[1].title,
     checkIn: '2024-06-03',
     checkOut: '2024-06-07',
     total: 925,
@@ -77,7 +185,7 @@ const mockBookings = [
   {
     id: 'BK003',
     guest: { name: 'Alex Brown', email: 'alex@example.com', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop' },
-    property: mockProperties[2].title,
+    property: adminProperties[2].title,
     checkIn: '2024-04-20',
     checkOut: '2024-04-23',
     total: 780,
@@ -88,7 +196,7 @@ const mockBookings = [
   {
     id: 'BK004',
     guest: { name: 'Lisa Chen', email: 'lisa@example.com', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop' },
-    property: mockProperties[4].title,
+    property: adminProperties[4].title,
     checkIn: '2024-03-15',
     checkOut: '2024-03-22',
     total: 3010,
@@ -164,11 +272,12 @@ const menuItems = [
 ];
 
 export function AdminDashboard() {
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('overview');
-  const [properties, setProperties] = useState(mockProperties);
-  const [users, setUsers] = useState(mockUsers);
-  const [bookings, setBookings] = useState(mockBookings);
-  const [reviews, setReviews] = useState(mockReviews);
+  const properties = adminProperties;
+  const users = adminUsers;
+  const bookings = mockBookings;
+  const reviews = adminReviews;
 
   const renderOverview = () => (
     <div className="space-y-6">
@@ -539,7 +648,7 @@ export function AdminDashboard() {
                     </div>
                     <p className="text-sm mb-4">{review.comment}</p>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Property: {mockProperties.find(p => p.id === review.propertyId)?.title}</span>
+                      <span>Property: {adminProperties.find(p => p.id === review.propertyId)?.title}</span>
                     </div>
                   </div>
                 </div>
@@ -953,11 +1062,15 @@ export function AdminDashboard() {
 
         <main className="flex-1 overflow-auto">
           <div className="p-6">
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex flex-wrap items-center gap-3 mb-6">
               <SidebarTrigger />
               <h1 className="text-2xl font-semibold">
                 {menuItems.find(item => item.id === activeSection)?.label}
               </h1>
+              <div className="ml-auto flex items-center gap-2">
+                <Button variant="outline" onClick={() => navigate('/admin/reports')}>Open Reports Center</Button>
+                <Button variant="outline" onClick={() => navigate('/admin/suspensions')}>Open Suspensions Center</Button>
+              </div>
             </div>
             {renderContent()}
           </div>

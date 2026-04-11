@@ -13,6 +13,34 @@ from .serializers import (
 )
 from listings.models import Listing
 from listings.serializers import ListingSerializer
+from django.db.models import Avg as _Avg
+
+
+def _check_superhost(owner):
+    """Auto-assign Superhost badge if owner meets criteria."""
+    try:
+        from listings.models import Review as _Review
+        total = Booking.objects.filter(
+            listing__owner=owner, status__in=['confirmed', 'completed']
+        ).count()
+        if total < 10:
+            return
+        avg = _Review.objects.filter(listing__owner=owner).aggregate(avg=_Avg('rating'))['avg'] or 0
+        responded = Booking.objects.filter(
+            listing__owner=owner, status__in=['confirmed', 'declined']
+        ).count()
+        total_requests = Booking.objects.filter(
+            listing__owner=owner,
+            status__in=['requested', 'confirmed', 'declined', 'completed']
+        ).count()
+        response_rate = (responded / total_requests * 100) if total_requests > 0 else 0
+        qualifies = avg >= 4.8 and response_rate >= 90
+        profile = owner.profile
+        if profile.is_superhost != qualifies:
+            profile.is_superhost = qualifies
+            profile.save()
+    except Exception:
+        pass
 
 
 @api_view(["GET", "POST"])
@@ -46,6 +74,11 @@ def bookings_collection(request):
             serializer = BookingCreateSerializer(data=request.data)
             if serializer.is_valid():
                 booking = serializer.save(customer=request.user)
+                # Instant book: auto-confirm if listing is set to instant
+                if listing.booking_mode == 'instant':
+                    booking.status = 'confirmed'
+                    booking.confirmed_at = timezone.now()
+                    booking.save()
                 return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -116,6 +149,10 @@ def confirm_booking(request, id):
     booking.status = 'confirmed'
     booking.confirmed_at = timezone.now()
     booking.save()
+
+    # Superhost check: auto-assign if owner meets criteria
+    _check_superhost(booking.listing.owner)
+
     return Response(BookingSerializer(booking, context={'request': request}).data)
 
 

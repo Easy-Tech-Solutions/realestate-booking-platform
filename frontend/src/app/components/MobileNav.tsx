@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router';
 import { Home, Search, Heart, MessageSquare, User } from 'lucide-react';
 import { cn } from '../../core/utils';
-import { useApp } from '../../core/context';
+import { useApp } from '../../hooks/useApp';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },

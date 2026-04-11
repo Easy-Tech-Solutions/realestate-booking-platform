@@ -4,8 +4,7 @@ import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Separator } from './ui/separator';
-import { useApp } from '../../core/context';
+import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 
 interface AuthDialogProps {

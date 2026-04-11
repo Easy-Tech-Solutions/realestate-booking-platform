@@ -7,7 +7,6 @@ import { Checkbox } from './ui/checkbox';
 import { Slider } from './ui/slider';
 import { AMENITIES, PROPERTY_TYPES } from '../../core/constants';
 import { formatCurrency } from '../../core/utils';
-import { mockProperties } from '../../services/mock-data';
 
 export interface ActiveFilters {
   priceRange: [number, number];
@@ -28,19 +27,16 @@ interface FiltersDialogProps {
 
 // Build a simple price histogram from mock data
 const BUCKETS = 20;
-const prices = mockProperties.map(p => p.price);
-const minPrice = Math.min(...prices);
-const maxPrice = Math.max(...prices);
-const bucketSize = (maxPrice - minPrice) / BUCKETS;
-const histogram = Array.from({ length: BUCKETS }, (_, i) => {
-  const lo = minPrice + i * bucketSize;
-  const hi = lo + bucketSize;
-  return prices.filter(p => p >= lo && p < hi).length;
-});
+const ABSOLUTE_MIN_PRICE = 0;
+const ABSOLUTE_MAX_PRICE = 2000;
+const DEFAULT_MIN_PRICE = 50;
+const DEFAULT_MAX_PRICE = 1000;
+const bucketSize = (ABSOLUTE_MAX_PRICE - ABSOLUTE_MIN_PRICE) / BUCKETS;
+const histogram = [3, 4, 5, 8, 10, 12, 11, 9, 8, 7, 6, 5, 4, 6, 7, 8, 6, 4, 3, 2];
 const histMax = Math.max(...histogram);
 
 export function FiltersDialog({ open, onClose, onApply }: FiltersDialogProps) {
-  const [priceRange, setPriceRange] = useState<[number, number]>([50, 1000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([DEFAULT_MIN_PRICE, DEFAULT_MAX_PRICE]);
   const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<string[]>([]);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
@@ -50,7 +46,7 @@ export function FiltersDialog({ open, onClose, onApply }: FiltersDialogProps) {
   const [superhost, setSuperhost] = useState(false);
 
   const handleClearAll = () => {
-    setPriceRange([50, 1000]);
+    setPriceRange([DEFAULT_MIN_PRICE, DEFAULT_MAX_PRICE]);
     setSelectedPropertyTypes([]);
     setSelectedAmenities([]);
     setBedrooms(null);
@@ -76,7 +72,7 @@ export function FiltersDialog({ open, onClose, onApply }: FiltersDialogProps) {
   };
 
   const activeCount = [
-    priceRange[0] !== 50 || priceRange[1] !== 1000,
+    priceRange[0] !== DEFAULT_MIN_PRICE || priceRange[1] !== DEFAULT_MAX_PRICE,
     selectedPropertyTypes.length > 0,
     selectedAmenities.length > 0,
     bedrooms !== null,
@@ -107,7 +103,7 @@ export function FiltersDialog({ open, onClose, onApply }: FiltersDialogProps) {
             {/* Histogram bars */}
             <div className="flex items-end gap-0.5 h-16 mb-3">
               {histogram.map((count, i) => {
-                const lo = minPrice + i * bucketSize;
+                const lo = ABSOLUTE_MIN_PRICE + i * bucketSize;
                 const hi = lo + bucketSize;
                 const inRange = hi >= priceRange[0] && lo <= priceRange[1];
                 return (
@@ -126,8 +122,8 @@ export function FiltersDialog({ open, onClose, onApply }: FiltersDialogProps) {
             <Slider
               value={priceRange}
               onValueChange={v => setPriceRange(v as [number, number])}
-              min={0}
-              max={2000}
+              min={ABSOLUTE_MIN_PRICE}
+              max={ABSOLUTE_MAX_PRICE}
               step={10}
               className="mb-4"
             />

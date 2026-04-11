@@ -1,51 +1,73 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import {
-  Star, Share, Heart, MapPin, Users, Bed, Bath, Award, Shield,
+  Star, Share, Heart, MapPin, Award, Shield,
   ChevronLeft, ChevronRight, X, Minus, Plus,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
 import { Calendar } from '../components/ui/calendar';
 import { motion, AnimatePresence } from 'motion/react';
-import { propertiesAPI, reviewsAPI } from '../../services/api.service';
-import { AMENITIES } from '../../core/constants';
-import { formatCurrency, calculateNights, calculateTotalPrice, formatDate, getInitials } from '../../core/utils';
-import { useApp } from '../../core/context';
+import { CANCELLATION_POLICIES } from '../../core/constants';
+import { formatCurrency, calculateNights, formatDate, getInitials } from '../../core/utils';
+import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { DateRange } from 'react-day-picker';
-import * as Icons from 'lucide-react';
 import type { Property, Review } from '../../core/types';
+import { ReportDialog } from '../components/ReportDialog';
+import { getErrorMessage } from '../../services/api/shared/errors';
+import { usePropertyDetails } from '../../hooks/queries/usePropertyDetails';
+import { usePropertyPricing } from '../../hooks/queries/usePropertyPricing';
+import { fallbackIcon, iconMap } from '../../core/icon-map';
 
 export function PropertyDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, wishlistIds, toggleWishlist } = useApp();
 
-  const [property, setProperty] = useState<Property | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [guests, setGuests] = useState(2);
+  const { propertyQuery, reviewsQuery, availabilityQuery } = usePropertyDetails(id);
+  const pricingQuery = usePropertyPricing(
+    id,
+    dateRange?.from?.toISOString().split('T')[0],
+    dateRange?.to?.toISOString().split('T')[0]
+  );
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (!id) return;
-    setIsLoading(true);
-    setFetchError(false);
-    propertiesAPI.getById(id)
-      .then(setProperty)
-      .catch(() => setFetchError(true))
-      .finally(() => setIsLoading(false));
-    reviewsAPI.getByProperty(id)
-      .then(setReviews)
-      .catch(() => {});
   }, [id]);
+
+  useEffect(() => {
+    if (propertyQuery.error || reviewsQuery.error || availabilityQuery.error) {
+      toast.error(getErrorMessage(propertyQuery.error || reviewsQuery.error || availabilityQuery.error, 'Failed to load property'));
+    }
+  }, [propertyQuery.error, reviewsQuery.error, availabilityQuery.error]);
+
+  useEffect(() => {
+    if (pricingQuery.error) {
+      toast.error(getErrorMessage(pricingQuery.error, 'Failed to calculate pricing'));
+    }
+  }, [pricingQuery.error]);
+
+  const property = useMemo<Property | null>(() => {
+    if (!propertyQuery.data) {
+      return null;
+    }
+    return {
+      ...propertyQuery.data,
+      bookedDates: availabilityQuery.data || [],
+    };
+  }, [propertyQuery.data, availabilityQuery.data]);
+
+  const reviews: Review[] = reviewsQuery.data || [];
+  const pricing = pricingQuery.data || null;
+  const isLoading = propertyQuery.isLoading || reviewsQuery.isLoading || availabilityQuery.isLoading;
+  const fetchError = propertyQuery.isError;
 
   if (isLoading) {
     return (
@@ -68,7 +90,15 @@ export function PropertyDetails() {
 
   const isWishlisted = wishlistIds.includes(property.id);
   const nights = dateRange?.from && dateRange?.to ? calculateNights(dateRange.from, dateRange.to) : 0;
-  const pricing = nights > 0 ? calculateTotalPrice(property.price, nights, 50) : null;
+  const reviewCategoryAverages = reviews.length ? [
+    { label: 'Cleanliness', value: reviews.reduce((sum, review) => sum + review.cleanliness, 0) / reviews.length },
+    { label: 'Accuracy', value: reviews.reduce((sum, review) => sum + review.accuracy, 0) / reviews.length },
+    { label: 'Check-in', value: reviews.reduce((sum, review) => sum + review.checkIn, 0) / reviews.length },
+    { label: 'Communication', value: reviews.reduce((sum, review) => sum + review.communication, 0) / reviews.length },
+    { label: 'Location', value: reviews.reduce((sum, review) => sum + review.location, 0) / reviews.length },
+    { label: 'Value', value: reviews.reduce((sum, review) => sum + review.value, 0) / reviews.length },
+  ] : [];
+  const cancellationPolicy = CANCELLATION_POLICIES[property.cancellationPolicy];
 
   const bookedDateSet = new Set(property.bookedDates ?? []);
   const isDateBlocked = (date: Date) => {
@@ -120,6 +150,14 @@ export function PropertyDetails() {
                   <Heart className={`w-4 h-4 mr-2 ${isWishlisted ? 'fill-destructive text-destructive' : ''}`} />
                   Save
                 </Button>
+                {isAuthenticated && (
+                  <ReportDialog
+                    triggerLabel="Report listing"
+                    triggerVariant="ghost"
+                    defaultContentType="listing"
+                    reportedListingId={property.id}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -197,6 +235,14 @@ export function PropertyDetails() {
                   )}
                 </div>
 
+                {isAuthenticated && (
+                  <ReportDialog
+                    triggerLabel={`Report ${property.host.firstName}`}
+                    defaultContentType="user"
+                    reportedUserId={property.hostId}
+                  />
+                )}
+
                 <Separator className="my-6" />
 
                 <div className="space-y-6">
@@ -244,10 +290,10 @@ export function PropertyDetails() {
                     <h2 className="text-2xl font-semibold mb-6">What this place offers</h2>
                     <div className="grid sm:grid-cols-2 gap-4">
                       {property.amenities.map((amenity) => {
-                        const IconComponent = Icons[amenity.icon as keyof typeof Icons] as React.ComponentType<{ className?: string }>;
+                        const IconComponent = iconMap[amenity.icon] || fallbackIcon;
                         return (
                           <div key={amenity.id} className="flex items-center gap-4">
-                            {IconComponent && <IconComponent className="w-6 h-6" />}
+                            <IconComponent className="w-6 h-6" />
                             <span>{amenity.name}</span>
                           </div>
                         );
@@ -284,6 +330,17 @@ export function PropertyDetails() {
                   </h2>
                 </div>
 
+                {reviewCategoryAverages.length > 0 && (
+                  <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3 mb-8">
+                    {reviewCategoryAverages.map((item) => (
+                      <div key={item.label} className="flex items-center justify-between border-b border-border pb-2 text-sm">
+                        <span className="font-medium">{item.label}</span>
+                        <span>{item.value.toFixed(1)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="grid sm:grid-cols-2 gap-8">
                   {reviews.map((review) => (
                     <div key={review.id} className="space-y-3">
@@ -301,6 +358,20 @@ export function PropertyDetails() {
                         </div>
                       </div>
                       <p className="text-sm leading-relaxed">{review.comment}</p>
+                      {review.response && (
+                        <div className="rounded-xl bg-muted p-4">
+                          <p className="text-sm font-semibold mb-1">Host response</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">{review.response}</p>
+                        </div>
+                      )}
+                      {isAuthenticated && (
+                        <ReportDialog
+                          triggerLabel="Report review"
+                          triggerVariant="outline"
+                          defaultContentType="review"
+                          reportedReviewId={review.id}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -323,7 +394,7 @@ export function PropertyDetails() {
                     <MapContainer
                       center={L.latLng(property.location.lat, property.location.lng)}
                       zoom={13}
-                      style={{ height: '100%', width: '100%' }}
+                      style={{ blockSize: '100%', inlineSize: '100%' }}
                       scrollWheelZoom={false}
                     >
                       <TileLayer
@@ -363,7 +434,9 @@ export function PropertyDetails() {
                   <div>
                     <h3 className="font-semibold mb-3">Cancellation policy</h3>
                     <div className="space-y-2 text-sm text-muted-foreground">
-                      <p className="capitalize">{property.cancellationPolicy}</p>
+                      <p>{cancellationPolicy?.name || property.cancellationPolicy}</p>
+                      <p>{cancellationPolicy?.description}</p>
+                      <p>{cancellationPolicy?.details}</p>
                     </div>
                   </div>
                 </div>
@@ -436,6 +509,12 @@ export function PropertyDetails() {
                           <span className="underline">{formatCurrency(property.price)} x {nights} nights</span>
                           <span>{formatCurrency(pricing.subtotal)}</span>
                         </div>
+                        {pricing.discount > 0 && (
+                          <div className="flex justify-between text-sm text-green-700">
+                            <span className="underline">{pricing.discountLabel || 'Discount'}</span>
+                            <span>-{formatCurrency(pricing.discount)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between text-sm">
                           <span className="underline">Cleaning fee</span>
                           <span>{formatCurrency(pricing.cleaningFee)}</span>

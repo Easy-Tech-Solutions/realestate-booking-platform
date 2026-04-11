@@ -1,15 +1,24 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Heart, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { PropertyCard } from '../components/PropertyCard';
-import { mockProperties } from '../../services/mock-data';
-import { useApp } from '../../core/context';
+import { useApp } from '../../hooks/useApp';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
+import { getErrorMessage } from '../../services/api/shared/errors';
+import { useFavoriteProperties } from '../../hooks/queries/useWishlists';
 
 export function Wishlists() {
-  const { wishlistIds } = useApp();
+  const { isAuthenticated } = useApp();
   const navigate = useNavigate();
-  const wishlistedProperties = mockProperties.filter(p => wishlistIds.includes(p.id));
+  const favoritesQuery = useFavoriteProperties(isAuthenticated);
+  const wishlistedProperties = favoritesQuery.data || [];
+
+  useEffect(() => {
+    if (favoritesQuery.error) {
+      toast.error(getErrorMessage(favoritesQuery.error, 'Failed to load favorites'));
+    }
+  }, [favoritesQuery.error]);
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -22,7 +31,9 @@ export function Wishlists() {
           </Button>
         </div>
 
-        {wishlistedProperties.length > 0 ? (
+        {favoritesQuery.isLoading ? (
+          <div className="text-center py-20 text-muted-foreground">Loading favorites...</div>
+        ) : wishlistedProperties.length > 0 ? (
           <div>
             <div className="mb-6">
               <h2 className="text-xl font-semibold mb-2">Favorites</h2>

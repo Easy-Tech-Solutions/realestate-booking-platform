@@ -1,21 +1,57 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { Award, MessageSquare, Shield, Star } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
-import { mockUsers, mockProperties, mockReviews } from '../../services/mock-data';
 import { PropertyCard } from '../components/PropertyCard';
 import { formatDate, getInitials } from '../../core/utils';
+import { ReportDialog } from '../components/ReportDialog';
+import { useApp } from '../../hooks/useApp';
+import { toast } from 'sonner';
+import { getErrorMessage } from '../../services/api/shared/errors';
+import { useHostProfile } from '../../hooks/queries/useHostProfile';
 
 export function HostProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const host = mockUsers.find(u => u.id === id);
-  const properties = mockProperties.filter(p => p.hostId === id);
-  const reviews = mockReviews.filter(r => properties.some(p => p.id === r.propertyId));
+  const { isAuthenticated } = useApp();
+  const { userQuery, propertiesQuery, reviews, isReviewsLoading } = useHostProfile(id);
+  const host = userQuery.data || null;
+  const properties = propertiesQuery.data || [];
+  const isLoading = userQuery.isLoading || propertiesQuery.isLoading || isReviewsLoading;
+
+  useEffect(() => {
+    if (userQuery.error) {
+      toast.error(getErrorMessage(userQuery.error, 'Failed to load host profile'));
+    }
+  }, [userQuery.error]);
+
+  useEffect(() => {
+    if (propertiesQuery.error) {
+      toast.error(getErrorMessage(propertiesQuery.error, 'Failed to load host listings'));
+    }
+  }, [propertiesQuery.error]);
+
+  const hostFirstName = host?.first_name || host?.username || 'Host';
+  const hostLastName = host?.last_name || '';
+  const hostAvatar = host?.profile?.image;
+  const isSuperhost = Boolean(host?.is_superhost || host?.profile?.is_superhost);
   const avgRating = reviews.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(2)
     : '—';
+
+  const hostCreatedAt = useMemo(
+    () => host?.member_since || host?.date_joined || new Date().toISOString(),
+    [host]
+  );
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Loading host...</p>
+      </div>
+    );
+  }
 
   if (!host) {
     return (
@@ -32,18 +68,17 @@ export function HostProfile() {
     <div className="min-h-screen bg-background py-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-20">
         <div className="grid lg:grid-cols-3 gap-12">
-          {/* Left: Host Card */}
           <div className="lg:col-span-1">
             <div className="border border-border rounded-2xl p-8 text-center sticky top-24">
-              {host.avatar ? (
-                <img src={host.avatar} alt={host.firstName} className="w-24 h-24 rounded-full object-cover mx-auto mb-4" />
+              {hostAvatar ? (
+                <img src={hostAvatar} alt={hostFirstName} className="w-24 h-24 rounded-full object-cover mx-auto mb-4" />
               ) : (
                 <div className="w-24 h-24 rounded-full bg-primary text-white flex items-center justify-center text-3xl font-semibold mx-auto mb-4">
-                  {getInitials(host.firstName, host.lastName)}
+                  {getInitials(hostFirstName, hostLastName)}
                 </div>
               )}
-              <h1 className="text-2xl font-semibold">{host.firstName}</h1>
-              {host.isHost && (
+              <h1 className="text-2xl font-semibold">{hostFirstName}</h1>
+              {isSuperhost && (
                 <div className="flex items-center justify-center gap-1 mt-1 text-sm text-muted-foreground">
                   <Award className="w-4 h-4 text-primary" />
                   <span>Superhost</span>
@@ -70,7 +105,7 @@ export function HostProfile() {
               <Separator className="my-6" />
 
               <div className="space-y-3 text-sm text-left">
-                {host.verified && (
+                {(host?.email_verified || host?.verified) && (
                   <div className="flex items-center gap-2">
                     <Shield className="w-4 h-4 text-primary" />
                     <span>Identity verified</span>
@@ -78,27 +113,34 @@ export function HostProfile() {
                 )}
                 <div className="flex items-center gap-2">
                   <Star className="w-4 h-4 text-primary" />
-                  <span>Member since {formatDate(host.createdAt, 'MMMM yyyy')}</span>
+                  <span>Member since {formatDate(hostCreatedAt, 'MMMM yyyy')}</span>
                 </div>
               </div>
 
               <Button className="w-full mt-6" onClick={() => navigate('/messages')}>
-                <MessageSquare className="w-4 h-4 mr-2" /> Contact {host.firstName}
+                <MessageSquare className="w-4 h-4 mr-2" /> Contact {hostFirstName}
               </Button>
+              {isAuthenticated && id && (
+                <ReportDialog
+                  className="w-full mt-3"
+                  triggerLabel={`Report ${hostFirstName}`}
+                  defaultContentType="user"
+                  reportedUserId={id}
+                />
+              )}
             </div>
           </div>
 
-          {/* Right: Listings + Reviews */}
           <div className="lg:col-span-2 space-y-10">
-            {host.bio && (
+            {host?.profile?.bio && (
               <div>
-                <h2 className="text-xl font-semibold mb-3">About {host.firstName}</h2>
-                <p className="text-muted-foreground leading-relaxed">{host.bio}</p>
+                <h2 className="text-xl font-semibold mb-3">About {hostFirstName}</h2>
+                <p className="text-muted-foreground leading-relaxed">{host.profile.bio}</p>
               </div>
             )}
 
             <div>
-              <h2 className="text-xl font-semibold mb-6">{host.firstName}'s listings</h2>
+              <h2 className="text-xl font-semibold mb-6">{hostFirstName}'s listings</h2>
               {properties.length > 0 ? (
                 <div className="grid sm:grid-cols-2 gap-6">
                   {properties.map(p => <PropertyCard key={p.id} property={p} />)}

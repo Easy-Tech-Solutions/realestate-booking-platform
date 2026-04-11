@@ -1,4 +1,4 @@
-import type { Property, User, Review, Booking } from '../core/types';
+import type { Property, User, Review } from '../core/types';
 
 export const mockUsers: User[] = [
   {

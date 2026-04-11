@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router';
-import { useApp } from '../../core/context';
+import { useApp } from '../../hooks/useApp';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

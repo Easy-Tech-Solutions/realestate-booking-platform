@@ -18,14 +18,51 @@ class Listing(models.Model):
         ('farm', 'Farm'),
     ]
 
+    PRIVACY_TYPES = [
+        ('entire_place', 'Entire place'),
+        ('private_room', 'Private room'),
+        ('shared_room', 'Shared room'),
+    ]
+
+    BOOKING_MODES = [
+        ('instant', 'Instant book'),
+        ('approve_first', 'Approve first'),
+    ]
+
+    CANCELLATION_POLICIES = [
+        ('flexible', 'Flexible'),
+        ('moderate', 'Moderate'),
+        ('strict', 'Strict'),
+        ('super_strict', 'Super Strict'),
+    ]
+
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     bedrooms = models.IntegerField(default=0)
+    beds = models.IntegerField(default=0)
+    bathrooms = models.IntegerField(default=0)
+    max_guests = models.IntegerField(default=1)
     property_type = models.CharField(max_length=50, choices=PROPERTY_TYPES)
+    privacy_type = models.CharField(max_length=20, choices=PRIVACY_TYPES, default='entire_place')
+    booking_mode = models.CharField(max_length=20, choices=BOOKING_MODES, default='instant')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='listings')
     address = models.CharField(max_length=200, blank=False)
     square_footage = models.IntegerField(default=0)
+    amenities = models.JSONField(default=list, blank=True)
+    highlights = models.JSONField(default=list, blank=True)
+    weekend_premium_percent = models.IntegerField(default=0)
+    new_listing_promo = models.BooleanField(default=False)
+    last_minute_discount_enabled = models.BooleanField(default=False)
+    last_minute_discount_percent = models.IntegerField(default=0)
+    weekly_discount_enabled = models.BooleanField(default=False)
+    weekly_discount_percent = models.IntegerField(default=0)
+    monthly_discount_enabled = models.BooleanField(default=False)
+    monthly_discount_percent = models.IntegerField(default=0)
+    exterior_camera = models.BooleanField(default=False)
+    noise_monitor = models.BooleanField(default=False)
+    weapons_on_property = models.BooleanField(default=False)
+    cancellation_policy = models.CharField(max_length=20, choices=CANCELLATION_POLICIES, default='flexible')
     is_available = models.BooleanField(default=True)
     main_image = models.ImageField(upload_to='listings/main/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -71,6 +108,14 @@ class Review(models.Model):
     rating = models.IntegerField(choices=RATING_CHOICES)
     title = models.CharField(max_length=100, blank=True)
     content = models.TextField()
+    cleanliness = models.IntegerField(null=True, blank=True)
+    accuracy = models.IntegerField(null=True, blank=True)
+    check_in_rating = models.IntegerField(null=True, blank=True)
+    communication = models.IntegerField(null=True, blank=True)
+    location_rating = models.IntegerField(null=True, blank=True)
+    value = models.IntegerField(null=True, blank=True)
+    host_response = models.TextField(blank=True, default='')
+    host_response_at = models.DateTimeField(null=True, blank=True)
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

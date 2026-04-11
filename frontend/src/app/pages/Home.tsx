@@ -1,31 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { PropertyCard } from '../components/PropertyCard';
 import { PROPERTY_CATEGORIES } from '../../core/constants';
-import { propertiesAPI } from '../../services/api.service';
 import { cn } from '../../core/utils';
-import type { Property } from '../../core/types';
+import { useHomeProperties } from '../../hooks/queries/useHomeProperties';
 
 export function Home() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [scrollPosition, setScrollPosition] = useState(0);
   const categoryScrollRef = React.useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setIsLoading(true);
-    const fetch = selectedCategory
-      ? propertiesAPI.getByCategory(selectedCategory)
-      : propertiesAPI.getFeatured();
-    fetch
-      .then(setProperties)
-      .catch(() => setProperties([]))
-      .finally(() => setIsLoading(false));
-  }, [selectedCategory]);
+  const propertiesQuery = useHomeProperties(selectedCategory);
+  const properties = propertiesQuery.data || [];
+  const isLoading = propertiesQuery.isLoading;
 
   const scrollCategories = (direction: 'left' | 'right') => {
     if (categoryScrollRef.current) {
@@ -33,7 +21,7 @@ export function Home() {
       const newPosition = direction === 'left'
         ? scrollPosition - scrollAmount
         : scrollPosition + scrollAmount;
-      categoryScrollRef.current.scrollTo({ left: newPosition, behavior: 'smooth' });
+      categoryScrollRef.current.scrollLeft = newPosition;
       setScrollPosition(newPosition);
     }
   };
@@ -47,6 +35,8 @@ export function Home() {
             {scrollPosition > 0 && (
               <button
                 onClick={() => scrollCategories('left')}
+                aria-label="Scroll categories left"
+                title="Scroll categories left"
                 className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white border border-border shadow-md flex items-center justify-center hover:shadow-lg transition-shadow"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -55,7 +45,6 @@ export function Home() {
             <div
               ref={categoryScrollRef}
               className="flex gap-8 py-4 overflow-x-auto scrollbar-hide scroll-smooth"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {PROPERTY_CATEGORIES.map((category) => (
                 <button
@@ -75,6 +64,8 @@ export function Home() {
             </div>
             <button
               onClick={() => scrollCategories('right')}
+              aria-label="Scroll categories right"
+              title="Scroll categories right"
               className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white border border-border shadow-md flex items-center justify-center hover:shadow-lg transition-shadow"
             >
               <ChevronRight className="w-4 h-4" />

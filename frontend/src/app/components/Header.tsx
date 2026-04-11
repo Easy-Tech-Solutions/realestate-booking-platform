@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import { useApp } from '../../core/context';
+import { useApp } from '../../hooks/useApp';
 import { AuthDialog } from './AuthDialog';
 import { SearchDialog } from './SearchDialog';
 import { getInitials } from '../../core/utils';
@@ -41,7 +41,7 @@ export function Header() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <HomeIcon className="w-5 h-5 text-white" />
               </div>
-              <span className="hidden sm:block text-xl font-semibold text-primary">staybnb</span>
+              <span className="hidden sm:block text-xl font-semibold text-primary">HomeKonnet</span>
             </Link>
 
             {/* Search Bar - Desktop */}
@@ -61,6 +61,8 @@ export function Header() {
 
             {/* Search Icon - Mobile */}
             <button
+              type="button"
+              title="Search"
               onClick={() => setShowSearchDialog(true)}
               className="md:hidden p-2 rounded-full hover:bg-muted"
             >
@@ -80,13 +82,15 @@ export function Header() {
               )}
 
               {isAuthenticated && (
-                <button
-                  onClick={() => navigate('/notifications')}
-                  className="hidden sm:flex p-2 rounded-full hover:bg-muted relative"
-                >
-                  <Bell className="w-5 h-5" />
-                </button>
-              )}
+                  <button
+                    type="button"
+                    title="View notifications"
+                    onClick={() => navigate('/notifications')}
+                    className="hidden sm:flex p-2 rounded-full hover:bg-muted relative"
+                  >
+                    <Bell className="w-5 h-5" />
+                  </button>
+                )}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

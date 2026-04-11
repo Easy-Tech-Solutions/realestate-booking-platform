@@ -10,13 +10,11 @@ import { Textarea } from '../components/ui/textarea';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import { PaymentMethod } from '../../core/types';
-import { useApp } from '../../core/context';
 import { bookingsAPI } from '../../services/api.service';
 
 export function Booking() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { addBooking } = useApp();
   const { property, checkIn, checkOut, guests, pricing } = location.state || {};
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
@@ -73,9 +71,24 @@ export function Booking() {
         notes: specialRequests,
       });
 
-      addBooking({ ...booking, totalPrice: currentPricing.total, paymentMethod });
+      const confirmedBooking = {
+        ...booking,
+        property: currentProperty,
+        checkIn: startDate,
+        checkOut: endDate,
+        guests: currentGuests,
+        totalPrice: currentPricing.total,
+        basePrice: currentPricing.subtotal,
+        cleaningFee: currentPricing.cleaningFee,
+        serviceFee: currentPricing.serviceFee,
+        taxes: currentPricing.taxes,
+        paymentMethod,
+      };
+
       toast.success('Booking confirmed!');
-      navigate('/booking/confirmed', { state: { booking } });
+      navigate(`/booking/confirmed?bookingId=${encodeURIComponent(confirmedBooking.id)}`, {
+        state: { booking: confirmedBooking },
+      });
     } catch (err: any) {
       toast.error(err.message || 'Booking failed. Please try again.');
     } finally {

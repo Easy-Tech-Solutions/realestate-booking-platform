@@ -1,22 +1,11 @@
 import React from 'react';
-import { Calendar, Heart, MapPin, MessageSquare, Star, Wallet } from 'lucide-react';
+import { Calendar, Heart, MapPin, Star, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
-import { useApp } from '../../core/context';
+import { useApp } from '../../hooks/useApp';
 import { formatCurrency, getInitials } from '../../core/utils';
-import { mockProperties, mockReviews } from '../../services/mock-data';
-
-const upcomingTrips = [
-  { property: mockProperties[0], checkIn: 'May 10, 2026', checkOut: 'May 15, 2026', status: 'confirmed' as const, total: 2475 },
-  { property: mockProperties[1], checkIn: 'Jun 3, 2026', checkOut: 'Jun 7, 2026', status: 'pending' as const, total: 925 },
-];
-
-const pastTrips = [
-  { property: mockProperties[2], checkIn: 'Jan 5, 2026', checkOut: 'Jan 8, 2026', status: 'completed' as const, total: 780 },
-  { property: mockProperties[4], checkIn: 'Dec 20, 2025', checkOut: 'Dec 27, 2025', status: 'completed' as const, total: 3010 },
-];
+import { useUserDashboardData } from '../../hooks/queries/useUserDashboard';
 
 const statusColor: Record<string, string> = {
   confirmed: 'bg-primary/10 text-primary',
@@ -25,9 +14,39 @@ const statusColor: Record<string, string> = {
 };
 
 export function UserDashboard() {
-  const { user } = useApp();
+  const { user, isAuthenticated } = useApp();
+  const {
+    dashboardQuery,
+    upcomingTrips,
+    pastTrips,
+    favoriteProperties,
+    userReviews,
+    totalSpent,
+    isLoading,
+  } = useUserDashboardData(user?.id, isAuthenticated);
 
   if (!user) return null;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background py-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-20">
+          <p className="text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dashboardQuery.isError) {
+    return (
+      <div className="min-h-screen bg-background py-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-20">
+          <h1 className="text-3xl font-semibold mb-2">Welcome back, {user.firstName}!</h1>
+          <p className="text-muted-foreground">We couldn't load your dashboard right now. Please try again shortly.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -52,8 +71,8 @@ export function UserDashboard() {
           {[
             { label: 'Upcoming Trips', value: upcomingTrips.length, icon: Calendar },
             { label: 'Past Trips', value: pastTrips.length, icon: MapPin },
-            { label: 'Wishlists', value: 3, icon: Heart },
-            { label: 'Total Spent', value: formatCurrency(7190), icon: Wallet },
+            { label: 'Wishlists', value: favoriteProperties.length, icon: Heart },
+            { label: 'Total Spent', value: formatCurrency(totalSpent), icon: Wallet },
           ].map(({ label, value, icon: Icon }) => (
             <Card key={label}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -80,19 +99,22 @@ export function UserDashboard() {
             <Card>
               <CardHeader><CardTitle>Upcoming Trips</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                {upcomingTrips.map((trip, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                {upcomingTrips.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No upcoming trips yet.</p>
+                )}
+                {upcomingTrips.map((trip) => (
+                  <div key={trip.booking.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
                     <div className="flex items-center gap-4">
                       <img src={trip.property.images[0]} alt={trip.property.title} className="w-20 h-16 rounded object-cover" />
                       <div>
                         <h3 className="font-semibold">{trip.property.title}</h3>
-                        <p className="text-sm text-muted-foreground">{trip.checkIn} → {trip.checkOut}</p>
-                        <p className="text-sm font-semibold mt-1">{formatCurrency(trip.total)}</p>
+                        <p className="text-sm text-muted-foreground">{trip.booking.checkIn} → {trip.booking.checkOut}</p>
+                        <p className="text-sm font-semibold mt-1">{formatCurrency(trip.estimatedTotal)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[trip.status]}`}>
-                        {trip.status}
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[trip.booking.status]}`}>
+                        {trip.booking.status}
                       </span>
                       <Button variant="outline" size="sm">View</Button>
                     </div>
@@ -106,19 +128,22 @@ export function UserDashboard() {
             <Card>
               <CardHeader><CardTitle>Past Trips</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                {pastTrips.map((trip, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                {pastTrips.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No past trips yet.</p>
+                )}
+                {pastTrips.map((trip) => (
+                  <div key={trip.booking.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
                     <div className="flex items-center gap-4">
                       <img src={trip.property.images[0]} alt={trip.property.title} className="w-20 h-16 rounded object-cover" />
                       <div>
                         <h3 className="font-semibold">{trip.property.title}</h3>
-                        <p className="text-sm text-muted-foreground">{trip.checkIn} → {trip.checkOut}</p>
-                        <p className="text-sm font-semibold mt-1">{formatCurrency(trip.total)}</p>
+                        <p className="text-sm text-muted-foreground">{trip.booking.checkIn} → {trip.booking.checkOut}</p>
+                        <p className="text-sm font-semibold mt-1">{formatCurrency(trip.estimatedTotal)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[trip.status]}`}>
-                        {trip.status}
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[trip.booking.status]}`}>
+                        {trip.booking.status}
                       </span>
                       <Button variant="outline" size="sm">Review</Button>
                     </div>
@@ -135,16 +160,15 @@ export function UserDashboard() {
                 <Button size="sm">New wishlist</Button>
               </CardHeader>
               <CardContent className="grid sm:grid-cols-3 gap-4">
-                {[
-                  { name: 'Beach Getaways', count: 4, img: mockProperties[0].images[0] },
-                  { name: 'Mountain Escapes', count: 2, img: mockProperties[1].images[0] },
-                  { name: 'City Breaks', count: 3, img: mockProperties[2].images[0] },
-                ].map((wl, i) => (
-                  <div key={i} className="border border-border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow">
-                    <img src={wl.img} alt={wl.name} className="w-full h-32 object-cover" />
+                {favoriteProperties.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No saved properties yet.</p>
+                )}
+                {favoriteProperties.map((property) => (
+                  <div key={property.id} className="border border-border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow">
+                    <img src={property.images[0]} alt={property.title} className="w-full h-32 object-cover" />
                     <div className="p-3">
-                      <p className="font-semibold">{wl.name}</p>
-                      <p className="text-sm text-muted-foreground">{wl.count} properties</p>
+                      <p className="font-semibold">{property.title}</p>
+                      <p className="text-sm text-muted-foreground">{property.location.city || 'Location unavailable'}</p>
                     </div>
                   </div>
                 ))}
@@ -156,10 +180,13 @@ export function UserDashboard() {
             <Card>
               <CardHeader><CardTitle>Reviews You've Written</CardTitle></CardHeader>
               <CardContent className="space-y-6">
-                {mockReviews.slice(0, 2).map((review, i) => (
-                  <div key={i} className="space-y-2 p-4 border border-border rounded-lg">
+                {userReviews.length === 0 && (
+                  <p className="text-sm text-muted-foreground">You haven't written any reviews yet.</p>
+                )}
+                {userReviews.map(({ review, propertyTitle }) => (
+                  <div key={review.id} className="space-y-2 p-4 border border-border rounded-lg">
                     <div className="flex items-center justify-between">
-                      <p className="font-semibold">{mockProperties.find(p => p.id === review.propertyId)?.title}</p>
+                      <p className="font-semibold">{propertyTitle}</p>
                       <div className="flex items-center gap-1">
                         {[...Array(review.rating)].map((_, j) => (
                           <Star key={j} className="w-3 h-3 fill-primary text-primary" />

@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { motion } from 'motion/react';
 import { Property } from '../../core/types';
 import { formatCurrency } from '../../core/utils';
-import { useApp } from '../../core/context';
+import { useApp } from '../../hooks/useApp';
 import { cn } from '../../core/utils';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { toast } from 'sonner';

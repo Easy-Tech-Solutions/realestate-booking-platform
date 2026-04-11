@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CreditCard, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { Switch } from '../components/ui/switch';
-import { useApp } from '../../core/context';
+import { useApp } from '../../hooks/useApp';
 import { getInitials } from '../../core/utils';
 import { toast } from 'sonner';
+import { notificationsAPI, usersAPI } from '../../services/api.service';
 
 export function Account() {
   const { user, setUser } = useApp();
@@ -20,7 +21,33 @@ export function Account() {
 
   const [emailNotif, setEmailNotif] = useState(true);
   const [smsNotif, setSmsNotif] = useState(true);
-  const [marketingNotif, setMarketingNotif] = useState(false);
+  const [marketingNotif, setMarketingNotif] = useState(true);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
+  const [networkProvider, setNetworkProvider] = useState<'mtn' | 'orange'>('mtn');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [smsOtp, setSmsOtp] = useState('');
+  const [phoneFlowLoading, setPhoneFlowLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const loadPreferences = async () => {
+      try {
+        const prefs = await notificationsAPI.getPreferences();
+        setEmailNotif(Boolean(prefs.in_app_enabled));
+        setSmsNotif(Boolean(prefs.new_message_email));
+        setMarketingNotif(Boolean(prefs.search_alert_email));
+      } catch {
+        // Keep current defaults if preference endpoint fails.
+      }
+    };
+
+    loadPreferences();
+  }, [user]);
 
   if (!user) return null;
 
@@ -29,11 +56,100 @@ export function Account() {
       toast.error('First name and email are required');
       return;
     }
+
     setSaving(true);
-    await new Promise(r => setTimeout(r, 600));
-    setUser({ ...user, firstName, lastName, email, phone });
-    setSaving(false);
-    toast.success('Profile updated successfully');
+    try {
+      await usersAPI.updateMyProfile({
+        first_name: firstName,
+        last_name: lastName,
+        email,
+      });
+
+      await notificationsAPI.updatePreferences({
+        in_app_enabled: emailNotif,
+        new_message_email: smsNotif,
+        search_alert_email: marketingNotif,
+      });
+
+      setUser({ ...user, firstName, lastName, email, phone });
+      toast.success('Profile updated successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleInitiatePhoneChange = async () => {
+    if (!currentPassword || !newPhoneNumber) {
+      toast.error('Current password and new phone number are required');
+      return;
+    }
+
+    setPhoneFlowLoading(true);
+    try {
+      const res = await usersAPI.initiatePhoneChange({
+        password: currentPassword,
+        new_phone_number: newPhoneNumber,
+        network_provider: networkProvider,
+      });
+      toast.success(res.message || 'Email verification code sent');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to start phone change');
+    } finally {
+      setPhoneFlowLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    if (!emailOtp) {
+      toast.error('Enter the email OTP first');
+      return;
+    }
+    setPhoneFlowLoading(true);
+    try {
+      const res = await usersAPI.verifyPhoneChangeEmail(emailOtp);
+      toast.success(res.message || 'Email OTP verified');
+    } catch (error: any) {
+      toast.error(error?.message || 'Email OTP verification failed');
+    } finally {
+      setPhoneFlowLoading(false);
+    }
+  };
+
+  const handleVerifySmsOtp = async () => {
+    if (!smsOtp) {
+      toast.error('Enter the SMS OTP first');
+      return;
+    }
+    setPhoneFlowLoading(true);
+    try {
+      const res = await usersAPI.verifyPhoneChangeSms(smsOtp);
+      setPhone(newPhoneNumber);
+      setCurrentPassword('');
+      setEmailOtp('');
+      setSmsOtp('');
+      setNewPhoneNumber('');
+      toast.success(res.message || 'Phone number updated');
+    } catch (error: any) {
+      toast.error(error?.message || 'SMS OTP verification failed');
+    } finally {
+      setPhoneFlowLoading(false);
+    }
+  };
+
+  const handleCancelPhoneChange = async () => {
+    setPhoneFlowLoading(true);
+    try {
+      const res = await usersAPI.cancelPhoneChange();
+      setEmailOtp('');
+      setSmsOtp('');
+      toast.success(res.message || 'Phone change canceled');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to cancel phone change');
+    } finally {
+      setPhoneFlowLoading(false);
+    }
   };
 
   return (
@@ -79,10 +195,60 @@ export function Account() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone number</Label>
-                <Input id="phone" placeholder="+1 (555) 000-0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                <Input id="phone" placeholder="Managed by secure flow below" value={phone} onChange={e => setPhone(e.target.value)} disabled />
               </div>
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? 'Saving...' : 'Save changes'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="border border-border rounded-xl p-6">
+            <h2 className="text-xl font-semibold mb-6">Change Mobile Money Number</h2>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                This follows the backend 3-step security flow: password verification, email OTP, then SMS OTP.
+              </p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="currentPassword">Current password</Label>
+                  <Input id="currentPassword" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="newPhone">New phone number</Label>
+                  <Input id="newPhone" value={newPhoneNumber} onChange={e => setNewPhoneNumber(e.target.value)} placeholder="e.g. 0880123456" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="network">Network provider</Label>
+                <select
+                  id="network"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2"
+                  value={networkProvider}
+                  onChange={e => setNetworkProvider(e.target.value as 'mtn' | 'orange')}
+                >
+                  <option value="mtn">MTN</option>
+                  <option value="orange">Orange</option>
+                </select>
+              </div>
+              <Button onClick={handleInitiatePhoneChange} disabled={phoneFlowLoading}>
+                {phoneFlowLoading ? 'Please wait...' : '1. Send Email OTP'}
+              </Button>
+
+              <Separator />
+
+              <div className="grid sm:grid-cols-[1fr,auto] gap-3">
+                <Input placeholder="2. Enter Email OTP" value={emailOtp} onChange={e => setEmailOtp(e.target.value)} />
+                <Button variant="outline" onClick={handleVerifyEmailOtp} disabled={phoneFlowLoading}>Verify Email OTP</Button>
+              </div>
+
+              <div className="grid sm:grid-cols-[1fr,auto] gap-3">
+                <Input placeholder="3. Enter SMS OTP" value={smsOtp} onChange={e => setSmsOtp(e.target.value)} />
+                <Button variant="outline" onClick={handleVerifySmsOtp} disabled={phoneFlowLoading}>Verify SMS OTP</Button>
+              </div>
+
+              <Button variant="destructive" onClick={handleCancelPhoneChange} disabled={phoneFlowLoading}>
+                Cancel Pending Phone Change
               </Button>
             </div>
           </div>

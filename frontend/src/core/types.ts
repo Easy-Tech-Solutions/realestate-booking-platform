@@ -170,7 +170,16 @@ export type PropertyType =
   | 'boat'
   | 'castle'
   | 'cave'
-  | 'farm';
+  | 'farm'
+  | 'room'
+  | 'suite'
+  | 'hall'
+  | 'resort'
+  | 'land'
+  | 'hotel'
+  | 'lodge'
+  | 'lighthouse'
+  | 'yurt';
 
 export type BookingStatus = 
   | 'pending' 

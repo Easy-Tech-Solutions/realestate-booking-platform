@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Calendar } from './ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { format } from 'date-fns';
-import { useApp } from '../../core/context';
+import { useApp } from '../../hooks/useApp';
 import { useNavigate } from 'react-router';
 
 interface SearchDialogProps {

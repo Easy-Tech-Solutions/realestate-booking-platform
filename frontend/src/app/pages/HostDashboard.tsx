@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   BarChart3,
   Calendar,
@@ -41,46 +41,36 @@ import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Separator } from '../components/ui/separator';
-import { formatCurrency } from '../../core/utils';
+import { formatCurrency, formatDate } from '../../core/utils';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line,
 } from 'recharts';
-import { mockProperties, mockReviews } from '../../services/mock-data';
-import { Property } from '../../core/types';
-
-// ─── Static mock data ────────────────────────────────────────────────────────
-
-const earningsData = [
-  { month: 'Jan', amount: 4200 },
-  { month: 'Feb', amount: 3800 },
-  { month: 'Mar', amount: 5100 },
-  { month: 'Apr', amount: 4600 },
-  { month: 'May', amount: 6200 },
-  { month: 'Jun', amount: 5800 },
-];
-
-const bookingsData = [
-  { month: 'Jan', bookings: 12 },
-  { month: 'Feb', bookings: 10 },
-  { month: 'Mar', bookings: 15 },
-  { month: 'Apr', bookings: 13 },
-  { month: 'May', bookings: 18 },
-  { month: 'Jun', bookings: 16 },
-];
+import type { Booking, Conversation, Property } from '../../core/types';
+import { toast } from 'sonner';
+import { getErrorMessage } from '../../services/api/shared/errors';
+import { useSendMessage } from '../../hooks/queries/useMessages';
+import { useDeleteHostProperty, useHostDashboardData, useRespondToHostReview, useUpdateHostProperty } from '../../hooks/queries/useHostDashboard';
 
 type Section = 'overview' | 'properties' | 'bookings' | 'messages' | 'pricing' | 'reviews';
 
-const navItems: { id: Section; label: string; icon: React.ElementType; badge?: number }[] = [
-  { id: 'overview',    label: 'Overview',          icon: BarChart3 },
-  { id: 'properties',  label: 'Properties',         icon: Home },
-  { id: 'bookings',    label: 'Upcoming Bookings',  icon: Calendar },
-  { id: 'messages',    label: 'Messages',           icon: MessageSquare, badge: 1 },
-  { id: 'pricing',     label: 'Pricing',            icon: DollarSign },
-  { id: 'reviews',     label: 'Recent Reviews',     icon: Star },
-];
+type DashboardMessage = {
+  id: string;
+  guest: string;
+  property: string;
+  message: string;
+  timestamp: string;
+  unread: boolean;
+};
 
-// ─── Edit property inline dialog ─────────────────────────────────────────────
+const navItems: { id: Section; label: string; icon: React.ElementType; badge?: number }[] = [
+  { id: 'overview', label: 'Overview', icon: BarChart3 },
+  { id: 'properties', label: 'Properties', icon: Home },
+  { id: 'bookings', label: 'Upcoming Bookings', icon: Calendar },
+  { id: 'messages', label: 'Messages', icon: MessageSquare },
+  { id: 'pricing', label: 'Pricing', icon: DollarSign },
+  { id: 'reviews', label: 'Recent Reviews', icon: Star },
+];
 
 function EditPropertyDialog({
   property,
@@ -99,15 +89,15 @@ function EditPropertyDialog({
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>Title</Label>
-        <Input value={title} onChange={e => setTitle(e.target.value)} />
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} />
       </div>
       <div className="space-y-2">
         <Label>Price per night (USD)</Label>
-        <Input type="number" value={price} onChange={e => setPrice(e.target.value)} />
+        <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
       </div>
       <div className="space-y-2">
         <Label>Description</Label>
-        <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} />
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
       </div>
       <div className="flex gap-2 pt-2">
         <Button onClick={() => onSave({ title, price: Number(price), description })}>Save changes</Button>
@@ -117,53 +107,173 @@ function EditPropertyDialog({
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+function getMonthKey(dateString?: string) {
+  if (!dateString) return 'Unknown';
+  const date = new Date(dateString);
+  return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString('en-US', { month: 'short' });
+}
 
 export function HostDashboard() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<Section>('overview');
-  const [properties, setProperties] = useState(mockProperties.filter(p => p.hostId === '1'));
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
-  const [messages, setMessages] = useState([
-    { id: '1', guest: 'Mike Johnson', property: 'Luxurious Beachfront Villa', message: 'Hi, I have a question about check-in time.', timestamp: '2024-05-10 14:30', unread: true },
-    { id: '2', guest: 'Emma Wilson', property: 'Cozy Mountain Cabin', message: 'Can I bring my dog?', timestamp: '2024-05-09 09:15', unread: false },
-  ]);
-  const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  const [selectedMessage, setSelectedMessage] = useState<DashboardMessage | null>(null);
   const [messageReply, setMessageReply] = useState('');
+  const [replyingReviewId, setReplyingReviewId] = useState<string | null>(null);
+  const [reviewReply, setReviewReply] = useState('');
+  const { dashboardQuery, conversationsQuery, reviews, isReviewsLoading } = useHostDashboardData();
+  const updatePropertyMutation = useUpdateHostProperty();
+  const deletePropertyMutation = useDeleteHostProperty();
+  const respondToReviewMutation = useRespondToHostReview();
+  const sendMessageMutation = useSendMessage();
+  const properties = useMemo(() => ((dashboardQuery.data?.listings || []) as Property[]), [dashboardQuery.data?.listings]);
+  const bookings = useMemo(() => ((dashboardQuery.data?.bookings_on_my_listings || []) as Booking[]), [dashboardQuery.data?.bookings_on_my_listings]);
+  const conversations = useMemo(() => ((conversationsQuery.data || []) as Conversation[]), [conversationsQuery.data]);
   const [pricingSettings, setPricingSettings] = useState({
-    basePrice: 450,
+    basePrice: properties[0]?.price || 0,
     weekendMultiplier: 1.2,
     seasonalMultiplier: 1.3,
-    minimumStay: 2,
+    minimumStay: 1,
     maximumStay: 30,
   });
+  const isLoading = dashboardQuery.isLoading || conversationsQuery.isLoading || isReviewsLoading;
 
-  const handleSaveProperty = (data: Partial<Property>) => {
-    if (editingProperty) {
-      setProperties(prev => prev.map(p => p.id === editingProperty.id ? { ...p, ...data } : p));
+  React.useEffect(() => {
+    if (dashboardQuery.error) {
+      toast.error(getErrorMessage(dashboardQuery.error, 'Failed to load host dashboard'));
     }
-    setEditingProperty(null);
+  }, [dashboardQuery.error]);
+
+  React.useEffect(() => {
+    if (conversationsQuery.error) {
+      toast.error(getErrorMessage(conversationsQuery.error, 'Failed to load messages'));
+    }
+  }, [conversationsQuery.error]);
+
+  React.useEffect(() => {
+    if (properties[0]?.price && pricingSettings.basePrice === 0) {
+      setPricingSettings((current) => ({ ...current, basePrice: properties[0].price }));
+    }
+  }, [properties, pricingSettings.basePrice]);
+
+  const handleSaveProperty = async (data: Partial<Property>) => {
+    if (!editingProperty) return;
+
+    const formData = new FormData();
+    if (data.title !== undefined) formData.append('title', data.title);
+    if (data.price !== undefined) formData.append('price', String(data.price));
+    if (data.description !== undefined) formData.append('description', data.description);
+
+    try {
+      await updatePropertyMutation.mutateAsync({ id: editingProperty.id, formData });
+      toast.success('Property updated');
+      setEditingProperty(null);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to update property'));
+    }
   };
 
-  const handleSendMessage = (id: string) => {
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, unread: false } : m));
-    setMessageReply('');
-    setSelectedMessage(null);
+  const handleDeleteProperty = async (propertyId: string) => {
+    try {
+      await deletePropertyMutation.mutateAsync(propertyId);
+      toast.success('Property deleted');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to delete property'));
+    }
   };
 
-  const unreadCount = messages.filter(m => m.unread).length;
+  const handleSendMessage = async () => {
+    if (!selectedMessage || !messageReply.trim()) return;
 
-  // ─── Section renderers ──────────────────────────────────────────────────────
+    try {
+      await sendMessageMutation.mutateAsync({ conversationId: selectedMessage.id, content: messageReply.trim() });
+      toast.success('Reply sent');
+      setMessageReply('');
+      setSelectedMessage(null);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to send reply'));
+    }
+  };
+
+  const handleRespondToReview = async () => {
+    if (!replyingReviewId || !reviewReply.trim()) return;
+
+    try {
+      await respondToReviewMutation.mutateAsync({ id: replyingReviewId, response: reviewReply.trim() });
+      toast.success('Review response posted');
+      setReviewReply('');
+      setReplyingReviewId(null);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to post review response'));
+    }
+  };
+
+  const dashboardMessages: DashboardMessage[] = useMemo(() => (
+    conversations.map((conversation) => {
+      const guest = conversation.participants[0]?.firstName
+        ? `${conversation.participants[0].firstName} ${conversation.participants[0].lastName}`.trim()
+        : conversation.participants[0]?.email || 'Guest';
+      const property = properties.find((item) => item.id === conversation.propertyId)?.title || 'General conversation';
+      return {
+        id: conversation.id,
+        guest,
+        property,
+        message: conversation.lastMessage?.content || 'No messages yet',
+        timestamp: conversation.lastMessage?.createdAt || conversation.updatedAt,
+        unread: conversation.unreadCount > 0,
+      };
+    })
+  ), [conversations, properties]);
+
+  const unreadCount = dashboardMessages.filter((message) => message.unread).length;
+
+  const totalEarnings = bookings
+    .filter((booking) => booking.status === 'confirmed' || booking.status === 'completed')
+    .reduce((sum, booking) => {
+      const property = properties.find((item) => item.id === booking.propertyId);
+      const nights = Math.max(
+        1,
+        Math.round((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86400000)
+      );
+      return sum + (property?.price || 0) * nights;
+    }, 0);
+
+  const averageRating = reviews.length
+    ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+    : 0;
+
+  const earningsData = useMemo(() => {
+    const totals = new Map<string, number>();
+    bookings.forEach((booking) => {
+      if (booking.status !== 'confirmed' && booking.status !== 'completed') return;
+      const property = properties.find((item) => item.id === booking.propertyId);
+      const nights = Math.max(
+        1,
+        Math.round((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86400000)
+      );
+      const month = getMonthKey(booking.checkIn);
+      totals.set(month, (totals.get(month) || 0) + (property?.price || 0) * nights);
+    });
+    return Array.from(totals.entries()).map(([month, amount]) => ({ month, amount }));
+  }, [bookings, properties]);
+
+  const bookingsData = useMemo(() => {
+    const totals = new Map<string, number>();
+    bookings.forEach((booking) => {
+      const month = getMonthKey(booking.checkIn);
+      totals.set(month, (totals.get(month) || 0) + 1);
+    });
+    return Array.from(totals.entries()).map(([month, count]) => ({ month, bookings: count }));
+  }, [bookings]);
 
   const renderOverview = () => (
     <div className="space-y-6">
-      {/* Stat cards */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Earnings',  value: formatCurrency(29700),    icon: DollarSign, sub: '+12.5% from last month' },
-          { label: 'Active Listings', value: properties.length,        icon: Home,       sub: 'All properties active' },
-          { label: 'Total Bookings',  value: 84,                       icon: Calendar,   sub: '+8 this month' },
-          { label: 'Average Rating',  value: '4.92',                   icon: Star,       sub: 'Based on 284 reviews' },
+          { label: 'Total Earnings', value: formatCurrency(totalEarnings), icon: DollarSign, sub: 'Confirmed bookings only' },
+          { label: 'Active Listings', value: properties.length, icon: Home, sub: 'Live on the platform' },
+          { label: 'Total Bookings', value: bookings.length, icon: Calendar, sub: 'All requests and stays' },
+          { label: 'Average Rating', value: averageRating ? averageRating.toFixed(2) : '—', icon: Star, sub: `${reviews.length} total reviews` },
         ].map(({ label, value, icon: Icon, sub }) => (
           <Card key={label}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -178,7 +288,6 @@ export function HostDashboard() {
         ))}
       </div>
 
-      {/* Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader><CardTitle>Earnings Overview</CardTitle></CardHeader>
@@ -188,7 +297,7 @@ export function HostDashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Bar dataKey="amount" fill="#004406" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -201,7 +310,7 @@ export function HostDashboard() {
               <LineChart data={bookingsData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
-                <YAxis />
+                <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Line type="monotone" dataKey="bookings" stroke="#004406" strokeWidth={2} dot={{ r: 4 }} />
               </LineChart>
@@ -210,7 +319,6 @@ export function HostDashboard() {
         </Card>
       </div>
 
-      {/* Quick actions */}
       <Card>
         <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-3">
@@ -239,7 +347,7 @@ export function HostDashboard() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {properties.map(property => (
+          {properties.map((property) => (
             <div key={property.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
               <div className="flex items-center gap-4">
                 <img src={property.images[0]} alt={property.title} className="w-20 h-16 rounded object-cover" />
@@ -259,55 +367,56 @@ export function HostDashboard() {
                   <Eye className="w-3 h-3 mr-1" /> View
                 </Button>
                 <Button
-                  variant="outline" size="sm"
+                  variant="outline"
+                  size="sm"
                   className="text-destructive hover:text-destructive"
-                  onClick={() => setProperties(prev => prev.filter(p => p.id !== property.id))}
+                  onClick={() => handleDeleteProperty(property.id)}
                 >
                   <Trash2 className="w-3 h-3 mr-1" /> Delete
                 </Button>
               </div>
             </div>
           ))}
+          {properties.length === 0 && <p className="text-sm text-muted-foreground">No properties yet.</p>}
         </div>
       </CardContent>
     </Card>
   );
 
-  const renderBookings = () => {
-    const hostBookings = [
-      { id: 'BK001', guestName: 'Mike Johnson', propertyTitle: properties[0]?.title ?? 'Property', checkIn: '2026-04-15', checkOut: '2026-04-20', guests: 2, total: 1250 },
-      { id: 'BK002', guestName: 'Emma Wilson', propertyTitle: properties[1]?.title ?? 'Property', checkIn: '2026-05-03', checkOut: '2026-05-07', guests: 3, total: 1480 },
-    ];
-    return (
-      <Card>
-        <CardHeader><CardTitle>Upcoming Bookings</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {hostBookings.map(b => (
-              <div key={b.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+  const renderBookings = () => (
+    <Card>
+      <CardHeader><CardTitle>Upcoming Bookings</CardTitle></CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {bookings.map((booking) => {
+            const property = properties.find((item) => item.id === booking.propertyId);
+            const guestName = booking.user?.firstName || booking.userId || 'Guest';
+            return (
+              <div key={booking.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
                 <div>
-                  <h3 className="font-semibold mb-1">{b.guestName}</h3>
+                  <h3 className="font-semibold mb-1">{guestName}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {b.checkIn} – {b.checkOut} · {b.guests} guests
+                    {booking.checkIn} - {booking.checkOut} · {booking.guests} guests
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{b.propertyTitle}</p>
-                  <p className="text-sm font-semibold mt-1">{formatCurrency(b.total)}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{property?.title || booking.propertyId}</p>
+                  <p className="text-sm font-semibold mt-1 capitalize">{booking.status}</p>
                 </div>
-                <Button variant="outline" size="sm">Contact guest</Button>
+                <Button variant="outline" size="sm" onClick={() => setActiveSection('messages')}>Contact guest</Button>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
+            );
+          })}
+          {bookings.length === 0 && <p className="text-sm text-muted-foreground">No bookings yet.</p>}
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   const renderMessages = () => (
     <Card>
       <CardHeader><CardTitle>Messages from Guests</CardTitle></CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {messages.map(message => (
+          {dashboardMessages.map((message) => (
             <div key={message.id} className="border border-border rounded-lg p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -317,19 +426,20 @@ export function HostDashboard() {
                   </div>
                   <p className="text-sm text-muted-foreground mb-1">Regarding: {message.property}</p>
                   <p className="text-sm mb-2">{message.message}</p>
-                  <p className="text-xs text-muted-foreground">{message.timestamp}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(message.timestamp, 'MMM dd, yyyy hh:mm a')}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => setSelectedMessage(message)}>
                     <MessageSquare className="w-3 h-3 mr-1" /> Reply
                   </Button>
-                  <Button variant="outline" size="sm">
-                    <Mail className="w-3 h-3 mr-1" /> Email
+                  <Button variant="outline" size="sm" onClick={() => navigate('/messages')}>
+                    <Mail className="w-3 h-3 mr-1" /> Open Inbox
                   </Button>
                 </div>
               </div>
             </div>
           ))}
+          {dashboardMessages.length === 0 && <p className="text-sm text-muted-foreground">No guest messages yet.</p>}
         </div>
       </CardContent>
     </Card>
@@ -342,16 +452,21 @@ export function HostDashboard() {
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-4">
             {[
-              { id: 'basePrice',          label: 'Base Price per Night',  key: 'basePrice',          step: undefined },
-              { id: 'weekendMultiplier',  label: 'Weekend Multiplier',    key: 'weekendMultiplier',  step: '0.1' },
-              { id: 'seasonalMultiplier', label: 'Seasonal Multiplier',   key: 'seasonalMultiplier', step: '0.1' },
+              { id: 'basePrice', label: 'Base Price per Night', key: 'basePrice', step: undefined },
+              { id: 'weekendMultiplier', label: 'Weekend Multiplier', key: 'weekendMultiplier', step: '0.1' },
+              { id: 'seasonalMultiplier', label: 'Seasonal Multiplier', key: 'seasonalMultiplier', step: '0.1' },
             ].map(({ id, label, key, step }) => (
               <div key={id}>
                 <Label htmlFor={id}>{label}</Label>
                 <Input
-                  id={id} type="number" step={step}
-                  value={(pricingSettings as any)[key]}
-                  onChange={e => setPricingSettings(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+                  id={id}
+                  type="number"
+                  step={step}
+                  value={String((pricingSettings as Record<string, number>)[key])}
+                  onChange={(e) => setPricingSettings((current) => ({
+                    ...current,
+                    [key]: Number(e.target.value),
+                  }))}
                 />
               </div>
             ))}
@@ -364,15 +479,19 @@ export function HostDashboard() {
               <div key={id}>
                 <Label htmlFor={id}>{label}</Label>
                 <Input
-                  id={id} type="number"
-                  value={(pricingSettings as any)[key]}
-                  onChange={e => setPricingSettings(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+                  id={id}
+                  type="number"
+                  value={String((pricingSettings as Record<string, number>)[key])}
+                  onChange={(e) => setPricingSettings((current) => ({
+                    ...current,
+                    [key]: Number(e.target.value),
+                  }))}
                 />
               </div>
             ))}
             <div className="pt-2">
-              <Button className="w-full">
-                <Settings className="w-4 h-4 mr-2" /> Save Pricing Settings
+              <Button className="w-full" disabled>
+                <Settings className="w-4 h-4 mr-2" /> Pricing is driven by listing settings
               </Button>
             </div>
           </div>
@@ -384,8 +503,8 @@ export function HostDashboard() {
           <h3 className="text-base font-semibold mb-4">Dynamic Pricing Preview</h3>
           <div className="grid md:grid-cols-3 gap-4">
             {[
-              { label: 'Weekday Price',     value: pricingSettings.basePrice },
-              { label: 'Weekend Price',     value: pricingSettings.basePrice * pricingSettings.weekendMultiplier },
+              { label: 'Weekday Price', value: pricingSettings.basePrice },
+              { label: 'Weekend Price', value: pricingSettings.basePrice * pricingSettings.weekendMultiplier },
               { label: 'Peak Season Price', value: pricingSettings.basePrice * pricingSettings.seasonalMultiplier },
             ].map(({ label, value }) => (
               <Card key={label}>
@@ -401,61 +520,86 @@ export function HostDashboard() {
     </Card>
   );
 
-  const renderReviews = () => {
-    const hostReviews = mockReviews.filter(r => properties.some(p => p.id === r.propertyId));
-    return (
-      <Card>
-        <CardHeader><CardTitle>Recent Reviews</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {hostReviews.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No reviews yet.</p>
-            ) : hostReviews.map((review, i) => (
-              <div key={review.id} className="space-y-2">
-                <div className="flex items-center gap-3">
-                  {review.user.avatar ? (
-                    <img src={review.user.avatar} alt={review.user.firstName} className="w-10 h-10 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold">
-                      {review.user.firstName[0]}
-                    </div>
-                  )}
-                  <div>
-                    <p className="font-semibold">{review.user.firstName} {review.user.lastName}</p>
-                    <div className="flex items-center gap-0.5">
-                      {[...Array(review.rating)].map((_, j) => (
-                        <Star key={j} className="w-3 h-3 fill-current text-primary" />
-                      ))}
-                    </div>
+  const renderReviews = () => (
+    <Card>
+      <CardHeader><CardTitle>Recent Reviews</CardTitle></CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {reviews.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No reviews yet.</p>
+          ) : reviews.map((review, index) => (
+            <div key={review.id} className="space-y-3">
+              <div className="flex items-center gap-3">
+                {review.user.avatar ? (
+                  <img src={review.user.avatar} alt={review.user.firstName} className="w-10 h-10 rounded-full object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold">
+                    {review.user.firstName[0]}
+                  </div>
+                )}
+                <div>
+                  <p className="font-semibold">{review.user.firstName} {review.user.lastName}</p>
+                  <div className="flex items-center gap-0.5">
+                    {Array.from({ length: review.rating }).map((_, starIndex) => (
+                      <Star key={starIndex} className="w-3 h-3 fill-current text-primary" />
+                    ))}
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">{review.comment}</p>
-                {i < hostReviews.length - 1 && <Separator />}
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
+              <p className="text-sm text-muted-foreground">{review.comment}</p>
+              {review.response ? (
+                <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground mb-1">Your response</p>
+                  <p>{review.response}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Textarea
+                    value={replyingReviewId === review.id ? reviewReply : ''}
+                    onChange={(e) => {
+                      setReplyingReviewId(review.id);
+                      setReviewReply(e.target.value);
+                    }}
+                    placeholder="Write a public response to this review..."
+                    rows={3}
+                  />
+                  <Button size="sm" onClick={handleRespondToReview} disabled={replyingReviewId !== review.id || !reviewReply.trim()}>
+                    Respond
+                  </Button>
+                </div>
+              )}
+              {index < reviews.length - 1 && <Separator />}
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
 
-  const sectionTitle = navItems.find(n => n.id === activeSection)?.label ?? 'Host Dashboard';
+  const sectionTitle = navItems.find((item) => item.id === activeSection)?.label ?? 'Host Dashboard';
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'overview':   return renderOverview();
-      case 'properties': return renderProperties();
-      case 'bookings':   return renderBookings();
-      case 'messages':   return renderMessages();
-      case 'pricing':    return renderPricing();
-      case 'reviews':    return renderReviews();
+      case 'overview':
+        return renderOverview();
+      case 'properties':
+        return renderProperties();
+      case 'bookings':
+        return renderBookings();
+      case 'messages':
+        return renderMessages();
+      case 'pricing':
+        return renderPricing();
+      case 'reviews':
+        return renderReviews();
+      default:
+        return null;
     }
   };
 
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
-        {/* Sidebar header */}
         <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
           <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
@@ -468,13 +612,12 @@ export function HostDashboard() {
           </div>
         </SidebarHeader>
 
-        {/* Nav items */}
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupLabel>Navigation</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {navItems.map(({ id, label, icon: Icon, badge }) => (
+                {navItems.map(({ id, label, icon: Icon }) => (
                   <SidebarMenuItem key={id}>
                     <SidebarMenuButton
                       isActive={activeSection === id}
@@ -484,8 +627,8 @@ export function HostDashboard() {
                       <Icon />
                       <span>{label}</span>
                     </SidebarMenuButton>
-                    {badge && badge > 0 && (
-                      <SidebarMenuBadge>{badge}</SidebarMenuBadge>
+                    {id === 'messages' && unreadCount > 0 && (
+                      <SidebarMenuBadge>{unreadCount}</SidebarMenuBadge>
                     )}
                   </SidebarMenuItem>
                 ))}
@@ -494,7 +637,6 @@ export function HostDashboard() {
           </SidebarGroup>
         </SidebarContent>
 
-        {/* Sidebar footer */}
         <SidebarFooter className="border-t border-sidebar-border">
           <SidebarMenu>
             <SidebarMenuItem>
@@ -509,21 +651,18 @@ export function HostDashboard() {
         <SidebarRail />
       </Sidebar>
 
-      {/* Main content area */}
       <SidebarInset>
-        {/* Top bar */}
         <header className="flex items-center gap-3 border-b border-border px-6 py-4 sticky top-0 bg-background z-10">
           <SidebarTrigger />
-          <Separator orientation="vertical" className="h-5" />
+          <SidebarSeparator orientation="vertical" className="h-5" />
           <h1 className="text-xl font-semibold">{sectionTitle}</h1>
         </header>
 
         <div className="p-6">
-          {renderContent()}
+          {isLoading ? <p className="text-muted-foreground">Loading dashboard...</p> : renderContent()}
         </div>
       </SidebarInset>
 
-      {/* Edit Property Dialog */}
       <Dialog open={!!editingProperty} onOpenChange={() => setEditingProperty(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -539,7 +678,6 @@ export function HostDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Message Reply Dialog */}
       {selectedMessage && (
         <Dialog open={!!selectedMessage} onOpenChange={() => setSelectedMessage(null)}>
           <DialogContent>
@@ -556,13 +694,13 @@ export function HostDashboard() {
                 <Textarea
                   id="reply"
                   value={messageReply}
-                  onChange={e => setMessageReply(e.target.value)}
+                  onChange={(e) => setMessageReply(e.target.value)}
                   placeholder="Type your response..."
                   rows={4}
                 />
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => handleSendMessage(selectedMessage.id)}>Send reply</Button>
+                <Button onClick={handleSendMessage}>Send reply</Button>
                 <Button variant="outline" onClick={() => setSelectedMessage(null)}>Cancel</Button>
               </div>
             </div>

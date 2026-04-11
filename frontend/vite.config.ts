@@ -23,4 +23,46 @@ export default defineConfig({
   define: {
     'process.env': {},
   },
+
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined;
+          }
+
+          if (id.includes('react-leaflet') || id.includes('/leaflet/')) {
+            return 'map-vendor';
+          }
+
+          if (id.includes('recharts') || id.includes('/d3-')) {
+            return 'charts-vendor';
+          }
+
+          if (id.includes('@tanstack/react-query')) {
+            return 'query-vendor';
+          }
+
+          if (id.includes('react-day-picker') || id.includes('date-fns')) {
+            return 'calendar-vendor';
+          }
+
+          if (id.includes('motion')) {
+            return 'motion-vendor';
+          }
+
+          if (id.includes('@radix-ui') || id.includes('cmdk') || id.includes('vaul')) {
+            return 'ui-vendor';
+          }
+
+          if (id.includes('react-router')) {
+            return 'router-vendor';
+          }
+
+          return undefined;
+        },
+      },
+    },
+  },
 })

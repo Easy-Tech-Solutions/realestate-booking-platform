@@ -4,17 +4,29 @@ import { CheckCircle, Calendar, MapPin, Users, MessageSquare, Download } from 'l
 import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
 import { formatCurrency, formatDate } from '../../core/utils';
+import type { Booking } from '../../core/types';
+import { useBookingConfirmedData } from '../../hooks/queries/useBookingConfirmed';
 
 export function BookingConfirmed() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { booking } = location.state || {};
+  const stateBooking = (location.state as { booking?: Booking } | null)?.booking;
+  const bookingId = new URLSearchParams(location.search).get('bookingId') || stateBooking?.id;
+  const { booking, isLoading, isError } = useBookingConfirmedData(bookingId || undefined, stateBooking);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Loading booking details...</p>
+      </div>
+    );
+  }
 
   if (!booking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-semibold mb-2">No booking found</h2>
+          <h2 className="text-2xl font-semibold mb-2">{isError ? 'Could not load booking' : 'No booking found'}</h2>
           <Button onClick={() => navigate('/')}>Go Home</Button>
         </div>
       </div>
