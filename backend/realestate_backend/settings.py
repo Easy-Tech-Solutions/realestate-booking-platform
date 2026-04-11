@@ -16,6 +16,17 @@ def env_list(name: str, default: str = "") -> list[str]:
     raw = os.environ.get(name, default)
     return [item.strip() for item in raw.split(",") if item.strip()]
 
+
+def env_origins(name: str, default: str = "") -> list[str]:
+    """Like env_list but silently drops entries that lack an http/https scheme."""
+    raw = os.environ.get(name, default)
+    origins = []
+    for item in raw.split(","):
+        item = item.strip()
+        if item and (item.startswith("http://") or item.startswith("https://")):
+            origins.append(item)
+    return origins
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "change-me-in-prod")
 DEBUG = env_bool("DJANGO_DEBUG", True)
 ALLOWED_HOSTS = env_list(
@@ -176,7 +187,7 @@ if DEBUG:
     if os.environ.get("FRONTEND_ORIGIN"):
         CORS_ALLOWED_ORIGINS.append(os.environ["FRONTEND_ORIGIN"])
 else:
-    CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", os.environ.get("FRONTEND_ORIGIN", ""))
+    CORS_ALLOWED_ORIGINS = env_origins("CORS_ALLOWED_ORIGINS", os.environ.get("FRONTEND_ORIGIN", ""))
 CORS_ALLOW_CREDENTIALS = True
 
 SIMPLE_JWT = {
