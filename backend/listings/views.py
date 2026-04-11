@@ -7,6 +7,7 @@ from rest_framework import status
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.db import IntegrityError
 from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats
 from bookings.models import Booking
 from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer
@@ -81,10 +82,13 @@ def listing_images(request, listing_id):
             return Response({"error": "Only the owner can add images"}, status=status.HTTP_403_FORBIDDEN)
         serializer = ListingImageCreateSerializer(data=request.data)
         if serializer.is_valid():
-            if not serializer.validated_data.get("order"):
+            if serializer.validated_data.get("order") is None:
                 max_order = listing.gallery_images.aggregate(models.Max("order"))["order__max"] or 0
                 serializer.validated_data["order"] = max_order + 1
-            image = serializer.save(listing=listing)
+            try:
+                image = serializer.save(listing=listing)
+            except IntegrityError:
+                return Response({"error": "An image with this display order already exists for the listing."}, status=status.HTTP_400_BAD_REQUEST)
             return Response(ListingImageCreateSerializer(image).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

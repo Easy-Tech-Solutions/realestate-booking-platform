@@ -264,11 +264,9 @@ export function CreateListing() {
 
       if (form.images.length > 1) {
         const remaining = form.images.slice(1, 11);
-        await Promise.all(
-          remaining.map((file, idx) =>
-            propertiesAPI.addGalleryImage(created.id, file, '', idx)
-          )
-        );
+        for (const [idx, file] of remaining.entries()) {
+          await propertiesAPI.addGalleryImage(created.id, file, '', idx);
+        }
       }
 
       toast.success('Listing created successfully');
