@@ -98,13 +98,17 @@ class ListingSerializer(serializers.ModelSerializer):
         return self._normalize_list_field(value, 'highlights')
 
     def validate_property_type(self, value):
-        category_slug = (value or 'homes').strip().lower()
+        category_slug = (value or '').strip().lower()
         if not category_slug:
+            # Default to 'homes' if the field is empty or None
             return 'homes'
-        if PropertyCategory.objects.filter(slug=category_slug, is_active=True).exists():
-            return category_slug
-        # Backward compatibility for older values in existing data.
-        return 'homes'
+
+        if not PropertyCategory.objects.filter(slug=category_slug, is_active=True).exists():
+            active_slugs = list(PropertyCategory.objects.filter(is_active=True).values_list('slug', flat=True))
+            raise serializers.ValidationError(
+                f"Invalid property_type '{value}'. Valid options are: {', '.join(active_slugs)}"
+            )
+        return category_slug
 
 
 class ListingImageCreateSerializer(serializers.ModelSerializer):

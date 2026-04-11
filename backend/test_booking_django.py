@@ -24,9 +24,8 @@ class BookingAPITestCase(APITestCase):
         self.listing = Listing.objects.create(
             owner=self.host,
             title="Test Beach House",
+            address="123 Ocean Drive, Testville, USA",
             price=100.00,
-            country="USA",
-            city="Testville"
         )
 
         # Authenticate the client as the guest

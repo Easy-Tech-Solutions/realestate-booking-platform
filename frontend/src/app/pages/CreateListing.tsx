@@ -382,12 +382,12 @@ export function CreateListing() {
             <div className="space-y-4">
               {[
                 { id: 'entire_place', title: 'An entire place', subtitle: 'Guests have the whole place to themselves.' },
-                { id: 'room', title: 'A room', subtitle: 'Guests have their own room and shared spaces.' },
+                { id: 'private_room', title: 'A private room', subtitle: 'Guests have their own room and shared spaces.' },
                 { id: 'shared_room', title: 'A shared room in a hostel', subtitle: 'Guests sleep in a shared room.' },
               ].map((option) => (
                 <button
                   key={option.id}
-                  onClick={() => update({ privacyType: option.id })}
+                  onClick={() => update({ privacyType: option.id as 'entire_place' | 'private_room' | 'shared_room' })}
                   className={cn(
                     'w-full border rounded-2xl p-6 text-left transition',
                     form.privacyType === option.id ? 'border-2 border-foreground' : 'hover:border-foreground'
