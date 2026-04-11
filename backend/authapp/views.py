@@ -14,6 +14,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.http import HttpResponse
+from django.db import transaction
 User = get_user_model()
 
 
@@ -73,21 +74,27 @@ def register(request):
         return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            first_name=first_name or "",
-            last_name=last_name or "",
-            is_active=not settings.AUTH_REQUIRE_EMAIL_VERIFICATION,
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name or "",
+                last_name=last_name or "",
+                is_active=not settings.AUTH_REQUIRE_EMAIL_VERIFICATION,
+            )
+            if settings.AUTH_REQUIRE_EMAIL_VERIFICATION:
+                from .utils import send_verification_email
+                send_verification_email(user)
+        message = "User registered successfully. Please check your email to verify your account."
+        if not settings.AUTH_REQUIRE_EMAIL_VERIFICATION:
+            message = "User registered successfully. You can now log in."
+        return Response({"message": message}, status=status.HTTP_201_CREATED)
+    except Exception:
+        return Response(
+            {"error": "Registration could not be completed because the verification email could not be sent. Please try again in a moment."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
-        # Send verification email (pseudo-code)
-        from . utils import send_verification_email
-        send_verification_email(user)
-        return Response({"message": "User registered successfully. Please check your email to verify your account."}, status=status.HTTP_201_CREATED)
-
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(["GET", "POST"])
 @permission_classes([AllowAny])
