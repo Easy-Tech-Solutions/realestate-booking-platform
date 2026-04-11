@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
@@ -51,12 +51,16 @@ const categories = [
 export function Help() {
   const [search, setSearch] = useState('');
 
-  const filtered = categories.map(cat => ({
-    ...cat,
-    faqs: cat.faqs.filter(
-      f => f.q.toLowerCase().includes(search.toLowerCase()) || f.a.toLowerCase().includes(search.toLowerCase())
-    ),
-  })).filter(cat => cat.faqs.length > 0);
+  const filteredCategories = useMemo(() => {
+    if (!search) return categories;
+    const lowercasedSearch = search.toLowerCase();
+    return categories
+      .map(cat => ({
+        ...cat,
+        faqs: cat.faqs.filter(f => f.q.toLowerCase().includes(lowercasedSearch) || f.a.toLowerCase().includes(lowercasedSearch)),
+      }))
+      .filter(cat => cat.faqs.length > 0);
+  }, [search]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -75,13 +79,13 @@ export function Help() {
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-12 max-w-3xl">
-        {filtered.length === 0 ? (
+        {filteredCategories.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-muted-foreground">No results found for "{search}"</p>
           </div>
         ) : (
           <div className="space-y-10">
-            {filtered.map(cat => (
+            {filteredCategories.map(cat => (
               <div key={cat.title}>
                 <h2 className="text-xl font-semibold mb-4">{cat.title}</h2>
                 <Accordion type="single" collapsible className="border border-border rounded-xl overflow-hidden">
