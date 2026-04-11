@@ -107,6 +107,7 @@ if DB_ENGINE == "postgres":
             "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
             "PORT": os.environ.get("POSTGRES_PORT", "5432"),
             "CONN_MAX_AGE": int(os.environ.get("POSTGRES_CONN_MAX_AGE", "60")),
+            "OPTIONS": {"sslmode": os.environ.get("POSTGRES_SSLMODE", "require")},
         }
     }
 else:
