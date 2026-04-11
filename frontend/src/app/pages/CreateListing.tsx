@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,7 +22,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { cn } from '../../core/utils';
-import { AMENITIES, PROPERTY_TYPES } from '../../core/constants';
+import { AMENITIES, PROPERTY_CATEGORIES } from '../../core/constants';
 import { propertiesAPI } from '../../services/api.service';
 import { toast } from 'sonner';
 
@@ -75,7 +76,7 @@ export function CreateListing() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
-    propertyType: 'apartment',
+    propertyType: 'homes',
     privacyType: 'entire_place',
 
     country: 'Rwanda',
@@ -118,6 +119,14 @@ export function CreateListing() {
   });
 
   const currentStep = STEPS[stepIndex];
+
+  const categoriesQuery = useQuery({
+    queryKey: ['property-categories', 'create-listing'],
+    queryFn: () => propertiesAPI.listCategories(),
+  });
+  const listingCategories = (categoriesQuery.data || []).length
+    ? (categoriesQuery.data || []).map((category) => ({ id: category.slug, name: category.name }))
+    : PROPERTY_CATEGORIES.map((category) => ({ id: category.id, name: category.name }));
 
   const update = (patch: Partial<typeof form>) => setForm((prev) => ({ ...prev, ...patch }));
 
@@ -338,7 +347,7 @@ export function CreateListing() {
           <section className="max-w-3xl mx-auto py-8">
             <h2 className="text-6xl font-semibold mb-8">Which of these best describes your place?</h2>
             <div className="grid sm:grid-cols-3 gap-4">
-              {PROPERTY_TYPES.map((type) => (
+              {listingCategories.map((type) => (
                 <button
                   key={type.id}
                   onClick={() => update({ propertyType: type.id })}

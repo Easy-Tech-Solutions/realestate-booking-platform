@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Listing, ListingImage, Favorite
+from .models import Listing, ListingImage, Favorite, PropertyCategory
+
+
+@admin.register(PropertyCategory)
+class PropertyCategoryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'slug', 'is_active', 'sort_order', 'updated_at']
+    list_filter = ['is_active']
+    search_fields = ['name', 'slug']
+    ordering = ['sort_order', 'name']
 
 class ListingImageInline(admin.TabularInline):
     model = ListingImage

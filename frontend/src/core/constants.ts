@@ -4,20 +4,15 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80
 export const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 
 export const PROPERTY_CATEGORIES = [
-  { id: 'beachfront', name: 'Beachfront', icon: '🏖️' },
-  { id: 'amazing-views', name: 'Amazing views', icon: '🏔️' },
-  { id: 'trending', name: 'Trending', icon: '🔥' },
-  { id: 'cabins', name: 'Cabins', icon: '🏕️' },
-  { id: 'lakefront', name: 'Lakefront', icon: '🌊' },
-  { id: 'amazing-pools', name: 'Amazing pools', icon: '🏊' },
-  { id: 'countryside', name: 'Countryside', icon: '🌾' },
-  { id: 'design', name: 'Design', icon: '✨' },
-  { id: 'tiny-homes', name: 'Tiny homes', icon: '🏡' },
-  { id: 'castles', name: 'Castles', icon: '🏰' },
-  { id: 'treehouses', name: 'Treehouses', icon: '🌳' },
-  { id: 'caves', name: 'Caves', icon: '⛰️' },
-  { id: 'luxe', name: 'Luxe', icon: '💎' },
-  { id: 'farms', name: 'Farms', icon: '🚜' },
+  { id: 'homes', name: 'Homes', icon: '🏠' },
+  { id: 'hotels', name: 'Hotels', icon: '🏨' },
+  { id: 'lodge', name: 'Lodge', icon: '🛖' },
+  { id: 'beaches', name: 'Beaches', icon: '🏖️' },
+  { id: 'roadside', name: 'Roadside', icon: '🛣️' },
+  { id: 'highway', name: 'Highway', icon: '🚗' },
+  { id: 'land', name: 'Land', icon: '🌿' },
+  { id: 'office-space', name: 'Office Space', icon: '🏢' },
+  { id: 'hall', name: 'Hall', icon: '🏛️' },
 ];
 
 export const AMENITIES = [

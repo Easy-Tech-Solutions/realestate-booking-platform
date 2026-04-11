@@ -1,23 +1,29 @@
 from django.db import models
 from django.conf import settings
+from django.utils.text import slugify
+
+
+class PropertyCategory(models.Model):
+    name = models.CharField(max_length=80, unique=True)
+    slug = models.SlugField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
 
 
 class Listing(models.Model):
-    PROPERTY_TYPES = [
-        ('house', 'House'),
-        ('apartment', 'Apartment'),
-        ('villa', 'Villa'),
-        ('cabin', 'Cabin'),
-        ('cottage', 'Cottage'),
-        ('bungalow', 'Bungalow'),
-        ('chalet', 'Chalet'),
-        ('treehouse', 'Treehouse'),
-        ('boat', 'Boat'),
-        ('castle', 'Castle'),
-        ('cave', 'Cave'),
-        ('farm', 'Farm'),
-    ]
-
     PRIVACY_TYPES = [
         ('entire_place', 'Entire place'),
         ('private_room', 'Private room'),
@@ -43,7 +49,7 @@ class Listing(models.Model):
     beds = models.IntegerField(default=0)
     bathrooms = models.IntegerField(default=0)
     max_guests = models.IntegerField(default=1)
-    property_type = models.CharField(max_length=50, choices=PROPERTY_TYPES)
+    property_type = models.CharField(max_length=50, default='homes')
     privacy_type = models.CharField(max_length=20, choices=PRIVACY_TYPES, default='entire_place')
     booking_mode = models.CharField(max_length=20, choices=BOOKING_MODES, default='instant')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='listings')

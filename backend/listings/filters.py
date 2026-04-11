@@ -11,8 +11,8 @@ class ListingFilter(filters.FilterSet):
     max_square_footage = filters.NumberFilter(field_name='square_footage', lookup_expr='lte')
     owner_id = filters.NumberFilter(field_name='owner__id', lookup_expr='exact')
 
-    # Exact match filters for choice fields
-    property_type_exact = filters.ChoiceFilter(field_name='property_type', choices=Listing.PROPERTY_TYPES)
+    # Exact match for dynamic categories
+    property_type_exact = filters.CharFilter(field_name='property_type', lookup_expr='exact')
 
     # Boolean filter for availability
     is_available = filters.BooleanFilter(field_name='is_available')

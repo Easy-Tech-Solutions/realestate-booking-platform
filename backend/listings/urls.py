@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    categories_collection, category_detail,
     listings_collection, listing_detail, listing_images, listing_image_detail,
     favorite_listing, favorites_collection, listing_reviews, create_review,
     review_detail, user_reviews, listing_stats, agent_analytics, popular_listings,
@@ -7,6 +8,8 @@ from .views import (
 )
 
 urlpatterns = [
+    path('categories/', categories_collection, name='categories_collection'),
+    path('categories/<int:id>/', category_detail, name='category_detail'),
     path('', listings_collection, name='listings_collection'),
     path('<int:id>/', listing_detail, name='listing_detail'),
     path('<int:listing_id>/images/', listing_images, name='listing_images'),

@@ -1,5 +1,15 @@
 from rest_framework import serializers
-from .models import Listing, ListingImage, Favorite, Review, ReviewImage
+from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyCategory
+
+
+class PropertyCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PropertyCategory
+        fields = ['id', 'name', 'slug', 'is_active', 'sort_order']
+        read_only_fields = ['id']
+        extra_kwargs = {
+            'slug': {'required': False, 'allow_blank': True},
+        }
 
 
 class ListingImageSerializer(serializers.ModelSerializer):
@@ -64,6 +74,15 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def get_review_count(self, obj):
         return obj.reviews.count()
+
+    def validate_property_type(self, value):
+        category_slug = (value or 'homes').strip().lower()
+        if not category_slug:
+            return 'homes'
+        if PropertyCategory.objects.filter(slug=category_slug, is_active=True).exists():
+            return category_slug
+        # Backward compatibility for older values in existing data.
+        return 'homes'
 
 
 class ListingImageCreateSerializer(serializers.ModelSerializer):
