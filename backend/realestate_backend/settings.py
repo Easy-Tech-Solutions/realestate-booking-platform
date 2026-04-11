@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "messaging",
     "notifications",
     "reports",
+    "suspensions",
 ]
 
 MIDDLEWARE = [
@@ -43,6 +44,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "suspensions.middleware.SuspensionMiddleware",
     "listings.middleware.ViewTrackingMiddleware",
 ]
 
@@ -120,6 +122,7 @@ REST_FRAMEWORK = {
         "register": "5/hour",
         "password_reset": "3/hour",
         "verify_email": "10/hour",
+        "phone_change": "5/hour",
     },
 }
 
