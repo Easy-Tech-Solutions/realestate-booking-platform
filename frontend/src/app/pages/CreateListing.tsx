@@ -286,7 +286,7 @@ export function CreateListing() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="px-8 py-6 flex items-center justify-between">
-        <div className="text-2xl font-semibold tracking-tight">airbnb</div>
+        <div className="text-2xl font-semibold tracking-tight">HomeKonet</div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm">Questions?</Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/host')}>Save & exit</Button>
@@ -297,7 +297,7 @@ export function CreateListing() {
         {currentStep === 'welcome' && (
           <div className="grid lg:grid-cols-2 gap-10 items-center py-10">
             <div>
-              <h1 className="text-6xl font-semibold leading-tight">It's easy to get started on Airbnb</h1>
+              <h1 className="text-6xl font-semibold leading-tight">It's easy to get started on HomeKonet</h1>
             </div>
             <div className="space-y-6">
               <div className="flex items-start justify-between border-b pb-4">
