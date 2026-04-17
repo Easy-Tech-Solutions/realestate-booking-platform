@@ -7,13 +7,54 @@ from rest_framework import status
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.parsers import MultiPartParser, FormParser
-from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats
+from django.db import IntegrityError
+from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory
 from bookings.models import Booking
-from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer
+from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer
 from .filters import ListingFilter
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+
+def _is_admin(user):
+    return bool(user and user.is_authenticated and (getattr(user, 'role', None) == 'admin' or user.is_superuser))
+
+
+@api_view(["GET", "POST"])
+def categories_collection(request):
+    if request.method == "GET":
+        queryset = PropertyCategory.objects.all().order_by('sort_order', 'name')
+        if not _is_admin(request.user):
+            queryset = queryset.filter(is_active=True)
+        return Response(PropertyCategorySerializer(queryset, many=True).data)
+
+    if not _is_admin(request.user):
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = PropertyCategorySerializer(data=request.data)
+    if serializer.is_valid():
+        category = serializer.save()
+        return Response(PropertyCategorySerializer(category).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["PUT", "DELETE"])
+def category_detail(request, id):
+    if not _is_admin(request.user):
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    category = get_object_or_404(PropertyCategory, pk=id)
+
+    if request.method == "PUT":
+        serializer = PropertyCategorySerializer(category, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    category.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["GET", "POST"])
@@ -81,10 +122,13 @@ def listing_images(request, listing_id):
             return Response({"error": "Only the owner can add images"}, status=status.HTTP_403_FORBIDDEN)
         serializer = ListingImageCreateSerializer(data=request.data)
         if serializer.is_valid():
-            if not serializer.validated_data.get("order"):
+            if serializer.validated_data.get("order") is None:
                 max_order = listing.gallery_images.aggregate(models.Max("order"))["order__max"] or 0
                 serializer.validated_data["order"] = max_order + 1
-            image = serializer.save(listing=listing)
+            try:
+                image = serializer.save(listing=listing)
+            except IntegrityError:
+                return Response({"error": "An image with this display order already exists for the listing."}, status=status.HTTP_400_BAD_REQUEST)
             return Response(ListingImageCreateSerializer(image).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

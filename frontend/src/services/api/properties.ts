@@ -4,6 +4,11 @@ import { buildSearchParams, normalizeListing, normalizeReview } from './shared/n
 import type { AvailabilityResponse, ListingPricingResponse } from './shared/contracts';
 
 export const propertiesAPI = {
+  getAll: async (): Promise<Property[]> => {
+    const data = await fetchWithAuth<unknown[]>('/api/listings/?ordering=-created_at');
+    return data.map(normalizeListing);
+  },
+
   search: async (filters: SearchFilters): Promise<Property[]> => {
     const params = buildSearchParams(filters);
     const data = await fetchWithAuth<unknown[]>(`/api/listings/?${params}`);
@@ -30,6 +35,28 @@ export const propertiesAPI = {
   getByCategory: async (category: string): Promise<Property[]> => {
     const data = await fetchWithAuth<unknown[]>(`/api/listings/?property_type=${category}`);
     return data.map(normalizeListing);
+  },
+
+  listCategories: async (): Promise<Array<{ id: number; name: string; slug: string; is_active: boolean; sort_order: number }>> => {
+    return fetchWithAuth('/api/listings/categories/');
+  },
+
+  createCategory: async (payload: { name: string; slug: string; is_active?: boolean; sort_order?: number }) => {
+    return fetchWithAuth('/api/listings/categories/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateCategory: async (id: number, payload: Partial<{ name: string; slug: string; is_active: boolean; sort_order: number }>) => {
+    return fetchWithAuth(`/api/listings/categories/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteCategory: async (id: number): Promise<void> => {
+    await fetchWithAuth(`/api/listings/categories/${id}/`, { method: 'DELETE' });
   },
 
   create: async (formData: FormData): Promise<Property> => {

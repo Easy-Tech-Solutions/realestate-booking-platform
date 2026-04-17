@@ -3,9 +3,9 @@ import { propertiesAPI } from '../../services/api.service';
 
 export function useHomeProperties(selectedCategory: string | null) {
   return useQuery({
-    queryKey: ['home', 'properties', selectedCategory || 'featured'],
+    queryKey: ['home', 'properties', selectedCategory || 'all'],
     queryFn: () => selectedCategory
       ? propertiesAPI.getByCategory(selectedCategory)
-      : propertiesAPI.getFeatured(),
+      : propertiesAPI.getAll(),
   });
 }

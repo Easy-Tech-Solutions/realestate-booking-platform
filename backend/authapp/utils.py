@@ -9,53 +9,39 @@ def send_verification_email(user):
     token = str(uuid.uuid4())
     user.email_verification_token = token
     user.save()
-    verification_url = f"{settings.FRONTEND_ORIGIN}/verify-email?token={token}"
-    subject = f"Verify your email for {settings.SITE_NAME}"
+
+    subject = "Verify your Email Address"
+    verification_url = f"https://{settings.LOCAL_DOMAIN}/api/auth/verify-email/?token={token}"
     html_message = render_to_string("auth/verification_email.html", {
         "user": user,
         "verification_url": verification_url,
         "site_name": settings.SITE_NAME,
     })
-    plain_message = strip_tags(html_message)
-
-    send_mail(
-        subject,
-        plain_message,
-        settings.DEFAULT_FROM_EMAIL,
-        [user.email],
-        html_message=html_message,
-        fail_silently=False,
-    )
-
-    if settings.DEBUG and settings.EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend":
-        print(f"\n=== EMAIL VERIFICATION LINK FOR {user.username} ===")
-        print(f"Open in frontend: {verification_url}")
+    if settings.DEBUG or settings.EMAIL_BACKEND.endswith("console.EmailBackend"):
+        print(f"\n=== EMAIL VERIFICATION TOKEN FOR {user.username} ===")
+        print(f"Token: {token}")
+        print(f"POST /api/auth/verify-email/  body: {{\"token\": \"{token}\"}}")
         print("=" * 55)
+    send_mail(subject, strip_tags(html_message), settings.DEFAULT_FROM_EMAIL,
+              [user.email], html_message=html_message)
 
 
 def send_password_reset_email(user):
     token = str(uuid.uuid4())
     user.password_reset_token = token
     user.save()
-    reset_url = f"{settings.FRONTEND_ORIGIN}/reset-password?token={token}"
-    subject = f"Reset your password for {settings.SITE_NAME}"
+
+    subject = "Reset your Password"
+    reset_url = f"https://{settings.LOCAL_DOMAIN}/reset-password?token={token}"
     html_message = render_to_string("auth/password_reset_email.html", {
         "user": user,
         "reset_url": reset_url,
         "site_name": settings.SITE_NAME,
     })
-    plain_message = strip_tags(html_message)
-
-    send_mail(
-        subject,
-        plain_message,
-        settings.DEFAULT_FROM_EMAIL,
-        [user.email],
-        html_message=html_message,
-        fail_silently=False,
-    )
-
-    if settings.DEBUG and settings.EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend":
-        print(f"\n=== PASSWORD RESET LINK FOR {user.username} ===")
-        print(f"Open in frontend: {reset_url}")
+    if settings.DEBUG or settings.EMAIL_BACKEND.endswith("console.EmailBackend"):
+        print(f"\n=== PASSWORD RESET TOKEN FOR {user.username} ===")
+        print(f"Token: {token}")
+        print(f"POST /api/auth/password-reset-confirm/  body: {{\"token\": \"{token}\", \"password\": \"...\", \"password2\": \"...\"}}")
         print("=" * 55)
+    send_mail(subject, strip_tags(html_message), settings.DEFAULT_FROM_EMAIL,
+              [user.email], html_message=html_message)

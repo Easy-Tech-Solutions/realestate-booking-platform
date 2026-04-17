@@ -13,47 +13,54 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='listing',
-            name='address',
-            field=models.CharField(default='', max_length=200),
-            preserve_default=False,
+        # These fields already exist from 0001_initial — update state only, skip SQL.
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='listing',
+                    name='address',
+                    field=models.CharField(default='', max_length=200),
+                    preserve_default=False,
+                ),
+                migrations.AddField(
+                    model_name='listing',
+                    name='description',
+                    field=models.TextField(blank=True),
+                ),
+                migrations.AddField(
+                    model_name='listing',
+                    name='is_available',
+                    field=models.BooleanField(default=True),
+                ),
+                migrations.AddField(
+                    model_name='listing',
+                    name='price',
+                    field=models.DecimalField(decimal_places=2, default=0, max_digits=12),
+                ),
+                migrations.AddField(
+                    model_name='listing',
+                    name='property_type',
+                    field=models.CharField(choices=[('house', 'House'), ('apartment', 'Apartment')], default='apartment', max_length=50),
+                    preserve_default=False,
+                ),
+                migrations.AddField(
+                    model_name='listing',
+                    name='square_footage',
+                    field=models.IntegerField(default=0),
+                ),
+                migrations.AddField(
+                    model_name='listing',
+                    name='updated_at',
+                    field=models.DateTimeField(auto_now=True),
+                ),
+            ],
+            database_operations=[],  # Already created by 0001_initial
         ),
-        migrations.AddField(
-            model_name='listing',
-            name='description',
-            field=models.TextField(blank=True),
-        ),
-        migrations.AddField(
-            model_name='listing',
-            name='is_available',
-            field=models.BooleanField(default=True),
-        ),
+        # owner is genuinely new — run both state and DB operations.
         migrations.AddField(
             model_name='listing',
             name='owner',
             field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, related_name='listings', to=settings.AUTH_USER_MODEL),
             preserve_default=False,
-        ),
-        migrations.AddField(
-            model_name='listing',
-            name='price',
-            field=models.DecimalField(decimal_places=2, default=0, max_digits=12),
-        ),
-        migrations.AddField(
-            model_name='listing',
-            name='property_type',
-            field=models.CharField(choices=[('house', 'House'), ('apartment', 'Apartment')], default='apartment', max_length=50),
-            preserve_default=False,
-        ),
-        migrations.AddField(
-            model_name='listing',
-            name='square_footage',
-            field=models.IntegerField(default=0),
-        ),
-        migrations.AddField(
-            model_name='listing',
-            name='updated_at',
-            field=models.DateTimeField(auto_now=True),
         ),
     ]

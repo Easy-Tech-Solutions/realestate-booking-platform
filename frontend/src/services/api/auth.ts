@@ -1,11 +1,12 @@
 import type { User } from '../../core/types';
-import { fetchWithAuth, clearTokens, setTokens } from './shared/client';
+import { fetchWithAuth, fetchPublicJson, clearTokens, setTokens } from './shared/client';
 import type { AuthLoginResponse } from './shared/contracts';
 import { normalizeUser } from './shared/normalizers';
 
 export const authAPI = {
   login: async (username: string, password: string): Promise<{ user: User; access: string; refresh: string }> => {
-    const data = await fetchWithAuth<AuthLoginResponse>('/api/auth/login/', {
+    clearTokens();
+    const data = await fetchPublicJson<AuthLoginResponse>('/api/auth/login/', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
@@ -20,15 +21,15 @@ export const authAPI = {
     password2: string;
     first_name?: string;
     last_name?: string;
-  }): Promise<{ message: string; verification_url?: string; verification_token?: string }> => {
-    return fetchWithAuth('/api/auth/register/', {
+  }): Promise<{ message: string }> => {
+    return fetchPublicJson('/api/auth/register/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
   verifyEmail: async (token: string): Promise<{ message: string }> => {
-    return fetchWithAuth('/api/auth/verify-email/', {
+    return fetchPublicJson('/api/auth/verify-email/', {
       method: 'POST',
       body: JSON.stringify({ token }),
     });
@@ -52,14 +53,14 @@ export const authAPI = {
   },
 
   passwordResetRequest: async (email: string): Promise<{ message: string }> => {
-    return fetchWithAuth('/api/auth/password-reset/', {
+    return fetchPublicJson('/api/auth/password-reset/', {
       method: 'POST',
       body: JSON.stringify({ email }),
     });
   },
 
   passwordResetConfirm: async (token: string, password: string, password2: string): Promise<{ message: string }> => {
-    return fetchWithAuth('/api/auth/password-reset-confirm/', {
+    return fetchPublicJson('/api/auth/password-reset-confirm/', {
       method: 'POST',
       body: JSON.stringify({ token, password, password2 }),
     });

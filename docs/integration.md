@@ -20,8 +20,10 @@ This document covers every step required to connect the React frontend to the Dj
 12. [Media Files](#12-media-files)
 13. [Celery & Background Tasks](#13-celery--background-tasks)
 14. [CORS Configuration](#14-cors-configuration)
-15. [Pages Using Mock Data](#15-pages-using-mock-data)
+15. [Mock Data Status](#15-mock-data-status)
 16. [Production Checklist](#16-production-checklist)
+17. [Detailed Production Infrastructure Guides](#17-detailed-production-infrastructure-guides)
+18. [Remaining Work Before Go-Live](#18-remaining-work-before-go-live)
 
 ---
 
@@ -439,25 +441,23 @@ For production, set `FRONTEND_ORIGIN` to your deployed frontend URL.
 
 ---
 
-## 15. Pages Using Mock Data
+## 15. Mock Data Status
 
-The following pages still import from `frontend/src/services/mock-data.ts` and **have not yet been wired to the real API**. They must be updated before the application is production-ready.
+Most high-traffic user flows have been moved to API-backed data sources.
 
-| File | Mock imports used |
-|---|---|
-| `src/app/pages/Wishlists.tsx` | `mockProperties` |
-| `src/app/pages/UserDashboard.tsx` | `mockProperties`, `mockReviews` |
-| `src/app/pages/AdminDashboard.tsx` | `mockUsers`, `mockProperties`, `mockReviews` |
-| `src/app/pages/HostProfile.tsx` | `mockUsers`, `mockProperties`, `mockReviews` |
-| `src/app/pages/HostDashboard.tsx` | `mockProperties`, `mockReviews` |
-| `src/app/components/FiltersDialog.tsx` | `mockProperties` |
+Current expectation before final release:
 
-**Replacement APIs** already available in `api.service.ts`:
+- Keep `frontend/src/services/mock-data.ts` as test/demo fixture only.
+- Ensure no production route depends on shared mock fixtures at runtime.
+- Verify dashboard, trips, booking confirmation, and filters continue to resolve data from live APIs.
 
-- `propertiesAPI.search()` / `propertiesAPI.getFeatured()` → replaces `mockProperties`
-- `propertiesAPI.getReviews()` → replaces `mockReviews`
-- `dashboardAPI.getMyDashboard()` → replaces dashboard mock data
-- `dashboardAPI.getAgentAnalytics()` → replaces host stats mock data
+Validation command:
+
+```bash
+bash scripts/release-check.sh --allow-dev
+```
+
+Then manually smoke test key pages to confirm there is no fallback to stale local fixtures.
 
 ---
 
@@ -477,4 +477,67 @@ The following pages still import from `frontend/src/services/mock-data.ts` and *
 - [ ] Use a process manager (e.g. `supervisor`, `systemd`) for Daphne and Celery
 - [ ] Enable HTTPS and update `CORS_ALLOWED_ORIGINS` and `WS_BASE_URL` accordingly
 - [ ] Set `AllowedHostsOriginValidator` — already enabled automatically when `DEBUG=false` (see `asgi.py`)
-- [ ] Wire the 6 pages listed in [Section 15](#15-pages-using-mock-data) to the real API
+
+---
+
+## 17. Detailed Production Infrastructure Guides
+
+Use the dedicated documents below for Linux production setup details.
+
+- Backend infrastructure and operations: `docs/backend/infrastructure-production.md`
+- Frontend infrastructure and delivery: `docs/frontend/infrastructure-production.md`
+
+These guides include concrete setup for PostgreSQL, Redis, SMTP email, external payment APIs, systemd services, Nginx, TLS, and release validation.
+
+---
+
+## 18. Remaining Work Before Go-Live
+
+This section is the authoritative list of what still needs to be completed for a safe production launch.
+
+### P0 (must complete before deployment)
+
+- Set `DJANGO_DEBUG=false` in backend production environment.
+- Set a strong `DJANGO_SECRET_KEY` (minimum 32 chars, non-default).
+- Set production-only `DJANGO_ALLOWED_HOSTS` and remove wildcard host patterns.
+- Move backend database to PostgreSQL and run all migrations on the production DB.
+- Set `REDIS_URL` and run Redis-backed cache/channel layer in production.
+- Set `EMAIL_BACKEND` to SMTP provider and configure:
+   - `EMAIL_HOST_USER`
+   - `EMAIL_HOST_PASSWORD`
+   - `DEFAULT_FROM_EMAIL`
+- Keep `AUTH_REQUIRE_EMAIL_VERIFICATION=true`.
+- Set `CELERY_ALWAYS_EAGER=false` and run Celery worker + beat as persistent services.
+- Configure and validate MTN live credentials and active DB gateway record (`mtn_momo`).
+- Configure public webhook URL and verify webhook signature validation.
+
+### P1 (deployment hardening)
+
+- Configure Nginx + TLS (Let's Encrypt) for both API and frontend domains.
+- Ensure secure cookie and SSL redirect settings are enabled in production.
+- Configure static/media strategy (local volume + backup, or object storage + CDN).
+- Set strict `CORS_ALLOWED_ORIGINS` to deployed frontend domains only.
+- Configure process supervision with systemd for:
+   - Daphne
+   - Celery worker
+   - Celery beat
+
+### P2 (operability and safety)
+
+- Set up monitoring and alerting for:
+   - API 5xx rates
+   - queue backlog
+   - payment webhook failures
+   - email delivery failures
+- Implement automated DB backups and restore test process.
+- Add deployment rollback procedure and runbook.
+
+### Release gate commands
+
+Run from repository root:
+
+```bash
+bash scripts/release-check.sh
+```
+
+Do not deploy with any FAIL result.

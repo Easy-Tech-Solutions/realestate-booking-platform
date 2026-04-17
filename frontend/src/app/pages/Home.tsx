@@ -1,16 +1,32 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import { PropertyCard } from '../components/PropertyCard';
 import { PROPERTY_CATEGORIES } from '../../core/constants';
 import { cn } from '../../core/utils';
 import { useHomeProperties } from '../../hooks/queries/useHomeProperties';
+import { propertiesAPI } from '../../services/api.service';
 
 export function Home() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [scrollPosition, setScrollPosition] = useState(0);
   const categoryScrollRef = React.useRef<HTMLDivElement>(null);
+  const categoriesQuery = useQuery({
+    queryKey: ['property-categories'],
+    queryFn: () => propertiesAPI.listCategories(),
+  });
+  const categories = (categoriesQuery.data || []).length
+    ? (categoriesQuery.data || []).map((category) => {
+        const fallback = PROPERTY_CATEGORIES.find((item) => item.id === category.slug);
+        return {
+          id: category.slug,
+          name: category.name,
+          icon: fallback?.icon || '🏷️',
+        };
+      })
+    : PROPERTY_CATEGORIES;
   const propertiesQuery = useHomeProperties(selectedCategory);
   const properties = propertiesQuery.data || [];
   const isLoading = propertiesQuery.isLoading;
@@ -46,7 +62,7 @@ export function Home() {
               ref={categoryScrollRef}
               className="flex gap-8 py-4 overflow-x-auto scrollbar-hide scroll-smooth"
             >
-              {PROPERTY_CATEGORIES.map((category) => (
+              {categories.map((category) => (
                 <button
                   key={category.id}
                   onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
@@ -79,7 +95,7 @@ export function Home() {
         {selectedCategory && (
           <div className="mb-6">
             <h2 className="text-2xl font-semibold">
-              {PROPERTY_CATEGORIES.find(c => c.id === selectedCategory)?.name}
+              {categories.find(c => c.id === selectedCategory)?.name}
             </h2>
             <p className="text-muted-foreground">
               {properties.length} stay{properties.length !== 1 ? 's' : ''}
@@ -94,7 +110,7 @@ export function Home() {
             ))}
           </div>
         ) : properties.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 gap-y-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6 gap-4 gap-y-6">
             {properties.map((property) => (
               <PropertyCard key={property.id} property={property} />
             ))}

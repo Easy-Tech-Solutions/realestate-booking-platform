@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,7 +22,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { cn } from '../../core/utils';
-import { AMENITIES, PROPERTY_TYPES } from '../../core/constants';
+import { AMENITIES, PROPERTY_CATEGORIES } from '../../core/constants';
 import { propertiesAPI } from '../../services/api.service';
 import { toast } from 'sonner';
 
@@ -75,7 +76,7 @@ export function CreateListing() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
-    propertyType: 'apartment',
+    propertyType: 'homes',
     privacyType: 'entire_place',
 
     country: 'Rwanda',
@@ -118,6 +119,14 @@ export function CreateListing() {
   });
 
   const currentStep = STEPS[stepIndex];
+
+  const categoriesQuery = useQuery({
+    queryKey: ['property-categories', 'create-listing'],
+    queryFn: () => propertiesAPI.listCategories(),
+  });
+  const listingCategories = (categoriesQuery.data || []).length
+    ? (categoriesQuery.data || []).map((category) => ({ id: category.slug, name: category.name }))
+    : PROPERTY_CATEGORIES.map((category) => ({ id: category.id, name: category.name }));
 
   const update = (patch: Partial<typeof form>) => setForm((prev) => ({ ...prev, ...patch }));
 
@@ -231,7 +240,11 @@ export function CreateListing() {
       const payload = new FormData();
       payload.append('title', form.title);
       payload.append('description', form.description);
-      payload.append('property_type', form.propertyType);
+      // The backend doesn't have 'apartment' as a valid category slug.
+      // We map it to 'homes' here as a temporary fix.
+      // The correct solution is to add 'apartment' to the PropertyCategory table in the Django admin.
+      const propertyTypeToSend = form.propertyType === 'apartment' ? 'homes' : form.propertyType;
+      payload.append('property_type', propertyTypeToSend);
       payload.append('privacy_type', form.privacyType);
       payload.append('address', composedAddress);
       payload.append('price', String(form.weekdayBasePrice));
@@ -264,17 +277,28 @@ export function CreateListing() {
 
       if (form.images.length > 1) {
         const remaining = form.images.slice(1, 11);
-        await Promise.all(
-          remaining.map((file, idx) =>
-            propertiesAPI.addGalleryImage(created.id, file, '', idx)
-          )
-        );
+        for (const [idx, file] of remaining.entries()) {
+          await propertiesAPI.addGalleryImage(created.id, file, '', idx);
+        }
       }
 
       toast.success('Listing created successfully');
       navigate('/host');
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to create listing');
+      if (error?.status === 401) {
+        toast.error('Your session has expired. Please log in again.');
+      } else if (error?.status === 400 && error?.data && typeof error.data === 'object') {
+        const firstEntry = Object.entries(error.data)[0] as [string, any] | undefined;
+        if (firstEntry) {
+          const [field, value] = firstEntry;
+          const detail = Array.isArray(value) ? value[0] : String(value);
+          toast.error(`${field}: ${detail}`);
+        } else {
+          toast.error('Invalid listing data. Please review all required fields.');
+        }
+      } else {
+        toast.error(error?.message || 'Failed to create listing');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -286,7 +310,7 @@ export function CreateListing() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="px-8 py-6 flex items-center justify-between">
-        <div className="text-2xl font-semibold tracking-tight">airbnb</div>
+        <div className="text-2xl font-semibold tracking-tight">HomeKonet</div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm">Questions?</Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/host')}>Save & exit</Button>
@@ -297,7 +321,7 @@ export function CreateListing() {
         {currentStep === 'welcome' && (
           <div className="grid lg:grid-cols-2 gap-10 items-center py-10">
             <div>
-              <h1 className="text-6xl font-semibold leading-tight">It's easy to get started on Airbnb</h1>
+              <h1 className="text-6xl font-semibold leading-tight">It's easy to get started on HomeKonet</h1>
             </div>
             <div className="space-y-6">
               <div className="flex items-start justify-between border-b pb-4">
@@ -340,7 +364,7 @@ export function CreateListing() {
           <section className="max-w-3xl mx-auto py-8">
             <h2 className="text-6xl font-semibold mb-8">Which of these best describes your place?</h2>
             <div className="grid sm:grid-cols-3 gap-4">
-              {PROPERTY_TYPES.map((type) => (
+              {listingCategories.map((type) => (
                 <button
                   key={type.id}
                   onClick={() => update({ propertyType: type.id })}
@@ -362,12 +386,12 @@ export function CreateListing() {
             <div className="space-y-4">
               {[
                 { id: 'entire_place', title: 'An entire place', subtitle: 'Guests have the whole place to themselves.' },
-                { id: 'room', title: 'A room', subtitle: 'Guests have their own room and shared spaces.' },
+                { id: 'private_room', title: 'A private room', subtitle: 'Guests have their own room and shared spaces.' },
                 { id: 'shared_room', title: 'A shared room in a hostel', subtitle: 'Guests sleep in a shared room.' },
               ].map((option) => (
                 <button
                   key={option.id}
-                  onClick={() => update({ privacyType: option.id })}
+                  onClick={() => update({ privacyType: option.id as 'entire_place' | 'private_room' | 'shared_room' })}
                   className={cn(
                     'w-full border rounded-2xl p-6 text-left transition',
                     form.privacyType === option.id ? 'border-2 border-foreground' : 'hover:border-foreground'

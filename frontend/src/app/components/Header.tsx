@@ -13,13 +13,16 @@ import { useApp } from '../../hooks/useApp';
 import { AuthDialog } from './AuthDialog';
 import { SearchDialog } from './SearchDialog';
 import { getInitials } from '../../core/utils';
+import { authAPI, usersAPI } from '../../services/api.service';
+import { toast } from 'sonner';
 
 export function Header() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout } = useApp();
+  const { user, isAuthenticated, logout, setUser } = useApp();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [isBecomingHost, setIsBecomingHost] = useState(false);
 
   const handleAuthClick = (mode: 'login' | 'register') => {
     setAuthMode(mode);
@@ -29,6 +32,31 @@ export function Header() {
   const handleLogout = async () => {
     await logout();
     navigate('/');
+  };
+
+  const handleBecomeHost = async () => {
+    if (!isAuthenticated) {
+      handleAuthClick('login');
+      return;
+    }
+
+    if (user?.isHost) {
+      navigate('/host');
+      return;
+    }
+
+    setIsBecomingHost(true);
+    try {
+      await usersAPI.updateMyProfile({ role: 'agent' });
+      const refreshedUser = await authAPI.getCurrentUser();
+      setUser(refreshedUser);
+      toast.success('You are now a host. Welcome to hosting!');
+      navigate('/host');
+    } catch (error: any) {
+      toast.error(error?.message || 'Unable to switch to host right now. Please try again.');
+    } finally {
+      setIsBecomingHost(false);
+    }
   };
 
   return (
@@ -41,7 +69,7 @@ export function Header() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <HomeIcon className="w-5 h-5 text-white" />
               </div>
-              <span className="hidden sm:block text-xl font-semibold text-primary">HomeKonnet</span>
+              <span className="hidden sm:block text-xl font-semibold text-primary">HomeKonetnnet</span>
             </Link>
 
             {/* Search Bar - Desktop */}
@@ -71,13 +99,14 @@ export function Header() {
 
             {/* Right Menu */}
             <div className="flex items-center gap-2">
-              {isAuthenticated && user?.isHost && (
+              {isAuthenticated && (
                 <Button
                   variant="ghost"
                   className="hidden sm:inline-flex"
-                  onClick={() => navigate('/host')}
+                  onClick={user?.isHost ? () => navigate('/host') : handleBecomeHost}
+                  disabled={isBecomingHost}
                 >
-                  Switch to hosting
+                  {user?.isHost ? 'Switch to hosting' : isBecomingHost ? 'Setting up host...' : 'Become a host'}
                 </Button>
               )}
 
@@ -138,6 +167,12 @@ export function Header() {
                         <LayoutDashboard className="w-4 h-4 mr-2" />
                         Dashboard
                       </DropdownMenuItem>
+                      {!user?.isHost && (
+                        <DropdownMenuItem onClick={handleBecomeHost}>
+                          <Settings className="w-4 h-4 mr-2" />
+                          Become a host
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       {user?.isHost && (
                         <>
