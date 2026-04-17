@@ -20,7 +20,7 @@ export const authAPI = {
     password2: string;
     first_name?: string;
     last_name?: string;
-  }): Promise<{ message: string }> => {
+  }): Promise<{ message: string; verification_url?: string; verification_token?: string }> => {
     return fetchWithAuth('/api/auth/register/', {
       method: 'POST',
       body: JSON.stringify(data),

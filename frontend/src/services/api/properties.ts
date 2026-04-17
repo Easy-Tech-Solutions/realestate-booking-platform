@@ -17,7 +17,14 @@ export const propertiesAPI = {
 
   getFeatured: async (): Promise<Property[]> => {
     const data = await fetchWithAuth<{ popular_listings?: unknown[] }>('/api/listings/analytics/popular/');
-    return (data.popular_listings || []).map(normalizeListing);
+    const popularListings = (data.popular_listings || []).map(normalizeListing);
+
+    if (popularListings.length > 0) {
+      return popularListings;
+    }
+
+    const fallback = await fetchWithAuth<unknown[]>('/api/listings/');
+    return fallback.map(normalizeListing);
   },
 
   getByCategory: async (category: string): Promise<Property[]> => {

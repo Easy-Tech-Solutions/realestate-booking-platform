@@ -12,6 +12,7 @@ from .throttles import LoginRateThrottle, RegisterRateThrottle, PasswordResetRat
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
+from django.conf import settings
 User = get_user_model()
 
 
@@ -75,7 +76,13 @@ def register(request):
         # Send verification email (pseudo-code)
         from . utils import send_verification_email
         send_verification_email(user)
-        return Response({"message": "User registered successfully. Please check your email to verify your account."}, status=status.HTTP_201_CREATED)
+        payload = {
+            "message": "User registered successfully. Please check your email to verify your account."
+        }
+        if settings.DEBUG and user.email_verification_token:
+            payload["verification_url"] = f"{settings.FRONTEND_ORIGIN}/verify-email?token={user.email_verification_token}"
+            payload["verification_token"] = user.email_verification_token
+        return Response(payload, status=status.HTTP_201_CREATED)
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

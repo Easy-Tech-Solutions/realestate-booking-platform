@@ -4,20 +4,18 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80
 export const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 
 export const PROPERTY_CATEGORIES = [
-  { id: 'beachfront', name: 'Beachfront', icon: '🏖️' },
-  { id: 'amazing-views', name: 'Amazing views', icon: '🏔️' },
-  { id: 'trending', name: 'Trending', icon: '🔥' },
-  { id: 'cabins', name: 'Cabins', icon: '🏕️' },
-  { id: 'lakefront', name: 'Lakefront', icon: '🌊' },
-  { id: 'amazing-pools', name: 'Amazing pools', icon: '🏊' },
-  { id: 'countryside', name: 'Countryside', icon: '🌾' },
-  { id: 'design', name: 'Design', icon: '✨' },
-  { id: 'tiny-homes', name: 'Tiny homes', icon: '🏡' },
-  { id: 'castles', name: 'Castles', icon: '🏰' },
-  { id: 'treehouses', name: 'Treehouses', icon: '🌳' },
-  { id: 'caves', name: 'Caves', icon: '⛰️' },
-  { id: 'luxe', name: 'Luxe', icon: '💎' },
-  { id: 'farms', name: 'Farms', icon: '🚜' },
+  { id: 'house', name: 'Houses', icon: '🏠' },
+  { id: 'apartment', name: 'Apartments', icon: '🏢' },
+  { id: 'villa', name: 'Villas', icon: '🌴' },
+  { id: 'cabin', name: 'Cabins', icon: '🏕️' },
+  { id: 'cottage', name: 'Cottages', icon: '🌿' },
+  { id: 'bungalow', name: 'Bungalows', icon: '🛖' },
+  { id: 'chalet', name: 'Chalets', icon: '🏔️' },
+  { id: 'treehouse', name: 'Treehouses', icon: '🌳' },
+  { id: 'boat', name: 'Boats', icon: '⛵' },
+  { id: 'castle', name: 'Castles', icon: '🏰' },
+  { id: 'cave', name: 'Caves', icon: '🪨' },
+  { id: 'farm', name: 'Farms', icon: '🚜' },
 ];
 
 export const AMENITIES = [
