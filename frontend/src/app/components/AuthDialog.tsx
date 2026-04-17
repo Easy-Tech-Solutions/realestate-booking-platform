@@ -47,8 +47,9 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
           first_name: formData.first_name,
           last_name: formData.last_name,
         });
-        toast.success(result.message || 'Account created! Please check your email to verify.');
+        toast.success(result.message || 'Account created! Check your email for the verification link.');
         onModeChange('login');
+        onClose();
       }
       setFormData({ username: '', email: '', password: '', password2: '', first_name: '', last_name: '' });
     } catch (error: any) {

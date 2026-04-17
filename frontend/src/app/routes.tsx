@@ -24,6 +24,8 @@ const AdminDashboard = lazyPage(() => import('./pages/AdminDashboard').then((mod
 const AdminReports = lazyPage(() => import('./pages/AdminReports').then((module) => ({ default: module.AdminReports })));
 const AdminSuspensions = lazyPage(() => import('./pages/AdminSuspensions').then((module) => ({ default: module.AdminSuspensions })));
 const Notifications = lazyPage(() => import('./pages/Notifications').then((module) => ({ default: module.Notifications })));
+const Login = lazyPage(() => import('./pages/Login').then((module) => ({ default: module.Login })));
+const VerifyEmail = lazyPage(() => import('./pages/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
 const HostProfile = lazyPage(() => import('./pages/HostProfile').then((module) => ({ default: module.HostProfile })));
 const Help = lazyPage(() => import('./pages/Help').then((module) => ({ default: module.Help })));
 const Terms = lazyPage(() => import('./pages/Terms').then((module) => ({ default: module.Terms })));
@@ -86,6 +88,8 @@ export const router = createBrowserRouter([
         ),
       },
       { path: 'notifications', Component: Notifications },
+      { path: 'login', Component: Login },
+      { path: 'verify-email', Component: VerifyEmail },
       { path: 'users/:id', Component: HostProfile },
       { path: 'help', Component: Help },
       { path: 'terms', Component: Terms },
