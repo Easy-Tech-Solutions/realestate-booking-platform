@@ -240,7 +240,11 @@ export function CreateListing() {
       const payload = new FormData();
       payload.append('title', form.title);
       payload.append('description', form.description);
-      payload.append('property_type', form.propertyType);
+      // The backend doesn't have 'apartment' as a valid category slug.
+      // We map it to 'homes' here as a temporary fix.
+      // The correct solution is to add 'apartment' to the PropertyCategory table in the Django admin.
+      const propertyTypeToSend = form.propertyType === 'apartment' ? 'homes' : form.propertyType;
+      payload.append('property_type', propertyTypeToSend);
       payload.append('privacy_type', form.privacyType);
       payload.append('address', composedAddress);
       payload.append('price', String(form.weekdayBasePrice));
