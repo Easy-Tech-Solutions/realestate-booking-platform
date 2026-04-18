@@ -2,6 +2,11 @@
 
 A full-featured property rental booking app built with React 18, TypeScript, and TailwindCSS v4. Designed from a [Figma prototype](https://www.figma.com/design/oo8Ma2soai9hrro20Q3S9z/Airbnb-like-Booking-App).
 
+## Frontend Docs Map
+
+- Detailed architecture and file-by-file frontend reference: `../docs/frontend/frontend-architecture.md`
+- Frontend production deployment and infrastructure: `../docs/frontend/infrastructure-production.md`
+
 ---
 
 ## Tech Stack
