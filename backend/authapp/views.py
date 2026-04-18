@@ -13,6 +13,8 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
+from django.http import HttpResponse
+from django.db import transaction
 User = get_user_model()
 
 
@@ -72,27 +74,33 @@ def register(request):
         return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            first_name=first_name or "",
-            last_name=last_name or "",
-            is_active=not settings.AUTH_REQUIRE_EMAIL_VERIFICATION,
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name or "",
+                last_name=last_name or "",
+                is_active=not settings.AUTH_REQUIRE_EMAIL_VERIFICATION,
+            )
+            if settings.AUTH_REQUIRE_EMAIL_VERIFICATION:
+                from .utils import send_verification_email
+                send_verification_email(user)
+        message = "User registered successfully. Please check your email to verify your account."
+        if not settings.AUTH_REQUIRE_EMAIL_VERIFICATION:
+            message = "User registered successfully. You can now log in."
+        return Response({"message": message}, status=status.HTTP_201_CREATED)
+    except Exception:
+        return Response(
+            {"error": "Registration could not be completed because the verification email could not be sent. Please try again in a moment."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
-        # Send verification email (pseudo-code)
-        from . utils import send_verification_email
-        send_verification_email(user)
-        return Response({"message": "User registered successfully. Please check your email to verify your account."}, status=status.HTTP_201_CREATED)
 
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @permission_classes([AllowAny])
 @throttle_classes([VerifyEmailRateThrottle])
 def verify_email(request):
-    token = request.data.get("token")
+    token = request.data.get("token") if request.method == "POST" else request.query_params.get("token")
     if not token:
         return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -102,8 +110,18 @@ def verify_email(request):
         user.is_active = True
         user.email_verification_token = None
         user.save()
+        if request.method == "GET":
+            login_url = getattr(settings, "FRONTEND_ORIGIN", "") or f"https://{settings.LOCAL_DOMAIN}"
+            return HttpResponse(
+                f"<html><body style='font-family: sans-serif; padding: 2rem;'><h1>Email verified</h1><p>Your account is now active. You can return to the app and log in.</p><p><a href='{login_url}'>Open app</a></p></body></html>"
+            )
         return Response({"message": "Email verified successfully"}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
+        if request.method == "GET":
+            return HttpResponse(
+                "<html><body style='font-family: sans-serif; padding: 2rem;'><h1>Invalid verification link</h1><p>This verification link is invalid or has already been used.</p></body></html>",
+                status=400,
+            )
         return Response({"error": "Invalid verification token"}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["POST"])

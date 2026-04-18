@@ -69,7 +69,7 @@ export function Header() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <HomeIcon className="w-5 h-5 text-white" />
               </div>
-              <span className="hidden sm:block text-xl font-semibold text-primary">HomeKonnet</span>
+              <span className="hidden sm:block text-xl font-semibold text-primary">HomeKonetnnet</span>
             </Link>
 
             {/* Search Bar - Desktop */}

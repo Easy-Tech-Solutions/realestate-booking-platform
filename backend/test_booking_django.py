@@ -1,63 +1,49 @@
 import os
 import sys
 import django
+from datetime import date
 
-# Add the project directory to the path
-sys.path.insert(0, os.path.dirname(__file__))
-
-# Setup Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'realestate_backend.settings')
-django.setup()
-
-# Now import Django modules
-from django.test import TestCase
-from django.test.client import Client
 from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient
+from rest_framework.test import APITestCase
+from rest_framework import status
 from bookings.models import Booking
 from listings.models import Listing
 from rest_framework_simplejwt.tokens import RefreshToken
 
-# Test booking creation
-client = APIClient()
+class BookingAPITestCase(APITestCase):
+    """
+    Test suite for the booking creation API endpoint.
+    This test will be run via `python manage.py test`.
+    """
+    def setUp(self):
+        """Set up the test data."""
+        User = get_user_model()
+        self.host = User.objects.create_user(username='host', email='john@example.com', password='password123')
+        self.guest = User.objects.create_user(username='guest', email='jane@example.com', password='password123')
 
-# Get users
-User = get_user_model()
-try:
-    jane = User.objects.get(email='jane@example.com')
-    john = User.objects.get(email='john@example.com')
-    print("Users found")
+        self.listing = Listing.objects.create(
+            owner=self.host,
+            title="Test Beach House",
+            address="123 Ocean Drive, Testville, USA",
+            price=100.00,
+        )
 
-    # Get John's listing
-    listing = Listing.objects.filter(owner=john).first()
-    if listing:
-        print(f"Found listing: {listing.title}")
+        # Authenticate the client as the guest
+        self.client.force_authenticate(user=self.guest)
 
-        # Create JWT token for Jane
-        refresh = RefreshToken.for_user(jane)
-        access_token = str(refresh.access_token)
-        client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
-
-        # Create booking
+    def test_create_booking_successfully(self):
+        """Ensure an authenticated user can create a booking for a listing."""
         booking_data = {
-            'listing': listing.id,
-            'start_date': '2024-02-01',
-            'end_date': '2024-02-05',
+            'listing': self.listing.id,
+            'start_date': date(2024, 10, 1),
+            'end_date': date(2024, 10, 5),
             'notes': 'Looking forward to staying here!'
         }
 
-        response = client.post('/api/bookings/', booking_data, format='json')
-        print(f"Booking creation status: {response.status_code}")
-        print(f"Booking response: {response.data}")
+        response = self.client.post('/api/bookings/', booking_data, format='json')
 
-        if response.status_code == 201:
-            print("SUCCESS: Booking created successfully!")
-        else:
-            print("FAILED: Booking creation failed")
-    else:
-        print("No listing found for John")
-
-except User.DoesNotExist as e:
-    print(f"User not found: {e}")
-except Exception as e:
-    print(f"Error: {e}")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Booking.objects.count(), 1)
+        booking = Booking.objects.first()
+        self.assertEqual(booking.guest, self.guest)
+        self.assertEqual(booking.listing, self.listing)

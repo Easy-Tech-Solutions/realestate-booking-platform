@@ -35,7 +35,7 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h3 className="font-semibold mb-4">staybnb</h3>
+            <h3 className="font-semibold mb-4">HomeKonet</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li><a href="#" className="hover:text-foreground">Newsroom</a></li>
               <li><a href="#" className="hover:text-foreground">Learn about new features</a></li>
@@ -49,7 +49,7 @@ export function Footer() {
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-4">
-            <p>© 2026 staybnb, Inc.</p>
+            <p>© 2026 HomeKonet, Inc.</p>
             <span>·</span>
             <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
             <span>·</span>

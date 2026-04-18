@@ -15,8 +15,9 @@ class User(AbstractUser):
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='user')
 
     def save(self, *args, **kwargs):
-        #Automatically set staff/superstaff based on role
-        if self.role == 'admin':
+        # Keep Django admin flags and app role aligned.
+        if self.is_superuser or self.is_staff or self.role == 'admin':
+            self.role = 'admin'
             self.is_staff = True
             self.is_superuser = True
         else:
