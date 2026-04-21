@@ -67,7 +67,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
       if (view === 'login') {
         await login(formData.username, formData.password);
         toast.success('Welcome back!');
-        onClose();
+        handleClose();
       } else {
         if (formData.password !== formData.password2) {
           toast.error('Passwords do not match');
@@ -83,23 +83,12 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
         });
         toast.success(result.message || 'Account created! Check your email for the verification link.');
         onModeChange('login');
-        onClose();
+        handleClose();
       }
 
-      const result = await register({
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-        password2: formData.password2,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-      });
-
-      toast.success(result.message || 'Account created! Please check your email to verify.');
-      onModeChange('login');
-      setView('login');
-      resetForm();
-    } catch (error: any) {
+    } 
+    
+    catch (error: any) {
       toast.error(
         error.message ||
           (view === 'forgot-password'

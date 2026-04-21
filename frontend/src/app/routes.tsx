@@ -31,6 +31,9 @@ const Help = lazyPage(() => import('./pages/Help').then((module) => ({ default: 
 const Terms = lazyPage(() => import('./pages/Terms').then((module) => ({ default: module.Terms })));
 const Privacy = lazyPage(() => import('./pages/Privacy').then((module) => ({ default: module.Privacy })));
 const NotFound = lazyPage(() => import('./pages/NotFound').then((module) => ({ default: module.NotFound })));
+const ResetPassword = lazyPage(() => import('./pages/ResetPassword').then((module) => ({ default: module.ResetPassword })));
+
+
 
 export const router = createBrowserRouter([
   {
@@ -95,6 +98,8 @@ export const router = createBrowserRouter([
       { path: 'terms', Component: Terms },
       { path: 'privacy', Component: Privacy },
       { path: '*', Component: NotFound },
+      { path: 'reset-password', Component: ResetPassword },
+
     ],
   },
 ]);
