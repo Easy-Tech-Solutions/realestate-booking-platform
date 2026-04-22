@@ -7,6 +7,12 @@ import { Label } from './ui/label';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { authAPI } from '../../services/api.service';
+import googleLogo  from '../../assets/google.png';
+import appleLogo  from '../../assets/apple.png';
+
+
+
+/* Props passed in from the parent header/menu that opens this dialog */
 
 interface AuthDialogProps {
   open: boolean;
@@ -15,12 +21,20 @@ interface AuthDialogProps {
   onModeChange: (mode: 'login' | 'register') => void;
 }
 
+/* Local dialog modes, including forgot-password */
+
 type AuthView = 'login' | 'register' | 'forgot-password';
 
 export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProps) {
   const { login, register } = useApp();
+
+    /* Local UI state for which auth screen is showing */
   const [view, setView] = useState<AuthView>(mode);
+
+   /* Loading state for async submit actions */
   const [isLoading, setIsLoading] = useState(false);
+
+  /* Shared form state used by login, register, and forgot-password */
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -30,10 +44,12 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     last_name: '',
   });
 
+  /* Keep the local dialog view in sync with the parent mode */
   useEffect(() => {
     setView(mode);
   }, [mode, open]);
 
+ { /* Clear all form inputs */}
   const resetForm = () => {
     setFormData({
       username: '',
@@ -45,17 +61,22 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     });
   };
 
+  
+  {/* Close dialog and restore its default state */}
   const handleClose = () => {
     setView(mode);
     resetForm();
     onClose();
   };
 
+  {/* Handle submit for login, register, and forgot-password */}
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
+
+      {/* Forgot-password flow: request reset email */}
       if (view === 'forgot-password') {
         const result = await authAPI.passwordResetRequest(formData.email);
         toast.success(result.message);
@@ -64,15 +85,19 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
         return;
       }
 
+      { /* Login flow */}
       if (view === 'login') {
         await login(formData.username, formData.password);
         toast.success('Welcome back!');
         handleClose();
       } else {
+         { /* Register flow: validate passwords match before calling register API */}
         if (formData.password !== formData.password2) {
           toast.error('Passwords do not match');
           return;
         }
+
+          { /* Register flow request */}
         const result = await register({
           username: formData.username,
           email: formData.email,
@@ -115,6 +140,9 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
         </div>
 
         <div className="p-6 space-y-4">
+
+          {/* Heading and helper text for the current auth view */}
+
           <div>
             <h3 className="text-lg font-semibold mb-2">
               {view === 'login'
@@ -132,9 +160,47 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
             </p>
           </div>
 
+
+
+        {/* Social sign-in section: shown for login/register, hidden for forgot-password */}
+          {view !== 'forgot-password' && (
+            <div className="space-y-3">
+              {/* Divider label */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+
+              {/* Placeholder provider buttons for Google and Apple */}
+              <div className="space-y-3">
+
+                <Button type="button" variant="outline" className="w-full">
+  <img src={googleLogo} alt="Google" className="w-4 h-4 mr-2" />
+  Continue with Google
+</Button>
+
+<Button type="button" variant="outline" className="w-full">
+  <img src={appleLogo} alt="Apple" className="w-6 h-6 mr-2" />
+  Continue with Apple
+</Button>
+
+
+              </div>
+            </div>
+          )}
+
+   {/* Main auth form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+
+            {/* Register and forgot-password both need email */}
             {(view === 'register' || view === 'forgot-password') && (
               <>
+
+                {/* Extra profile fields shown only on registration */}
                 {view === 'register' && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -146,6 +212,8 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                         value={formData.first_name}
                         onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                       />
+    
+
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="last_name">Last name</Label>
@@ -159,7 +227,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                     </div>
                   </div>
                 )}
-
+{/* Email field */}
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <div className="relative">
@@ -177,6 +245,8 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                 </div>
               </>
             )}
+
+{/* Username field for login/register only */}
 
             {view !== 'forgot-password' && (
               <div className="space-y-2">
@@ -196,6 +266,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
               </div>
             )}
 
+ {/* Confirm password shown only in register mode */}
             {view !== 'forgot-password' && (
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
@@ -214,6 +285,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
               </div>
             )}
 
+ {/* Forgot-password shortcut shown only in login mode */}
             {view === 'login' && (
               <div className="flex justify-end">
                 <button
@@ -244,11 +316,13 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
               </div>
             )}
 
+{/* Submit button changes label based on current auth view */}
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Please wait...' : view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Send reset link'}
             </Button>
           </form>
 
+{/* Bottom links for switching between login/register/forgot-password */}
           <div className="text-center text-sm">
             {view === 'login' ? (
               <span>
