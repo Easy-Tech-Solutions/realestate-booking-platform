@@ -1,3 +1,6 @@
+import re
+import secrets
+
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -8,7 +11,14 @@ from django.core.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from .serializers import UserSerializer
-from .throttles import LoginRateThrottle, RegisterRateThrottle, PasswordResetRateThrottle, VerifyEmailRateThrottle
+from .throttles import (
+    LoginRateThrottle,
+    RegisterRateThrottle,
+    PasswordResetRateThrottle,
+    VerifyEmailRateThrottle,
+    GoogleLoginRateThrottle,
+)
+from .models import SocialAccount
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils import timezone
@@ -252,3 +262,194 @@ def password_reset_confirm(request):
     user.password_reset_token = None
     user.save()
     return Response({"message": "Password reset successfully. You can now log in with your new password."}, status=status.HTTP_200_OK)
+
+
+GOOGLE_ALLOWED_ISSUERS = {"accounts.google.com", "https://accounts.google.com"}
+GOOGLE_SIGNUP_ALLOWED_ROLES = {"user", "agent"}
+
+
+def _verify_google_id_token(token):
+    """Return the decoded Google ID-token payload, or None if invalid.
+
+    Validates signature, expiry, audience, and issuer. Returns None on any
+    failure so the caller can respond with a generic 401 (no detail leaked).
+    """
+    client_id = getattr(settings, "GOOGLE_OAUTH_CLIENT_ID", "")
+    if not client_id:
+        return None
+
+    try:
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_requests
+    except ImportError:
+        return None
+
+    try:
+        payload = google_id_token.verify_oauth2_token(
+            token, google_requests.Request(), client_id
+        )
+    except Exception:
+        return None
+
+    if payload.get("iss") not in GOOGLE_ALLOWED_ISSUERS:
+        return None
+    if not payload.get("email") or not payload.get("sub"):
+        return None
+    if not payload.get("email_verified"):
+        return None
+
+    return payload
+
+
+def _unique_username_from_email(email):
+    base = re.sub(r"[^a-z0-9_]", "", email.split("@")[0].lower())[:20] or "user"
+    candidate = base
+    while User.objects.filter(username=candidate).exists():
+        candidate = f"{base}-{secrets.token_hex(3)}"
+    return candidate
+
+
+def _issue_tokens_for_user(user):
+    refresh = RefreshToken.for_user(user)
+    return {
+        "refresh": str(refresh),
+        "access": str(refresh.access_token),
+        "user": UserSerializer(user).data,
+    }
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@throttle_classes([GoogleLoginRateThrottle])
+def google_login(request):
+    """Sign in or register via a Google ID token.
+
+    Request body:
+      { "id_token": "<JWT from Google>", "role": "user" | "agent" (optional) }
+
+    Responses:
+      200 { refresh, access, user }                   — existing user signed in
+      200 { needs_role: true, email, suggested_username }
+                                                       — new user, frontend must
+                                                         resubmit with `role`
+      409 { error: "...", code: "email_already_registered" }
+                                                       — local account owns this
+                                                         email (no auto-linking)
+      403 { error: "..." }                             — admin/suspended/inactive
+      401 { error: "Invalid Google token" }            — verification failed
+      400 { error: "..." }                             — missing/invalid input
+    """
+    id_token_str = request.data.get("id_token")
+    if not id_token_str:
+        return Response({"error": "id_token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    payload = _verify_google_id_token(id_token_str)
+    if payload is None:
+        return Response({"error": "Invalid Google token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    google_sub = payload["sub"]
+    email = payload["email"].lower().strip()
+    first_name = payload.get("given_name", "") or ""
+    last_name = payload.get("family_name", "") or ""
+
+    # Case 1: returning Google user — SocialAccount already linked.
+    social = (
+        SocialAccount.objects
+        .select_related("user")
+        .filter(provider=SocialAccount.PROVIDER_GOOGLE, provider_user_id=google_sub)
+        .first()
+    )
+    if social is not None:
+        user = social.user
+
+        # Admins/staff must use password login (per product decision).
+        if user.is_staff or user.is_superuser or user.role == "admin":
+            return Response(
+                {"error": "Administrator accounts must sign in with a password."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not user.is_active:
+            return Response(
+                {"error": "This account has been deactivated."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        suspension = _get_active_suspension(user)
+        if suspension:
+            return Response(_suspension_response(suspension), status=status.HTTP_403_FORBIDDEN)
+
+        social.last_login_at = timezone.now()
+        social.save(update_fields=["last_login_at"])
+        return Response(_issue_tokens_for_user(user), status=status.HTTP_200_OK)
+
+    # Case 2: email already owned by a local (password) account — no auto-link.
+    if User.objects.filter(email__iexact=email).exists():
+        return Response(
+            {
+                "error": "An account with this email already exists. Please log in with your password.",
+                "code": "email_already_registered",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Case 3: new user. Require a role choice on this second call.
+    role = request.data.get("role")
+    if role is None:
+        return Response(
+            {
+                "needs_role": True,
+                "email": email,
+                "suggested_username": _unique_username_from_email(email),
+                "first_name": first_name,
+                "last_name": last_name,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    if role not in GOOGLE_SIGNUP_ALLOWED_ROLES:
+        return Response(
+            {"error": "Invalid role. Choose 'user' or 'agent'."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        with transaction.atomic():
+            # Re-check inside the transaction to close the race window between
+            # the needs_role response and this call.
+            if User.objects.filter(email__iexact=email).exists():
+                return Response(
+                    {
+                        "error": "An account with this email already exists. Please log in with your password.",
+                        "code": "email_already_registered",
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            username = _unique_username_from_email(email)
+            user = User(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                role=role,
+                email_verified=True,
+                is_active=True,
+            )
+            user.set_unusable_password()
+            user.save()
+
+            SocialAccount.objects.create(
+                user=user,
+                provider=SocialAccount.PROVIDER_GOOGLE,
+                provider_user_id=google_sub,
+                email_at_link=email,
+                last_login_at=timezone.now(),
+            )
+    except Exception:
+        return Response(
+            {"error": "Could not complete Google sign-up. Please try again."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    return Response(_issue_tokens_for_user(user), status=status.HTTP_201_CREATED)

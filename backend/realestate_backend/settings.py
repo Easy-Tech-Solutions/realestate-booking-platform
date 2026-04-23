@@ -212,6 +212,7 @@ REST_FRAMEWORK = {
         "password_reset": "3/hour",
         "verify_email": "10/hour",
         "phone_change": "5/hour",
+        "google_login": "20/min" if DEBUG else "10/min",
     },
 }
 
@@ -271,6 +272,8 @@ AUTHENTICATION_BACKENDS = [
 
 AUTH_USER_MODEL = "users.User"
 
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 os.makedirs(MEDIA_ROOT, exist_ok=True)
@@ -325,4 +328,3 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-#Test comment
