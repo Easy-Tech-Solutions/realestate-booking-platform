@@ -1,5 +1,15 @@
 from django.urls import path
-from .views import register, verify_email, login_view, logout_view, me, refresh_token_view, password_reset_request, password_reset_confirm
+from .views import (
+    register,
+    verify_email,
+    login_view,
+    logout_view,
+    me,
+    refresh_token_view,
+    password_reset_request,
+    password_reset_confirm,
+    google_login,
+)
 
 urlpatterns = [
     path('register/', register, name='register'),
@@ -10,4 +20,5 @@ urlpatterns = [
     path('me/', me, name='me'),
     path('password-reset/', password_reset_request, name='password_reset_request'),
     path('password-reset-confirm/', password_reset_confirm, name='password_reset_confirm'),
+    path('google/', google_login, name='google_login'),
 ]
