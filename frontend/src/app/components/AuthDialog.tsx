@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { authAPI } from '../../services/api.service';
 import googleLogo  from '../../assets/google.png';
 import appleLogo  from '../../assets/apple.png';
+import { API_BASE_URL } from '../../core/constants';
 
 
 
@@ -127,6 +128,11 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     }
   };
 
+const handleGoogleSignIn = () => {
+  window.location.href = `${API_BASE_URL}/api/auth/google/`;
+};
+
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[480px] p-0 gap-0">
@@ -178,7 +184,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
               {/* Placeholder provider buttons for Google and Apple */}
               <div className="space-y-3">
 
-                <Button type="button" variant="outline" className="w-full">
+                <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn}>
   <img src={googleLogo} alt="Google" className="w-4 h-4 mr-2" />
   Continue with Google
 </Button>
