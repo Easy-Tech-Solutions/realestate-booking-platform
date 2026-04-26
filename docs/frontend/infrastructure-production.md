@@ -2,6 +2,8 @@
 
 This guide covers production deployment of the React + Vite frontend on Linux, including build pipeline, environment variables, and reverse proxy configuration.
 
+For code architecture, file responsibilities, and API wiring details, see `docs/frontend/frontend-architecture.md`.
+
 ## 1. Target Architecture
 
 - Build tool: Vite
