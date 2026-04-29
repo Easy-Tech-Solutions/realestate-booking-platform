@@ -1,6 +1,10 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
+from urllib.parse import urlparse, parse_qsl
+
+load_dotenv() 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,7 +24,7 @@ def load_env_file(path: Path) -> None:
         os.environ.setdefault(key, value)
 
 
-load_env_file(BASE_DIR / ".env")
+#load_env_file(BASE_DIR / ".env")
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -113,31 +117,43 @@ TEMPLATES = [
 WSGI_APPLICATION = "realestate_backend.wsgi.application"
 ASGI_APPLICATION = "realestate_backend.asgi.application"
 
-DB_ENGINE = os.environ.get("DB_ENGINE", "sqlite").lower()
+tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
+#DB_ENGINE = os.environ.get("DB_ENGINE", "sqlite").lower()
 
-if DB_ENGINE == "postgres":
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.environ.get("POSTGRES_DB", "realestate"),
-            "USER": os.environ.get("POSTGRES_USER", "postgres"),
-            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
-            "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
-            "CONN_MAX_AGE": int(os.environ.get("POSTGRES_CONN_MAX_AGE", "60")),
-            "OPTIONS": {
-                "sslmode": os.environ.get("POSTGRES_SSLMODE", "require"),
-                "channel_binding": os.environ.get("POSTGRES_CHANNEL_BINDING", "require"),
-            },
-        }
+#if DB_ENGINE == "postgres":
+    #DATABASES = {
+        #"default": {
+            #"ENGINE": "django.db.backends.postgresql",
+            #"NAME": os.environ.get("POSTGRES_DB", "realestate"),
+            #"USER": os.environ.get("POSTGRES_USER", "postgres"),
+            #"PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
+            #"HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+            #"PORT": os.environ.get("POSTGRES_PORT", "5432"),
+            #"CONN_MAX_AGE": int(os.environ.get("POSTGRES_CONN_MAX_AGE", "60")),
+            #"OPTIONS": {
+                #"sslmode": os.environ.get("POSTGRES_SSLMODE", "require"),
+                #"channel_binding": os.environ.get("POSTGRES_CHANNEL_BINDING", "require"),
+            #},
+        #}
+    #}
+#else:
+    #DATABASES = {
+        #"default": {
+            #"ENGINE": "django.db.backends.sqlite3",
+            #"NAME": BASE_DIR / "db.sqlite3",
+        #}
+    #}
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': tmpPostgres.path.replace('/', ''),
+        'USER': tmpPostgres.username,
+        'PASSWORD': tmpPostgres.password,
+        'HOST': tmpPostgres.hostname,
+        'PORT': 5432,
+        'OPTIONS': dict(parse_qsl(tmpPostgres.query)),
     }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
