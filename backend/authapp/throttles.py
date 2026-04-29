@@ -17,6 +17,10 @@ class VerifyEmailRateThrottle(AnonRateThrottle):
     scope = "verify_email"
 
 
+class GoogleLoginRateThrottle(AnonRateThrottle):
+    scope = "google_login"
+
+
 class PhoneChangeRateThrottle(UserRateThrottle):
     """
     Limits how often an authenticated user can hit any phone-change endpoint.
