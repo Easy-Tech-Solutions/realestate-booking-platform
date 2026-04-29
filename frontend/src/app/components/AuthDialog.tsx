@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, Mail, Lock, User as UserIcon } from 'lucide-react';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,9 +8,7 @@ import { Label } from './ui/label';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { authAPI } from '../../services/api.service';
-import googleLogo  from '../../assets/google.png';
 import appleLogo  from '../../assets/apple.png';
-import { API_BASE_URL } from '../../core/constants';
 
 
 
@@ -22,12 +21,19 @@ interface AuthDialogProps {
   onModeChange: (mode: 'login' | 'register') => void;
 }
 
-/* Local dialog modes, including forgot-password */
+/* Local dialog modes, including forgot-password and Google's role-picker step */
 
-type AuthView = 'login' | 'register' | 'forgot-password';
+type AuthView = 'login' | 'register' | 'forgot-password' | 'choose-role';
+
+interface PendingGoogleSignup {
+  idToken: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
 
 export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProps) {
-  const { login, register } = useApp();
+  const { login, register, loginWithGoogle } = useApp();
 
     /* Local UI state for which auth screen is showing */
   const [view, setView] = useState<AuthView>(mode);
@@ -45,9 +51,14 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     last_name: '',
   });
 
-  /* Keep the local dialog view in sync with the parent mode */
+  /* Holds a verified Google ID token while the user picks their role on first sign-in */
+  const [pendingGoogleSignup, setPendingGoogleSignup] = useState<PendingGoogleSignup | null>(null);
+
+  /* Keep the local dialog view in sync with the parent mode (but don't clobber the role picker) */
   useEffect(() => {
-    setView(mode);
+    if (view !== 'choose-role') {
+      setView(mode);
+    }
   }, [mode, open]);
 
  { /* Clear all form inputs */}
@@ -62,10 +73,11 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     });
   };
 
-  
+
   {/* Close dialog and restore its default state */}
   const handleClose = () => {
     setView(mode);
+    setPendingGoogleSignup(null);
     resetForm();
     onClose();
   };
@@ -128,9 +140,73 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     }
   };
 
-const handleGoogleSignIn = () => {
-  window.location.href = `${API_BASE_URL}/api/auth/google/`;
-};
+  /*
+   * Google Sign-In flow:
+   *   1. <GoogleLogin> renders Google's button and returns a CredentialResponse
+   *      whose `credential` field is a signed ID-token JWT.
+   *   2. POST it to /api/auth/google/ via authAPI.loginWithGoogle (in the store).
+   *   3. If the user is new, the backend asks us to collect a role first
+   *      (`needs_role`); we stash the ID token and switch to the role picker.
+   *   4. The role picker re-submits with { id_token, role } to create the user.
+   */
+  const handleGoogleCredential = async (credentialResponse: CredentialResponse) => {
+    const idToken = credentialResponse.credential;
+    if (!idToken) {
+      toast.error('Google sign-in was cancelled.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await loginWithGoogle(idToken);
+      if (result.status === 'success') {
+        toast.success('Welcome!');
+        handleClose();
+        return;
+      }
+
+      // First-time Google sign-up — ask the user to choose a role.
+      setPendingGoogleSignup({
+        idToken: result.idToken,
+        email: result.email,
+        firstName: result.firstName,
+        lastName: result.lastName,
+      });
+      setView('choose-role');
+    } catch (error: any) {
+      toast.error(error.message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    toast.error('Google sign-in failed. Please try again.');
+  };
+
+  const handleRoleChoice = async (role: 'user' | 'agent') => {
+    if (!pendingGoogleSignup) return;
+    setIsLoading(true);
+    try {
+      const result = await loginWithGoogle(pendingGoogleSignup.idToken, role);
+      if (result.status === 'success') {
+        toast.success('Welcome to the platform!');
+        handleClose();
+      } else {
+        // Should not happen on the second call, but fall through safely.
+        toast.error('Could not complete sign-up. Please try again.');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Could not complete sign-up.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const cancelRoleChoice = () => {
+    setPendingGoogleSignup(null);
+    setView(mode);
+  };
 
 
   return (
@@ -141,7 +217,13 @@ const handleGoogleSignIn = () => {
             <X className="w-4 h-4" />
           </button>
           <h2 className="text-center font-semibold">
-            {view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Forgot password'}
+            {view === 'login'
+              ? 'Log in'
+              : view === 'register'
+                ? 'Sign up'
+                : view === 'forgot-password'
+                  ? 'Forgot password'
+                  : 'Choose your role'}
           </h2>
         </div>
 
@@ -155,21 +237,63 @@ const handleGoogleSignIn = () => {
                 ? 'Welcome back'
                 : view === 'register'
                   ? 'Create your account'
-                  : 'Reset your password'}
+                  : view === 'forgot-password'
+                    ? 'Reset your password'
+                    : `Welcome${pendingGoogleSignup?.firstName ? `, ${pendingGoogleSignup.firstName}` : ''}!`}
             </h3>
             <p className="text-sm text-muted-foreground">
               {view === 'login'
                 ? 'Log in to continue your journey'
                 : view === 'register'
                   ? 'Create an account to get started'
-                  : 'Enter your email and we will send you a password reset link'}
+                  : view === 'forgot-password'
+                    ? 'Enter your email and we will send you a password reset link'
+                    : 'How do you plan to use the platform? You can change this later in settings.'}
             </p>
           </div>
 
+          {/* Role-picker step shown after Google reports a brand-new user. */}
+          {view === 'choose-role' && (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => handleRoleChoice('user')}
+                disabled={isLoading}
+                className="w-full text-left border rounded-lg p-4 hover:bg-muted transition disabled:opacity-50"
+              >
+                <div className="font-semibold">I'm here to book</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Find and book properties listed by agents.
+                </div>
+              </button>
 
+              <button
+                type="button"
+                onClick={() => handleRoleChoice('agent')}
+                disabled={isLoading}
+                className="w-full text-left border rounded-lg p-4 hover:bg-muted transition disabled:opacity-50"
+              >
+                <div className="font-semibold">I'm an agent</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  List and manage properties for booking.
+                </div>
+              </button>
 
-        {/* Social sign-in section: shown for login/register, hidden for forgot-password */}
-          {view !== 'forgot-password' && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={cancelRoleChoice}
+                  disabled={isLoading}
+                  className="text-sm text-muted-foreground hover:underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+        {/* Social sign-in section: shown for login/register, hidden for forgot-password and role-picker */}
+          {view !== 'forgot-password' && view !== 'choose-role' && (
             <div className="space-y-3">
               {/* Divider label */}
               <div className="relative">
@@ -181,25 +305,31 @@ const handleGoogleSignIn = () => {
                 </div>
               </div>
 
-              {/* Placeholder provider buttons for Google and Apple */}
+              {/* Provider buttons. Google's button is rendered by GIS itself
+                  so the look and accessibility match Google's spec. */}
               <div className="space-y-3">
+                <div className="flex justify-center">
+                  <GoogleLogin
+                    onSuccess={handleGoogleCredential}
+                    onError={handleGoogleError}
+                    theme="outline"
+                    size="large"
+                    text="continue_with"
+                    shape="rectangular"
+                    width="376"
+                  />
+                </div>
 
-                <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn}>
-  <img src={googleLogo} alt="Google" className="w-4 h-4 mr-2" />
-  Continue with Google
-</Button>
-
-<Button type="button" variant="outline" className="w-full">
-  <img src={appleLogo} alt="Apple" className="w-6 h-6 mr-2" />
-  Continue with Apple
-</Button>
-
-
+                <Button type="button" variant="outline" className="w-full">
+                  <img src={appleLogo} alt="Apple" className="w-6 h-6 mr-2" />
+                  Continue with Apple
+                </Button>
               </div>
             </div>
           )}
 
-   {/* Main auth form */}
+   {/* Main auth form (hidden during the role-picker step) */}
+          {view !== 'choose-role' && (
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* Register and forgot-password both need email */}
@@ -327,8 +457,10 @@ const handleGoogleSignIn = () => {
               {isLoading ? 'Please wait...' : view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Send reset link'}
             </Button>
           </form>
+          )}
 
-{/* Bottom links for switching between login/register/forgot-password */}
+{/* Bottom links for switching between login/register/forgot-password (hidden during role-picker) */}
+          {view !== 'choose-role' && (
           <div className="text-center text-sm">
             {view === 'login' ? (
               <span>
@@ -367,6 +499,7 @@ const handleGoogleSignIn = () => {
               </span>
             )}
           </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

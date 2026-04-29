@@ -1,3 +1,4 @@
+import logging
 import re
 import secrets
 
@@ -26,6 +27,8 @@ from django.conf import settings
 from django.http import HttpResponse
 from django.db import transaction
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 
 def _get_active_suspension(user):
@@ -272,30 +275,52 @@ def _verify_google_id_token(token):
     """Return the decoded Google ID-token payload, or None if invalid.
 
     Validates signature, expiry, audience, and issuer. Returns None on any
-    failure so the caller can respond with a generic 401 (no detail leaked).
+    failure so the caller can respond with a generic 401 (no detail leaked
+    to the client). The actual reason is logged server-side so operators
+    can distinguish misconfiguration from bad input.
     """
     client_id = getattr(settings, "GOOGLE_OAUTH_CLIENT_ID", "")
     if not client_id:
+        logger.error(
+            "google_login: GOOGLE_OAUTH_CLIENT_ID is not configured; "
+            "every Google sign-in will fail until it is set."
+        )
         return None
 
     try:
         from google.oauth2 import id_token as google_id_token
         from google.auth.transport import requests as google_requests
     except ImportError:
+        logger.error(
+            "google_login: 'google-auth' package is not installed. "
+            "Run `pip install -r requirements.txt`."
+        )
         return None
 
     try:
         payload = google_id_token.verify_oauth2_token(
             token, google_requests.Request(), client_id
         )
+    except ValueError as exc:
+        # google-auth raises ValueError for signature / expiry / audience
+        # mismatches. The message is safe to log but not to return.
+        logger.warning("google_login: token verification failed: %s", exc)
+        return None
     except Exception:
+        logger.exception("google_login: unexpected error verifying token")
         return None
 
     if payload.get("iss") not in GOOGLE_ALLOWED_ISSUERS:
+        logger.warning("google_login: rejected token with iss=%r", payload.get("iss"))
         return None
     if not payload.get("email") or not payload.get("sub"):
+        logger.warning("google_login: token missing email or sub claim")
         return None
     if not payload.get("email_verified"):
+        logger.warning(
+            "google_login: rejected token for unverified email %r",
+            payload.get("email"),
+        )
         return None
 
     return payload
