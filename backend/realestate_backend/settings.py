@@ -1,10 +1,10 @@
 import os
 from pathlib import Path
 from datetime import timedelta
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from urllib.parse import urlparse, parse_qsl
 
-load_dotenv() 
+#oad_dotenv() 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -238,6 +238,7 @@ if DEBUG:
         "http://localhost:5173",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
+        "https://realestate-booking-platform.vercel.app",
     ]
     if os.environ.get("FRONTEND_ORIGIN"):
         CORS_ALLOWED_ORIGINS.append(os.environ["FRONTEND_ORIGIN"])
