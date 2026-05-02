@@ -1,0 +1,24 @@
+{% extends "emails/base_email.html" %}
+
+{% block subject %}Payment Confirmation — {{ data.listing_title }}{% endblock %}
+
+{% block content %}
+  <h2 style="color:#27ae60;">Payment Successful</h2>
+  <p>Hi {{ user.get_full_name|default:user.username }},</p>
+  <p>{{ notification.message }}</p>
+
+  <div class="info-box">
+    <p><strong>Property:</strong> {{ data.listing_title }}</p>
+    <p><strong>Amount:</strong> {{ data.amount }} {{ data.currency }}</p>
+    <p><strong>Transaction ID:</strong> {{ data.payment_id }}</p>
+  </div>
+
+  <a class="cta-btn" href="http://{{ site_url }}/bookings/{{ data.booking_id }}">
+    View Booking
+  </a>
+
+  <hr class="divider"/>
+  <p style="font-size:13px; color:#888;">
+    Payment #{{ data.payment_id }} &mdash; {{ site_name }}
+  </p>
+{% endblock %}

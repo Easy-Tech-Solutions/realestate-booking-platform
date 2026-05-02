@@ -1,0 +1,41 @@
+{% extends "emails/base_email.html" %}
+
+{% block subject %}Price {{ data.direction|title }} — {{ data.listing_title }}{% endblock %}
+
+{% block content %}
+  <h2>
+    Price
+    {% if data.direction == "decreased" %}
+      <span style="color:#27ae60;">Decreased &#8595;</span>
+    {% else %}
+      <span style="color:#e67e22;">Increased &#8593;</span>
+    {% endif %}
+    &mdash; {{ data.listing_title }}
+  </h2>
+  <p>Hi {{ user.get_full_name|default:user.username }},</p>
+  <p>
+    The price for a property on your favourites list has changed.
+  </p>
+
+  <div class="info-box">
+    <p><strong>Property:</strong> {{ data.listing_title }}</p>
+    <p><strong>Previous Price:</strong> {{ data.old_price }}</p>
+    <p>
+      <strong>New Price:</strong>
+      {% if data.direction == "decreased" %}
+        <span style="color:#27ae60;">{{ data.new_price }}</span>
+      {% else %}
+        <span style="color:#e67e22;">{{ data.new_price }}</span>
+      {% endif %}
+    </p>
+  </div>
+
+  <a class="cta-btn" href="http://{{ site_url }}/listings/{{ data.listing_id }}">
+    View Property
+  </a>
+
+  <hr class="divider"/>
+  <p style="font-size:13px; color:#888;">
+    {{ site_name }}
+  </p>
+{% endblock %}
