@@ -362,7 +362,7 @@ def popular_listings(request):
             "price": str(listing.price),
             "property_type": listing.property_type,
             "address": listing.address,
-            "main_image_url": listing.main_image.url if listing.main_image else None,
+            "main_image_url": request.build_absolute_uri(listing.main_image.url) if listing.main_image else None,
             "owner_username": listing.owner.username,
             "views": item["view_count"],
             "favorites": favorite_count,
