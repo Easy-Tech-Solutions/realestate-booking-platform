@@ -1,3 +1,0 @@
-/* Aggregates legacy site styles during migration.
-   Import via Vite alias so paths resolve cross-platform. */
-@import "@legacyCss/styles.css";
