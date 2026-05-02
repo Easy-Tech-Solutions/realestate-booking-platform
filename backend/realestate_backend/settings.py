@@ -53,7 +53,7 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "change-me-in-prod")
 DEBUG = env_bool("DJANGO_DEBUG", True)
 ALLOWED_HOSTS = env_list(
     "DJANGO_ALLOWED_HOSTS",
-    "localhost:127.0.0.1" if DEBUG else "homekonnet.onrender.com",
+    "localhost,127.0.0.1" if DEBUG else "homekonnet-yof3.onrender.com,homekonnet.onrender.com",
 )
 
 INSTALLED_APPS = [
