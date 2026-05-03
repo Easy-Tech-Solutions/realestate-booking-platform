@@ -87,7 +87,7 @@ function EditPropertyDialog({
   onCancel,
 }: {
   property: Property;
-  onSave: (formData: FormData) => void;
+  onSave: (formData: FormData, removedGalleryIds: number[], newGalleryFiles: File[]) => void;
   onCancel: () => void;
 }) {
   const { data: raw } = useQuery({
@@ -131,8 +131,18 @@ function EditPropertyDialog({
   const [mainImagePreview, setMainImagePreview] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
+  // Gallery
+  type GalleryImage = { id: number; image_url: string | null };
+  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+  const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([]);
+  const [newGalleryPreviews, setNewGalleryPreviews] = useState<string[]>([]);
+  const [removedGalleryIds, setRemovedGalleryIds] = useState<number[]>([]);
+
   useEffect(() => {
     if (raw && !initialized) {
+      if (Array.isArray(raw.gallery_images)) {
+        setGalleryImages(raw.gallery_images.map((img: any) => ({ id: img.id, image_url: img.image_url })));
+      }
       setPrivacyType(raw.privacy_type || 'entire_place');
       setHighlights(Array.isArray(raw.highlights) ? raw.highlights : []);
       setWeekendPremiumPercent(Number(raw.weekend_premium_percent) || 0);
@@ -151,6 +161,23 @@ function EditPropertyDialog({
       setInitialized(true);
     }
   }, [raw, initialized, property.instantBook, property.cancellationPolicy]);
+
+  const onNewGallerySelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setNewGalleryFiles((prev) => [...prev, ...files]);
+    setNewGalleryPreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))]);
+  };
+
+  const removeExistingGalleryImage = (id: number) => {
+    setRemovedGalleryIds((prev) => [...prev, id]);
+    setGalleryImages((prev) => prev.filter((img) => img.id !== id));
+  };
+
+  const removeNewGalleryFile = (index: number) => {
+    setNewGalleryFiles((prev) => prev.filter((_, i) => i !== index));
+    setNewGalleryPreviews((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const toggleAmenity = (id: string) => {
     setSelectedAmenities((prev) =>
@@ -201,7 +228,7 @@ function EditPropertyDialog({
     fd.append('noise_monitor', String(noiseMonitor));
     fd.append('weapons_on_property', String(weaponsOnProperty));
     if (mainImageFile) fd.append('main_image', mainImageFile);
-    onSave(fd);
+    onSave(fd, removedGalleryIds, newGalleryFiles);
   };
 
   const Counter = ({
@@ -251,6 +278,41 @@ function EditPropertyDialog({
             {mainImageFile && <p className="mt-1 text-xs text-muted-foreground">{mainImageFile.name}</p>}
           </div>
         </div>
+
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-5 mb-3">Gallery Photos</p>
+        <div className="grid grid-cols-3 gap-2">
+          {galleryImages.map((img) => (
+            <div key={img.id} className="relative group">
+              <img src={img.image_url ?? ''} alt="Gallery" className="h-20 w-full rounded-lg object-cover border border-border" />
+              <button
+                type="button"
+                onClick={() => removeExistingGalleryImage(img.id)}
+                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 text-white text-xs rounded-lg"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          {newGalleryPreviews.map((preview, i) => (
+            <div key={`new-${i}`} className="relative group">
+              <img src={preview} alt="New" className="h-20 w-full rounded-lg object-cover border border-dashed border-border" />
+              <button
+                type="button"
+                onClick={() => removeNewGalleryFile(i)}
+                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 text-white text-xs rounded-lg"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+        <label
+          htmlFor="edit-gallery-photos"
+          className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-accent"
+        >
+          <Camera className="h-4 w-4" /> Add gallery photos
+        </label>
+        <input id="edit-gallery-photos" type="file" accept="image/*" multiple className="hidden" onChange={onNewGallerySelected} />
       </section>
 
       <Separator />
@@ -524,10 +586,14 @@ export function HostDashboard() {
     }
   }, [properties, pricingSettings.basePrice]);
 
-  const handleSaveProperty = async (formData: FormData) => {
+  const handleSaveProperty = async (formData: FormData, removedGalleryIds: number[], newGalleryFiles: File[]) => {
     if (!editingProperty) return;
     try {
       await updatePropertyMutation.mutateAsync({ id: editingProperty.id, formData });
+      await Promise.all(removedGalleryIds.map((imgId) => propertiesAPI.deleteGalleryImage(editingProperty.id, imgId)));
+      for (const [idx, file] of newGalleryFiles.entries()) {
+        await propertiesAPI.addGalleryImage(editingProperty.id, file, '', idx);
+      }
       toast.success('Property updated');
       setEditingProperty(null);
     } catch (error) {
