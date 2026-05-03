@@ -120,6 +120,7 @@ export function normalizeBooking(b: any): Booking {
     reviewCount: 0,
     isSuperhost: false,
     instantBook: false,
+    selfCheckin: false,
     cancellationPolicy: 'flexible',
     houseRules: [],
     checkIn: '15:00',
