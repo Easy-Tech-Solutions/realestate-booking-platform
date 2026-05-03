@@ -145,6 +145,10 @@ export const propertiesAPI = {
     return data.map(normalizeListing);
   },
 
+  getFullDetails: async (id: string): Promise<any> => {
+    return fetchWithAuth(`/api/listings/${id}/`);
+  },
+
   getPlatformStats: async (): Promise<{ total_properties: number; total_locations: number; happy_guests: number }> => {
     return fetchWithAuth('/api/listings/analytics/platform-stats/');
   },
