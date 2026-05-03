@@ -100,6 +100,9 @@ function EditPropertyDialog({
   const [price, setPrice] = useState(String(property.price));
   const [description, setDescription] = useState(property.description);
   const [address, setAddress] = useState(property.location?.address || '');
+  const [city, setCity] = useState(property.location?.city || '');
+  const [state, setState] = useState(property.location?.state || '');
+  const [country, setCountry] = useState(property.location?.country || '');
   const [propertyType, setPropertyType] = useState(String(property.propertyType || 'homes'));
   const [guests, setGuests] = useState(Math.max(1, property.guests || 1));
   const [bedrooms, setBedrooms] = useState(Math.max(1, property.bedrooms || 1));
@@ -122,6 +125,7 @@ function EditPropertyDialog({
   const [monthlyPercent, setMonthlyPercent] = useState(15);
   const [bookingMode, setBookingMode] = useState(property.instantBook ? 'instant' : 'approve_first');
   const [cancellationPolicy, setCancellationPolicy] = useState(property.cancellationPolicy || 'flexible');
+  const [selfCheckin, setSelfCheckin] = useState(property.selfCheckin ?? false);
   const [exteriorCamera, setExteriorCamera] = useState(false);
   const [noiseMonitor, setNoiseMonitor] = useState(false);
   const [weaponsOnProperty, setWeaponsOnProperty] = useState(false);
@@ -143,6 +147,9 @@ function EditPropertyDialog({
       if (Array.isArray(raw.gallery_images)) {
         setGalleryImages(raw.gallery_images.map((img: any) => ({ id: img.id, image_url: img.image_url })));
       }
+      setCity(raw.city || property.location?.city || '');
+      setState(raw.state || property.location?.state || '');
+      setCountry(raw.country || property.location?.country || '');
       setPrivacyType(raw.privacy_type || 'entire_place');
       setHighlights(Array.isArray(raw.highlights) ? raw.highlights : []);
       setWeekendPremiumPercent(Number(raw.weekend_premium_percent) || 0);
@@ -155,6 +162,7 @@ function EditPropertyDialog({
       setMonthlyPercent(Number(raw.monthly_discount_percent) || 15);
       setBookingMode(raw.booking_mode || (property.instantBook ? 'instant' : 'approve_first'));
       setCancellationPolicy(raw.cancellation_policy || property.cancellationPolicy || 'flexible');
+      setSelfCheckin(Boolean(raw.self_checkin));
       setExteriorCamera(Boolean(raw.exterior_camera));
       setNoiseMonitor(Boolean(raw.noise_monitor));
       setWeaponsOnProperty(Boolean(raw.weapons_on_property));
@@ -208,6 +216,9 @@ function EditPropertyDialog({
     fd.append('property_type', propertyType);
     fd.append('privacy_type', privacyType);
     fd.append('address', address);
+    fd.append('city', city);
+    fd.append('state', state);
+    fd.append('country', country);
     fd.append('bedrooms', String(bedrooms));
     fd.append('beds', String(beds));
     fd.append('bathrooms', String(bathrooms));
@@ -216,6 +227,7 @@ function EditPropertyDialog({
     fd.append('highlights', JSON.stringify(highlights));
     fd.append('booking_mode', bookingMode);
     fd.append('cancellation_policy', cancellationPolicy);
+    fd.append('self_checkin', String(selfCheckin));
     fd.append('weekend_premium_percent', String(weekendPremiumPercent));
     fd.append('new_listing_promo', String(newListingPromo));
     fd.append('last_minute_discount_enabled', String(lastMinuteEnabled));
@@ -350,7 +362,21 @@ function EditPropertyDialog({
         </div>
         <div className="space-y-2">
           <Label>Address</Label>
-          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address" />
+          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street address" />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>City</Label>
+            <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
+          </div>
+          <div className="space-y-2">
+            <Label>State / Province</Label>
+            <Input value={state} onChange={(e) => setState(e.target.value)} placeholder="State" />
+          </div>
+          <div className="space-y-2">
+            <Label>Country</Label>
+            <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Country" />
+          </div>
         </div>
         <div className="space-y-2">
           <Label>Description</Label>
@@ -513,6 +539,10 @@ function EditPropertyDialog({
       <section>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Safety & Property Info</p>
         <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Checkbox id="edit-self-checkin" checked={selfCheckin} onCheckedChange={(v) => setSelfCheckin(Boolean(v))} />
+            <label htmlFor="edit-self-checkin" className="text-sm cursor-pointer">Self check-in available</label>
+          </div>
           <div className="flex items-center gap-2">
             <Checkbox id="edit-ext-cam" checked={exteriorCamera} onCheckedChange={(v) => setExteriorCamera(Boolean(v))} />
             <label htmlFor="edit-ext-cam" className="text-sm cursor-pointer">Exterior security camera on property</label>
