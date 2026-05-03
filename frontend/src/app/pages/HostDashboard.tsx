@@ -432,7 +432,7 @@ function EditPropertyDialog({
           </div>
           <div className="space-y-2">
             <Label>Cancellation Policy</Label>
-            <Select value={cancellationPolicy} onValueChange={setCancellationPolicy}>
+            <Select value={cancellationPolicy} onValueChange={(v) => setCancellationPolicy(v as typeof cancellationPolicy)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="flexible">Flexible</SelectItem>
