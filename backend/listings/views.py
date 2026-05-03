@@ -372,6 +372,25 @@ def popular_listings(request):
 
 
 @api_view(["GET"])
+def platform_stats(request):
+    """Public endpoint returning site-wide stats for the landing page."""
+    total_properties = Listing.objects.filter(is_available=True).count()
+    total_locations = (
+        Listing.objects.filter(is_available=True, address__isnull=False)
+        .exclude(address="")
+        .values("address")
+        .distinct()
+        .count()
+    )
+    happy_guests = Review.objects.values("reviewer").distinct().count()
+    return Response({
+        "total_properties": total_properties,
+        "total_locations": total_locations,
+        "happy_guests": happy_guests,
+    })
+
+
+@api_view(["GET"])
 def listing_availability(request, listing_id):
     from datetime import timedelta as _td
     listing = get_object_or_404(Listing, pk=listing_id)

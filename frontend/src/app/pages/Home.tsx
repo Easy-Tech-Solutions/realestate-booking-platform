@@ -32,6 +32,16 @@ export function Home() {
   const properties = propertiesQuery.data || [];
   const isLoading = propertiesQuery.isLoading;
 
+  const platformStatsQuery = useQuery({
+    queryKey: ['platform-stats'],
+    queryFn: () => propertiesAPI.getPlatformStats(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+  const formatStat = (n: number): string => {
+    if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k+`;
+    return `${n}+`;
+  };
+
   const propertiesSectionRef = useRef<HTMLDivElement>(null);
 
   const scrollToProperties = () => {
@@ -128,9 +138,19 @@ export function Home() {
                 className="flex flex-wrap gap-10"
               >
                 {[
-                  { icon: MapPin, value: '50+', label: 'Locations' },
-                  { value: '500+', label: 'Properties' },
-                  { value: '10k+', label: 'Happy Guests' },
+                  {
+                    icon: MapPin,
+                    value: platformStatsQuery.data ? formatStat(platformStatsQuery.data.total_locations) : '—',
+                    label: 'Locations',
+                  },
+                  {
+                    value: platformStatsQuery.data ? formatStat(platformStatsQuery.data.total_properties) : '—',
+                    label: 'Properties',
+                  },
+                  {
+                    value: platformStatsQuery.data ? formatStat(platformStatsQuery.data.happy_guests) : '—',
+                    label: 'Happy Guests',
+                  },
                 ].map((stat) => (
                   <div key={stat.label}>
                     <p className="text-2xl font-bold text-white">{stat.value}</p>

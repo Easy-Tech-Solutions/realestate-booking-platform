@@ -4,7 +4,7 @@ from .views import (
     listings_collection, listing_detail, listing_images, listing_image_detail,
     favorite_listing, favorites_collection, listing_reviews, create_review,
     review_detail, user_reviews, listing_stats, agent_analytics, popular_listings,
-    listing_availability, listing_pricing, review_response
+    platform_stats, listing_availability, listing_pricing, review_response
 )
 
 urlpatterns = [
@@ -26,4 +26,5 @@ urlpatterns = [
     path('<int:listing_id>/availability/', listing_availability, name='listing_availability'),
     path('<int:listing_id>/pricing/', listing_pricing, name='listing_pricing'),
     path('reviews/<int:id>/respond/', review_response, name='review_response'),
+    path('analytics/platform-stats/', platform_stats, name='platform_stats'),
 ]

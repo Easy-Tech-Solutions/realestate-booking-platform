@@ -142,4 +142,8 @@ export const propertiesAPI = {
     const data = await fetchWithAuth<unknown[]>(`/api/listings/?owner_id=${encodeURIComponent(hostId)}`);
     return data.map(normalizeListing);
   },
+
+  getPlatformStats: async (): Promise<{ total_properties: number; total_locations: number; happy_guests: number }> => {
+    return fetchWithAuth('/api/listings/analytics/platform-stats/');
+  },
 };
