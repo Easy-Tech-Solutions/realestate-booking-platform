@@ -80,6 +80,10 @@ export const propertiesAPI = {
     });
   },
 
+  deleteGalleryImage: async (listingId: string, imageId: number): Promise<void> => {
+    await fetchWithAuth(`/api/listings/${listingId}/images/${imageId}/`, { method: 'DELETE' });
+  },
+
   update: async (id: string, formData: FormData): Promise<Property> => {
     const data = await fetchWithAuth(`/api/listings/${id}/`, {
       method: 'PUT',
