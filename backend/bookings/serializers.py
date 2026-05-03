@@ -22,9 +22,9 @@ class BookingSerializer(serializers.ModelSerializer):
             'id', 'customer', 'customer_username', 'listing', 'listing_title',
             'listing_owner', 'start_date', 'end_date', 'status', 'notes',
             'requested_at', 'confirmed_at', 'declined_at', 'owner_notes',
-            'decline_reason', 'days_until_expiry'
+            'decline_reason', 'total_price', 'days_until_expiry'
         ]
-        read_only_fields = ['customer', 'requested_at', 'confirmed_at', 'declined_at']
+        read_only_fields = ['customer', 'requested_at', 'confirmed_at', 'declined_at', 'total_price']
 
     def get_days_until_expiry(self, obj):
         if obj.status == 'requested' and obj.requested_at:

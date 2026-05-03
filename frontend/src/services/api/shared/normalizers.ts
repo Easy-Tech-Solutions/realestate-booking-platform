@@ -160,8 +160,8 @@ export function normalizeBooking(b: any): Booking {
     serviceFee: 0,
     taxes: 0,
     status: statusMap[b.status] || 'pending',
-    paymentStatus: 'pending' as const,
-    paymentMethod: 'stripe' as const,
+    paymentStatus: (b.payment_status as Booking['paymentStatus']) || 'pending',
+    paymentMethod: (b.payment_method as Booking['paymentMethod']) || 'stripe',
     specialRequests: b.notes,
     createdAt: b.requested_at,
   };
@@ -265,7 +265,7 @@ export function buildSearchParams(filters: SearchFilters): string {
   if (filters.priceMin) params.set('min_price', String(filters.priceMin));
   if (filters.priceMax) params.set('max_price', String(filters.priceMax));
   if (filters.bedrooms) params.set('min_bedrooms', String(filters.bedrooms));
-  if (filters.propertyType?.length) params.set('property_type', filters.propertyType[0]);
+  if (filters.propertyType?.length) params.set('property_type_in', filters.propertyType.join(','));
   if (filters.guests) params.set('min_guests', String(filters.guests));
   return params.toString();
 }

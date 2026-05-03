@@ -73,12 +73,16 @@ def bookings_collection(request):
 
             serializer = BookingCreateSerializer(data=request.data)
             if serializer.is_valid():
-                booking = serializer.save(customer=request.user)
+                start = serializer.validated_data['start_date']
+                end = serializer.validated_data['end_date']
+                nights = max((end - start).days, 1)
+                total_price = listing.price * nights
+                booking = serializer.save(customer=request.user, total_price=total_price)
                 # Instant book: auto-confirm if listing is set to instant
                 if listing.booking_mode == 'instant':
                     booking.status = 'confirmed'
                     booking.confirmed_at = timezone.now()
-                    booking.save()
+                    booking.save(update_fields=['status', 'confirmed_at'])
                 return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
