@@ -22,10 +22,12 @@ class ListingImageSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def get_image_url(self, obj):
-        request = self.context.get('request')
-        if obj.image and request:
-            return request.build_absolute_uri(obj.image.url)
-        return obj.image.url if obj.image else None
+        if not obj.image:
+            return None
+        try:
+            return obj.image.url
+        except Exception:
+            return None
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -63,17 +65,16 @@ class ListingSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'owner_username', 'owner_id']
 
     def get_main_image_url(self, obj):
-        request = self.context.get('request')
-        if obj.main_image and request:
-            return request.build_absolute_uri(obj.main_image.url)
-        return obj.main_image.url if obj.main_image else None
+        if not obj.main_image:
+            return None
+        try:
+            return obj.main_image.url
+        except Exception:
+            return None
 
     def get_owner_avatar(self, obj):
-        request = self.context.get('request')
         try:
             if obj.owner.profile.image:
-                if request:
-                    return request.build_absolute_uri(obj.owner.profile.image.url)
                 return obj.owner.profile.image.url
         except Exception:
             pass
@@ -153,10 +154,12 @@ class ReviewImageSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
     def get_image_url(self, obj):
-        request = self.context.get('request')
-        if obj.image and request:
-            return request.build_absolute_uri(obj.image.url)
-        return obj.image.url if obj.image else None
+        if not obj.image:
+            return None
+        try:
+            return obj.image.url
+        except Exception:
+            return None
 
 
 class ReviewSerializer(serializers.ModelSerializer):
@@ -177,11 +180,11 @@ class ReviewSerializer(serializers.ModelSerializer):
                             'host_response', 'host_response_at']
 
     def get_reviewer_avatar(self, obj):
-        request = self.context.get('request')
-        if hasattr(obj.reviewer, 'profile') and obj.reviewer.profile.image:
-            if request:
-                return request.build_absolute_uri(obj.reviewer.profile.image.url)
-            return obj.reviewer.profile.image.url
+        try:
+            if hasattr(obj.reviewer, 'profile') and obj.reviewer.profile.image:
+                return obj.reviewer.profile.image.url
+        except Exception:
+            pass
         return None
 
 
