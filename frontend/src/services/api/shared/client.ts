@@ -58,6 +58,10 @@ async function refreshAccessToken(): Promise<string | null> {
     const data = await response.json();
     accessToken = data.access;
     localStorage.setItem('accessToken', data.access);
+    if (data.refresh) {
+      refreshToken = data.refresh;
+      localStorage.setItem('refreshToken', data.refresh);
+    }
     return data.access;
   } catch {
     clearTokens();

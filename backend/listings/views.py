@@ -13,8 +13,15 @@ from bookings.models import Booking
 from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer
 from .filters import ListingFilter
 from django.contrib.auth import get_user_model
+from rest_framework.pagination import PageNumberPagination
 
 User = get_user_model()
+
+
+class _ListingPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 def _is_admin(user):
@@ -62,7 +69,10 @@ def category_detail(request, id):
 def listings_collection(request):
     if request.method == "GET":
         items = ListingFilter(request.GET, queryset=Listing.objects.all())
-        return Response(ListingSerializer(items.qs, many=True, context={"request": request}).data)
+        paginator = _ListingPagination()
+        page = paginator.paginate_queryset(items.qs, request)
+        serialized = ListingSerializer(page, many=True, context={"request": request}).data
+        return paginator.get_paginated_response(serialized)
 
     elif request.method == "POST":
         if not request.user.is_authenticated:
@@ -191,6 +201,9 @@ def create_review(request):
 
     listing = get_object_or_404(Listing, pk=request.data.get("listing"))
 
+    if not Booking.objects.filter(listing=listing, customer=request.user, status='completed').exists():
+        return Response({"error": "You must complete a stay before leaving a review"}, status=status.HTTP_400_BAD_REQUEST)
+
     if Review.objects.filter(listing=listing, reviewer=request.user).exists():
         return Response({"error": "You have already reviewed this listing"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -242,7 +255,10 @@ def listing_stats(request, listing_id):
     if listing.owner != request.user and not request.user.is_superuser:
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-    days = int(request.GET.get("days", 30))
+    try:
+        days = min(int(request.GET.get("days", 30)), 365)
+    except (ValueError, TypeError):
+        return Response({"error": "days must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
     end_date = timezone.now().date()
     start_date = end_date - timedelta(days=days)
 
@@ -251,7 +267,7 @@ def listing_stats(request, listing_id):
     total_favorites = Favorite.objects.filter(listing=listing).count()
     total_bookings = Booking.objects.filter(listing=listing).count()
     total_revenue = Booking.objects.filter(listing=listing, status="confirmed").aggregate(
-        total=Sum("listing__price"))["total"] or 0
+        total=Sum("total_price"))["total"] or 0
 
     daily_stats = PropertyStats.objects.filter(listing=listing, date__gte=start_date, date__lte=end_date).order_by("date")
 
@@ -293,34 +309,37 @@ def agent_analytics(request):
     if user.role not in ["agent", "admin"]:
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-    days = int(request.GET.get("days", 30))
+    try:
+        days = min(int(request.GET.get("days", 30)), 365)
+    except (ValueError, TypeError):
+        return Response({"error": "days must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
     end_date = timezone.now().date()
     start_date = end_date - timedelta(days=days)
 
-    listings = Listing.objects.filter(owner=user)
+    listings = Listing.objects.filter(owner=user).annotate(
+        view_count=Count('property_views', distinct=True),
+        favorite_count=Count('favorited_by', distinct=True),
+        booking_count=Count('bookings', distinct=True),
+        confirmed_revenue=Sum('bookings__total_price', filter=Q(bookings__status='confirmed')),
+    )
     total_listings = listings.count()
-    total_views = PropertyView.objects.filter(listing__in=listings).count()
-    total_favorites = Favorite.objects.filter(listing__in=listings).count()
-    total_bookings = Booking.objects.filter(listing__in=listings).count()
-    total_revenue = Booking.objects.filter(listing__in=listings, status="confirmed").aggregate(
-        total=Sum("listing__price"))["total"] or 0
+    total_views = sum(l.view_count for l in listings)
+    total_favorites = sum(l.favorite_count for l in listings)
+    total_bookings = sum(l.booking_count for l in listings)
+    total_revenue = sum(l.confirmed_revenue or 0 for l in listings)
 
-    property_stats = []
-    for listing in listings:
-        views = PropertyView.objects.filter(listing=listing).count()
-        favorites = Favorite.objects.filter(listing=listing).count()
-        bookings_count = Booking.objects.filter(listing=listing).count()
-        revenue = Booking.objects.filter(listing=listing, status="confirmed").aggregate(
-            total=Sum("listing__price"))["total"] or 0
-        property_stats.append({
-            "id": listing.id,
-            "title": listing.title,
-            "price": str(listing.price),
-            "views": views,
-            "favorites": favorites,
-            "bookings": bookings_count,
-            "revenue": str(revenue),
-        })
+    property_stats = [
+        {
+            "id": l.id,
+            "title": l.title,
+            "price": str(l.price),
+            "views": l.view_count,
+            "favorites": l.favorite_count,
+            "bookings": l.booking_count,
+            "revenue": str(l.confirmed_revenue or 0),
+        }
+        for l in listings
+    ]
 
     property_stats.sort(key=lambda x: float(x["revenue"]), reverse=True)
 
@@ -352,10 +371,19 @@ def popular_listings(request):
         .order_by("-view_count")[:20]
     )
 
+    listing_ids = [item["listing"] for item in view_counts]
+    listings_map = {
+        l.id: l
+        for l in Listing.objects.filter(pk__in=listing_ids)
+        .select_related('owner')
+        .annotate(favorite_count=Count('favorited_by', distinct=True))
+    }
+
     result = []
     for item in view_counts:
-        listing = Listing.objects.get(pk=item["listing"])
-        favorite_count = Favorite.objects.filter(listing=listing).count()
+        listing = listings_map.get(item["listing"])
+        if not listing:
+            continue
         result.append({
             "id": listing.id,
             "title": listing.title,
@@ -365,7 +393,7 @@ def popular_listings(request):
             "main_image_url": request.build_absolute_uri(listing.main_image.url) if listing.main_image else None,
             "owner_username": listing.owner.username,
             "views": item["view_count"],
-            "favorites": favorite_count,
+            "favorites": listing.favorite_count,
         })
 
     return Response({"popular_listings": result})

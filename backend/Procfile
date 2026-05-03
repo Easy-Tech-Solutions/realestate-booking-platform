@@ -1,1 +1,2 @@
-web: daphne -b 0.0.0.0 -p $PORT realestate_backend.asgi:application
+web: python manage.py migrate --no-input && daphne -b 0.0.0.0 -p $PORT realestate_backend.asgi:application
+worker: celery -A realestate_backend worker -l info
