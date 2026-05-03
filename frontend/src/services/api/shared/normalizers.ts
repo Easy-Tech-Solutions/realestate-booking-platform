@@ -260,11 +260,12 @@ export function normalizeMessage(message: any): Message {
 
 export function buildSearchParams(filters: SearchFilters): string {
   const params = new URLSearchParams();
-  if (filters.location) params.set('address', filters.location);
+  if (filters.location) params.set('location', filters.location);
   if (filters.priceMin) params.set('min_price', String(filters.priceMin));
   if (filters.priceMax) params.set('max_price', String(filters.priceMax));
   if (filters.bedrooms) params.set('min_bedrooms', String(filters.bedrooms));
   if (filters.propertyType?.length) params.set('property_type', filters.propertyType[0]);
+  if (filters.guests) params.set('min_guests', String(filters.guests));
   return params.toString();
 }
 

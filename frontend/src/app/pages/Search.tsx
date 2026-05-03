@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Filter, Map as MapIcon } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Button } from '../components/ui/button';
 import { PropertyCard } from '../components/PropertyCard';
@@ -28,6 +28,19 @@ function createPriceIcon(price: number, hovered: boolean) {
     ">${formatCurrency(price)}</div>`,
     iconAnchor: [30, 16],
   });
+}
+
+function MapAutoFit({ positions }: { positions: [number, number][] }) {
+  const map = useMap();
+  React.useEffect(() => {
+    if (positions.length === 0) return;
+    if (positions.length === 1) {
+      map.setView(positions[0], 13);
+    } else {
+      map.fitBounds(L.latLngBounds(positions), { padding: [40, 40] });
+    }
+  }, [positions, map]);
+  return null;
 }
 
 export function Search() {
@@ -157,23 +170,33 @@ export function Search() {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  {filtered.map(p => p.location.lat && p.location.lng ? (
-                    <Marker
-                      key={p.id}
-                      position={[p.location.lat, p.location.lng]}
-                      icon={createPriceIcon(p.price, hoveredId === p.id)}
-                    >
-                      <Popup>
-                        <button
-                          onClick={() => navigate(`/rooms/${p.id}`)}
-                          className="font-semibold text-sm hover:underline block mb-1"
-                        >
-                          {p.title}
-                        </button>
-                        <p className="text-xs text-gray-500">{formatCurrency(p.price)}/night</p>
-                      </Popup>
-                    </Marker>
-                  ) : null)}
+                  {(() => {
+                    const positions = filtered
+                      .filter(p => p.location.lat && p.location.lng)
+                      .map(p => [p.location.lat, p.location.lng] as [number, number]);
+                    return (
+                      <>
+                        <MapAutoFit positions={positions} />
+                        {filtered.map(p => p.location.lat && p.location.lng ? (
+                          <Marker
+                            key={p.id}
+                            position={[p.location.lat, p.location.lng]}
+                            icon={createPriceIcon(p.price, hoveredId === p.id)}
+                          >
+                            <Popup>
+                              <button
+                                onClick={() => navigate(`/rooms/${p.id}`)}
+                                className="font-semibold text-sm hover:underline block mb-1"
+                              >
+                                {p.title}
+                              </button>
+                              <p className="text-xs text-gray-500">{formatCurrency(p.price)}/night</p>
+                            </Popup>
+                          </Marker>
+                        ) : null)}
+                      </>
+                    );
+                  })()}
                 </MapContainer>
               </div>
             )}
