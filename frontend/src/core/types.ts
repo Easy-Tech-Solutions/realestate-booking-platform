@@ -35,6 +35,7 @@ export interface Property {
   reviewCount: number;
   isSuperhost: boolean;
   instantBook: boolean;
+  selfCheckin: boolean;
   cancellationPolicy: CancellationPolicy;
   houseRules: string[];
   checkIn: string;

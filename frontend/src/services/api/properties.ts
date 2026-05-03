@@ -5,14 +5,16 @@ import type { AvailabilityResponse, ListingPricingResponse } from './shared/cont
 
 export const propertiesAPI = {
   getAll: async (): Promise<Property[]> => {
-    const data = await fetchWithAuth<unknown[]>('/api/listings/?ordering=-created_at');
-    return data.map(normalizeListing);
+    const data = await fetchWithAuth<unknown>('/api/listings/?ordering=-created_at');
+    const results = Array.isArray(data) ? data : (data as any).results || [];
+    return results.map(normalizeListing);
   },
 
   search: async (filters: SearchFilters): Promise<Property[]> => {
     const params = buildSearchParams(filters);
-    const data = await fetchWithAuth<unknown[]>(`/api/listings/?${params}`);
-    return data.map(normalizeListing);
+    const data = await fetchWithAuth<unknown>(`/api/listings/?${params}`);
+    const results = Array.isArray(data) ? data : (data as any).results || [];
+    return results.map(normalizeListing);
   },
 
   getById: async (id: string): Promise<Property> => {

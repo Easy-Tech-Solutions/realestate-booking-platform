@@ -255,14 +255,16 @@ export function PropertyDetails() {
                       </div>
                     </div>
                   )}
-                  <div className="flex gap-4">
-                    <MapPin className="w-6 h-6 flex-shrink-0" />
-                    <div>
-                      <h3 className="font-semibold">Great location</h3>
-                      <p className="text-muted-foreground text-sm">95% of recent guests gave the location a 5-star rating</p>
+                  {reviewCategoryAverages.length > 0 && reviewCategoryAverages.find(r => r.label === 'Location')?.value >= 4.5 && (
+                    <div className="flex gap-4">
+                      <MapPin className="w-6 h-6 flex-shrink-0" />
+                      <div>
+                        <h3 className="font-semibold">Great location</h3>
+                        <p className="text-muted-foreground text-sm">95% of recent guests gave the location a 5-star rating</p>
+                      </div>
                     </div>
-                  </div>
-                  {property.instantBook && (
+                  )}
+                  {property.selfCheckin && (
                     <div className="flex gap-4">
                       <Shield className="w-6 h-6 flex-shrink-0" />
                       <div>

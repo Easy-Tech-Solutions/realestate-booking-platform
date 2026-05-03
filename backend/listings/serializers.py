@@ -33,6 +33,9 @@ class ListingSerializer(serializers.ModelSerializer):
     main_image_url = serializers.SerializerMethodField()
     owner_username = serializers.CharField(source='owner.username', read_only=True)
     owner_id = serializers.IntegerField(source='owner.id', read_only=True)
+    owner_first_name = serializers.CharField(source='owner.first_name', read_only=True)
+    owner_last_name = serializers.CharField(source='owner.last_name', read_only=True)
+    owner_avatar = serializers.SerializerMethodField()
     owner_is_superhost = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
@@ -41,7 +44,9 @@ class ListingSerializer(serializers.ModelSerializer):
         model = Listing
         fields = [
             "id", "title", "description", "price", "property_type", "privacy_type",
-            "address", "square_footage", "bedrooms", "beds", "bathrooms", "max_guests",
+            "address", "city", "state", "country", "latitude", "longitude",
+            "check_in_time", "check_out_time", "self_checkin",
+            "square_footage", "bedrooms", "beds", "bathrooms", "max_guests",
             "amenities", "highlights", "booking_mode", "cancellation_policy",
             "weekend_premium_percent",
             "new_listing_promo",
@@ -51,7 +56,8 @@ class ListingSerializer(serializers.ModelSerializer):
             "exterior_camera", "noise_monitor", "weapons_on_property",
             "is_available", "created_at", "updated_at",
             "gallery_images", "main_image", "main_image_url",
-            "owner_username", "owner_id", "owner_is_superhost",
+            "owner_username", "owner_id", "owner_first_name", "owner_last_name",
+            "owner_avatar", "owner_is_superhost",
             "average_rating", "review_count",
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'owner_username', 'owner_id']
@@ -61,6 +67,17 @@ class ListingSerializer(serializers.ModelSerializer):
         if obj.main_image and request:
             return request.build_absolute_uri(obj.main_image.url)
         return obj.main_image.url if obj.main_image else None
+
+    def get_owner_avatar(self, obj):
+        request = self.context.get('request')
+        try:
+            if obj.owner.profile.image:
+                if request:
+                    return request.build_absolute_uri(obj.owner.profile.image.url)
+                return obj.owner.profile.image.url
+        except Exception:
+            pass
+        return None
 
     def get_owner_is_superhost(self, obj):
         try:
