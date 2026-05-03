@@ -243,12 +243,16 @@ if DEBUG:
         "http://localhost:5173",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
+        "https://homekonet.vercel.app",
         "https://realestate-booking-platform.vercel.app",
     ]
     if os.environ.get("FRONTEND_ORIGIN"):
         CORS_ALLOWED_ORIGINS.append(os.environ["FRONTEND_ORIGIN"])
 else:
-    CORS_ALLOWED_ORIGINS = env_origins("CORS_ALLOWED_ORIGINS", os.environ.get("FRONTEND_ORIGIN", ""))
+    CORS_ALLOWED_ORIGINS = env_origins(
+        "CORS_ALLOWED_ORIGINS",
+        os.environ.get("FRONTEND_ORIGIN", "https://homekonet.vercel.app"),
+    )
 CORS_ALLOWED_ORIGIN_REGEXES = env_list("CORS_ALLOWED_ORIGIN_REGEXES", "")
 CORS_ALLOW_CREDENTIALS = True
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
