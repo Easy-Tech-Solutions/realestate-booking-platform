@@ -444,11 +444,11 @@ export function CreateListing() {
                 <div key={key} className="flex items-center justify-between py-5 border-b">
                   <p className="text-3xl">{label}</p>
                   <div className="flex items-center gap-5">
-                    <button className="w-10 h-10 rounded-full border flex items-center justify-center" onClick={() => updateCount(key, -1)}>
+                    <button type="button" aria-label={`Decrease ${label}`} className="w-10 h-10 rounded-full border flex items-center justify-center" onClick={() => updateCount(key, -1)}>
                       <Minus className="w-4 h-4" />
                     </button>
                     <span className="text-3xl font-medium w-8 text-center">{form[key]}</span>
-                    <button className="w-10 h-10 rounded-full border flex items-center justify-center" onClick={() => updateCount(key, 1)}>
+                    <button type="button" aria-label={`Increase ${label}`} className="w-10 h-10 rounded-full border flex items-center justify-center" onClick={() => updateCount(key, 1)}>
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
@@ -499,6 +499,8 @@ export function CreateListing() {
                   <div key={index} className="relative group border rounded-xl overflow-hidden">
                     <img src={preview} alt={`Upload ${index + 1}`} className="w-full h-28 object-cover" />
                     <button
+                      type="button"
+                      aria-label={`Remove photo ${index + 1}`}
                       className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 text-white text-sm"
                       onClick={() => removePhoto(index)}
                     >
@@ -684,6 +686,7 @@ export function CreateListing() {
               <div className="flex items-center gap-4">
                 <input
                   type="range"
+                  aria-label="Weekend premium percentage"
                   min={0}
                   max={99}
                   value={form.weekendPremiumPercent}
