@@ -51,10 +51,17 @@ def env_origins(name: str, default: str = "") -> list[str]:
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "change-me-in-prod")
 DEBUG = env_bool("DJANGO_DEBUG", True)
-ALLOWED_HOSTS = env_list(
-    "DJANGO_ALLOWED_HOSTS",
-    "localhost,127.0.0.1" if DEBUG else "homekonnet-yof3.onrender.com,homekonnet.onrender.com",
-)
+
+# If DJANGO_ALLOWED_HOSTS is explicitly set, use it.
+# Otherwise allow localhost + any *.onrender.com subdomain automatically.
+_render_host = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+_default_hosts = "localhost,127.0.0.1" + (f",{_render_host}" if _render_host else "")
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", _default_hosts)
+
+# Always trust every *.onrender.com hostname so Render custom-domain
+# routing and health-check pings never produce a DisallowedHost 400.
+if not os.environ.get("DJANGO_ALLOWED_HOSTS"):
+    ALLOWED_HOSTS += [".onrender.com"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -237,22 +244,24 @@ REST_FRAMEWORK = {
     },
 }
 
-if DEBUG:
-    CORS_ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "https://homekonet.vercel.app",
-        "https://realestate-booking-platform.vercel.app",
-    ]
-    if os.environ.get("FRONTEND_ORIGIN"):
-        CORS_ALLOWED_ORIGINS.append(os.environ["FRONTEND_ORIGIN"])
-else:
-    CORS_ALLOWED_ORIGINS = env_origins(
-        "CORS_ALLOWED_ORIGINS",
-        os.environ.get("FRONTEND_ORIGIN", "https://homekonet.vercel.app"),
-    )
+# Base allowed origins — always present regardless of DEBUG
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "https://homekonet.vercel.app",
+    "https://realestate-booking-platform.vercel.app",
+]
+
+# Append origins from env vars (CORS_ALLOWED_ORIGINS and FRONTEND_ORIGIN)
+for _origin in env_origins("CORS_ALLOWED_ORIGINS", ""):
+    if _origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(_origin)
+_fe_origin = os.environ.get("FRONTEND_ORIGIN", "")
+if _fe_origin and _fe_origin not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(_fe_origin)
+
 CORS_ALLOWED_ORIGIN_REGEXES = env_list("CORS_ALLOWED_ORIGIN_REGEXES", "")
 CORS_ALLOW_CREDENTIALS = True
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
