@@ -211,7 +211,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[480px] p-0 gap-0">
+      <DialogContent className="w-full max-w-[95vw] sm:max-w-[480px] p-0 gap-0 max-h-[90vh] overflow-y-auto">
         <div className="relative border-b border-border p-6">
           <button onClick={handleClose} className="absolute left-6 top-6 p-1 rounded-full hover:bg-muted">
             <X className="w-4 h-4" />
@@ -316,7 +316,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                     size="large"
                     text="continue_with"
                     shape="rectangular"
-                    width="376"
+                    width="320"
                   />
                 </div>
 

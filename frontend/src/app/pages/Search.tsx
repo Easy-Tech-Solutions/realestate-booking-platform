@@ -90,18 +90,18 @@ export function Search() {
     <>
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div>
               <p className="text-sm text-muted-foreground mb-1">
                 {searchFilters.location && `${searchFilters.location} · `}
                 {searchFilters.guests && `${searchFilters.guests} guests`}
               </p>
-              <h1 className="text-2xl font-semibold">
+              <h1 className="text-xl sm:text-2xl font-semibold">
                 {filtered.length} stay{filtered.length !== 1 ? 's' : ''}
-                {hasActiveFilters && <span className="text-base font-normal text-muted-foreground ml-2">· Filters applied</span>}
+                {hasActiveFilters && <span className="text-sm sm:text-base font-normal text-muted-foreground ml-2">· Filters applied</span>}
               </h1>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3">
               <Button
                 variant={hasActiveFilters ? 'default' : 'outline'}
                 size="sm"

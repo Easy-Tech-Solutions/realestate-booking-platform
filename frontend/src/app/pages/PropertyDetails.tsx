@@ -202,9 +202,9 @@ export function PropertyDetails() {
             </Button>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-12">
+          <div className="grid lg:grid-cols-3 gap-8 lg:gap-12">
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-8">
+            <div className="lg:col-span-2 lg:order-1 space-y-8">
               {/* Host Info */}
               <div>
                 <div className="flex items-start justify-between mb-4">
@@ -445,10 +445,10 @@ export function PropertyDetails() {
               </div>
             </div>
 
-            {/* Booking Widget */}
-            <div className="lg:col-span-1">
+            {/* Booking Widget - shown inline on mobile above content, sticky on desktop */}
+            <div className="lg:col-span-1 lg:order-2">
               <div className="sticky top-24">
-                <div className="border border-border rounded-xl p-6 shadow-xl">
+                <div className="border border-border rounded-xl p-4 sm:p-6 shadow-xl">
                   <div className="flex items-baseline gap-1 mb-4">
                     <span className="text-2xl font-semibold">{formatCurrency(property.price)}</span>
                     <span className="text-muted-foreground">night</span>

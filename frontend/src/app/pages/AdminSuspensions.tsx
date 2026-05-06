@@ -114,7 +114,7 @@ export function AdminSuspensions() {
           <CardHeader>
             <CardTitle>Issue New Suspension</CardTitle>
           </CardHeader>
-          <CardContent className="grid md:grid-cols-2 gap-4">
+          <CardContent className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>User ID</Label>
               <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="e.g. 12" />
@@ -136,11 +136,11 @@ export function AdminSuspensions() {
                 <Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
               </div>
             )}
-            <div className="md:col-span-2 space-y-2">
+            <div className="sm:col-span-2 space-y-2">
               <Label>Reason</Label>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Write a clear suspension reason" />
             </div>
-            <div className="md:col-span-2">
+            <div className="sm:col-span-2">
               <Button onClick={createSuspension} disabled={creating}>{creating ? 'Creating...' : 'Issue Suspension'}</Button>
             </div>
           </CardContent>
@@ -171,7 +171,7 @@ export function AdminSuspensions() {
                     <p className="text-sm">{item.reason}</p>
 
                     {item.status === 'active' && (
-                      <div className="grid md:grid-cols-[1fr,140px] gap-3">
+                      <div className="grid sm:grid-cols-[1fr,140px] gap-3">
                         <Input
                           value={revokeReason[item.id] || ''}
                           onChange={(e) => setRevokeReason(prev => ({ ...prev, [item.id]: e.target.value }))}

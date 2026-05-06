@@ -309,40 +309,40 @@ export function CreateListing() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="px-8 py-6 flex items-center justify-between">
-        <div className="text-2xl font-semibold tracking-tight">HomeKonet</div>
+      <header className="px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between flex-wrap gap-3">
+        <div className="text-xl sm:text-2xl font-semibold tracking-tight">HomeKonet</div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm">Questions?</Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/host')}>Save & exit</Button>
         </div>
       </header>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 pb-10">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 pb-10">
         {currentStep === 'welcome' && (
-          <div className="grid lg:grid-cols-2 gap-10 items-center py-10">
+          <div className="grid lg:grid-cols-2 gap-8 items-center py-8">
             <div>
-              <h1 className="text-6xl font-semibold leading-tight">It's easy to get started on HomeKonet</h1>
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-semibold leading-tight">It's easy to get started on HomeKonet</h1>
             </div>
             <div className="space-y-6">
               <div className="flex items-start justify-between border-b pb-4">
                 <div>
-                  <p className="text-3xl font-semibold">1</p>
-                  <p className="text-3xl font-semibold">Tell us about your place</p>
-                  <p className="text-muted-foreground text-2xl">Share basic info, like where it is and how many guests can stay.</p>
+                  <p className="text-xl sm:text-3xl font-semibold">1</p>
+                  <p className="text-xl sm:text-3xl font-semibold">Tell us about your place</p>
+                  <p className="text-muted-foreground text-base sm:text-2xl">Share basic info, like where it is and how many guests can stay.</p>
                 </div>
               </div>
               <div className="flex items-start justify-between border-b pb-4">
                 <div>
-                  <p className="text-3xl font-semibold">2</p>
-                  <p className="text-3xl font-semibold">Make it stand out</p>
-                  <p className="text-muted-foreground text-2xl">Add photos plus a title and description.</p>
+                  <p className="text-xl sm:text-3xl font-semibold">2</p>
+                  <p className="text-xl sm:text-3xl font-semibold">Make it stand out</p>
+                  <p className="text-muted-foreground text-base sm:text-2xl">Add photos plus a title and description.</p>
                 </div>
               </div>
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-3xl font-semibold">3</p>
-                  <p className="text-3xl font-semibold">Finish up and publish</p>
-                  <p className="text-muted-foreground text-2xl">Set booking settings, pricing, and publish.</p>
+                  <p className="text-xl sm:text-3xl font-semibold">3</p>
+                  <p className="text-xl sm:text-3xl font-semibold">Finish up and publish</p>
+                  <p className="text-muted-foreground text-base sm:text-2xl">Set booking settings, pricing, and publish.</p>
                 </div>
               </div>
             </div>
@@ -350,19 +350,19 @@ export function CreateListing() {
         )}
 
         {currentStep === 'step1_intro' && (
-          <div className="grid lg:grid-cols-2 gap-10 items-center py-12">
+          <div className="grid lg:grid-cols-2 gap-8 items-center py-10">
             <div>
-              <p className="text-2xl text-muted-foreground mb-2">Step 1</p>
-              <h2 className="text-6xl font-semibold mb-4">Tell us about your place</h2>
-              <p className="text-3xl text-muted-foreground">We'll ask what type of property you have and where guests can stay.</p>
+              <p className="text-lg sm:text-2xl text-muted-foreground mb-2">Step 1</p>
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-4">Tell us about your place</h2>
+              <p className="text-lg sm:text-2xl text-muted-foreground">We'll ask what type of property you have and where guests can stay.</p>
             </div>
-            <div className="rounded-3xl border p-10 text-center text-muted-foreground">Property setup</div>
+            <div className="rounded-3xl border p-8 text-center text-muted-foreground">Property setup</div>
           </div>
         )}
 
         {currentStep === 'property_type' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-8">Which of these best describes your place?</h2>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-8">Which of these best describes your place?</h2>
             <div className="grid sm:grid-cols-3 gap-4">
               {listingCategories.map((type) => (
                 <button
@@ -382,7 +382,7 @@ export function CreateListing() {
 
         {currentStep === 'privacy_type' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-8">What type of place will guests have?</h2>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-8">What type of place will guests have?</h2>
             <div className="space-y-4">
               {[
                 { id: 'entire_place', title: 'An entire place', subtitle: 'Guests have the whole place to themselves.' },
@@ -397,8 +397,8 @@ export function CreateListing() {
                     form.privacyType === option.id ? 'border-2 border-foreground' : 'hover:border-foreground'
                   )}
                 >
-                  <p className="text-3xl font-medium mb-1">{option.title}</p>
-                  <p className="text-muted-foreground text-2xl">{option.subtitle}</p>
+                  <p className="text-xl sm:text-3xl font-medium mb-1">{option.title}</p>
+                  <p className="text-muted-foreground text-base sm:text-2xl">{option.subtitle}</p>
                 </button>
               ))}
             </div>
@@ -407,8 +407,8 @@ export function CreateListing() {
 
         {currentStep === 'location' && (
           <section className="max-w-3xl mx-auto py-8 space-y-6">
-            <h2 className="text-6xl font-semibold">Where's your place located?</h2>
-            <p className="text-2xl text-muted-foreground">We only share your address with guests after booking.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold">Where's your place located?</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground">We only share your address with guests after booking.</p>
             <div className="space-y-4">
               <div>
                 <Label>Country / region</Label>
@@ -432,8 +432,8 @@ export function CreateListing() {
 
         {currentStep === 'basics' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-3">Share some basics about your place</h2>
-            <p className="text-2xl text-muted-foreground mb-8">You'll add more details later, like bed types.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Share some basics about your place</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">You'll add more details later, like bed types.</p>
             <div className="space-y-2">
               {[
                 { label: 'Guests', key: 'guests' as const },
@@ -442,12 +442,12 @@ export function CreateListing() {
                 { label: 'Bathrooms', key: 'bathrooms' as const },
               ].map(({ label, key }) => (
                 <div key={key} className="flex items-center justify-between py-5 border-b">
-                  <p className="text-3xl">{label}</p>
+                  <p className="text-xl sm:text-3xl">{label}</p>
                   <div className="flex items-center gap-5">
                     <button type="button" aria-label={`Decrease ${label}`} className="w-10 h-10 rounded-full border flex items-center justify-center" onClick={() => updateCount(key, -1)}>
                       <Minus className="w-4 h-4" />
                     </button>
-                    <span className="text-3xl font-medium w-8 text-center">{form[key]}</span>
+                    <span className="text-xl sm:text-3xl font-medium w-8 text-center">{form[key]}</span>
                     <button type="button" aria-label={`Increase ${label}`} className="w-10 h-10 rounded-full border flex items-center justify-center" onClick={() => updateCount(key, 1)}>
                       <Plus className="w-4 h-4" />
                     </button>
@@ -460,8 +460,8 @@ export function CreateListing() {
 
         {currentStep === 'amenities' && (
           <section className="max-w-4xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-3">Tell guests what your place has to offer</h2>
-            <p className="text-2xl text-muted-foreground mb-8">You can add more amenities after publishing.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Tell guests what your place has to offer</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">You can add more amenities after publishing.</p>
             <div className="grid sm:grid-cols-3 gap-4">
               {AMENITIES.map((amenity) => (
                 <button
@@ -472,7 +472,7 @@ export function CreateListing() {
                     form.amenities.includes(amenity.id) ? 'border-2 border-foreground' : 'hover:border-foreground'
                   )}
                 >
-                  <p className="text-2xl font-medium mb-1">{amenity.name}</p>
+                  <p className="text-base sm:text-xl font-medium mb-1">{amenity.name}</p>
                 </button>
               ))}
             </div>
@@ -481,13 +481,13 @@ export function CreateListing() {
 
         {currentStep === 'photos' && (
           <section className="max-w-4xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-3">Add some photos of your apartment</h2>
-            <p className="text-2xl text-muted-foreground mb-8">You'll need at least 5 photos to get started.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Add some photos of your apartment</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">You'll need at least 5 photos to get started.</p>
 
             <label className="border-2 border-dashed rounded-2xl min-h-[340px] flex flex-col items-center justify-center cursor-pointer hover:border-foreground transition">
               <Camera className="w-14 h-14 mb-4 text-muted-foreground" />
-              <p className="text-3xl font-medium mb-1">Drag and drop</p>
-              <p className="text-muted-foreground text-2xl mb-4">or browse for photos</p>
+              <p className="text-xl sm:text-3xl font-medium mb-1">Drag and drop</p>
+              <p className="text-muted-foreground text-base sm:text-2xl mb-4">or browse for photos</p>
               <span className="px-5 py-3 rounded-xl border font-medium">Browse</span>
               <input type="file" accept="image/*" multiple className="hidden" onChange={onPhotosSelected} />
             </label>
@@ -515,8 +515,8 @@ export function CreateListing() {
 
         {currentStep === 'title' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-3">Now, let's give your apartment a title</h2>
-            <p className="text-2xl text-muted-foreground mb-8">Short titles work best. You can always edit later.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Now, let's give your apartment a title</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Short titles work best. You can always edit later.</p>
             <Textarea
               rows={6}
               maxLength={50}
@@ -530,15 +530,15 @@ export function CreateListing() {
 
         {currentStep === 'highlights' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-3">Next, let's describe your apartment</h2>
-            <p className="text-2xl text-muted-foreground mb-8">Choose up to 2 highlights.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Next, let's describe your apartment</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Choose up to 2 highlights.</p>
             <div className="flex flex-wrap gap-3">
               {HIGHLIGHTS.map((h) => (
                 <button
                   key={h}
                   onClick={() => toggleHighlight(h)}
                   className={cn(
-                    'px-5 py-3 rounded-full border text-2xl',
+                    'px-5 py-3 rounded-full border text-base sm:text-xl',
                     form.highlights.includes(h) ? 'border-foreground bg-muted' : 'hover:border-foreground'
                   )}
                 >
@@ -551,8 +551,8 @@ export function CreateListing() {
 
         {currentStep === 'description' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-3">Create your description</h2>
-            <p className="text-2xl text-muted-foreground mb-8">Share what makes your place special.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Create your description</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Share what makes your place special.</p>
             <Textarea
               rows={8}
               maxLength={500}
@@ -567,9 +567,9 @@ export function CreateListing() {
         {currentStep === 'step3_intro' && (
           <div className="grid lg:grid-cols-2 gap-10 items-center py-12">
             <div>
-              <p className="text-2xl text-muted-foreground mb-2">Step 3</p>
-              <h2 className="text-6xl font-semibold mb-4">Finish up and publish</h2>
-              <p className="text-3xl text-muted-foreground">Choose booking settings, set up pricing, and publish your listing.</p>
+              <p className="text-base sm:text-2xl text-muted-foreground mb-2">Step 3</p>
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-4">Finish up and publish</h2>
+              <p className="text-xl sm:text-3xl text-muted-foreground">Choose booking settings, set up pricing, and publish your listing.</p>
             </div>
             <div className="rounded-3xl border p-10 text-center text-muted-foreground">Publishing setup</div>
           </div>
@@ -577,8 +577,8 @@ export function CreateListing() {
 
         {currentStep === 'booking_settings' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-3">Pick your booking settings</h2>
-            <p className="text-2xl text-muted-foreground mb-8">You can change this at any time.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Pick your booking settings</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">You can change this at any time.</p>
             <div className="space-y-4">
               {[
                 {
@@ -600,8 +600,8 @@ export function CreateListing() {
                     form.bookingMode === opt.id ? 'border-2 border-foreground' : 'hover:border-foreground'
                   )}
                 >
-                  <p className="text-3xl font-medium">{opt.title}</p>
-                  <p className="text-2xl text-muted-foreground">{opt.subtitle}</p>
+                  <p className="text-xl sm:text-3xl font-medium">{opt.title}</p>
+                  <p className="text-base sm:text-2xl text-muted-foreground">{opt.subtitle}</p>
                 </button>
               ))}
             </div>
@@ -610,8 +610,8 @@ export function CreateListing() {
 
         {currentStep === 'discounts' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-3">Add discounts</h2>
-            <p className="text-2xl text-muted-foreground mb-8">Help your place stand out and get booked faster.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Add discounts</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Help your place stand out and get booked faster.</p>
             <div className="space-y-4">
               {[
                 {
@@ -641,14 +641,14 @@ export function CreateListing() {
               ].map((item) => {
                 const enabled = form[item.key as keyof typeof form] as boolean;
                 return (
-                  <div key={item.key} className="border rounded-2xl p-5 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-12 rounded-xl border flex items-center justify-center text-3xl font-semibold">
+                  <div key={item.key} className="border rounded-2xl p-5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-16 h-12 rounded-xl border flex-shrink-0 flex items-center justify-center text-xl sm:text-3xl font-semibold">
                         {typeof item.value === 'number' ? `${item.value}%` : '20%'}
                       </div>
-                      <div>
-                        <p className="text-3xl font-medium">{item.title}</p>
-                        <p className="text-2xl text-muted-foreground">{item.description}</p>
+                      <div className="min-w-0">
+                        <p className="text-base sm:text-xl font-medium">{item.title}</p>
+                        <p className="text-sm sm:text-base text-muted-foreground">{item.description}</p>
                       </div>
                     </div>
                     <Checkbox
@@ -664,10 +664,10 @@ export function CreateListing() {
 
         {currentStep === 'weekday_price' && (
           <section className="max-w-3xl mx-auto py-8 text-center">
-            <h2 className="text-6xl font-semibold mb-3">Now, set a weekday base price</h2>
-            <p className="text-2xl text-muted-foreground mb-8">Tip: $42. You'll set a weekend price next.</p>
-            <div className="text-[120px] font-semibold leading-none">${form.weekdayBasePrice}</div>
-            <p className="text-3xl text-muted-foreground mt-3">Guest price before taxes ${guestPriceBeforeTaxes} <ChevronDown className="inline w-5 h-5" /></p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Now, set a weekday base price</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Tip: $42. You'll set a weekend price next.</p>
+            <div className="text-[60px] sm:text-[90px] lg:text-[120px] font-semibold leading-none">${form.weekdayBasePrice}</div>
+            <p className="text-xl sm:text-3xl text-muted-foreground mt-3">Guest price before taxes ${guestPriceBeforeTaxes} <ChevronDown className="inline w-5 h-5" /></p>
             <div className="mt-8 flex justify-center gap-3">
               <Button variant="outline" size="sm" onClick={() => update({ weekdayBasePrice: Math.max(10, form.weekdayBasePrice - 1) })}>-</Button>
               <Button variant="outline" size="sm" onClick={() => update({ weekdayBasePrice: form.weekdayBasePrice + 1 })}>+</Button>
@@ -677,12 +677,12 @@ export function CreateListing() {
 
         {currentStep === 'weekend_price' && (
           <section className="max-w-3xl mx-auto py-8 text-center">
-            <h2 className="text-6xl font-semibold mb-3">Set a weekend price</h2>
-            <p className="text-2xl text-muted-foreground mb-8">Add a premium for Fridays and Saturdays.</p>
-            <div className="text-[120px] font-semibold leading-none">${weekendPrice}</div>
-            <p className="text-3xl text-muted-foreground mt-3">Guest price before taxes ${Math.round(weekendPrice * 1.14)} <ChevronDown className="inline w-5 h-5" /></p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Set a weekend price</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Add a premium for Fridays and Saturdays.</p>
+            <div className="text-[60px] sm:text-[90px] lg:text-[120px] font-semibold leading-none">${weekendPrice}</div>
+            <p className="text-xl sm:text-3xl text-muted-foreground mt-3">Guest price before taxes ${Math.round(weekendPrice * 1.14)} <ChevronDown className="inline w-5 h-5" /></p>
             <div className="max-w-xl mx-auto mt-10 text-left">
-              <p className="text-3xl font-medium mb-2">Weekend premium</p>
+              <p className="text-xl sm:text-3xl font-medium mb-2">Weekend premium</p>
               <div className="flex items-center gap-4">
                 <input
                   type="range"
@@ -693,7 +693,7 @@ export function CreateListing() {
                   onChange={(e) => update({ weekendPremiumPercent: Number(e.target.value) })}
                   className="w-full"
                 />
-                <div className="w-20 h-14 border rounded-2xl flex items-center justify-center text-4xl font-semibold">
+                <div className="w-20 h-14 border rounded-2xl flex items-center justify-center text-2xl sm:text-4xl font-semibold">
                   {form.weekendPremiumPercent}%
                 </div>
               </div>
@@ -703,8 +703,8 @@ export function CreateListing() {
 
         {currentStep === 'safety' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-6xl font-semibold mb-3">Share safety details</h2>
-            <p className="text-2xl text-muted-foreground mb-8">Does your place have any of these?</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Share safety details</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Does your place have any of these?</p>
             <div className="space-y-6 max-w-2xl">
               {[
                 { key: 'exteriorCamera', label: 'Exterior security camera present' },
@@ -712,7 +712,7 @@ export function CreateListing() {
                 { key: 'weaponsOnProperty', label: 'Weapon(s) on the property' },
               ].map((s) => (
                 <div key={s.key} className="flex items-center justify-between">
-                  <p className="text-3xl">{s.label}</p>
+                  <p className="text-xl sm:text-3xl">{s.label}</p>
                   <Checkbox
                     checked={form[s.key as keyof typeof form] as boolean}
                     onCheckedChange={(checked) => update({ [s.key]: Boolean(checked) } as Partial<typeof form>)}
@@ -725,22 +725,22 @@ export function CreateListing() {
 
         {currentStep === 'final_details' && (
           <section className="max-w-3xl mx-auto py-8 space-y-6">
-            <h2 className="text-6xl font-semibold">Provide a few final details</h2>
-            <p className="text-2xl text-muted-foreground">This is required to help prevent fraud.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold">Provide a few final details</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground">This is required to help prevent fraud.</p>
 
             <div className="rounded-2xl border p-5 bg-muted/20">
-              <p className="text-2xl text-muted-foreground">Residential address preview</p>
-              <p className="text-3xl mt-2">{composedAddress || 'No address yet'}</p>
+              <p className="text-base sm:text-2xl text-muted-foreground">Residential address preview</p>
+              <p className="text-xl sm:text-3xl mt-2">{composedAddress || 'No address yet'}</p>
             </div>
 
             <div className="rounded-2xl border p-5 bg-muted/20">
-              <p className="text-2xl text-muted-foreground">Pricing preview</p>
-              <p className="text-3xl mt-2">Weekday: ${form.weekdayBasePrice} · Weekend: ${weekendPrice}</p>
+              <p className="text-base sm:text-2xl text-muted-foreground">Pricing preview</p>
+              <p className="text-xl sm:text-3xl mt-2">Weekday: ${form.weekdayBasePrice} · Weekend: ${weekendPrice}</p>
             </div>
 
             <div className="rounded-2xl border p-5 bg-muted/20">
-              <p className="text-2xl text-muted-foreground">Ready to publish</p>
-              <p className="text-3xl mt-2">Your listing has {form.images.length} photos, {form.amenities.length} amenities, and booking settings configured.</p>
+              <p className="text-base sm:text-2xl text-muted-foreground">Ready to publish</p>
+              <p className="text-xl sm:text-3xl mt-2">Your listing has {form.images.length} photos, {form.amenities.length} amenities, and booking settings configured.</p>
             </div>
           </section>
         )}

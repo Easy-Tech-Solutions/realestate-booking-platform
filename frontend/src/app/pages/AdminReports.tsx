@@ -87,9 +87,9 @@ export function AdminReports() {
         </div>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <CardTitle>All Reports</CardTitle>
-            <div className="w-52">
+            <div className="w-full sm:w-52">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by status" />
@@ -123,7 +123,7 @@ export function AdminReports() {
 
                     <p className="text-sm">{report.description}</p>
 
-                    <div className="grid lg:grid-cols-[220px,1fr,120px] gap-3">
+                    <div className="grid sm:grid-cols-[1fr,120px] lg:grid-cols-[220px,1fr,120px] gap-3">
                       <Select
                         value={draftStatus[report.id] || ''}
                         onValueChange={(val) => setDraftStatus(prev => ({ ...prev, [report.id]: val }))}

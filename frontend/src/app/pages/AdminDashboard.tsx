@@ -339,15 +339,15 @@ export function AdminDashboard() {
 
   const renderUserManagement = () => (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">User Management</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input placeholder="Search users..." className="pl-10 w-64" />
+            <Input placeholder="Search users..." className="pl-10 w-full sm:w-64" />
           </div>
           <Select>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-full sm:w-32">
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
             <SelectContent>
@@ -363,7 +363,7 @@ export function AdminDashboard() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <div className="overflow-x-auto">
             <TableHeader>
               <TableRow>
                 <TableHead>User</TableHead>
@@ -415,6 +415,7 @@ export function AdminDashboard() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -422,15 +423,15 @@ export function AdminDashboard() {
 
   const renderPropertyManagement = () => (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">Property Management</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input placeholder="Search properties..." className="pl-10 w-64" />
+            <Input placeholder="Search properties..." className="pl-10 w-full sm:w-64" />
           </div>
           <Select>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-full sm:w-32">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -470,6 +471,7 @@ export function AdminDashboard() {
 
         <Card className="lg:col-span-2">
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -514,6 +516,7 @@ export function AdminDashboard() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -522,11 +525,11 @@ export function AdminDashboard() {
 
   const renderBookings = () => (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">Bookings Management</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <Select>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-full sm:w-32">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -542,6 +545,7 @@ export function AdminDashboard() {
 
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -602,6 +606,7 @@ export function AdminDashboard() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -609,11 +614,11 @@ export function AdminDashboard() {
 
   const renderReviews = () => (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">Review Moderation</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <Select>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-full sm:w-32">
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
             <SelectContent>
@@ -630,7 +635,7 @@ export function AdminDashboard() {
         {reviews.map((review) => (
           <Card key={review.id}>
             <CardContent className="p-6">
-              <div className="flex items-start justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="flex items-start gap-4">
                   <Avatar>
                     <AvatarImage src={review.user.avatar} />
@@ -670,9 +675,9 @@ export function AdminDashboard() {
 
   const renderMessages = () => (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">Messages & Communication</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <Button>
             <Mail className="w-4 h-4 mr-2" />
             Send Email Campaign
@@ -799,11 +804,11 @@ export function AdminDashboard() {
 
   const renderPayments = () => (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">Payment Transactions</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <Select>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-full sm:w-32">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
@@ -818,6 +823,7 @@ export function AdminDashboard() {
 
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -854,6 +860,7 @@ export function AdminDashboard() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -869,6 +876,7 @@ export function AdminDashboard() {
         <Card>
           <CardHeader><CardTitle>Login Activity</CardTitle></CardHeader>
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -899,10 +907,9 @@ export function AdminDashboard() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
-
-        <div className="space-y-6">
           <Card>
             <CardHeader><CardTitle>2FA Status</CardTitle></CardHeader>
             <CardContent>
@@ -1067,7 +1074,7 @@ export function AdminDashboard() {
               <h1 className="text-2xl font-semibold">
                 {menuItems.find(item => item.id === activeSection)?.label}
               </h1>
-              <div className="ml-auto flex items-center gap-2">
+              <div className="ml-auto flex flex-wrap items-center gap-2">
                 <Button variant="outline" onClick={() => navigate('/admin/reports')}>Open Reports Center</Button>
                 <Button variant="outline" onClick={() => navigate('/admin/suspensions')}>Open Suspensions Center</Button>
               </div>

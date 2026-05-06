@@ -110,12 +110,17 @@ export function Booking() {
 
           <h1 className="text-3xl font-semibold mb-8">Confirm and pay</h1>
 
-          <div className="grid lg:grid-cols-2 gap-12">
-            {/* Left Column - Payment Form */}
-            <div className="space-y-8">
-              {/* Trip Details */}
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Your trip</h2>
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+            {/* Mobile: summary first, then form */}
+            {/* Right Column - Booking Summary */}
+            <div className="lg:order-2">
+              <div className="sticky top-24 border border-border rounded-xl p-4 sm:p-6">
+                <div className="flex gap-3 sm:gap-4 mb-6">
+                  <img
+                    src={currentProperty.images?.[0]}
+                    alt={currentProperty.title}
+                    className="w-24 h-20 sm:w-32 sm:h-24 rounded-lg object-cover flex-shrink-0"
+                  />
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
                     <div>
@@ -300,15 +305,11 @@ export function Booking() {
               </Button>
             </div>
 
-            {/* Right Column - Booking Summary */}
-            <div>
-              <div className="sticky top-24 border border-border rounded-xl p-6">
-                <div className="flex gap-4 mb-6">
-                  <img
-                    src={currentProperty.images?.[0]}
-                    alt={currentProperty.title}
-                    className="w-32 h-24 rounded-lg object-cover"
-                  />
+            {/* Left Column - Payment Form */}
+            <div className="lg:order-1 space-y-8">
+              {/* Trip Details */}
+              <div>
+                <h2 className="text-xl font-semibold mb-4">Your trip</h2>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">{currentProperty.propertyType}</p>
                     <h3 className="font-semibold mb-2 line-clamp-2">{currentProperty.title}</h3>

@@ -88,11 +88,11 @@ export function UserDashboard() {
 
         {/* Tabs */}
         <Tabs defaultValue="upcoming">
-          <TabsList className="mb-6">
-            <TabsTrigger value="upcoming">Upcoming Trips</TabsTrigger>
-            <TabsTrigger value="past">Past Trips</TabsTrigger>
-            <TabsTrigger value="wishlists">Wishlists</TabsTrigger>
-            <TabsTrigger value="reviews">My Reviews</TabsTrigger>
+          <TabsList className="mb-6 flex overflow-x-auto w-full sm:w-auto">
+            <TabsTrigger value="upcoming" className="flex-shrink-0">Upcoming Trips</TabsTrigger>
+            <TabsTrigger value="past" className="flex-shrink-0">Past Trips</TabsTrigger>
+            <TabsTrigger value="wishlists" className="flex-shrink-0">Wishlists</TabsTrigger>
+            <TabsTrigger value="reviews" className="flex-shrink-0">My Reviews</TabsTrigger>
           </TabsList>
 
           <TabsContent value="upcoming">
@@ -103,16 +103,16 @@ export function UserDashboard() {
                   <p className="text-sm text-muted-foreground">No upcoming trips yet.</p>
                 )}
                 {upcomingTrips.map((trip) => (
-                  <div key={trip.booking.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                  <div key={trip.booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-border rounded-lg">
                     <div className="flex items-center gap-4">
-                      <img src={trip.property.images[0]} alt={trip.property.title} className="w-20 h-16 rounded object-cover" />
-                      <div>
-                        <h3 className="font-semibold">{trip.property.title}</h3>
+                      <img src={trip.property.images[0]} alt={trip.property.title} className="w-20 h-16 rounded object-cover flex-shrink-0" />
+                      <div className="min-w-0">
+                        <h3 className="font-semibold truncate">{trip.property.title}</h3>
                         <p className="text-sm text-muted-foreground">{trip.booking.checkIn} → {trip.booking.checkOut}</p>
                         <p className="text-sm font-semibold mt-1">{formatCurrency(trip.estimatedTotal)}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-shrink-0">
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[trip.booking.status]}`}>
                         {trip.booking.status}
                       </span>
@@ -132,16 +132,16 @@ export function UserDashboard() {
                   <p className="text-sm text-muted-foreground">No past trips yet.</p>
                 )}
                 {pastTrips.map((trip) => (
-                  <div key={trip.booking.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                  <div key={trip.booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-border rounded-lg">
                     <div className="flex items-center gap-4">
-                      <img src={trip.property.images[0]} alt={trip.property.title} className="w-20 h-16 rounded object-cover" />
-                      <div>
-                        <h3 className="font-semibold">{trip.property.title}</h3>
+                      <img src={trip.property.images[0]} alt={trip.property.title} className="w-20 h-16 rounded object-cover flex-shrink-0" />
+                      <div className="min-w-0">
+                        <h3 className="font-semibold truncate">{trip.property.title}</h3>
                         <p className="text-sm text-muted-foreground">{trip.booking.checkIn} → {trip.booking.checkOut}</p>
                         <p className="text-sm font-semibold mt-1">{formatCurrency(trip.estimatedTotal)}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-shrink-0">
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[trip.booking.status]}`}>
                         {trip.booking.status}
                       </span>
