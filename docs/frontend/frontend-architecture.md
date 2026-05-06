@@ -11,7 +11,7 @@ It explains:
 
 Scope for this guide:
 - Includes: frontend source and frontend config/docs files.
-- Excludes: generated and third-party folders such as frontend/dist and frontend/node_modules.
+- Excludes: generated and third-party folders such as frontend/dist and frontend/node_modules..
 
 ## Quick Start for New Frontend Developers
 
