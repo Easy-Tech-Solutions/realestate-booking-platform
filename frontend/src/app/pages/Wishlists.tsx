@@ -39,7 +39,7 @@ export function Wishlists() {
               <h2 className="text-xl font-semibold mb-2">Favorites</h2>
               <p className="text-muted-foreground">{wishlistedProperties.length} saved places</p>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 gap-y-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 gap-y-6">
               {wishlistedProperties.map((property) => (
                 <PropertyCard key={property.id} property={property} />
               ))}
