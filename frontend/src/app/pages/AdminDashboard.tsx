@@ -911,6 +911,8 @@ export function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        <div className="space-y-6">
           <Card>
             <CardHeader><CardTitle>2FA Status</CardTitle></CardHeader>
             <CardContent>
