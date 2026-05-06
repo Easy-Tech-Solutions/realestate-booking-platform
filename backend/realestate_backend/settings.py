@@ -256,7 +256,11 @@ _fe_origin = os.environ.get("FRONTEND_ORIGIN", "")
 if _fe_origin and _fe_origin not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(_fe_origin)
 
-CORS_ALLOWED_ORIGIN_REGEXES = env_list("CORS_ALLOWED_ORIGIN_REGEXES", "")
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://realestate-booking-platform[a-z0-9\-]*\.vercel\.app$",
+    r"^https://homekon[a-z0-9\-]*\.vercel\.app$",
+    *env_list("CORS_ALLOWED_ORIGIN_REGEXES", ""),
+]
 CORS_ALLOW_CREDENTIALS = True
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 
