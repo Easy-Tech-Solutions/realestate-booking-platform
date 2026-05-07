@@ -24,7 +24,7 @@ export function useNotificationSocket(enabled: boolean) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'notification') {
+        if (data.type === 'new_notification') {
           const n = data.notification;
           // Show a toast for incoming notifications
           toast(n.title, {

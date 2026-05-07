@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Payment, Currency, Refund
+from .models import Payment, Currency, Refund, SavedCard
 from bookings.models import Booking
 
 class PaymentInitiateSerializer(serializers.ModelSerializer):
@@ -85,6 +85,33 @@ class RefundDetailSerializer(serializers.ModelSerializer):
             'created_at', 'processed_at'
         ]
         read_only_fields = ['id', 'created_at', 'processed_at']
+
+
+class SavedCardSerializer(serializers.ModelSerializer):
+    card_type_display = serializers.CharField(source='get_card_type_display', read_only=True)
+
+    class Meta:
+        model = SavedCard
+        fields = [
+            'id', 'cardholder_name', 'last4', 'card_type', 'card_type_display',
+            'expiry_month', 'expiry_year', 'is_default', 'created_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'card_type_display']
+
+    def validate_last4(self, value):
+        if not value.isdigit() or len(value) != 4:
+            raise serializers.ValidationError('last4 must be exactly 4 digits.')
+        return value
+
+    def validate_expiry_month(self, value):
+        if not value.isdigit() or not (1 <= int(value) <= 12):
+            raise serializers.ValidationError('expiry_month must be 01-12.')
+        return value.zfill(2)
+
+    def validate_expiry_year(self, value):
+        if not value.isdigit() or len(value) != 4:
+            raise serializers.ValidationError('expiry_year must be a 4-digit year.')
+        return value
 
 
 class MTNWebhookSerializer(serializers.Serializer):

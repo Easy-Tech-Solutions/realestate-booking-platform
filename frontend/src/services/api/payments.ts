@@ -57,3 +57,53 @@ export const paymentAPI = {
     return fetchWithAuth('/api/payments/user/');
   },
 };
+
+export interface SavedCard {
+  id: number;
+  cardholder_name: string;
+  last4: string;
+  card_type: 'visa' | 'mastercard' | 'amex' | 'discover' | 'other';
+  card_type_display: string;
+  expiry_month: string;
+  expiry_year: string;
+  is_default: boolean;
+  created_at: string;
+}
+
+export const cardsAPI = {
+  list: (): Promise<SavedCard[]> =>
+    fetchWithAuth('/api/payments/cards/'),
+
+  add: (payload: {
+    cardholder_name: string;
+    last4: string;
+    card_type: string;
+    expiry_month: string;
+    expiry_year: string;
+    is_default?: boolean;
+  }): Promise<SavedCard> =>
+    fetchWithAuth('/api/payments/cards/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  update: (id: number, payload: Partial<{
+    cardholder_name: string;
+    expiry_month: string;
+    expiry_year: string;
+    is_default: boolean;
+  }>): Promise<SavedCard> =>
+    fetchWithAuth(`/api/payments/cards/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  remove: (id: number): Promise<void> =>
+    fetchWithAuth(`/api/payments/cards/${id}/`, { method: 'DELETE' }),
+
+  setDefault: (id: number): Promise<SavedCard> =>
+    fetchWithAuth(`/api/payments/cards/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_default: true }),
+    }),
+};

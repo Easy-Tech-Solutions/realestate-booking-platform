@@ -10,6 +10,14 @@ export const notificationsAPI = {
     return fetchWithAuth(`/api/notifications/${id}/read/`, { method: 'POST' });
   },
 
+  markUnread: async (id: string) => {
+    return fetchWithAuth(`/api/notifications/${id}/unread/`, { method: 'PATCH' });
+  },
+
+  deleteOne: async (id: string) => {
+    return fetchWithAuth(`/api/notifications/${id}/`, { method: 'DELETE' });
+  },
+
   markAllRead: async () => {
     return fetchWithAuth('/api/notifications/read-all/', { method: 'POST' });
   },

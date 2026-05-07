@@ -9,10 +9,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Payment, PaymentGateway, WebhookLog
+from .models import Payment, PaymentGateway, WebhookLog, SavedCard
 from .serializers import (
     PaymentInitiateSerializer, PaymentVerifySerializer, RefundSerializer,
-    PaymentSerializer, RefundDetailSerializer,
+    PaymentSerializer, RefundDetailSerializer, SavedCardSerializer,
 )
 from .services import PaymentService
 
@@ -267,3 +267,44 @@ def mtn_momo_webhook(request):
     webhook_log.save(update_fields=['processed'])
 
     return JsonResponse({'status': 'ok'})
+
+
+# ── Saved Cards ───────────────────────────────────────────────────────────────
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def saved_cards(request):
+    if request.method == 'GET':
+        cards = SavedCard.objects.filter(user=request.user)
+        return Response(SavedCardSerializer(cards, many=True).data)
+
+    serializer = SavedCardSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # If this is the user's first card, make it default automatically
+    is_first = not SavedCard.objects.filter(user=request.user).exists()
+    card = serializer.save(user=request.user, is_default=serializer.validated_data.get('is_default', False) or is_first)
+    return Response(SavedCardSerializer(card).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def saved_card_detail(request, card_id):
+    card = get_object_or_404(SavedCard, pk=card_id, user=request.user)
+
+    if request.method == 'DELETE':
+        card.delete()
+        # If no cards remain or if we just deleted the default, promote the newest remaining card
+        remaining = SavedCard.objects.filter(user=request.user)
+        if remaining.exists() and not remaining.filter(is_default=True).exists():
+            newest = remaining.first()
+            newest.is_default = True
+            newest.save(update_fields=['is_default'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    serializer = SavedCardSerializer(card, data=request.data, partial=(request.method == 'PATCH'))
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    card = serializer.save()
+    return Response(SavedCardSerializer(card).data)

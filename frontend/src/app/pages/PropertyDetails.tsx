@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import {
   Star, Share, Heart, MapPin, Award, Shield,
-  ChevronLeft, ChevronRight, X, Minus, Plus,
+  ChevronLeft, ChevronRight, X, Minus, Plus, MessageCircle,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
@@ -14,6 +14,7 @@ import { CANCELLATION_POLICIES } from '../../core/constants';
 import { formatCurrency, calculateNights, formatDate, getInitials } from '../../core/utils';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
+import { messagesAPI } from '../../services/api.service';
 import { DateRange } from 'react-day-picker';
 import type { Property, Review } from '../../core/types';
 import { ReportDialog } from '../components/ReportDialog';
@@ -25,7 +26,8 @@ import { fallbackIcon, iconMap } from '../../core/icon-map';
 export function PropertyDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated, wishlistIds, toggleWishlist } = useApp();
+  const { isAuthenticated, wishlistIds, toggleWishlist, user } = useApp();
+  const [messagingHost, setMessagingHost] = useState(false);
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
@@ -235,12 +237,39 @@ export function PropertyDetails() {
                   )}
                 </div>
 
-                {isAuthenticated && (
-                  <ReportDialog
-                    triggerLabel={`Report ${property.host.firstName}`}
-                    defaultContentType="user"
-                    reportedUserId={property.hostId}
-                  />
+                {isAuthenticated && user?.id !== property.hostId && (
+                  <div className="flex items-center gap-3 mt-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      disabled={messagingHost}
+                      onClick={async () => {
+                        setMessagingHost(true);
+                        try {
+                          const conv = await messagesAPI.startConversation(
+                            property.hostId,
+                            '',
+                            property.id,
+                          );
+                          navigate(`/messages?conversation=${conv.id}`);
+                        } catch {
+                          toast.error('Could not start conversation. Please try again.');
+                        } finally {
+                          setMessagingHost(false);
+                        }
+                      }}
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      {messagingHost ? 'Opening…' : `Message ${property.host.firstName}`}
+                    </Button>
+                    <ReportDialog
+                      triggerLabel={`Report ${property.host.firstName}`}
+                      defaultContentType="user"
+                      reportedUserId={property.hostId}
+                    />
+                  </div>
                 )}
 
                 <Separator className="my-6" />

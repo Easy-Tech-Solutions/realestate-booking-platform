@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { X, Mail, Lock, User as UserIcon } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+
+const GOOGLE_ENABLED = Boolean(import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID);
 import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -308,17 +310,19 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
               {/* Provider buttons. Google's button is rendered by GIS itself
                   so the look and accessibility match Google's spec. */}
               <div className="space-y-3">
-                <div className="flex justify-center">
-                  <GoogleLogin
-                    onSuccess={handleGoogleCredential}
-                    onError={handleGoogleError}
-                    theme="outline"
-                    size="large"
-                    text="continue_with"
-                    shape="rectangular"
-                    width="320"
-                  />
-                </div>
+                {GOOGLE_ENABLED && (
+                  <div className="flex justify-center">
+                    <GoogleLogin
+                      onSuccess={handleGoogleCredential}
+                      onError={handleGoogleError}
+                      theme="outline"
+                      size="large"
+                      text="continue_with"
+                      shape="rectangular"
+                      width="320"
+                    />
+                  </div>
+                )}
 
                 <Button type="button" variant="outline" className="w-full">
                   <img src={appleLogo} alt="Apple" className="w-6 h-6 mr-2" />

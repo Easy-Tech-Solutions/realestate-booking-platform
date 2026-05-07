@@ -41,9 +41,16 @@ class NotificationViewSet(
 
     @action(detail=True, methods=['post'], url_path='read')
     def read(self, request, pk=None):
-        #Mark a single notification as read
         notification = self.get_object()
         notification.mark_read()
+        return Response(NotificationSerializer(notification).data)
+
+    @action(detail=True, methods=['patch'], url_path='unread')
+    def mark_unread(self, request, pk=None):
+        notification = self.get_object()
+        notification.is_read = False
+        notification.read_at = None
+        notification.save(update_fields=['is_read', 'read_at'])
         return Response(NotificationSerializer(notification).data)
 
     @action(detail=False, methods=['post'], url_path='read-all')
