@@ -290,6 +290,11 @@ AUTH_REQUIRE_EMAIL_VERIFICATION = env_bool("AUTH_REQUIRE_EMAIL_VERIFICATION", Tr
 LOCAL_DOMAIN = os.environ.get("LOCAL_DOMAIN", "localhost:8000")
 SITE_NAME = os.environ.get("SITE_NAME", "Real Estate Booking Platform")
 
+# Web Push (VAPID) — generate keys once with: python manage.py generate_vapid_keys
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", DEFAULT_FROM_EMAIL or "admin@homekonet.com")
+
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]

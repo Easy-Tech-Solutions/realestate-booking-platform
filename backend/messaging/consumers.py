@@ -57,8 +57,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send_error("Invalid JSON.")
             return
 
-        print(f"[WS DEBUG] Raw text_data: {repr(text_data)}")
-        print(f"[WS DEBUG] Parsed data keys: {list(data.keys())}")
         msg_type = data.get('type')
 
         # --- Authentication handshake ---

@@ -1,4 +1,4 @@
-import { fetchWithAuth } from './shared/client';
+import { fetchWithAuth, fetchPublicJson } from './shared/client';
 import type { NotificationPreferencesResponse } from './shared/contracts';
 
 export const notificationsAPI = {
@@ -26,6 +26,34 @@ export const notificationsAPI = {
     return fetchWithAuth('/api/notifications/preferences/', {
       method: 'PATCH',
       body: JSON.stringify(partialPrefs),
+    });
+  },
+
+  getVapidPublicKey: async (): Promise<string | null> => {
+    try {
+      const data = await fetchPublicJson<{ public_key: string }>('/api/notifications/vapid-public-key/');
+      return data.public_key ?? null;
+    } catch {
+      return null;
+    }
+  },
+
+  registerDeviceToken: async (payload: {
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+    device_type?: string;
+  }) => {
+    return fetchWithAuth('/api/notifications/device-token/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  unregisterDeviceToken: async (endpoint: string) => {
+    return fetchWithAuth('/api/notifications/device-token/', {
+      method: 'DELETE',
+      body: JSON.stringify({ endpoint }),
     });
   },
 };

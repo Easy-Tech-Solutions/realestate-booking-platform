@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -33,6 +33,8 @@ type WizardStep =
   | 'privacy_type'
   | 'location'
   | 'basics'
+  | 'check_in_out'
+  | 'land_details'
   | 'amenities'
   | 'photos'
   | 'title'
@@ -46,29 +48,140 @@ type WizardStep =
   | 'safety'
   | 'final_details';
 
-const STEPS: WizardStep[] = [
-  'welcome',
-  'step1_intro',
-  'property_type',
-  'privacy_type',
-  'location',
-  'basics',
-  'amenities',
-  'photos',
-  'title',
-  'highlights',
-  'description',
-  'step3_intro',
-  'booking_settings',
-  'discounts',
-  'weekday_price',
-  'weekend_price',
-  'safety',
-  'final_details',
+type PropertyGroup = 'residential' | 'hotel' | 'land' | 'commercial';
+
+function getPropertyGroup(type: string): PropertyGroup {
+  if (type === 'hotels') return 'hotel';
+  if (type === 'land') return 'land';
+  if (['office-space', 'hall', 'roadside', 'highway'].includes(type)) return 'commercial';
+  return 'residential';
+}
+
+const STEPS_BY_GROUP: Record<PropertyGroup, WizardStep[]> = {
+  residential: [
+    'welcome', 'step1_intro', 'property_type', 'privacy_type', 'location',
+    'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
+    'step3_intro', 'booking_settings', 'discounts', 'weekday_price', 'weekend_price',
+    'safety', 'final_details',
+  ],
+  hotel: [
+    'welcome', 'step1_intro', 'property_type', 'location', 'basics',
+    'check_in_out', 'amenities', 'photos', 'title', 'description',
+    'step3_intro', 'booking_settings', 'discounts', 'weekday_price', 'weekend_price',
+    'final_details',
+  ],
+  land: [
+    'welcome', 'step1_intro', 'property_type', 'location', 'land_details',
+    'photos', 'title', 'description', 'step3_intro', 'weekday_price', 'final_details',
+  ],
+  commercial: [
+    'welcome', 'step1_intro', 'property_type', 'location', 'basics',
+    'amenities', 'photos', 'title', 'description',
+    'step3_intro', 'booking_settings', 'discounts', 'weekday_price', 'final_details',
+  ],
+};
+
+const HOTEL_AMENITIES = [
+  { id: 'wifi', name: 'Wifi' },
+  { id: 'room-service', name: 'Room service' },
+  { id: 'concierge', name: 'Concierge' },
+  { id: 'spa', name: 'Spa' },
+  { id: 'restaurant', name: 'Restaurant' },
+  { id: 'bar', name: 'Bar' },
+  { id: 'pool', name: 'Swimming pool' },
+  { id: 'gym', name: 'Gym' },
+  { id: 'business-center', name: 'Business center' },
+  { id: 'laundry', name: 'Laundry service' },
+  { id: 'airport-shuttle', name: 'Airport shuttle' },
+  { id: 'breakfast', name: 'Breakfast included' },
+  { id: 'minibar', name: 'Minibar' },
+  { id: 'safe', name: 'In-room safe' },
+  { id: 'ac', name: 'Air conditioning' },
+  { id: 'tv', name: 'TV' },
+  { id: 'parking', name: 'Free parking' },
+  { id: 'ev-charger', name: 'EV charger' },
+];
+
+const COMMERCIAL_AMENITIES = [
+  { id: 'wifi', name: 'Wifi' },
+  { id: 'projector', name: 'Projector' },
+  { id: 'whiteboard', name: 'Whiteboard' },
+  { id: 'conference-call', name: 'Conference call system' },
+  { id: 'printing', name: 'Printing facilities' },
+  { id: 'kitchen', name: 'Kitchen / kitchenette' },
+  { id: 'parking', name: 'Free parking' },
+  { id: 'security', name: 'Security' },
+  { id: 'reception', name: 'Reception' },
+  { id: 'ac', name: 'Air conditioning' },
+  { id: 'tv', name: 'TV / Display screen' },
+  { id: 'sound-system', name: 'Sound system' },
+  { id: 'stage', name: 'Stage / Podium' },
+  { id: 'catering', name: 'Catering available' },
 ];
 
 const HIGHLIGHTS = ['Peaceful', 'Unique', 'Family-friendly', 'Stylish', 'Central', 'Spacious'];
-const COUNTRIES = ['Rwanda', 'Kenya', 'Uganda', 'Tanzania', 'Ghana', 'Nigeria'];
+
+const CHECK_IN_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
+const CHECK_OUT_TIMES = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'];
+
+const COUNTRIES = [
+  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
+  'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain',
+  'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
+  'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria',
+  'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cambodia', 'Cameroon', 'Canada',
+  'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros',
+  'Congo (Brazzaville)', 'Congo (Kinshasa)', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus',
+  'Czech Republic', 'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador',
+  'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini',
+  'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon', 'Gambia', 'Georgia', 'Germany',
+  'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana',
+  'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq',
+  'Ireland', 'Israel', 'Italy', 'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya',
+  'Kiribati', 'Kuwait', 'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho',
+  'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar',
+  'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania',
+  'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro',
+  'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands',
+  'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia',
+  'Norway', 'Oman', 'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea',
+  'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania',
+  'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia',
+  'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe',
+  'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore',
+  'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa', 'South Korea',
+  'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland',
+  'Syria', 'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo',
+  'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu',
+  'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States',
+  'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam',
+  'Yemen', 'Zambia', 'Zimbabwe',
+];
+
+const DRAFT_KEY = 'create_listing_draft';
+
+const GROUP_LABELS: Record<PropertyGroup, { place: string; title: string; description: string }> = {
+  residential: {
+    place: 'place',
+    title: 'Now, let\'s give your place a title',
+    description: 'Create your description',
+  },
+  hotel: {
+    place: 'hotel / room',
+    title: 'Give your hotel listing a name',
+    description: 'Describe what guests can expect',
+  },
+  land: {
+    place: 'land',
+    title: 'Give your land listing a title',
+    description: 'Describe the land and its potential',
+  },
+  commercial: {
+    place: 'space',
+    title: 'Give your space a name',
+    description: 'Describe what makes your space ideal',
+  },
+};
 
 export function CreateListing() {
   const navigate = useNavigate();
@@ -90,6 +203,10 @@ export function CreateListing() {
     bedrooms: 1,
     beds: 1,
     bathrooms: 1,
+
+    squareFootage: 0,
+    checkInTime: '15:00',
+    checkOutTime: '11:00',
 
     amenities: ['wifi', 'tv', 'kitchen', 'washer'] as string[],
 
@@ -118,7 +235,44 @@ export function CreateListing() {
     weaponsOnProperty: false,
   });
 
-  const currentStep = STEPS[stepIndex];
+  const propertyGroup = useMemo(() => getPropertyGroup(form.propertyType), [form.propertyType]);
+  const steps = useMemo(() => STEPS_BY_GROUP[propertyGroup], [propertyGroup]);
+  const currentStep = steps[stepIndex];
+  const groupLabels = GROUP_LABELS[propertyGroup];
+
+  const currentAmenities = useMemo(() => {
+    if (propertyGroup === 'hotel') return HOTEL_AMENITIES;
+    if (propertyGroup === 'commercial') return COMMERCIAL_AMENITIES;
+    return AMENITIES;
+  }, [propertyGroup]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(DRAFT_KEY);
+    if (!saved) return;
+    try {
+      const { form: savedForm, stepIndex: savedStep } = JSON.parse(saved);
+      setForm((prev) => ({ ...prev, ...savedForm, images: [], imagePreviews: [] }));
+      setStepIndex(savedStep ?? 0);
+      toast.info('Draft restored — please re-add your photos.');
+    } catch {
+      localStorage.removeItem(DRAFT_KEY);
+    }
+  }, []);
+
+  // If property type changes and current step no longer exists in the new flow, go back to property_type
+  useEffect(() => {
+    if (currentStep && !steps.includes(currentStep)) {
+      setStepIndex(2);
+    }
+  }, [steps, currentStep]);
+
+  const saveAndExit = () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { images, imagePreviews, ...serializableForm } = form;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ form: serializableForm, stepIndex }));
+    toast.success('Draft saved');
+    navigate('/host');
+  };
 
   const categoriesQuery = useQuery({
     queryKey: ['property-categories', 'create-listing'],
@@ -167,23 +321,16 @@ export function CreateListing() {
   };
 
   const composedAddress = useMemo(() => {
-    return [
-      form.address1,
-      form.address2,
-      form.city,
-      form.state,
-      form.country,
-      form.postalCode,
-    ]
+    return [form.address1, form.address2, form.city, form.state, form.country, form.postalCode]
       .filter(Boolean)
       .join(', ');
   }, [form]);
 
   const sectionProgress = useMemo(() => {
-    const s1Start = STEPS.indexOf('step1_intro');
-    const s1End = STEPS.indexOf('description');
-    const s2Start = STEPS.indexOf('step3_intro');
-    const s2End = STEPS.indexOf('final_details');
+    const s1Start = steps.indexOf('step1_intro');
+    const s1End = steps.indexOf('description');
+    const s2Start = steps.indexOf('step3_intro');
+    const s2End = steps.indexOf('final_details');
 
     const ratio = (start: number, end: number) => {
       if (stepIndex < start) return 0;
@@ -196,32 +343,27 @@ export function CreateListing() {
       step2: ratio(s2Start, s2End),
       step3: stepIndex >= s2Start ? Math.min(1, (stepIndex - s2Start + 1) / (s2End - s2Start + 1)) : 0,
     };
-  }, [stepIndex]);
+  }, [stepIndex, steps]);
+
+  const minPhotos = propertyGroup === 'land' ? 1 : propertyGroup === 'commercial' ? 3 : 5;
 
   const canContinue = useMemo(() => {
     switch (currentStep) {
-      case 'property_type':
-        return Boolean(form.propertyType);
-      case 'privacy_type':
-        return Boolean(form.privacyType);
-      case 'location':
-        return Boolean(form.address1 && form.city && form.country);
-      case 'photos':
-        return form.images.length >= 5;
-      case 'title':
-        return form.title.trim().length > 0;
-      case 'description':
-        return form.description.trim().length > 0;
-      case 'final_details':
-        return Boolean(form.address1 && form.city && form.country);
-      default:
-        return true;
+      case 'property_type': return Boolean(form.propertyType);
+      case 'privacy_type': return Boolean(form.privacyType);
+      case 'location': return Boolean(form.address1 && form.city && form.country);
+      case 'photos': return form.images.length >= minPhotos;
+      case 'title': return form.title.trim().length > 0;
+      case 'description': return form.description.trim().length > 0;
+      case 'land_details': return form.squareFootage > 0;
+      case 'final_details': return Boolean(form.address1 && form.city && form.country);
+      default: return true;
     }
-  }, [currentStep, form]);
+  }, [currentStep, form, minPhotos]);
 
   const next = () => {
     if (!canContinue) return;
-    if (stepIndex < STEPS.length - 1) setStepIndex((s) => s + 1);
+    if (stepIndex < steps.length - 1) setStepIndex((s) => s + 1);
   };
 
   const back = () => {
@@ -240,22 +382,19 @@ export function CreateListing() {
       const payload = new FormData();
       payload.append('title', form.title);
       payload.append('description', form.description);
-      // The backend doesn't have 'apartment' as a valid category slug.
-      // We map it to 'homes' here as a temporary fix.
-      // The correct solution is to add 'apartment' to the PropertyCategory table in the Django admin.
       const propertyTypeToSend = form.propertyType === 'apartment' ? 'homes' : form.propertyType;
       payload.append('property_type', propertyTypeToSend);
-      payload.append('privacy_type', form.privacyType);
+      payload.append('privacy_type', propertyGroup === 'hotel' ? 'private_room' : form.privacyType);
       payload.append('address', composedAddress);
       payload.append('price', String(form.weekdayBasePrice));
-      payload.append('bedrooms', String(form.bedrooms));
-      payload.append('beds', String(form.beds));
-      payload.append('bathrooms', String(form.bathrooms));
+      payload.append('bedrooms', String(propertyGroup === 'hotel' || propertyGroup === 'commercial' ? 0 : form.bedrooms));
+      payload.append('beds', String(propertyGroup === 'land' || propertyGroup === 'commercial' ? 0 : form.beds));
+      payload.append('bathrooms', String(propertyGroup === 'land' ? 0 : form.bathrooms));
       payload.append('max_guests', String(form.guests));
       payload.append('amenities', JSON.stringify(form.amenities));
       payload.append('highlights', JSON.stringify(form.highlights));
       payload.append('booking_mode', form.bookingMode.startsWith('approve') ? 'approve_first' : 'instant');
-      payload.append('weekend_premium_percent', String(form.weekendPremiumPercent));
+      payload.append('weekend_premium_percent', String(propertyGroup === 'land' ? 0 : form.weekendPremiumPercent));
       payload.append('new_listing_promo', String(form.newListingPromo));
       payload.append('last_minute_discount_enabled', String(form.lastMinuteDiscountEnabled));
       payload.append('last_minute_discount_percent', String(form.lastMinuteDiscountPercent));
@@ -263,10 +402,12 @@ export function CreateListing() {
       payload.append('weekly_discount_percent', String(form.weeklyDiscountPercent));
       payload.append('monthly_discount_enabled', String(form.monthlyDiscountEnabled));
       payload.append('monthly_discount_percent', String(form.monthlyDiscountPercent));
-      payload.append('exterior_camera', String(form.exteriorCamera));
-      payload.append('noise_monitor', String(form.noiseMonitor));
-      payload.append('weapons_on_property', String(form.weaponsOnProperty));
-      payload.append('square_footage', '0');
+      payload.append('exterior_camera', String(propertyGroup === 'residential' ? form.exteriorCamera : false));
+      payload.append('noise_monitor', String(propertyGroup === 'residential' ? form.noiseMonitor : false));
+      payload.append('weapons_on_property', String(propertyGroup === 'residential' ? form.weaponsOnProperty : false));
+      payload.append('square_footage', String(form.squareFootage));
+      payload.append('check_in_time', form.checkInTime);
+      payload.append('check_out_time', form.checkOutTime);
       payload.append('is_available', 'true');
 
       if (form.images[0]) {
@@ -282,6 +423,7 @@ export function CreateListing() {
         }
       }
 
+      localStorage.removeItem(DRAFT_KEY);
       toast.success('Listing created successfully');
       navigate('/host');
     } catch (error: any) {
@@ -307,17 +449,37 @@ export function CreateListing() {
   const guestPriceBeforeTaxes = Math.round(form.weekdayBasePrice * 1.14);
   const weekendPrice = Math.round(form.weekdayBasePrice * (1 + form.weekendPremiumPercent / 100));
 
+  // Basics step rows — differ by property group
+  const basicsRows = useMemo(() => {
+    if (propertyGroup === 'commercial') {
+      return [{ label: 'Capacity', key: 'guests' as const }];
+    }
+    if (propertyGroup === 'hotel') {
+      return [
+        { label: 'Max guests per room', key: 'guests' as const },
+        { label: 'Beds', key: 'beds' as const },
+        { label: 'Bathrooms', key: 'bathrooms' as const },
+      ];
+    }
+    return [
+      { label: 'Guests', key: 'guests' as const },
+      { label: 'Bedrooms', key: 'bedrooms' as const },
+      { label: 'Beds', key: 'beds' as const },
+      { label: 'Bathrooms', key: 'bathrooms' as const },
+    ];
+  }, [propertyGroup]);
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between flex-wrap gap-3">
         <div className="text-xl sm:text-2xl font-semibold tracking-tight">HomeKonet</div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm">Questions?</Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/host')}>Save & exit</Button>
+          <Button variant="outline" size="sm" onClick={saveAndExit}>Save & exit</Button>
         </div>
       </header>
 
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 pb-10">
+
         {currentStep === 'welcome' && (
           <div className="grid lg:grid-cols-2 gap-8 items-center py-8">
             <div>
@@ -407,7 +569,7 @@ export function CreateListing() {
 
         {currentStep === 'location' && (
           <section className="max-w-3xl mx-auto py-8 space-y-6">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold">Where's your place located?</h2>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold">Where's your {groupLabels.place} located?</h2>
             <p className="text-base sm:text-2xl text-muted-foreground">We only share your address with guests after booking.</p>
             <div className="space-y-4">
               <div>
@@ -432,15 +594,24 @@ export function CreateListing() {
 
         {currentStep === 'basics' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Share some basics about your place</h2>
-            <p className="text-base sm:text-2xl text-muted-foreground mb-8">You'll add more details later, like bed types.</p>
+            {propertyGroup === 'commercial' ? (
+              <>
+                <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Share some basics about your space</h2>
+                <p className="text-base sm:text-2xl text-muted-foreground mb-8">How many people can your space accommodate?</p>
+              </>
+            ) : propertyGroup === 'hotel' ? (
+              <>
+                <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Tell us about this room</h2>
+                <p className="text-base sm:text-2xl text-muted-foreground mb-8">Share details about the room's capacity and facilities.</p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Share some basics about your place</h2>
+                <p className="text-base sm:text-2xl text-muted-foreground mb-8">You'll add more details later, like bed types.</p>
+              </>
+            )}
             <div className="space-y-2">
-              {[
-                { label: 'Guests', key: 'guests' as const },
-                { label: 'Bedrooms', key: 'bedrooms' as const },
-                { label: 'Beds', key: 'beds' as const },
-                { label: 'Bathrooms', key: 'bathrooms' as const },
-              ].map(({ label, key }) => (
+              {basicsRows.map(({ label, key }) => (
                 <div key={key} className="flex items-center justify-between py-5 border-b">
                   <p className="text-xl sm:text-3xl">{label}</p>
                   <div className="flex items-center gap-5">
@@ -458,12 +629,111 @@ export function CreateListing() {
           </section>
         )}
 
+        {currentStep === 'check_in_out' && (
+          <section className="max-w-3xl mx-auto py-8 space-y-8">
+            <div>
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Set check-in and check-out times</h2>
+              <p className="text-base sm:text-2xl text-muted-foreground">Let guests know when they can arrive and when they need to leave.</p>
+            </div>
+            <div className="space-y-6">
+              <div>
+                <Label className="text-xl sm:text-2xl mb-3 block">Check-in time</Label>
+                <div className="flex flex-wrap gap-3">
+                  {CHECK_IN_TIMES.map((t) => (
+                    <button
+                      type="button"
+                      key={t}
+                      onClick={() => update({ checkInTime: t })}
+                      className={cn(
+                        'px-5 py-3 rounded-xl border text-base sm:text-xl font-medium transition',
+                        form.checkInTime === t ? 'border-2 border-foreground bg-muted' : 'hover:border-foreground'
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xl sm:text-2xl mb-3 block">Check-out time</Label>
+                <div className="flex flex-wrap gap-3">
+                  {CHECK_OUT_TIMES.map((t) => (
+                    <button
+                      type="button"
+                      key={t}
+                      onClick={() => update({ checkOutTime: t })}
+                      className={cn(
+                        'px-5 py-3 rounded-xl border text-base sm:text-xl font-medium transition',
+                        form.checkOutTime === t ? 'border-2 border-foreground bg-muted' : 'hover:border-foreground'
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {currentStep === 'land_details' && (
+          <section className="max-w-3xl mx-auto py-8 space-y-8">
+            <div>
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Tell us about the land</h2>
+              <p className="text-base sm:text-2xl text-muted-foreground">Share the size and key characteristics of the property.</p>
+            </div>
+            <div className="space-y-6">
+              <div>
+                <Label className="text-xl sm:text-2xl mb-2 block">Total area (sq ft)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="e.g. 10000"
+                  value={form.squareFootage || ''}
+                  onChange={(e) => update({ squareFootage: Number(e.target.value) })}
+                  className="text-xl"
+                />
+                {form.squareFootage > 0 && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    ≈ {(form.squareFootage / 43560).toFixed(2)} acres
+                  </p>
+                )}
+              </div>
+              <div className="space-y-4">
+                <Label className="text-xl sm:text-2xl block">Land features</Label>
+                {[
+                  { id: 'road-access', name: 'Road access' },
+                  { id: 'fenced', name: 'Fenced' },
+                  { id: 'water-supply', name: 'Water supply' },
+                  { id: 'electricity', name: 'Electricity connection' },
+                  { id: 'flat-terrain', name: 'Flat terrain' },
+                  { id: 'trees', name: 'Trees / vegetation' },
+                ].map((feature) => (
+                  <div key={feature.id} className="flex items-center justify-between py-3 border-b">
+                    <p className="text-xl sm:text-2xl">{feature.name}</p>
+                    <Checkbox
+                      checked={form.amenities.includes(feature.id)}
+                      onCheckedChange={() => toggleAmenity(feature.id)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {currentStep === 'amenities' && (
           <section className="max-w-4xl mx-auto py-8">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Tell guests what your place has to offer</h2>
-            <p className="text-base sm:text-2xl text-muted-foreground mb-8">You can add more amenities after publishing.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">
+              {propertyGroup === 'hotel'
+                ? 'What does your hotel offer?'
+                : propertyGroup === 'commercial'
+                ? 'What does your space have?'
+                : 'Tell guests what your place has to offer'}
+            </h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">You can add more after publishing.</p>
             <div className="grid sm:grid-cols-3 gap-4">
-              {AMENITIES.map((amenity) => (
+              {currentAmenities.map((amenity) => (
                 <button
                   key={amenity.id}
                   onClick={() => toggleAmenity(amenity.id)}
@@ -481,8 +751,12 @@ export function CreateListing() {
 
         {currentStep === 'photos' && (
           <section className="max-w-4xl mx-auto py-8">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Add some photos of your apartment</h2>
-            <p className="text-base sm:text-2xl text-muted-foreground mb-8">You'll need at least 5 photos to get started.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">
+              {propertyGroup === 'land' ? 'Add photos of the land' : `Add some photos of your ${groupLabels.place}`}
+            </h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">
+              You'll need at least {minPhotos} photo{minPhotos !== 1 ? 's' : ''} to get started.
+            </p>
 
             <label className="border-2 border-dashed rounded-2xl min-h-[340px] flex flex-col items-center justify-center cursor-pointer hover:border-foreground transition">
               <Camera className="w-14 h-14 mb-4 text-muted-foreground" />
@@ -515,14 +789,14 @@ export function CreateListing() {
 
         {currentStep === 'title' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Now, let's give your apartment a title</h2>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">{groupLabels.title}</h2>
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">Short titles work best. You can always edit later.</p>
             <Textarea
               rows={6}
               maxLength={50}
               value={form.title}
               onChange={(e) => update({ title: e.target.value })}
-              placeholder="Enter listing title"
+              placeholder={`Enter ${groupLabels.place} title`}
             />
             <p className="text-sm text-muted-foreground mt-2">{form.title.length}/50</p>
           </section>
@@ -530,7 +804,7 @@ export function CreateListing() {
 
         {currentStep === 'highlights' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Next, let's describe your apartment</h2>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Next, let's describe your place</h2>
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">Choose up to 2 highlights.</p>
             <div className="flex flex-wrap gap-3">
               {HIGHLIGHTS.map((h) => (
@@ -551,14 +825,14 @@ export function CreateListing() {
 
         {currentStep === 'description' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Create your description</h2>
-            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Share what makes your place special.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">{groupLabels.description}</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Share what makes your {groupLabels.place} special.</p>
             <Textarea
               rows={8}
               maxLength={500}
               value={form.description}
               onChange={(e) => update({ description: e.target.value })}
-              placeholder="Describe your place"
+              placeholder={`Describe your ${groupLabels.place}`}
             />
             <p className="text-sm text-muted-foreground mt-2">{form.description.length}/500</p>
           </section>
@@ -581,16 +855,8 @@ export function CreateListing() {
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">You can change this at any time.</p>
             <div className="space-y-4">
               {[
-                {
-                  id: 'approve_first_3',
-                  title: 'Approve your first 3 bookings',
-                  subtitle: 'Recommended for new hosts.',
-                },
-                {
-                  id: 'instant_book',
-                  title: 'Use Instant Book',
-                  subtitle: 'Let guests book automatically.',
-                },
+                { id: 'approve_first_3', title: 'Approve your first 3 bookings', subtitle: 'Recommended for new hosts.' },
+                { id: 'instant_book', title: 'Use Instant Book', subtitle: 'Let guests book automatically.' },
               ].map((opt) => (
                 <button
                   key={opt.id}
@@ -614,30 +880,10 @@ export function CreateListing() {
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">Help your place stand out and get booked faster.</p>
             <div className="space-y-4">
               {[
-                {
-                  key: 'newListingPromo',
-                  title: 'New listing promotion',
-                  description: 'Offer 20% off your first 3 bookings',
-                  value: true,
-                },
-                {
-                  key: 'lastMinuteDiscountEnabled',
-                  title: 'Last-minute discount',
-                  description: 'For stays booked 14 days or less before arrival',
-                  value: form.lastMinuteDiscountPercent,
-                },
-                {
-                  key: 'weeklyDiscountEnabled',
-                  title: 'Weekly discount',
-                  description: 'For stays of 7 nights or more',
-                  value: form.weeklyDiscountPercent,
-                },
-                {
-                  key: 'monthlyDiscountEnabled',
-                  title: 'Monthly discount',
-                  description: 'For stays of 28 nights or more',
-                  value: form.monthlyDiscountPercent,
-                },
+                { key: 'newListingPromo', title: 'New listing promotion', description: 'Offer 20% off your first 3 bookings', value: true },
+                { key: 'lastMinuteDiscountEnabled', title: 'Last-minute discount', description: 'For stays booked 14 days or less before arrival', value: form.lastMinuteDiscountPercent },
+                { key: 'weeklyDiscountEnabled', title: 'Weekly discount', description: 'For stays of 7 nights or more', value: form.weeklyDiscountPercent },
+                { key: 'monthlyDiscountEnabled', title: 'Monthly discount', description: 'For stays of 28 nights or more', value: form.monthlyDiscountPercent },
               ].map((item) => {
                 const enabled = form[item.key as keyof typeof form] as boolean;
                 return (
@@ -664,10 +910,18 @@ export function CreateListing() {
 
         {currentStep === 'weekday_price' && (
           <section className="max-w-3xl mx-auto py-8 text-center">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Now, set a weekday base price</h2>
-            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Tip: $42. You'll set a weekend price next.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">
+              {propertyGroup === 'land' || propertyGroup === 'commercial'
+                ? 'Set your daily price'
+                : 'Now, set a weekday base price'}
+            </h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">
+              {propertyGroup === 'land' ? 'Price per day for the land.' : 'Tip: $42. You\'ll set a weekend price next.'}
+            </p>
             <div className="text-[60px] sm:text-[90px] lg:text-[120px] font-semibold leading-none">${form.weekdayBasePrice}</div>
-            <p className="text-xl sm:text-3xl text-muted-foreground mt-3">Guest price before taxes ${guestPriceBeforeTaxes} <ChevronDown className="inline w-5 h-5" /></p>
+            <p className="text-xl sm:text-3xl text-muted-foreground mt-3">
+              Guest price before taxes ${guestPriceBeforeTaxes} <ChevronDown className="inline w-5 h-5" />
+            </p>
             <div className="mt-8 flex justify-center gap-3">
               <Button variant="outline" size="sm" onClick={() => update({ weekdayBasePrice: Math.max(10, form.weekdayBasePrice - 1) })}>-</Button>
               <Button variant="outline" size="sm" onClick={() => update({ weekdayBasePrice: form.weekdayBasePrice + 1 })}>+</Button>
@@ -680,7 +934,9 @@ export function CreateListing() {
             <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Set a weekend price</h2>
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">Add a premium for Fridays and Saturdays.</p>
             <div className="text-[60px] sm:text-[90px] lg:text-[120px] font-semibold leading-none">${weekendPrice}</div>
-            <p className="text-xl sm:text-3xl text-muted-foreground mt-3">Guest price before taxes ${Math.round(weekendPrice * 1.14)} <ChevronDown className="inline w-5 h-5" /></p>
+            <p className="text-xl sm:text-3xl text-muted-foreground mt-3">
+              Guest price before taxes ${Math.round(weekendPrice * 1.14)} <ChevronDown className="inline w-5 h-5" />
+            </p>
             <div className="max-w-xl mx-auto mt-10 text-left">
               <p className="text-xl sm:text-3xl font-medium mb-2">Weekend premium</p>
               <div className="flex items-center gap-4">
@@ -729,21 +985,35 @@ export function CreateListing() {
             <p className="text-base sm:text-2xl text-muted-foreground">This is required to help prevent fraud.</p>
 
             <div className="rounded-2xl border p-5 bg-muted/20">
-              <p className="text-base sm:text-2xl text-muted-foreground">Residential address preview</p>
+              <p className="text-base sm:text-2xl text-muted-foreground">Address</p>
               <p className="text-xl sm:text-3xl mt-2">{composedAddress || 'No address yet'}</p>
             </div>
 
             <div className="rounded-2xl border p-5 bg-muted/20">
-              <p className="text-base sm:text-2xl text-muted-foreground">Pricing preview</p>
-              <p className="text-xl sm:text-3xl mt-2">Weekday: ${form.weekdayBasePrice} · Weekend: ${weekendPrice}</p>
+              <p className="text-base sm:text-2xl text-muted-foreground">Pricing</p>
+              <p className="text-xl sm:text-3xl mt-2">
+                {propertyGroup === 'land' || propertyGroup === 'commercial'
+                  ? `Daily rate: $${form.weekdayBasePrice}`
+                  : `Weekday: $${form.weekdayBasePrice} · Weekend: $${weekendPrice}`}
+              </p>
             </div>
+
+            {propertyGroup === 'hotel' && (
+              <div className="rounded-2xl border p-5 bg-muted/20">
+                <p className="text-base sm:text-2xl text-muted-foreground">Check-in / Check-out</p>
+                <p className="text-xl sm:text-3xl mt-2">Check-in: {form.checkInTime} · Check-out: {form.checkOutTime}</p>
+              </div>
+            )}
 
             <div className="rounded-2xl border p-5 bg-muted/20">
               <p className="text-base sm:text-2xl text-muted-foreground">Ready to publish</p>
-              <p className="text-xl sm:text-3xl mt-2">Your listing has {form.images.length} photos, {form.amenities.length} amenities, and booking settings configured.</p>
+              <p className="text-xl sm:text-3xl mt-2">
+                Your listing has {form.images.length} photos and {form.amenities.length} amenities configured.
+              </p>
             </div>
           </section>
         )}
+
       </main>
 
       <footer className="border-t pt-3 pb-4 px-6">

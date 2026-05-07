@@ -1,13 +1,14 @@
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import ListModelMixin, DestroyModelMixin, RetrieveModelMixin
 
-from .models import Notification, NotificationPreference
+from .models import Notification, NotificationPreference, DeviceToken
 from .serializers import NotificationSerializer, NotificationPreferenceSerializer
 
 
@@ -59,6 +60,42 @@ class NotificationViewSet(
         #Return the count of unread notifications (for badge display)
         count = Notification.objects.filter(user=request.user, is_read=False).count()
         return Response({'unread_count': count})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vapid_public_key(request):
+    """Return the VAPID public key so the frontend can subscribe to push."""
+    key = getattr(settings, 'VAPID_PUBLIC_KEY', None)
+    if not key:
+        return Response({'error': 'Push notifications not configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    return Response({'public_key': key})
+
+
+@api_view(['POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def device_token(request):
+    """Register or unregister a Web Push subscription for the current user."""
+    endpoint = request.data.get('endpoint', '').strip()
+    p256dh = request.data.get('p256dh', '').strip()
+    auth_key = request.data.get('auth', '').strip()
+    device_type = request.data.get('device_type', 'web')
+
+    if not endpoint:
+        return Response({'error': 'endpoint is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if request.method == 'POST':
+        if not p256dh or not auth_key:
+            return Response({'error': 'p256dh and auth are required'}, status=status.HTTP_400_BAD_REQUEST)
+        _, created = DeviceToken.objects.update_or_create(
+            user=request.user,
+            endpoint=endpoint,
+            defaults={'p256dh': p256dh, 'auth': auth_key, 'device_type': device_type},
+        )
+        return Response({'status': 'registered'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    DeviceToken.objects.filter(user=request.user, endpoint=endpoint).delete()
+    return Response({'status': 'unregistered'}, status=status.HTTP_200_OK)
 
 
 class NotificationPreferenceView(APIView):

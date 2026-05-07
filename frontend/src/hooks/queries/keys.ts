@@ -21,4 +21,8 @@ export const queryKeys = {
   dashboard: {
     me: ['dashboard', 'me'] as const,
   },
+  notifications: {
+    all: ['notifications'] as const,
+    unreadCount: ['notifications', 'unread-count'] as const,
+  },
 };

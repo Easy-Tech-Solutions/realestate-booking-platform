@@ -131,6 +131,33 @@ class NotificationPreference(models.Model):
         return f'{self.user.username} - notification preferences'
 
     def email_enabled_for(self, notification_type: str) -> bool:
-        #Return True if the user wants an email for this notification type
         field_name = f'{notification_type}_email'
         return getattr(self, field_name, True)
+
+
+class DeviceToken(models.Model):
+    """Stores a Web Push subscription for a user's browser/device."""
+    DEVICE_TYPES = [
+        ('web', 'Web Browser'),
+        ('android', 'Android'),
+        ('ios', 'iOS'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='device_tokens',
+    )
+    # For Web Push: the subscription endpoint URL
+    endpoint = models.TextField()
+    # Web Push encryption keys
+    p256dh = models.TextField()
+    auth = models.TextField()
+    device_type = models.CharField(max_length=20, choices=DEVICE_TYPES, default='web')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'endpoint']
+
+    def __str__(self):
+        return f'{self.user.username} ({self.device_type})'

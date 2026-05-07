@@ -109,9 +109,13 @@ def create_notification(
         'created_at': notification.created_at.isoformat(),
     })
 
-    # Queue email via Celery (or run synchronously in dev with ALWAYS_EAGER)
+    # Queue email via Celery
     if send_email and user.email and prefs.email_enabled_for(notification_type):
         send_notification_email.delay(notification.id)
+
+    # Queue Web Push via Celery
+    from .tasks import send_push_notification_task
+    send_push_notification_task.delay(notification.id)
 
     return notification
 
