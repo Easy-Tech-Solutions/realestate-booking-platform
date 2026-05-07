@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, Mail, Lock, User as UserIcon } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
-
-const GOOGLE_ENABLED = Boolean(import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID);
 import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -10,7 +8,6 @@ import { Label } from './ui/label';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { authAPI } from '../../services/api.service';
-import appleLogo  from '../../assets/apple.png';
 
 
 
@@ -309,25 +306,16 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
 
               {/* Provider buttons. Google's button is rendered by GIS itself
                   so the look and accessibility match Google's spec. */}
-              <div className="space-y-3">
-                {GOOGLE_ENABLED && (
-                  <div className="flex justify-center">
-                    <GoogleLogin
-                      onSuccess={handleGoogleCredential}
-                      onError={handleGoogleError}
-                      theme="outline"
-                      size="large"
-                      text="continue_with"
-                      shape="rectangular"
-                      width="320"
-                    />
-                  </div>
-                )}
-
-                <Button type="button" variant="outline" className="w-full">
-                  <img src={appleLogo} alt="Apple" className="w-6 h-6 mr-2" />
-                  Continue with Apple
-                </Button>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleCredential}
+                  onError={handleGoogleError}
+                  theme="outline"
+                  size="large"
+                  text="continue_with"
+                  shape="rectangular"
+                  width="320"
+                />
               </div>
             </div>
           )}
