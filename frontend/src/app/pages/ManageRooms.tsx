@@ -100,6 +100,7 @@ function RoomForm({
           <Label htmlFor="room-type">Room type *</Label>
           <select
             id="room-type"
+            aria-label="Room type"
             value={form.roomType}
             onChange={e => setForm(f => ({ ...f, roomType: e.target.value as HotelRoom['roomType'] }))}
             className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
@@ -170,6 +171,7 @@ function RoomForm({
           <Label htmlFor="bed-type">Bed type</Label>
           <select
             id="bed-type"
+            aria-label="Bed type"
             value={form.bedType}
             onChange={e => setForm(f => ({ ...f, bedType: e.target.value as HotelRoom['bedType'] }))}
             className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
@@ -214,6 +216,7 @@ function RoomForm({
         <input
           id="is-active"
           type="checkbox"
+          aria-label="Active (visible to guests)"
           checked={form.isActive}
           onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))}
           className="h-4 w-4 rounded border-border"

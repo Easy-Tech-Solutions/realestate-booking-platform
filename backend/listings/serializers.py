@@ -30,6 +30,23 @@ class ListingImageSerializer(serializers.ModelSerializer):
             return None
 
 
+class ListingImageCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ListingImage
+        fields = ['image', 'caption', 'order']
+
+
+class HotelRoomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HotelRoom
+        fields = [
+            'id', 'listing', 'name', 'room_type', 'description',
+            'price_per_night', 'max_occupancy', 'beds', 'bed_type',
+            'bathrooms', 'amenities', 'total_count', 'is_active', 'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
 class ListingSerializer(serializers.ModelSerializer):
     gallery_images = ListingImageSerializer(many=True, read_only=True)
     hotel_rooms = HotelRoomSerializer(many=True, read_only=True)
@@ -127,23 +144,6 @@ class ListingSerializer(serializers.ModelSerializer):
                 f"Invalid property_type '{value}'. Valid options are: {', '.join(active_slugs)}"
             )
         return category_slug
-
-
-class ListingImageCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ListingImage
-        fields = ['image', 'caption', 'order']
-
-
-class HotelRoomSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = HotelRoom
-        fields = [
-            'id', 'listing', 'name', 'room_type', 'description',
-            'price_per_night', 'max_occupancy', 'beds', 'bed_type',
-            'bathrooms', 'amenities', 'total_count', 'is_active', 'created_at',
-        ]
-        read_only_fields = ['id', 'created_at']
 
 
 class FavoriteSerializer(serializers.ModelSerializer):
