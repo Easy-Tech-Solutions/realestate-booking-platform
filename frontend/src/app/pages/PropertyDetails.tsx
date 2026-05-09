@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -62,6 +62,26 @@ export function PropertyDetails() {
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
+  const [mobileSlideIndex, setMobileSlideIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const touchStartX = useRef<number>(0);
+
+  const pauseAndResume = useCallback(() => {
+    setIsAutoPlaying(false);
+    const t = setTimeout(() => setIsAutoPlaying(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (!isAutoPlaying) return;
+    const timer = setInterval(() => {
+      setMobileSlideIndex(prev => {
+        const total = property?.images?.length ?? 0;
+        return total > 0 ? (prev + 1) % total : 0;
+      });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [isAutoPlaying, property?.images?.length]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [guests, setGuests] = useState(2);
 
@@ -221,8 +241,70 @@ export function PropertyDetails() {
             </div>
           </div>
 
-          {/* Image Gallery */}
-          <div className="relative grid grid-cols-4 grid-rows-2 gap-2 h-[400px] rounded-xl overflow-hidden mb-8 cursor-pointer">
+          {/* Mobile Image Slider */}
+          <div className="relative md:hidden mb-8 rounded-xl overflow-hidden">
+            <div
+              className="relative h-[280px] overflow-hidden rounded-xl select-none"
+              onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; setIsAutoPlaying(false); }}
+              onTouchEnd={(e) => {
+                const delta = touchStartX.current - e.changedTouches[0].clientX;
+                if (Math.abs(delta) > 40) {
+                  const total = property.images.length;
+                  setMobileSlideIndex(prev => delta > 0 ? (prev + 1) % total : (prev - 1 + total) % total);
+                }
+                pauseAndResume();
+              }}
+              onClick={() => { setSelectedImageIndex(mobileSlideIndex); setShowImageGallery(true); }}
+            >
+              {/* Sliding strip */}
+              <div
+                className="flex h-full transition-transform duration-300 ease-in-out will-change-transform"
+                style={{ transform: `translateX(-${mobileSlideIndex * 100}%)` }}
+              >
+                {property.images.map((img, i) => (
+                  <div key={i} className="min-w-full h-full flex-shrink-0">
+                    <img src={img} alt={`${property.title} ${i + 1}`} className="w-full h-full object-cover" draggable={false} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Prev / Next */}
+              <button
+                aria-label="Previous photo"
+                onClick={(e) => { e.stopPropagation(); const t = property.images.length; setMobileSlideIndex(p => (p - 1 + t) % t); pauseAndResume(); }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                aria-label="Next photo"
+                onClick={(e) => { e.stopPropagation(); setMobileSlideIndex(p => (p + 1) % property.images.length); pauseAndResume(); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              {/* Counter badge */}
+              <span className="absolute top-3 right-3 bg-black/50 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                {mobileSlideIndex + 1} / {property.images.length}
+              </span>
+
+              {/* Dot indicators */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {property.images.map((_, i) => (
+                  <button
+                    key={i}
+                    aria-label={`Go to photo ${i + 1}`}
+                    onClick={(e) => { e.stopPropagation(); setMobileSlideIndex(i); pauseAndResume(); }}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${i === mobileSlideIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/60'}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Image Gallery — desktop grid */}
+          <div className="relative hidden md:grid grid-cols-4 grid-rows-2 gap-2 h-[400px] rounded-xl overflow-hidden mb-8 cursor-pointer">
             <div
               className="col-span-2 row-span-2 relative group"
               onClick={() => { setSelectedImageIndex(0); setShowImageGallery(true); }}
@@ -860,7 +942,16 @@ export function PropertyDetails() {
                 <p className="text-white">{selectedImageIndex + 1} / {property.images.length}</p>
               </div>
 
-              <div className="flex-1 flex items-center justify-center relative">
+              <div className="flex-1 flex items-center justify-center relative"
+                onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+                onTouchEnd={(e) => {
+                  const delta = touchStartX.current - e.changedTouches[0].clientX;
+                  if (Math.abs(delta) > 40) {
+                    const total = property.images.length;
+                    setSelectedImageIndex(prev => delta > 0 ? (prev + 1) % total : (prev - 1 + total) % total);
+                  }
+                }}
+              >
                 <button
                   aria-label="Previous image"
                   onClick={() => setSelectedImageIndex(prev => prev === 0 ? property.images.length - 1 : prev - 1)}
