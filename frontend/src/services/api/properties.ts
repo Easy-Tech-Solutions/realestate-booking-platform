@@ -35,8 +35,9 @@ export const propertiesAPI = {
   },
 
   getByCategory: async (category: string): Promise<Property[]> => {
-    const data = await fetchWithAuth<unknown[]>(`/api/listings/?property_type=${category}`);
-    return data.map(normalizeListing);
+    const data = await fetchWithAuth<unknown>(`/api/listings/?property_type=${category}`);
+    const results = Array.isArray(data) ? data : (data as any).results || [];
+    return results.map(normalizeListing);
   },
 
   listCategories: async (): Promise<Array<{ id: number; name: string; slug: string; is_active: boolean; sort_order: number }>> => {
@@ -145,8 +146,9 @@ export const propertiesAPI = {
   },
 
   getByHost: async (hostId: string): Promise<Property[]> => {
-    const data = await fetchWithAuth<unknown[]>(`/api/listings/?owner_id=${encodeURIComponent(hostId)}`);
-    return data.map(normalizeListing);
+    const data = await fetchWithAuth<unknown>(`/api/listings/?owner_id=${encodeURIComponent(hostId)}`);
+    const results = Array.isArray(data) ? data : (data as any).results || [];
+    return results.map(normalizeListing);
   },
 
   getFullDetails: async (id: string): Promise<any> => {
