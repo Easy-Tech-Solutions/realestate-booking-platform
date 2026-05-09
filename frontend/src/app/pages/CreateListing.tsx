@@ -385,6 +385,9 @@ export function CreateListing() {
       payload.append('property_type', form.propertyType);
       payload.append('privacy_type', propertyGroup === 'hotel' ? 'private_room' : form.privacyType);
       payload.append('address', composedAddress);
+      payload.append('city', form.city);
+      payload.append('state', form.state);
+      payload.append('country', form.country);
       payload.append('price', String(form.weekdayBasePrice));
       payload.append('bedrooms', String(propertyGroup === 'hotel' || propertyGroup === 'commercial' ? 0 : form.bedrooms));
       payload.append('beds', String(propertyGroup === 'land' || propertyGroup === 'commercial' ? 0 : form.beds));

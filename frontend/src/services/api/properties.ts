@@ -35,7 +35,7 @@ export const propertiesAPI = {
   },
 
   getByCategory: async (category: string): Promise<Property[]> => {
-    const data = await fetchWithAuth<unknown>(`/api/listings/?property_type=${category}`);
+    const data = await fetchWithAuth<unknown>(`/api/listings/?property_type=${encodeURIComponent(category)}`);
     const results = Array.isArray(data) ? data : (data as any).results || [];
     return results.map(normalizeListing);
   },
