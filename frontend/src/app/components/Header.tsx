@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard } from 'lucide-react';
+import logo from '../../assets/logo2.jpg';
 import { Button } from './ui/button';
 import {
   DropdownMenu,
@@ -66,10 +67,7 @@ export function Header() {
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <HomeIcon className="w-5 h-5 text-white" />
-              </div>
-              <span className="hidden sm:block text-xl font-semibold text-primary">HomeKonetnnet</span>
+              <img src={logo} alt="HomeKonet" className="h-10 w-auto" />
             </Link>
 
             {/* Search Bar - Desktop */}

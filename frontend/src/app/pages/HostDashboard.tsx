@@ -587,6 +587,12 @@ export function HostDashboard() {
   const deletePropertyMutation = useDeleteHostProperty();
   const respondToReviewMutation = useRespondToHostReview();
   const sendMessageMutation = useSendMessage();
+  const draftsQuery = useQuery({
+    queryKey: ['my-drafts'],
+    queryFn: () => propertiesAPI.getMyDrafts(),
+    staleTime: 30_000,
+  });
+  const drafts = useMemo(() => draftsQuery.data || [], [draftsQuery.data]);
   const properties = useMemo(() => ((dashboardQuery.data?.listings || []) as Property[]), [dashboardQuery.data?.listings]);
   const bookings = useMemo(() => ((dashboardQuery.data?.bookings_on_my_listings || []) as Booking[]), [dashboardQuery.data?.bookings_on_my_listings]);
   const conversations = useMemo(() => ((conversationsQuery.data || []) as Conversation[]), [conversationsQuery.data]);
@@ -797,54 +803,109 @@ export function HostDashboard() {
   );
 
   const renderProperties = () => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Your Properties</CardTitle>
-        <Button onClick={() => navigate('/host/new')}>
-          <Plus className="w-4 h-4 mr-2" /> Add new property
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {properties.map((property) => (
-            <div key={property.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-border rounded-lg">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <img src={property.images[0]} alt={property.title} className="w-20 h-16 rounded object-cover flex-shrink-0" />
-                <div className="min-w-0">
-                  <h3 className="font-semibold truncate">{property.title}</h3>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {property.location.city}, {property.location.state} · {property.rating.toFixed(1)}★ · {property.reviewCount} reviews
-                  </p>
-                  <p className="text-sm font-semibold mt-1">{formatCurrency(property.price)}/night</p>
+    <div className="space-y-6">
+      {/* Drafts */}
+      {drafts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Drafts
+              <Badge variant="secondary">{drafts.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {drafts.map((draft) => (
+                <div key={draft.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-dashed border-border rounded-lg bg-muted/30">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold truncate">{draft.title || 'Untitled Draft'}</h3>
+                      <Badge variant="outline" className="text-xs shrink-0">Draft</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {[draft.location.city, draft.location.country].filter(Boolean).join(', ') || 'Location not set'} · {draft.propertyType}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Last edited {new Date(draft.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button size="sm" onClick={() => navigate('/host/new')}>
+                      Continue editing
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={async () => {
+                        try {
+                          await propertiesAPI.delete(draft.id);
+                          localStorage.removeItem('create_listing_draft');
+                          draftsQuery.refetch();
+                          toast.success('Draft deleted');
+                        } catch {
+                          toast.error('Failed to delete draft');
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" /> Discard
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Published listings */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Your Properties</CardTitle>
+          <Button onClick={() => navigate('/host/new')}>
+            <Plus className="w-4 h-4 mr-2" /> Add new property
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {properties.map((property) => (
+              <div key={property.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-border rounded-lg">
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <img src={property.images[0]} alt={property.title} className="w-20 h-16 rounded object-cover flex-shrink-0" />
+                  <div className="min-w-0">
+                    <h3 className="font-semibold truncate">{property.title}</h3>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {property.location.city}, {property.location.state} · {property.rating.toFixed(1)}★ · {property.reviewCount} reviews
+                    </p>
+                    <p className="text-sm font-semibold mt-1">{formatCurrency(property.price)}/night</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button variant="outline" size="sm" onClick={() => setEditingProperty(property)}>
+                    <Edit className="w-3 h-3 mr-1" /> Edit
+                  </Button>
+                  {property.propertyType === 'hotels' && (
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/host/listings/${property.id}/rooms`)}>
+                      <Hotel className="w-3 h-3 mr-1" /> Manage Rooms
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/rooms/${property.id}`)}>
+                    <Eye className="w-3 h-3 mr-1" /> View
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleDeleteProperty(property.id)}
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" /> Delete
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Button variant="outline" size="sm" onClick={() => setEditingProperty(property)}>
-                  <Edit className="w-3 h-3 mr-1" /> Edit
-                </Button>
-                {property.propertyType === 'hotels' && (
-                  <Button variant="outline" size="sm" onClick={() => navigate(`/host/listings/${property.id}/rooms`)}>
-                    <Hotel className="w-3 h-3 mr-1" /> Manage Rooms
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={() => navigate(`/rooms/${property.id}`)}>
-                  <Eye className="w-3 h-3 mr-1" /> View
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => handleDeleteProperty(property.id)}
-                >
-                  <Trash2 className="w-3 h-3 mr-1" /> Delete
-                </Button>
-              </div>
-            </div>
-          ))}
-          {properties.length === 0 && <p className="text-sm text-muted-foreground">No properties yet.</p>}
-        </div>
-      </CardContent>
-    </Card>
+            ))}
+            {properties.length === 0 && <p className="text-sm text-muted-foreground">No properties yet.</p>}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 
   const renderBookings = () => (

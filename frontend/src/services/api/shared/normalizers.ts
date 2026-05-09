@@ -73,6 +73,7 @@ export function normalizeListing(l: any): Property {
     maxNights: 365,
     bookedDates: [],
     createdAt: l.created_at,
+    status: l.status as 'draft' | 'published' | undefined,
     hotelRooms: Array.isArray(l.hotel_rooms) ? l.hotel_rooms.map(normalizeHotelRoom) : undefined,
   };
 }

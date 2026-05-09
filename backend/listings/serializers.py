@@ -74,13 +74,27 @@ class ListingSerializer(serializers.ModelSerializer):
             "weekly_discount_enabled", "weekly_discount_percent",
             "monthly_discount_enabled", "monthly_discount_percent",
             "exterior_camera", "noise_monitor", "weapons_on_property",
-            "is_available", "created_at", "updated_at",
+            "is_available", "status", "created_at", "updated_at",
             "gallery_images", "hotel_rooms", "main_image", "main_image_url",
             "owner_username", "owner_id", "owner_first_name", "owner_last_name",
             "owner_avatar", "owner_is_superhost",
             "average_rating", "review_count",
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'owner_username', 'owner_id']
+        extra_kwargs = {
+            'title': {'required': False, 'allow_blank': True},
+            'address': {'required': False, 'allow_blank': True},
+            'city': {'required': False, 'allow_blank': True},
+        }
+
+    def validate(self, attrs):
+        # For new listings being published, enforce required fields
+        if self.instance is None and attrs.get('status', 'published') != 'draft':
+            if not str(attrs.get('title', '')).strip():
+                raise serializers.ValidationError({'title': 'Title is required'})
+            if not str(attrs.get('address', '')).strip():
+                raise serializers.ValidationError({'address': 'Address is required'})
+        return attrs
 
     def get_main_image_url(self, obj):
         if not obj.main_image:

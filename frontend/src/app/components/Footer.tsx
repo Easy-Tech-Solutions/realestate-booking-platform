@@ -2,6 +2,7 @@ import React from 'react';
 import { Globe } from 'lucide-react';
 import { Link } from 'react-router';
 import { Separator } from './ui/separator';
+import logo from '../../assets/logo2.jpg';
 
 export function Footer() {
   return (
@@ -35,7 +36,9 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h3 className="font-semibold mb-4">HomeKonet</h3>
+            <h3 className="font-semibold mb-4">
+            <img src={logo} alt="HomeKonet" className="h-8 w-auto" />
+          </h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li><a href="#" className="hover:text-foreground">Newsroom</a></li>
               <li><a href="#" className="hover:text-foreground">Learn about new features</a></li>

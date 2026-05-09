@@ -178,6 +178,11 @@ export const propertiesAPI = {
     return fetchWithAuth('/api/listings/analytics/platform-stats/');
   },
 
+  getMyDrafts: async (): Promise<Property[]> => {
+    const data = await fetchWithAuth<unknown[]>('/api/listings/my-drafts/');
+    return data.map(normalizeListing);
+  },
+
   getRooms: async (listingId: string): Promise<HotelRoom[]> => {
     const data = await fetchWithAuth<unknown[]>(`/api/listings/${listingId}/rooms/`);
     return data.map(normalizeHotelRoom);

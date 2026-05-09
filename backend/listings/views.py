@@ -68,7 +68,7 @@ def category_detail(request, id):
 @parser_classes([MultiPartParser, FormParser])
 def listings_collection(request):
     if request.method == "GET":
-        items = ListingFilter(request.GET, queryset=Listing.objects.all())
+        items = ListingFilter(request.GET, queryset=Listing.objects.filter(status='published'))
         paginator = _ListingPagination()
         page = paginator.paginate_queryset(items.qs, request)
         serialized = ListingSerializer(page, many=True, context={"request": request}).data
@@ -615,3 +615,12 @@ def hotel_room_availability(request, listing_id):
         result.append(data)
 
     return Response(result)
+
+
+
+@api_view(["GET"])
+def my_drafts(request):
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    drafts = Listing.objects.filter(owner=request.user, status='draft').order_by('-updated_at')
+    return Response(ListingSerializer(drafts, many=True, context={"request": request}).data)

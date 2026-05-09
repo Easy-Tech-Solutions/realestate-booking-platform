@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import logo from '../../assets/logo2.jpg';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -249,6 +250,8 @@ export function CreateListing() {
   const navigate = useNavigate();
   const [stepIndex, setStepIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [draftListingId, setDraftListingId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     propertyType: 'apartment',
@@ -315,9 +318,10 @@ export function CreateListing() {
     const saved = localStorage.getItem(DRAFT_KEY);
     if (!saved) return;
     try {
-      const { form: savedForm, stepIndex: savedStep } = JSON.parse(saved);
+      const { form: savedForm, stepIndex: savedStep, draftListingId: savedDraftId } = JSON.parse(saved);
       setForm((prev) => ({ ...prev, ...savedForm, images: [], imagePreviews: [] }));
       setStepIndex(savedStep ?? 0);
+      if (savedDraftId) setDraftListingId(savedDraftId);
       toast.info('Draft restored — please re-add your photos.');
     } catch {
       localStorage.removeItem(DRAFT_KEY);
@@ -331,11 +335,52 @@ export function CreateListing() {
     }
   }, [steps, currentStep]);
 
-  const saveAndExit = () => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const saveAndExit = async () => {
+    // Always persist form state to localStorage immediately
     const { images, imagePreviews, ...serializableForm } = form;
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ form: serializableForm, stepIndex }));
-    toast.success('Draft saved');
+    const localDraftId = draftListingId;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ form: serializableForm, stepIndex, draftListingId: localDraftId }));
+
+    setIsSavingDraft(true);
+    try {
+      const payload = new FormData();
+      payload.append('title', form.title.trim() || 'Untitled Draft');
+      payload.append('description', form.description || '');
+      payload.append('property_type', form.propertyType);
+      payload.append('privacy_type', propertyGroup === 'hotel' ? 'private_room' : (form.privacyType || 'entire_place'));
+      payload.append('address', composedAddress || form.address1 || '');
+      payload.append('city', form.city || '');
+      payload.append('state', form.state || '');
+      payload.append('country', form.country || 'Rwanda');
+      payload.append('price', String(form.weekdayBasePrice || 0));
+      payload.append('amenities', JSON.stringify(form.amenities));
+      payload.append('highlights', JSON.stringify(form.highlights));
+      payload.append('bedrooms', String(form.bedrooms || 0));
+      payload.append('beds', String(form.beds || 0));
+      payload.append('bathrooms', String(form.bathrooms || 0));
+      payload.append('max_guests', String(form.guests || 1));
+      payload.append('square_footage', String(form.squareFootage || 0));
+      payload.append('check_in_time', form.checkInTime || '15:00');
+      payload.append('check_out_time', form.checkOutTime || '11:00');
+      payload.append('status', 'draft');
+
+      let savedId: string;
+      if (localDraftId) {
+        const updated = await propertiesAPI.update(localDraftId, payload);
+        savedId = updated.id;
+      } else {
+        const created = await propertiesAPI.create(payload);
+        savedId = created.id;
+        setDraftListingId(savedId);
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ form: serializableForm, stepIndex, draftListingId: savedId }));
+      }
+      toast.success('Draft saved — continue anytime from your dashboard.');
+    } catch {
+      toast.success('Draft saved locally.');
+    } finally {
+      setIsSavingDraft(false);
+    }
+
     navigate('/host');
   };
 
@@ -505,12 +550,15 @@ export function CreateListing() {
       payload.append('check_in_time', form.checkInTime);
       payload.append('check_out_time', form.checkOutTime);
       payload.append('is_available', 'true');
+      payload.append('status', 'published');
 
       if (form.images[0]) {
         payload.append('main_image', form.images[0]);
       }
 
-      const created = await propertiesAPI.create(payload);
+      const created = draftListingId
+        ? await propertiesAPI.update(draftListingId, payload)
+        : await propertiesAPI.create(payload);
 
       if (form.images.length > 1) {
         const remaining = form.images.slice(1, 11);
@@ -588,9 +636,13 @@ export function CreateListing() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between flex-wrap gap-3">
-        <div className="text-xl sm:text-2xl font-semibold tracking-tight">HomeKonet</div>
+        <div className="text-xl sm:text-2xl font-semibold tracking-tight">
+          <img src={logo} alt="HomeKonet" className="h-10 w-auto" />
+        </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={saveAndExit}>Save & exit</Button>
+          <Button variant="outline" size="sm" onClick={saveAndExit} disabled={isSavingDraft}>
+            {isSavingDraft ? 'Saving...' : 'Save & exit'}
+          </Button>
         </div>
       </header>
 

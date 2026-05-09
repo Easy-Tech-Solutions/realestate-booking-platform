@@ -44,6 +44,7 @@ export interface Property {
   maxNights: number;
   bookedDates: string[];
   createdAt: string;
+  status?: 'draft' | 'published';
   hotelRooms?: HotelRoom[];
 }
 
