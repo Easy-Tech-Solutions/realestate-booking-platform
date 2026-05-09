@@ -102,6 +102,25 @@ export const propertiesAPI = {
     return data.map(normalizeReview);
   },
 
+  createReview: async (payload: {
+    listing: string;
+    rating: number;
+    title: string;
+    content: string;
+    cleanliness: number;
+    accuracy: number;
+    check_in_rating: number;
+    communication: number;
+    location_rating: number;
+    value: number;
+  }): Promise<Review> => {
+    const data = await fetchWithAuth('/api/listings/reviews/create/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return normalizeReview(data);
+  },
+
   toggleFavorite: async (id: string, isFavorited: boolean): Promise<void> => {
     await fetchWithAuth(`/api/listings/${id}/favorite/`, {
       method: isFavorited ? 'DELETE' : 'POST',

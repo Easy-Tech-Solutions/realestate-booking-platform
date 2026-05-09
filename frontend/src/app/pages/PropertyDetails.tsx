@@ -7,14 +7,18 @@ import {
   ChevronLeft, ChevronRight, X, Minus, Plus, MessageCircle,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
 import { Separator } from '../components/ui/separator';
 import { Calendar } from '../components/ui/calendar';
 import { motion, AnimatePresence } from 'motion/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { CANCELLATION_POLICIES } from '../../core/constants';
 import { formatCurrency, calculateNights, formatDate, getInitials } from '../../core/utils';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
-import { messagesAPI } from '../../services/api.service';
+import { messagesAPI, propertiesAPI } from '../../services/api.service';
 import { DateRange } from 'react-day-picker';
 import type { Property, Review } from '../../core/types';
 import { ReportDialog } from '../components/ReportDialog';
@@ -22,17 +26,52 @@ import { getErrorMessage } from '../../services/api/shared/errors';
 import { usePropertyDetails } from '../../hooks/queries/usePropertyDetails';
 import { usePropertyPricing } from '../../hooks/queries/usePropertyPricing';
 import { fallbackIcon, iconMap } from '../../core/icon-map';
+import { queryKeys } from '../../hooks/queries/keys';
+
+function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          onMouseEnter={() => setHovered(n)}
+          onMouseLeave={() => setHovered(0)}
+          className="p-0.5"
+          aria-label={`${n} star${n !== 1 ? 's' : ''}`}
+        >
+          <Star
+            className={`w-6 h-6 transition-colors ${
+              n <= (hovered || value) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function PropertyDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, wishlistIds, toggleWishlist, user } = useApp();
+  const queryClient = useQueryClient();
   const [messagingHost, setMessagingHost] = useState(false);
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [guests, setGuests] = useState(2);
+
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewForm, setReviewForm] = useState({
+    rating: 0, title: '', content: '',
+    cleanliness: 0, accuracy: 0, check_in_rating: 0,
+    communication: 0, location_rating: 0, value: 0,
+  });
   const { propertyQuery, reviewsQuery, availabilityQuery } = usePropertyDetails(id);
   const pricingQuery = usePropertyPricing(
     id,
@@ -385,10 +424,15 @@ export function PropertyDetails() {
                         )}
                         <div>
                           <p className="font-semibold">{review.user.firstName} {review.user.lastName}</p>
-                          <p className="text-sm text-muted-foreground">{formatDate(review.createdAt, 'MMMM yyyy')}</p>
+                          <div className="flex items-center gap-1">
+                            {[1,2,3,4,5].map(n => (
+                              <Star key={n} className={`w-3 h-3 ${n <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                            ))}
+                            <span className="text-xs text-muted-foreground ml-1">{formatDate(review.createdAt, 'MMMM yyyy')}</span>
+                          </div>
                         </div>
                       </div>
-                      <p className="text-sm leading-relaxed">{review.comment}</p>
+                      {review.comment && <p className="text-sm leading-relaxed">{review.comment}</p>}
                       {review.response && (
                         <div className="rounded-xl bg-muted p-4">
                           <p className="text-sm font-semibold mb-1">Host response</p>
@@ -408,8 +452,124 @@ export function PropertyDetails() {
                 </div>
 
                 {reviews.length === 0 && (
-                  <p className="text-muted-foreground text-sm">No reviews yet.</p>
+                  <p className="text-muted-foreground text-sm">No reviews yet. Be the first to leave one!</p>
                 )}
+
+                {/* Write a review */}
+                {(() => {
+                  const canReview = isAuthenticated && user?.id !== property.hostId;
+                  const alreadyReviewed = reviews.some(r => r.userId === String(user?.id));
+                  if (!canReview) return null;
+                  if (alreadyReviewed) {
+                    return (
+                      <div className="mt-8 p-4 rounded-xl bg-muted text-sm text-muted-foreground">
+                        You have already submitted a review for this property.
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="mt-8">
+                      {!showReviewForm ? (
+                        <Button variant="outline" onClick={() => setShowReviewForm(true)}>
+                          Write a review
+                        </Button>
+                      ) : (
+                        <div className="border border-border rounded-xl p-6 space-y-6">
+                          <h3 className="text-lg font-semibold">Write a review</h3>
+
+                          {/* Overall rating */}
+                          <div className="space-y-2">
+                            <Label>Overall rating <span className="text-destructive">*</span></Label>
+                            <StarPicker value={reviewForm.rating} onChange={v => setReviewForm(f => ({ ...f, rating: v }))} />
+                          </div>
+
+                          {/* Sub-ratings */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            {([
+                              ['Cleanliness', 'cleanliness'],
+                              ['Accuracy', 'accuracy'],
+                              ['Check-in', 'check_in_rating'],
+                              ['Communication', 'communication'],
+                              ['Location', 'location_rating'],
+                              ['Value', 'value'],
+                            ] as [string, keyof typeof reviewForm][]).map(([label, field]) => (
+                              <div key={field} className="space-y-1">
+                                <Label className="text-xs">{label}</Label>
+                                <StarPicker
+                                  value={reviewForm[field] as number}
+                                  onChange={v => setReviewForm(f => ({ ...f, [field]: v }))}
+                                />
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Title */}
+                          <div className="space-y-2">
+                            <Label htmlFor="review-title">Title</Label>
+                            <Input
+                              id="review-title"
+                              placeholder="Summarise your stay"
+                              value={reviewForm.title}
+                              onChange={e => setReviewForm(f => ({ ...f, title: e.target.value }))}
+                            />
+                          </div>
+
+                          {/* Comment */}
+                          <div className="space-y-2">
+                            <Label htmlFor="review-content">Your review <span className="text-destructive">*</span></Label>
+                            <Textarea
+                              id="review-content"
+                              placeholder="Tell others what you liked or didn't like about your stay..."
+                              rows={5}
+                              value={reviewForm.content}
+                              onChange={e => setReviewForm(f => ({ ...f, content: e.target.value }))}
+                            />
+                          </div>
+
+                          <div className="flex gap-3">
+                            <Button
+                              type="button"
+                              disabled={reviewSubmitting || reviewForm.rating === 0 || !reviewForm.content.trim()}
+                              onClick={async () => {
+                                if (reviewForm.rating === 0) { toast.error('Please select an overall rating'); return; }
+                                if (!reviewForm.content.trim()) { toast.error('Please write a review comment'); return; }
+                                setReviewSubmitting(true);
+                                try {
+                                  await propertiesAPI.createReview({
+                                    listing: id!,
+                                    rating: reviewForm.rating,
+                                    title: reviewForm.title,
+                                    content: reviewForm.content,
+                                    cleanliness: reviewForm.cleanliness || reviewForm.rating,
+                                    accuracy: reviewForm.accuracy || reviewForm.rating,
+                                    check_in_rating: reviewForm.check_in_rating || reviewForm.rating,
+                                    communication: reviewForm.communication || reviewForm.rating,
+                                    location_rating: reviewForm.location_rating || reviewForm.rating,
+                                    value: reviewForm.value || reviewForm.rating,
+                                  });
+                                  toast.success('Review submitted!');
+                                  setShowReviewForm(false);
+                                  setReviewForm({ rating: 0, title: '', content: '', cleanliness: 0, accuracy: 0, check_in_rating: 0, communication: 0, location_rating: 0, value: 0 });
+                                  queryClient.invalidateQueries({ queryKey: queryKeys.properties.reviews(id!) });
+                                  queryClient.invalidateQueries({ queryKey: queryKeys.properties.detail(id!) });
+                                } catch (err: any) {
+                                  toast.error(err.message || 'Failed to submit review');
+                                } finally {
+                                  setReviewSubmitting(false);
+                                }
+                              }}
+                            >
+                              {reviewSubmitting ? 'Submitting…' : 'Submit review'}
+                            </Button>
+                            <Button type="button" variant="ghost" onClick={() => setShowReviewForm(false)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               <Separator />
