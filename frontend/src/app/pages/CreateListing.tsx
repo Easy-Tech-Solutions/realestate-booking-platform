@@ -762,6 +762,7 @@ export function CreateListing() {
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium">Room type</label>
                     <select
+                      aria-label="Room type"
                       value={room.roomType}
                       onChange={(e) => updateRoom(idx, { roomType: e.target.value })}
                       className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
@@ -799,11 +800,11 @@ export function CreateListing() {
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium">Number of rooms (inventory)</label>
                     <div className="flex items-center gap-3">
-                      <button type="button" className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { totalCount: Math.max(1, room.totalCount - 1) })}>
+                      <button type="button" aria-label="Decrease room count" className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { totalCount: Math.max(1, room.totalCount - 1) })}>
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="text-base font-medium w-6 text-center">{room.totalCount}</span>
-                      <button type="button" className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { totalCount: room.totalCount + 1 })}>
+                      <button type="button" aria-label="Increase room count" className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { totalCount: room.totalCount + 1 })}>
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
@@ -819,11 +820,11 @@ export function CreateListing() {
                   <div key={field} className="flex items-center justify-between py-3 border-b">
                     <p className="text-base sm:text-xl">{label}</p>
                     <div className="flex items-center gap-4">
-                      <button type="button" className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { [field]: Math.max(1, room[field] - 1) })}>
+                      <button type="button" aria-label={`Decrease ${label}`} className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { [field]: Math.max(1, room[field] - 1) })}>
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="text-base font-medium w-6 text-center">{room[field]}</span>
-                      <button type="button" className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { [field]: room[field] + 1 })}>
+                      <button type="button" aria-label={`Increase ${label}`} className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { [field]: room[field] + 1 })}>
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
@@ -834,6 +835,7 @@ export function CreateListing() {
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Bed type</label>
                   <select
+                    aria-label="Bed type"
                     value={room.bedType}
                     onChange={(e) => updateRoom(idx, { bedType: e.target.value })}
                     className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"

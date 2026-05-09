@@ -6,7 +6,7 @@ import { normalizeUser } from './shared/normalizers';
 export type GoogleSignupRole = 'user' | 'agent';
 
 export type GoogleLoginResult =
-  | { status: 'success'; user: User; access: string; refresh: string }
+  | { status: 'success'; user: User; access: string }
   | {
       status: 'needs_role';
       idToken: string;
@@ -31,14 +31,14 @@ function isNeedsRole(data: GoogleLoginRawResponse): data is GoogleLoginNeedsRole
 }
 
 export const authAPI = {
-  login: async (username: string, password: string): Promise<{ user: User; access: string; refresh: string }> => {
+  login: async (username: string, password: string): Promise<{ user: User; access: string }> => {
     clearTokens();
     const data = await fetchPublicJson<AuthLoginResponse>('/api/auth/login/', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
-    setTokens(data.access, data.refresh);
-    return { user: normalizeUser(data.user), access: data.access, refresh: data.refresh };
+    setTokens(data.access);
+    return { user: normalizeUser(data.user), access: data.access };
   },
 
   register: async (data: {
@@ -66,7 +66,6 @@ export const authAPI = {
     try {
       await fetchWithAuth('/api/auth/logout/', {
         method: 'POST',
-        body: JSON.stringify({ refresh: localStorage.getItem('refreshToken') }),
       });
     } catch {
       // Ignore logout network failures and clear local state anyway.
@@ -114,12 +113,11 @@ export const authAPI = {
       };
     }
 
-    setTokens(data.access, data.refresh);
+    setTokens(data.access);
     return {
       status: 'success',
       user: normalizeUser(data.user),
       access: data.access,
-      refresh: data.refresh,
     };
   },
 };

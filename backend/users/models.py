@@ -10,8 +10,10 @@ class User(AbstractUser):
         ('admin', 'Admin')
     ]
     email_verified = models.BooleanField(default=False)
-    email_verification_token = models.CharField(max_length=100, blank=True, null=True)
-    password_reset_token = models.CharField(max_length=100, blank=True, null=True)
+    email_verification_token = models.CharField(max_length=200, blank=True, null=True)
+    email_verification_token_expires_at = models.DateTimeField(null=True, blank=True)
+    password_reset_token = models.CharField(max_length=200, blank=True, null=True)
+    password_reset_token_expires_at = models.DateTimeField(null=True, blank=True)
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='user')
 
     def save(self, *args, **kwargs):

@@ -1,5 +1,6 @@
 export {
   authAPI,
+  attemptTokenRefresh,
   bookingToolsAPI,
   bookingsAPI,
   cardsAPI,

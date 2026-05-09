@@ -11,7 +11,8 @@ export function BookingConfirmed() {
   const location = useLocation();
   const navigate = useNavigate();
   const stateBooking = (location.state as { booking?: Booking } | null)?.booking;
-  const bookingId = new URLSearchParams(location.search).get('bookingId') || stateBooking?.id;
+  // ID comes only from router state — never from the URL to avoid leaking booking IDs in logs/history.
+  const bookingId = stateBooking?.id;
   const { booking, isLoading, isError } = useBookingConfirmedData(bookingId || undefined, stateBooking);
 
   if (isLoading) {

@@ -12,4 +12,4 @@ export { usersAPI } from './users';
 export { reportsAPI } from './reports';
 export { suspensionsAPI } from './suspensions';
 export { bookingToolsAPI } from './booking-tools';
-export { clearTokens, getAccessToken, setTokens } from './shared/client';
+export { clearTokens, getAccessToken, setTokens, attemptTokenRefresh } from './shared/client';

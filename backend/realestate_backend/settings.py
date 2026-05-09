@@ -49,8 +49,16 @@ def env_origins(name: str, default: str = "") -> list[str]:
             origins.append(item)
     return origins
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "change-me-in-prod")
-DEBUG = env_bool("DJANGO_DEBUG", True)
+_secret_key = os.environ.get("DJANGO_SECRET_KEY", "")
+if not _secret_key:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY environment variable is not set. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(50))\""
+    )
+SECRET_KEY = _secret_key
+
+DEBUG = env_bool("DJANGO_DEBUG", False)
 
 # If DJANGO_ALLOWED_HOSTS is explicitly set, use it.
 # Otherwise allow localhost + any *.onrender.com subdomain automatically.
@@ -240,16 +248,21 @@ REST_FRAMEWORK = {
 }
 
 # Base allowed origins — always present regardless of DEBUG
-CORS_ALLOWED_ORIGINS = [
+# Exact origins only — no wildcard regex; credentials must never be sent to unknown subdomains.
+_dev_origins = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
+] if DEBUG else []
+
+CORS_ALLOWED_ORIGINS = [
+    *_dev_origins,
     "https://homekonet.vercel.app",
     "https://realestate-booking-platform.vercel.app",
 ]
 
-# Append origins from env vars (CORS_ALLOWED_ORIGINS and FRONTEND_ORIGIN)
+# Additional origins supplied via environment (comma-separated, must be exact https:// URLs)
 for _origin in env_origins("CORS_ALLOWED_ORIGINS", ""):
     if _origin not in CORS_ALLOWED_ORIGINS:
         CORS_ALLOWED_ORIGINS.append(_origin)
@@ -257,11 +270,7 @@ _fe_origin = os.environ.get("FRONTEND_ORIGIN", "")
 if _fe_origin and _fe_origin not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(_fe_origin)
 
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://realestate-booking-platform[a-z0-9\-]*\.vercel\.app$",
-    r"^https://homekon[a-z0-9\-]*\.vercel\.app$",
-    *env_list("CORS_ALLOWED_ORIGIN_REGEXES", ""),
-]
+CORS_ALLOWED_ORIGIN_REGEXES: list[str] = []  # no regex patterns — exact origins only
 CORS_ALLOW_CREDENTIALS = True
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 
@@ -362,6 +371,10 @@ else:
     }
 
 MESSAGE_ATTACHMENT_MAX_SIZE = 10 * 1024 * 1024
+
+# Max file upload size: 10 MB per file
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
 CELERY_BROKER_URL = REDIS_URL or 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = REDIS_URL or 'redis://localhost:6379/0'

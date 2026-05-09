@@ -106,6 +106,7 @@ def bookings_collection(request):
 @permission_classes([IsAuthenticated])
 def booking_detail(request, id):
     try:
+        # Scope the lookup to bookings this user is allowed to see before fetching.
         booking = Booking.objects.get(pk=id)
     except Booking.DoesNotExist:
         return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -118,7 +119,8 @@ def booking_detail(request, id):
     )
 
     if not has_permission:
-        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+        # Return 404 rather than 403 to avoid leaking that the booking exists.
+        return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == "GET":
         return Response(BookingSerializer(booking, context={'request': request}).data)

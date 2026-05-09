@@ -1,7 +1,14 @@
 // Application constants
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-export const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+
+// Always use secure WebSocket (wss://) in production; fall back to ws:// only in local dev.
+const _wsEnv = import.meta.env.VITE_WS_URL || '';
+export const WS_BASE_URL = _wsEnv
+  ? _wsEnv
+  : window.location.protocol === 'https:'
+    ? `wss://${window.location.host}`
+    : 'ws://localhost:8000';
 
 export const PROPERTY_CATEGORIES = [
   { id: 'apartment', name: 'Apartment', icon: '🏠' },

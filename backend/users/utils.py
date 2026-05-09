@@ -22,7 +22,7 @@ send_phone_change_sms_otp(phone_number, otp, network_provider)
                swap in their SDK if preferred.
 """
 
-import random
+import secrets
 import string
 
 from django.core.mail import send_mail
@@ -30,8 +30,7 @@ from django.conf import settings
 
 
 def generate_otp(length=6):
-    #Return a random numeric OTP string of `length` digits
-    return ''.join(random.choices(string.digits, k=length))
+    return ''.join(secrets.choice(string.digits) for _ in range(length))
 
 
 # ── Email OTP ──────────────────────────────────────────────────────────────────

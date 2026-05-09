@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { CreditCard, Smartphone, Wallet, ChevronRight, Shield, Star, BedDouble, Users } from 'lucide-react';
+import { Smartphone, Wallet, ChevronRight, Shield, Star, BedDouble, Users } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,14 +13,19 @@ import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import { PaymentMethod } from '../../core/types';
 import { bookingsAPI } from '../../services/api.service';
+import { fetchWithAuth } from '../../services/api/shared/client';
 
-export function Booking() {
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+
+function BookingForm() {
   const location = useLocation();
   const navigate = useNavigate();
   const { property, checkIn, checkOut, guests, pricing, selectedRoom } = location.state || {};
 
+  const stripe = useStripe();
+  const elements = useElements();
+
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
-  const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvc: '', name: '' });
   const [phoneNumber, setPhoneNumber] = useState('');
   const [specialRequests, setSpecialRequests] = useState('');
   const [agreedToRules, setAgreedToRules] = useState(false);
@@ -46,12 +53,12 @@ export function Booking() {
       toast.error('Please agree to the house rules and cancellation policy');
       return;
     }
-    if (paymentMethod === 'stripe' && (!cardDetails.number || !cardDetails.expiry || !cardDetails.cvc)) {
-      toast.error('Please enter valid card details');
-      return;
-    }
     if (paymentMethod === 'mtn_momo' && !phoneNumber) {
       toast.error('Please enter your phone number');
+      return;
+    }
+    if (paymentMethod === 'stripe' && (!stripe || !elements)) {
+      toast.error('Stripe has not loaded yet. Please try again.');
       return;
     }
 
@@ -63,6 +70,29 @@ export function Booking() {
       const endDate = currentCheckOut instanceof Date
         ? currentCheckOut.toISOString().split('T')[0]
         : currentCheckOut;
+
+      if (paymentMethod === 'stripe') {
+        const amountCents = Math.round(currentPricing.total * 100);
+        const { client_secret } = await fetchWithAuth<{ client_secret: string }>(
+          '/api/payments/stripe/payment-intent/',
+          { method: 'POST', body: JSON.stringify({ amount_cents: amountCents, currency: 'usd' }) }
+        );
+
+        const cardElement = elements!.getElement(CardElement);
+        if (!cardElement) {
+          toast.error('Card element not found');
+          return;
+        }
+
+        const { error: stripeError } = await stripe!.confirmCardPayment(client_secret, {
+          payment_method: { card: cardElement },
+        });
+
+        if (stripeError) {
+          toast.error(stripeError.message || 'Card payment failed');
+          return;
+        }
+      }
 
       const booking = await bookingsAPI.create({
         listing: currentProperty.id,
@@ -87,7 +117,7 @@ export function Booking() {
       };
 
       toast.success('Booking confirmed!');
-      navigate(`/booking/confirmed?bookingId=${encodeURIComponent(confirmedBooking.id)}`, {
+      navigate('/booking/confirmed', {
         state: { booking: confirmedBooking },
       });
     } catch (err: any) {
@@ -130,7 +160,7 @@ export function Booking() {
                       className="flex items-center gap-4 p-4 border-2 border-border rounded-xl cursor-pointer hover:border-primary transition-colors has-[:checked]:border-primary has-[:checked]:bg-secondary/30"
                     >
                       <RadioGroupItem value="stripe" id="stripe" />
-                      <CreditCard className="w-5 h-5" />
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="4" fill="#635BFF"/><path d="M11.2 9.5c0-.8.7-1.1 1.8-1.1 1.6 0 3.6.5 5 1.3V6.2C16.7 5.4 14.8 5 12.9 5 9.5 5 7 6.8 7 10c0 4.9 6.7 4.1 6.7 6.2 0 1-.8 1.3-1.9 1.3-1.7 0-3.8-.7-5.5-1.6v3.6C7.7 20.4 9.8 21 12 21c3.5 0 6.1-1.7 6.1-5-.1-5.3-6.9-4.3-6.9-6.5z" fill="white"/></svg>
                       <div>
                         <p className="font-semibold">Credit or Debit Card</p>
                         <p className="text-sm text-muted-foreground">Visa, Mastercard, Amex</p>
@@ -167,44 +197,23 @@ export function Booking() {
               {/* Payment details */}
               {paymentMethod === 'stripe' && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="cardNumber">Card number</Label>
-                    <Input
-                      id="cardNumber"
-                      placeholder="1234 5678 9012 3456"
-                      value={cardDetails.number}
-                      onChange={(e) => setCardDetails({ ...cardDetails, number: e.target.value })}
+                  <Label>Card details</Label>
+                  <div className="border border-border rounded-lg p-4">
+                    <CardElement
+                      options={{
+                        style: {
+                          base: {
+                            fontSize: '16px',
+                            color: 'hsl(var(--foreground))',
+                            '::placeholder': { color: 'hsl(var(--muted-foreground))' },
+                          },
+                        },
+                      }}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="expiry">Expiration</Label>
-                      <Input
-                        id="expiry"
-                        placeholder="MM/YY"
-                        value={cardDetails.expiry}
-                        onChange={(e) => setCardDetails({ ...cardDetails, expiry: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="cvc">CVC</Label>
-                      <Input
-                        id="cvc"
-                        placeholder="123"
-                        value={cardDetails.cvc}
-                        onChange={(e) => setCardDetails({ ...cardDetails, cvc: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cardName">Cardholder name</Label>
-                    <Input
-                      id="cardName"
-                      placeholder="Name on card"
-                      value={cardDetails.name}
-                      onChange={(e) => setCardDetails({ ...cardDetails, name: e.target.value })}
-                    />
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Powered by Stripe — your card number never touches our servers.
+                  </p>
                 </div>
               )}
 
@@ -408,5 +417,13 @@ export function Booking() {
         </div>
       </div>
     </div>
+  );
+}
+
+export function Booking() {
+  return (
+    <Elements stripe={stripePromise}>
+      <BookingForm />
+    </Elements>
   );
 }

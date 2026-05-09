@@ -240,14 +240,19 @@ def mtn_momo_webhook(request):
         processed=False,
     )
 
-    # Validate HMAC signature when webhook_secret is configured
-    if gateway_config.webhook_secret:
-        signature = request.headers.get('X-Signature', '')
-        gateway = PaymentService.get_gateway('mtn_momo')
-        if not gateway or not gateway.validate_webhook(payload, signature):
-            webhook_log.error_message = 'Invalid webhook signature'
+    # Signature validation is mandatory — reject the request if the secret is not configured.
+    if not gateway_config.webhook_secret:
+        if webhook_log:
+            webhook_log.error_message = 'webhook_secret not configured; refusing to process unsigned webhook'
             webhook_log.save(update_fields=['error_message'])
-            return JsonResponse({'error': 'Invalid signature'}, status=401)
+        return JsonResponse({'error': 'Webhook secret not configured'}, status=500)
+
+    signature = request.headers.get('X-Signature', '')
+    gateway = PaymentService.get_gateway('mtn_momo')
+    if not gateway or not gateway.validate_webhook(payload, signature):
+        webhook_log.error_message = 'Invalid webhook signature'
+        webhook_log.save(update_fields=['error_message'])
+        return JsonResponse({'error': 'Invalid signature'}, status=401)
 
     # Look up the payment by our UUID embedded as externalId
     external_id = payload.get('externalId')
@@ -267,6 +272,42 @@ def mtn_momo_webhook(request):
     webhook_log.save(update_fields=['processed'])
 
     return JsonResponse({'status': 'ok'})
+
+
+# ── Stripe PaymentIntent ───────────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_stripe_payment_intent(request):
+    """
+    Creates a Stripe PaymentIntent for the given amount and returns the client_secret.
+    The frontend uses this to confirm payment without raw card data touching our server.
+    """
+    import stripe
+    from django.conf import settings as django_settings
+
+    stripe_secret = getattr(django_settings, 'STRIPE_SECRET_KEY', '') or ''
+    if not stripe_secret:
+        return Response({'error': 'Stripe is not configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    amount_cents = request.data.get('amount_cents')
+    currency = request.data.get('currency', 'usd').lower()
+
+    if not amount_cents or not isinstance(amount_cents, int) or amount_cents <= 0:
+        return Response({'error': 'amount_cents must be a positive integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        stripe.api_key = stripe_secret
+        intent = stripe.PaymentIntent.create(
+            amount=amount_cents,
+            currency=currency,
+            metadata={'user_id': str(request.user.id)},
+        )
+        return Response({'client_secret': intent.client_secret})
+    except stripe.error.StripeError as e:
+        return Response({'error': str(e.user_message or e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception:
+        return Response({'error': 'Could not create payment intent'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ── Saved Cards ───────────────────────────────────────────────────────────────

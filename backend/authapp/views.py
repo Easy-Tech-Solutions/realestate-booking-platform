@@ -121,16 +121,6 @@ def verify_email(request):
 
     try:
         user = User.objects.get(email_verification_token=token)
-        user.email_verified = True
-        user.is_active = True
-        user.email_verification_token = None
-        user.save()
-        if request.method == "GET":
-            login_url = getattr(settings, "FRONTEND_ORIGIN", "") or f"https://{settings.LOCAL_DOMAIN}"
-            return HttpResponse(
-                f"<html><body style='font-family: sans-serif; padding: 2rem;'><h1>Email verified</h1><p>Your account is now active. You can return to the app and log in.</p><p><a href='{login_url}'>Open app</a></p></body></html>"
-            )
-        return Response({"message": "Email verified successfully"}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         if request.method == "GET":
             return HttpResponse(
@@ -138,6 +128,26 @@ def verify_email(request):
                 status=400,
             )
         return Response({"error": "Invalid verification token"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if user.email_verification_token_expires_at and timezone.now() > user.email_verification_token_expires_at:
+        if request.method == "GET":
+            return HttpResponse(
+                "<html><body style='font-family: sans-serif; padding: 2rem;'><h1>Link expired</h1><p>This verification link has expired. Please request a new one.</p></body></html>",
+                status=400,
+            )
+        return Response({"error": "Verification link has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.email_verified = True
+    user.is_active = True
+    user.email_verification_token = None
+    user.email_verification_token_expires_at = None
+    user.save(update_fields=['email_verified', 'is_active', 'email_verification_token', 'email_verification_token_expires_at'])
+    if request.method == "GET":
+        login_url = getattr(settings, "FRONTEND_ORIGIN", "") or f"https://{settings.LOCAL_DOMAIN}"
+        return HttpResponse(
+            f"<html><body style='font-family: sans-serif; padding: 2rem;'><h1>Email verified</h1><p>Your account is now active. You can return to the app and log in.</p><p><a href='{login_url}'>Open app</a></p></body></html>"
+        )
+    return Response({"message": "Email verified successfully"}, status=status.HTTP_200_OK)
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -166,28 +176,39 @@ def login_view(request):
 
     #Geneate JWT tokens
     refresh = RefreshToken.for_user(user)
-    return Response({
-        "refresh": str(refresh),
-        "access": str(refresh.access_token),
-        "user": UserSerializer(user).data
+    access_token = str(refresh.access_token)
+    refresh_token = str(refresh)
+
+    response = Response({
+        "access": access_token,
+        "user": UserSerializer(user).data,
     })
+    response.set_cookie(
+        'refresh_token',
+        refresh_token,
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite='Strict',
+        max_age=60 * 60 * 24 * 7,  # 7 days — matches SimpleJWT REFRESH_TOKEN_LIFETIME
+        path='/api/auth/',
+    )
+    return response
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
     try:
-        refresh_token = request.data.get("refresh")
-        if not refresh_token:
-            return Response({"error":"Refresh token is required"}, status=status.HTTP_400_BAD_REQUEST)
+        refresh_token = request.COOKIES.get("refresh_token") or request.data.get("refresh")
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except TokenError:
+                pass
 
-        # Blacklist the refresh token
-        token = RefreshToken(refresh_token)
-        token.blacklist()
-
-        return Response({"message": "Logged out successfully"}, status=status.HTTP_205_RESET_CONTENT)
-
-    except TokenError as e:
-        return Response({"error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
+        response = Response({"message": "Logged out successfully"}, status=status.HTTP_205_RESET_CONTENT)
+        response.delete_cookie('refresh_token', path='/api/auth/')
+        return response
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -195,7 +216,7 @@ def logout_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def refresh_token_view(request):
-    refresh_token = request.data.get("refresh")
+    refresh_token = request.COOKIES.get("refresh_token") or request.data.get("refresh")
     if not refresh_token:
         return Response({"error": "Refresh token is required"}, status=status.HTTP_400_BAD_REQUEST)
     try:
@@ -213,7 +234,22 @@ def refresh_token_view(request):
                 pass
 
         access_token = str(refresh.access_token)
-        return Response({"access": access_token, "access_token": access_token})
+        response = Response({"access": access_token, "access_token": access_token})
+
+        # Rotate refresh cookie if SimpleJWT issues a new one
+        new_refresh = refresh.get("new_refresh", None)
+        if new_refresh:
+            response.set_cookie(
+                'refresh_token',
+                str(new_refresh),
+                httponly=True,
+                secure=not settings.DEBUG,
+                samesite='Strict',
+                max_age=60 * 60 * 24 * 7,
+                path='/api/auth/',
+            )
+
+        return response
     except Exception:
         return Response({"error": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
 @api_view(["GET"])
@@ -263,9 +299,13 @@ def password_reset_confirm(request):
     except User.DoesNotExist:
         return Response({"error": "Invalid or expired reset token"}, status=status.HTTP_400_BAD_REQUEST)
 
+    if user.password_reset_token_expires_at and timezone.now() > user.password_reset_token_expires_at:
+        return Response({"error": "Invalid or expired reset token"}, status=status.HTTP_400_BAD_REQUEST)
+
     user.set_password(password)
     user.password_reset_token = None
-    user.save()
+    user.password_reset_token_expires_at = None
+    user.save(update_fields=['password', 'password_reset_token', 'password_reset_token_expires_at'])
     return Response({"message": "Password reset successfully. You can now log in with your new password."}, status=status.HTTP_200_OK)
 
 
@@ -336,13 +376,22 @@ def _unique_username_from_email(email):
     return candidate
 
 
-def _issue_tokens_for_user(user):
+def _issue_tokens_for_user(user, http_status=200):
     refresh = RefreshToken.for_user(user)
-    return {
-        "refresh": str(refresh),
-        "access": str(refresh.access_token),
-        "user": UserSerializer(user).data,
-    }
+    response = Response(
+        {"access": str(refresh.access_token), "user": UserSerializer(user).data},
+        status=http_status,
+    )
+    response.set_cookie(
+        'refresh_token',
+        str(refresh),
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite='Strict',
+        max_age=60 * 60 * 24 * 7,
+        path='/api/auth/',
+    )
+    return response
 
 
 @api_view(["POST"])
@@ -408,7 +457,7 @@ def google_login(request):
 
         social.last_login_at = timezone.now()
         social.save(update_fields=["last_login_at"])
-        return Response(_issue_tokens_for_user(user), status=status.HTTP_200_OK)
+        return _issue_tokens_for_user(user, http_status=status.HTTP_200_OK)
 
     # Case 2: email already owned by a local (password) account — no auto-link.
     if User.objects.filter(email__iexact=email).exists():
@@ -479,4 +528,4 @@ def google_login(request):
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
-    return Response(_issue_tokens_for_user(user), status=status.HTTP_201_CREATED)
+    return _issue_tokens_for_user(user, http_status=status.HTTP_201_CREATED)

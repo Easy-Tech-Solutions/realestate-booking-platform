@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { toast } from 'sonner';
 import type { User, SearchFilters } from '../core/types';
-import { authAPI, propertiesAPI, clearTokens, getAccessToken } from '../services/api.service';
+import { authAPI, propertiesAPI, clearTokens, attemptTokenRefresh } from '../services/api.service';
 import type { GoogleLoginResult, GoogleSignupRole } from '../services/api/auth';
 import { queryClient } from '../providers/QueryProvider';
 import { queryKeys } from '../hooks/queries/keys';
@@ -95,14 +95,15 @@ export const useAppStore = create<AppStoreState>()(
       },
 
       initialize: async () => {
-        const token = getAccessToken();
-        if (!token) {
-          set({ user: null, isAuthenticated: false, isLoading: false });
-          return;
-        }
-
         set({ isLoading: true });
         try {
+          // On page load, access token is gone (in-memory only).
+          // Try to get a fresh one using the httpOnly refresh cookie.
+          const newAccess = await attemptTokenRefresh();
+          if (!newAccess) {
+            set({ user: null, isAuthenticated: false, isLoading: false });
+            return;
+          }
           const user = await authAPI.getCurrentUser();
           set({ user, isAuthenticated: true, isLoading: false });
           loadFavoritesIntoStore();
