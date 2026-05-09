@@ -1,5 +1,5 @@
 import { AMENITIES } from '../../../core/constants';
-import type { Booking, Conversation, Message, Property, Review, SearchFilters, User } from '../../../core/types';
+import type { Booking, Conversation, HotelRoom, HotelRoomAvailability, Message, Property, Review, SearchFilters, User } from '../../../core/types';
 
 export function normalizeUser(u: any): User {
   const firstName = u.first_name || u.full_name?.split(' ')[0] || u.username || u.email?.split('@')[0] || '';
@@ -73,6 +73,33 @@ export function normalizeListing(l: any): Property {
     maxNights: 365,
     bookedDates: [],
     createdAt: l.created_at,
+    hotelRooms: Array.isArray(l.hotel_rooms) ? l.hotel_rooms.map(normalizeHotelRoom) : undefined,
+  };
+}
+
+export function normalizeHotelRoom(r: any): HotelRoom {
+  return {
+    id: String(r.id),
+    listingId: String(r.listing),
+    name: r.name,
+    roomType: r.room_type,
+    description: r.description || '',
+    pricePerNight: parseFloat(r.price_per_night) || 0,
+    maxOccupancy: Number(r.max_occupancy || 2),
+    beds: Number(r.beds || 1),
+    bedType: r.bed_type || 'queen',
+    bathrooms: Number(r.bathrooms || 1),
+    amenities: Array.isArray(r.amenities) ? r.amenities : [],
+    totalCount: Number(r.total_count || 1),
+    isActive: Boolean(r.is_active),
+    createdAt: r.created_at,
+  };
+}
+
+export function normalizeHotelRoomAvailability(r: any): HotelRoomAvailability {
+  return {
+    ...normalizeHotelRoom(r),
+    availableCount: Number(r.available_count ?? r.total_count ?? 0),
   };
 }
 

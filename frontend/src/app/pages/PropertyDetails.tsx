@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import {
   Star, Share, Heart, MapPin, Award, Shield,
-  ChevronLeft, ChevronRight, X, Minus, Plus, MessageCircle,
+  ChevronLeft, ChevronRight, X, Minus, Plus, MessageCircle, BedDouble, Users, Check,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -13,14 +13,14 @@ import { Textarea } from '../components/ui/textarea';
 import { Separator } from '../components/ui/separator';
 import { Calendar } from '../components/ui/calendar';
 import { motion, AnimatePresence } from 'motion/react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { CANCELLATION_POLICIES } from '../../core/constants';
 import { formatCurrency, calculateNights, formatDate, getInitials } from '../../core/utils';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { messagesAPI, propertiesAPI } from '../../services/api.service';
 import { DateRange } from 'react-day-picker';
-import type { Property, Review } from '../../core/types';
+import type { Property, Review, HotelRoom, HotelRoomAvailability } from '../../core/types';
 import { ReportDialog } from '../components/ReportDialog';
 import { getErrorMessage } from '../../services/api/shared/errors';
 import { usePropertyDetails } from '../../hooks/queries/usePropertyDetails';
@@ -72,12 +72,25 @@ export function PropertyDetails() {
     cleanliness: 0, accuracy: 0, check_in_rating: 0,
     communication: 0, location_rating: 0, value: 0,
   });
+  const [selectedRoom, setSelectedRoom] = useState<HotelRoom | null>(null);
+
   const { propertyQuery, reviewsQuery, availabilityQuery } = usePropertyDetails(id);
   const pricingQuery = usePropertyPricing(
     id,
     dateRange?.from?.toISOString().split('T')[0],
-    dateRange?.to?.toISOString().split('T')[0]
+    dateRange?.to?.toISOString().split('T')[0],
+    selectedRoom?.id,
   );
+
+  const startDateStr = dateRange?.from?.toISOString().split('T')[0];
+  const endDateStr = dateRange?.to?.toISOString().split('T')[0];
+  const isHotel = propertyQuery.data?.propertyType === 'hotels';
+
+  const roomAvailabilityQuery = useQuery({
+    queryKey: ['hotel-rooms-availability', id, startDateStr, endDateStr],
+    queryFn: () => propertiesAPI.getRoomAvailability(id!, startDateStr!, endDateStr!),
+    enabled: Boolean(isHotel && id && startDateStr && endDateStr),
+  });
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -157,8 +170,13 @@ export function PropertyDetails() {
       toast.error('Please select check-in and check-out dates');
       return;
     }
+    const hotelRooms = propertyQuery.data?.hotelRooms ?? [];
+    if (isHotel && hotelRooms.length > 0 && !selectedRoom) {
+      toast.error('Please select a room type to continue');
+      return;
+    }
     navigate('/book', {
-      state: { property, checkIn: dateRange.from, checkOut: dateRange.to, guests, pricing },
+      state: { property, checkIn: dateRange.from, checkOut: dateRange.to, guests, pricing, selectedRoom },
     });
   };
 
@@ -352,6 +370,77 @@ export function PropertyDetails() {
               </div>
 
               <Separator />
+
+              {/* Hotel Rooms Section */}
+              {isHotel && (property.hotelRooms?.length ?? 0) > 0 && (
+                <>
+                  <div>
+                    <h2 className="text-2xl font-semibold mb-2">Available Rooms</h2>
+                    {!startDateStr || !endDateStr ? (
+                      <p className="text-sm text-muted-foreground mb-4">Select dates above to see room availability.</p>
+                    ) : null}
+                    <div className="space-y-4">
+                      {(roomAvailabilityQuery.data ?? property.hotelRooms ?? []).map((room: HotelRoom | HotelRoomAvailability) => {
+                        const available = 'availableCount' in room ? room.availableCount : room.totalCount;
+                        const isUnavailable = startDateStr && endDateStr && available === 0;
+                        const isSelected = selectedRoom?.id === room.id;
+                        return (
+                          <div
+                            key={room.id}
+                            onClick={() => !isUnavailable && setSelectedRoom(isSelected ? null : room)}
+                            className={`border rounded-xl p-4 transition-all cursor-pointer ${
+                              isUnavailable
+                                ? 'opacity-50 cursor-not-allowed border-border'
+                                : isSelected
+                                ? 'border-primary ring-1 ring-primary bg-primary/5'
+                                : 'border-border hover:border-primary/60'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-4 flex-wrap">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <h3 className="font-semibold">{room.name}</h3>
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground capitalize">
+                                    {room.roomType}
+                                  </span>
+                                  {isSelected && <Check className="w-4 h-4 text-primary" />}
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2 flex-wrap">
+                                  <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5" /> {room.beds} {room.bedType} bed{room.beds > 1 ? 's' : ''}</span>
+                                  <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Up to {room.maxOccupancy} guests</span>
+                                  <span>{room.bathrooms} bath{room.bathrooms !== 1 ? 's' : ''}</span>
+                                </div>
+                                {room.description ? <p className="text-sm text-muted-foreground mb-2">{room.description}</p> : null}
+                                {room.amenities.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {room.amenities.slice(0, 5).map((a) => (
+                                      <span key={a} className="text-xs bg-muted px-2 py-0.5 rounded-full">{a}</span>
+                                    ))}
+                                    {room.amenities.length > 5 && (
+                                      <span className="text-xs text-muted-foreground">+{room.amenities.length - 5} more</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="font-semibold">{formatCurrency(room.pricePerNight)}<span className="text-sm font-normal text-muted-foreground"> / night</span></p>
+                                {startDateStr && endDateStr ? (
+                                  isUnavailable
+                                    ? <p className="text-xs text-destructive mt-1">Not available</p>
+                                    : <p className="text-xs text-green-700 mt-1">{available} of {room.totalCount} available</p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground mt-1">{room.totalCount} room{room.totalCount !== 1 ? 's' : ''}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <Separator />
+                </>
+              )}
 
               {/* Amenities */}
               {property.amenities.length > 0 && (
@@ -639,8 +728,13 @@ export function PropertyDetails() {
               <div className="sticky top-24">
                 <div className="border border-border rounded-xl p-4 sm:p-6 shadow-xl">
                   <div className="flex items-baseline gap-1 mb-4">
-                    <span className="text-2xl font-semibold">{formatCurrency(property.price)}</span>
+                    <span className="text-2xl font-semibold">
+                      {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)}
+                    </span>
                     <span className="text-muted-foreground">night</span>
+                    {selectedRoom && (
+                      <span className="text-xs text-muted-foreground ml-1">· {selectedRoom.name}</span>
+                    )}
                   </div>
 
                   <div className="space-y-3 mb-4">
@@ -697,7 +791,7 @@ export function PropertyDetails() {
                     <>
                       <div className="space-y-3 mb-4">
                         <div className="flex justify-between text-sm">
-                          <span className="underline">{formatCurrency(property.price)} x {nights} nights</span>
+                          <span className="underline">{formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)} x {nights} nights</span>
                           <span>{formatCurrency(pricing.subtotal)}</span>
                         </div>
                         {pricing.discount > 0 && (

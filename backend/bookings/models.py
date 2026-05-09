@@ -14,6 +14,10 @@ class Booking(models.Model):
     ]
 
     listing = models.ForeignKey('listings.Listing', on_delete=models.CASCADE, related_name='bookings')
+    hotel_room = models.ForeignKey(
+        'listings.HotelRoom', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='bookings'
+    )
     customer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bookings')
     start_date = models.DateField()
     end_date = models.DateField()

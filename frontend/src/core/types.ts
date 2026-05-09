@@ -44,6 +44,7 @@ export interface Property {
   maxNights: number;
   bookedDates: string[];
   createdAt: string;
+  hotelRooms?: HotelRoom[];
 }
 
 export interface Location {
@@ -102,7 +103,30 @@ export interface Booking {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   specialRequests?: string;
+  hotelRoomId?: string;
+  hotelRoom?: HotelRoom;
   createdAt: string;
+}
+
+export interface HotelRoom {
+  id: string;
+  listingId: string;
+  name: string;
+  roomType: 'standard' | 'deluxe' | 'suite' | 'family' | 'studio' | 'penthouse';
+  description: string;
+  pricePerNight: number;
+  maxOccupancy: number;
+  beds: number;
+  bedType: 'king' | 'queen' | 'twin' | 'double' | 'single' | 'bunk';
+  bathrooms: number;
+  amenities: string[];
+  totalCount: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface HotelRoomAvailability extends HotelRoom {
+  availableCount: number;
 }
 
 export interface Message {

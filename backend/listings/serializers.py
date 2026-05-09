@@ -1,6 +1,6 @@
 from rest_framework import serializers
 import json
-from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyCategory
+from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyCategory, HotelRoom
 
 
 class PropertyCategorySerializer(serializers.ModelSerializer):
@@ -32,6 +32,7 @@ class ListingImageSerializer(serializers.ModelSerializer):
 
 class ListingSerializer(serializers.ModelSerializer):
     gallery_images = ListingImageSerializer(many=True, read_only=True)
+    hotel_rooms = HotelRoomSerializer(many=True, read_only=True)
     main_image_url = serializers.SerializerMethodField()
     owner_username = serializers.CharField(source='owner.username', read_only=True)
     owner_id = serializers.IntegerField(source='owner.id', read_only=True)
@@ -57,7 +58,7 @@ class ListingSerializer(serializers.ModelSerializer):
             "monthly_discount_enabled", "monthly_discount_percent",
             "exterior_camera", "noise_monitor", "weapons_on_property",
             "is_available", "created_at", "updated_at",
-            "gallery_images", "main_image", "main_image_url",
+            "gallery_images", "hotel_rooms", "main_image", "main_image_url",
             "owner_username", "owner_id", "owner_first_name", "owner_last_name",
             "owner_avatar", "owner_is_superhost",
             "average_rating", "review_count",
@@ -132,6 +133,17 @@ class ListingImageCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ListingImage
         fields = ['image', 'caption', 'order']
+
+
+class HotelRoomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HotelRoom
+        fields = [
+            'id', 'listing', 'name', 'room_type', 'description',
+            'price_per_night', 'max_occupancy', 'beds', 'bed_type',
+            'bathrooms', 'amenities', 'total_count', 'is_active', 'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
 
 
 class FavoriteSerializer(serializers.ModelSerializer):

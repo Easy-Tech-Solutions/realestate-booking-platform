@@ -32,6 +32,7 @@ const Terms = lazyPage(() => import('./pages/Terms').then((module) => ({ default
 const Privacy = lazyPage(() => import('./pages/Privacy').then((module) => ({ default: module.Privacy })));
 const NotFound = lazyPage(() => import('./pages/NotFound').then((module) => ({ default: module.NotFound })));
 const ResetPassword = lazyPage(() => import('./pages/ResetPassword').then((module) => ({ default: module.ResetPassword })));
+const ManageRooms = lazyPage(() => import('./pages/ManageRooms').then((module) => ({ default: module.ManageRooms })));
 
 
 
@@ -62,6 +63,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requireHost>
             <CreateListing />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'host/listings/:id/rooms',
+        element: (
+          <ProtectedRoute requireHost>
+            <ManageRooms />
           </ProtectedRoute>
         ),
       },

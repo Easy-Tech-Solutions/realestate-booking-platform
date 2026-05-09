@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { CreditCard, Smartphone, Wallet, ChevronRight, Shield, Star } from 'lucide-react';
+import { CreditCard, Smartphone, Wallet, ChevronRight, Shield, Star, BedDouble, Users } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -15,7 +15,7 @@ import { bookingsAPI } from '../../services/api.service';
 export function Booking() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { property, checkIn, checkOut, guests, pricing } = location.state || {};
+  const { property, checkIn, checkOut, guests, pricing, selectedRoom } = location.state || {};
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
   const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvc: '', name: '' });
@@ -69,6 +69,7 @@ export function Booking() {
         start_date: startDate,
         end_date: endDate,
         notes: specialRequests,
+        ...(selectedRoom ? { hotel_room: selectedRoom.id } : {}),
       });
 
       const confirmedBooking = {
@@ -302,6 +303,33 @@ export function Booking() {
 
                 <Separator />
 
+                {/* Selected room (hotels only) */}
+                {selectedRoom && (
+                  <>
+                    <div className="space-y-2">
+                      <h2 className="text-lg font-semibold">Selected room</h2>
+                      <div className="rounded-lg border border-border p-3 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium">{selectedRoom.name}</p>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground capitalize">
+                            {selectedRoom.roomType}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <BedDouble className="w-3 h-3" /> {selectedRoom.beds} {selectedRoom.bedType} bed{selectedRoom.beds > 1 ? 's' : ''}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3 h-3" /> Up to {selectedRoom.maxOccupancy} guests
+                          </span>
+                        </div>
+                        <p className="text-sm font-semibold">{formatCurrency(selectedRoom.pricePerNight)}<span className="text-xs font-normal text-muted-foreground"> / night</span></p>
+                      </div>
+                    </div>
+                    <Separator />
+                  </>
+                )}
+
                 {/* Trip dates & guests */}
                 <div className="space-y-4">
                   <h2 className="text-lg font-semibold">Your trip</h2>
@@ -335,10 +363,10 @@ export function Booking() {
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
                       <span>
-                        {formatCurrency(currentProperty.price || 0)} ×{' '}
-                        {currentPricing.subtotal && currentProperty.price
-                          ? Math.round(currentPricing.subtotal / currentProperty.price)
-                          : 0}{' '}
+                        {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : (currentProperty.price || 0))} ×{' '}
+                        {currentPricing.nights || (currentPricing.subtotal && (selectedRoom?.pricePerNight || currentProperty.price)
+                          ? Math.round(currentPricing.subtotal / (selectedRoom?.pricePerNight || currentProperty.price))
+                          : 0)}{' '}
                         nights
                       </span>
                       <span>{formatCurrency(currentPricing.subtotal)}</span>

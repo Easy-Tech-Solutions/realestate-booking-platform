@@ -13,6 +13,7 @@ from .serializers import (
 )
 from listings.models import Listing
 from listings.serializers import ListingSerializer
+from listings.models import HotelRoom
 from django.db.models import Avg as _Avg
 
 
@@ -76,7 +77,16 @@ def bookings_collection(request):
                 start = serializer.validated_data['start_date']
                 end = serializer.validated_data['end_date']
                 nights = max((end - start).days, 1)
-                total_price = listing.price * nights
+                hotel_room = serializer.validated_data.get('hotel_room')
+                if hotel_room:
+                    if hotel_room.listing_id != listing.id:
+                        return Response({'error': 'Room does not belong to this listing'}, status=status.HTTP_400_BAD_REQUEST)
+                    from listings.views import _get_available_room_count
+                    if _get_available_room_count(hotel_room, start, end) < 1:
+                        return Response({'error': 'Room not available for selected dates'}, status=status.HTTP_400_BAD_REQUEST)
+                    total_price = float(hotel_room.price_per_night) * nights
+                else:
+                    total_price = listing.price * nights
                 booking = serializer.save(customer=request.user, total_price=total_price)
                 # Instant book: auto-confirm if listing is set to instant
                 if listing.booking_mode == 'instant':

@@ -8,9 +8,9 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import IntegrityError
-from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory
+from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory, HotelRoom
 from bookings.models import Booking
-from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer
+from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer
 from .filters import ListingFilter
 from django.contrib.auth import get_user_model
 from rest_framework.pagination import PageNumberPagination
@@ -459,6 +459,15 @@ def listing_pricing(request, listing_id):
 
     nights = (end - start).days
     base_price = float(listing.price)
+
+    room_id = request.GET.get("room_id")
+    if room_id:
+        try:
+            room = HotelRoom.objects.get(pk=room_id, listing=listing, is_active=True)
+            base_price = float(room.price_per_night)
+        except HotelRoom.DoesNotExist:
+            pass
+
     weekend_premium = listing.weekend_premium_percent / 100.0
 
     subtotal = 0.0
@@ -521,3 +530,85 @@ def review_response(request, id):
     review.save()
 
     return Response(ReviewSerializer(review, context={"request": request}).data)
+
+
+def _get_available_room_count(room, start_date, end_date):
+    overlapping = Booking.objects.filter(
+        hotel_room=room,
+        status__in=['requested', 'confirmed'],
+        start_date__lt=end_date,
+        end_date__gt=start_date,
+    ).count()
+    return max(0, room.total_count - overlapping)
+
+
+@api_view(["GET", "POST"])
+def hotel_rooms_collection(request, listing_id):
+    listing = get_object_or_404(Listing, pk=listing_id)
+
+    if request.method == "GET":
+        rooms = listing.hotel_rooms.filter(is_active=True)
+        return Response(HotelRoomSerializer(rooms, many=True).data)
+
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    if listing.owner != request.user and not request.user.is_superuser:
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = HotelRoomSerializer(data={**request.data, 'listing': listing.id})
+    if serializer.is_valid():
+        room = serializer.save(listing=listing)
+        return Response(HotelRoomSerializer(room).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET", "PUT", "DELETE"])
+def hotel_room_detail(request, listing_id, room_id):
+    listing = get_object_or_404(Listing, pk=listing_id)
+    room = get_object_or_404(HotelRoom, pk=room_id, listing=listing)
+
+    if request.method == "GET":
+        return Response(HotelRoomSerializer(room).data)
+
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    if listing.owner != request.user and not request.user.is_superuser:
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == "PUT":
+        serializer = HotelRoomSerializer(room, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(HotelRoomSerializer(room).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    room.delete()
+    return Response({"message": "Room deleted"}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET"])
+def hotel_room_availability(request, listing_id):
+    from datetime import date as _date
+
+    listing = get_object_or_404(Listing, pk=listing_id)
+    start_str = request.GET.get("start_date")
+    end_str = request.GET.get("end_date")
+
+    if not start_str or not end_str:
+        return Response({"error": "start_date and end_date are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        start = _date.fromisoformat(start_str)
+        end = _date.fromisoformat(end_str)
+    except ValueError:
+        return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=status.HTTP_400_BAD_REQUEST)
+
+    rooms = listing.hotel_rooms.filter(is_active=True)
+    result = []
+    for room in rooms:
+        available_count = _get_available_room_count(room, start, end)
+        data = HotelRoomSerializer(room).data
+        data['available_count'] = available_count
+        result.append(data)
+
+    return Response(result)

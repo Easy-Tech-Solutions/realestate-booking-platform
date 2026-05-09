@@ -20,7 +20,7 @@ class BookingSerializer(serializers.ModelSerializer):
         model = Booking
         fields = [
             'id', 'customer', 'customer_username', 'listing', 'listing_title',
-            'listing_owner', 'start_date', 'end_date', 'status', 'notes',
+            'listing_owner', 'hotel_room', 'start_date', 'end_date', 'status', 'notes',
             'requested_at', 'confirmed_at', 'declined_at', 'owner_notes',
             'decline_reason', 'total_price', 'days_until_expiry'
         ]
@@ -38,7 +38,7 @@ class BookingSerializer(serializers.ModelSerializer):
 class BookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
-        fields = ['listing', 'start_date', 'end_date', 'notes']
+        fields = ['listing', 'hotel_room', 'start_date', 'end_date', 'notes']
 
     def validate(self, data):
         if data['start_date'] >= data['end_date']:

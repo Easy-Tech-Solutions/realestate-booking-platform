@@ -189,3 +189,34 @@ class PropertyStats(models.Model):
 
     def __str__(self):
         return f'Stats for {self.listing.title} on {self.date}'
+
+
+class HotelRoom(models.Model):
+    BED_TYPE_CHOICES = [
+        ('king', 'King'), ('queen', 'Queen'), ('twin', 'Twin'),
+        ('double', 'Double'), ('single', 'Single'), ('bunk', 'Bunk'),
+    ]
+    ROOM_TYPE_CHOICES = [
+        ('standard', 'Standard'), ('deluxe', 'Deluxe'), ('suite', 'Suite'),
+        ('family', 'Family'), ('studio', 'Studio'), ('penthouse', 'Penthouse'),
+    ]
+
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='hotel_rooms')
+    name = models.CharField(max_length=120)
+    room_type = models.CharField(max_length=20, choices=ROOM_TYPE_CHOICES, default='standard')
+    description = models.TextField(blank=True)
+    price_per_night = models.DecimalField(max_digits=12, decimal_places=2)
+    max_occupancy = models.PositiveIntegerField(default=2)
+    beds = models.PositiveIntegerField(default=1)
+    bed_type = models.CharField(max_length=20, choices=BED_TYPE_CHOICES, default='queen')
+    bathrooms = models.PositiveIntegerField(default=1)
+    amenities = models.JSONField(default=list, blank=True)
+    total_count = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['room_type', 'price_per_night']
+
+    def __str__(self):
+        return f"{self.listing.title} — {self.name}"

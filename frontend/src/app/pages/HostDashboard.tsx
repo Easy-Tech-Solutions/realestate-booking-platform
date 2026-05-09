@@ -15,6 +15,7 @@ import {
   Star,
   Trash2,
   TrendingUp,
+  Hotel,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import {
@@ -821,6 +822,11 @@ export function HostDashboard() {
                 <Button variant="outline" size="sm" onClick={() => setEditingProperty(property)}>
                   <Edit className="w-3 h-3 mr-1" /> Edit
                 </Button>
+                {property.propertyType === 'hotels' && (
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/host/listings/${property.id}/rooms`)}>
+                    <Hotel className="w-3 h-3 mr-1" /> Manage Rooms
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={() => navigate(`/rooms/${property.id}`)}>
                   <Eye className="w-3 h-3 mr-1" /> View
                 </Button>

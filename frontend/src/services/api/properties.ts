@@ -1,6 +1,6 @@
-import type { Property, Review, SearchFilters } from '../../core/types';
+import type { Property, Review, SearchFilters, HotelRoom, HotelRoomAvailability } from '../../core/types';
 import { fetchWithAuth } from './shared/client';
-import { buildSearchParams, normalizeListing, normalizeReview } from './shared/normalizers';
+import { buildSearchParams, normalizeListing, normalizeReview, normalizeHotelRoom, normalizeHotelRoomAvailability } from './shared/normalizers';
 import type { AvailabilityResponse, ListingPricingResponse } from './shared/contracts';
 
 export const propertiesAPI = {
@@ -137,7 +137,7 @@ export const propertiesAPI = {
     return data.booked_dates || [];
   },
 
-  calculatePricing: async (id: string, startDate: string, endDate: string): Promise<{
+  calculatePricing: async (id: string, startDate: string, endDate: string, roomId?: string): Promise<{
     nights: number;
     subtotal: number;
     discount: number;
@@ -148,9 +148,9 @@ export const propertiesAPI = {
     taxes: number;
     total: number;
   }> => {
-    const data = await fetchWithAuth<ListingPricingResponse>(
-      `/api/listings/${id}/pricing/?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`
-    );
+    let url = `/api/listings/${id}/pricing/?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+    if (roomId) url += `&room_id=${encodeURIComponent(roomId)}`;
+    const data = await fetchWithAuth<ListingPricingResponse>(url);
     return {
       nights: data.nights,
       subtotal: data.subtotal,
@@ -176,5 +176,63 @@ export const propertiesAPI = {
 
   getPlatformStats: async (): Promise<{ total_properties: number; total_locations: number; happy_guests: number }> => {
     return fetchWithAuth('/api/listings/analytics/platform-stats/');
+  },
+
+  getRooms: async (listingId: string): Promise<HotelRoom[]> => {
+    const data = await fetchWithAuth<unknown[]>(`/api/listings/${listingId}/rooms/`);
+    return data.map(normalizeHotelRoom);
+  },
+
+  createRoom: async (listingId: string, payload: Partial<HotelRoom>): Promise<HotelRoom> => {
+    const body = {
+      listing: listingId,
+      name: payload.name,
+      room_type: payload.roomType,
+      description: payload.description,
+      price_per_night: payload.pricePerNight,
+      max_occupancy: payload.maxOccupancy,
+      beds: payload.beds,
+      bed_type: payload.bedType,
+      bathrooms: payload.bathrooms,
+      amenities: payload.amenities,
+      total_count: payload.totalCount,
+      is_active: payload.isActive ?? true,
+    };
+    const data = await fetchWithAuth(`/api/listings/${listingId}/rooms/`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    return normalizeHotelRoom(data);
+  },
+
+  updateRoom: async (listingId: string, roomId: string, payload: Partial<HotelRoom>): Promise<HotelRoom> => {
+    const body: Record<string, any> = {};
+    if (payload.name !== undefined) body.name = payload.name;
+    if (payload.roomType !== undefined) body.room_type = payload.roomType;
+    if (payload.description !== undefined) body.description = payload.description;
+    if (payload.pricePerNight !== undefined) body.price_per_night = payload.pricePerNight;
+    if (payload.maxOccupancy !== undefined) body.max_occupancy = payload.maxOccupancy;
+    if (payload.beds !== undefined) body.beds = payload.beds;
+    if (payload.bedType !== undefined) body.bed_type = payload.bedType;
+    if (payload.bathrooms !== undefined) body.bathrooms = payload.bathrooms;
+    if (payload.amenities !== undefined) body.amenities = payload.amenities;
+    if (payload.totalCount !== undefined) body.total_count = payload.totalCount;
+    if (payload.isActive !== undefined) body.is_active = payload.isActive;
+    const data = await fetchWithAuth(`/api/listings/${listingId}/rooms/${roomId}/`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    return normalizeHotelRoom(data);
+  },
+
+  deleteRoom: async (listingId: string, roomId: string): Promise<void> => {
+    await fetchWithAuth(`/api/listings/${listingId}/rooms/${roomId}/`, { method: 'DELETE' });
+  },
+
+  getRoomAvailability: async (listingId: string, startDate: string, endDate: string): Promise<HotelRoomAvailability[]> => {
+    const data = await fetchWithAuth<unknown[]>(
+      `/api/listings/${listingId}/rooms/availability/?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`
+    );
+    return data.map(normalizeHotelRoomAvailability);
   },
 };
