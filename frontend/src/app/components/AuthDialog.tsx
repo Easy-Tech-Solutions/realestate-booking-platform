@@ -212,7 +212,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="w-full max-w-[95vw] sm:max-w-[480px] p-0 gap-0 max-h-[90vh] overflow-y-auto">
         <div className="relative border-b border-border p-6">
-          <button onClick={handleClose} className="absolute left-6 top-6 p-1 rounded-full hover:bg-muted">
+          <button type="button" title="Close dialog" onClick={handleClose} className="absolute left-6 top-6 p-1 rounded-full hover:bg-muted">
             <X className="w-4 h-4" />
           </button>
           <h2 className="text-center font-semibold">

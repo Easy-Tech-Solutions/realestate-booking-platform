@@ -4,7 +4,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80
 export const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 
 export const PROPERTY_CATEGORIES = [
-  { id: 'homes', name: 'Homes', icon: '🏠' },
+  { id: 'apartment', name: 'Apartment', icon: '🏠' },
   { id: 'hotels', name: 'Hotels', icon: '🏨' },
   { id: 'lodge', name: 'Lodge', icon: '🛖' },
   { id: 'beaches', name: 'Beaches', icon: '🏖️' },

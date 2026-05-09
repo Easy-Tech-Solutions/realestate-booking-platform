@@ -118,8 +118,7 @@ class ListingSerializer(serializers.ModelSerializer):
     def validate_property_type(self, value):
         category_slug = (value or '').strip().lower()
         if not category_slug:
-            # Default to 'homes' if the field is empty or None
-            return 'homes'
+            return 'apartment'
 
         if not PropertyCategory.objects.filter(slug=category_slug, is_active=True).exists():
             active_slugs = list(PropertyCategory.objects.filter(is_active=True).values_list('slug', flat=True))

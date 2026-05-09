@@ -103,7 +103,7 @@ function EditPropertyDialog({
   const [city, setCity] = useState(property.location?.city || '');
   const [state, setState] = useState(property.location?.state || '');
   const [country, setCountry] = useState(property.location?.country || '');
-  const [propertyType, setPropertyType] = useState(String(property.propertyType || 'homes'));
+  const [propertyType, setPropertyType] = useState(String(property.propertyType || 'apartment'));
   const [guests, setGuests] = useState(Math.max(1, property.guests || 1));
   const [bedrooms, setBedrooms] = useState(Math.max(1, property.bedrooms || 1));
   const [beds, setBeds] = useState(Math.max(1, property.beds || 1));

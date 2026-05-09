@@ -189,7 +189,7 @@ export function CreateListing() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
-    propertyType: 'homes',
+    propertyType: 'apartment',
     privacyType: 'entire_place',
 
     country: 'Rwanda',
@@ -382,8 +382,7 @@ export function CreateListing() {
       const payload = new FormData();
       payload.append('title', form.title);
       payload.append('description', form.description);
-      const propertyTypeToSend = form.propertyType === 'apartment' ? 'homes' : form.propertyType;
-      payload.append('property_type', propertyTypeToSend);
+      payload.append('property_type', form.propertyType);
       payload.append('privacy_type', propertyGroup === 'hotel' ? 'private_room' : form.privacyType);
       payload.append('address', composedAddress);
       payload.append('price', String(form.weekdayBasePrice));

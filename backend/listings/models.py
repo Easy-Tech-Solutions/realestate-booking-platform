@@ -49,7 +49,7 @@ class Listing(models.Model):
     beds = models.IntegerField(default=0)
     bathrooms = models.IntegerField(default=0)
     max_guests = models.IntegerField(default=1)
-    property_type = models.CharField(max_length=50, default='homes')
+    property_type = models.CharField(max_length=50, default='apartment')
     privacy_type = models.CharField(max_length=20, choices=PRIVACY_TYPES, default='entire_place')
     booking_mode = models.CharField(max_length=20, choices=BOOKING_MODES, default='instant')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='listings')
