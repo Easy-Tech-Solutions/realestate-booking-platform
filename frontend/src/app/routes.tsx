@@ -1,12 +1,54 @@
 import { lazy } from 'react';
 import type { ComponentType } from 'react';
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, useRouteError } from 'react-router';
 import { RootLayout } from './layouts/RootLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
+function ChunkErrorFallback() {
+  const error = useRouteError() as Error | undefined;
+  const isChunkError = /Failed to fetch dynamically imported module|Importing a module script failed/i.test(
+    error?.message ?? ''
+  );
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="text-center space-y-4 max-w-sm">
+        <h1 className="text-2xl font-semibold">
+          {isChunkError ? 'Update available' : 'Something went wrong'}
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          {isChunkError
+            ? 'A new version of the app was deployed. Reload to continue.'
+            : 'An unexpected error occurred.'}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+        >
+          Reload
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const CHUNK_RELOAD_KEY = 'chunk-load-reload';
+
 const lazyPage = <TProps extends object>(
   factory: () => Promise<{ default: ComponentType<TProps> }>
-) => lazy(factory);
+) =>
+  lazy(() =>
+    factory().catch((err: Error) => {
+      const isChunkError = /Failed to fetch dynamically imported module|Importing a module script failed/i.test(
+        err?.message ?? ''
+      );
+      if (isChunkError && !sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+        window.location.reload();
+        return new Promise<never>(() => {});
+      }
+      throw err;
+    })
+  );
 
 const Home = lazyPage(() => import('./pages/Home').then((module) => ({ default: module.Home })));
 const PropertyDetails = lazyPage(() => import('./pages/PropertyDetails').then((module) => ({ default: module.PropertyDetails })));
@@ -40,6 +82,7 @@ export const router = createBrowserRouter([
   {
     path: '/',
     Component: RootLayout,
+    errorElement: <ChunkErrorFallback />,
     children: [
       { index: true, Component: Home },
       { path: 'rooms/:id', Component: PropertyDetails },
