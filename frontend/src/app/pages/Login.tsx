@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { Lock, User as UserIcon, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 
 export function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const next = searchParams.get('next') || '/';
   const { login } = useApp();
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -22,7 +24,7 @@ export function Login() {
     try {
       await login(username, password);
       toast.success('Welcome back!');
-      navigate('/');
+      navigate(next, { replace: true });
     } catch (error: any) {
       toast.error(error?.message || 'Login failed');
     } finally {

@@ -15,7 +15,7 @@ export function ProtectedRoute({ children, requireHost, requireAdmin }: Protecte
   if (isLoading) return null;
 
   if (!isAuthenticated) {
-    return <Navigate to="/" state={{ from: location, openAuth: true }} replace />;
+    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
   }
 
   if (requireHost && !user?.isHost) {

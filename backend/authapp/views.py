@@ -188,7 +188,7 @@ def login_view(request):
         refresh_token,
         httponly=True,
         secure=not settings.DEBUG,
-        samesite='Strict',
+        samesite='None' if not settings.DEBUG else 'Lax',
         max_age=60 * 60 * 24 * 7,  # 7 days — matches SimpleJWT REFRESH_TOKEN_LIFETIME
         path='/api/auth/',
     )
@@ -244,7 +244,7 @@ def refresh_token_view(request):
                 str(new_refresh),
                 httponly=True,
                 secure=not settings.DEBUG,
-                samesite='Strict',
+                samesite='None' if not settings.DEBUG else 'Lax',
                 max_age=60 * 60 * 24 * 7,
                 path='/api/auth/',
             )
@@ -387,7 +387,7 @@ def _issue_tokens_for_user(user, http_status=200):
         str(refresh),
         httponly=True,
         secure=not settings.DEBUG,
-        samesite='Strict',
+        samesite='None' if not settings.DEBUG else 'Lax',
         max_age=60 * 60 * 24 * 7,
         path='/api/auth/',
     )
