@@ -190,6 +190,7 @@ export function normalizeBooking(b: any): Booking {
     paymentStatus: (b.payment_status as Booking['paymentStatus']) || 'pending',
     paymentMethod: (b.payment_method as Booking['paymentMethod']) || 'stripe',
     specialRequests: b.notes,
+    hotelRoomId: b.hotel_room ? String(b.hotel_room) : undefined,
     createdAt: b.requested_at,
   };
 }

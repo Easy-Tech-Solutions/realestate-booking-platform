@@ -49,7 +49,7 @@ class HotelRoomSerializer(serializers.ModelSerializer):
 
 class ListingSerializer(serializers.ModelSerializer):
     gallery_images = ListingImageSerializer(many=True, read_only=True)
-    hotel_rooms = HotelRoomSerializer(many=True, read_only=True)
+    hotel_rooms = serializers.SerializerMethodField()
     main_image_url = serializers.SerializerMethodField()
     owner_username = serializers.CharField(source='owner.username', read_only=True)
     owner_id = serializers.IntegerField(source='owner.id', read_only=True)
@@ -111,6 +111,10 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def get_review_count(self, obj):
         return obj.reviews.count()
+
+    def get_hotel_rooms(self, obj):
+        active_rooms = obj.hotel_rooms.filter(is_active=True)
+        return HotelRoomSerializer(active_rooms, many=True).data
 
     def _normalize_list_field(self, value, field_name):
         if value is None or value == '':

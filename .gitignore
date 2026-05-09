@@ -87,3 +87,5 @@ tmp/
 .settings/
 *.sublime-workspace
 *.sublime-project
+.agents/
+.claude/

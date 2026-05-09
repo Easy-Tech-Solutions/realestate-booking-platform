@@ -33,6 +33,8 @@ type WizardStep =
   | 'privacy_type'
   | 'location'
   | 'basics'
+  | 'hotel_room_count'
+  | 'hotel_rooms'
   | 'check_in_out'
   | 'land_details'
   | 'amenities'
@@ -65,7 +67,8 @@ const STEPS_BY_GROUP: Record<PropertyGroup, WizardStep[]> = {
     'safety', 'final_details',
   ],
   hotel: [
-    'welcome', 'step1_intro', 'property_type', 'location', 'basics',
+    'welcome', 'step1_intro', 'property_type', 'location',
+    'hotel_room_count', 'hotel_rooms',
     'check_in_out', 'amenities', 'photos', 'title', 'description',
     'step3_intro', 'booking_settings', 'discounts', 'weekday_price', 'weekend_price',
     'final_details',
@@ -118,6 +121,65 @@ const COMMERCIAL_AMENITIES = [
   { id: 'stage', name: 'Stage / Podium' },
   { id: 'catering', name: 'Catering available' },
 ];
+
+const ROOM_TYPES_WIZARD = [
+  { value: 'standard', label: 'Standard' },
+  { value: 'deluxe', label: 'Deluxe' },
+  { value: 'suite', label: 'Suite' },
+  { value: 'family', label: 'Family' },
+  { value: 'studio', label: 'Studio' },
+  { value: 'penthouse', label: 'Penthouse' },
+];
+
+const BED_TYPES_WIZARD = [
+  { value: 'king', label: 'King' },
+  { value: 'queen', label: 'Queen' },
+  { value: 'twin', label: 'Twin' },
+  { value: 'double', label: 'Double' },
+  { value: 'single', label: 'Single' },
+  { value: 'bunk', label: 'Bunk' },
+];
+
+const ROOM_AMENITIES_WIZARD = [
+  { id: 'wifi', name: 'Wifi' },
+  { id: 'minibar', name: 'Minibar' },
+  { id: 'safe', name: 'In-room safe' },
+  { id: 'ac', name: 'Air conditioning' },
+  { id: 'tv', name: 'TV' },
+  { id: 'balcony', name: 'Balcony' },
+  { id: 'jacuzzi', name: 'Jacuzzi' },
+  { id: 'bathtub', name: 'Bathtub' },
+  { id: 'room-service', name: 'Room service' },
+  { id: 'ocean-view', name: 'Ocean view' },
+  { id: 'city-view', name: 'City view' },
+  { id: 'kitchenette', name: 'Kitchenette' },
+];
+
+type HotelRoomDraft = {
+  name: string;
+  roomType: string;
+  description: string;
+  pricePerNight: number;
+  maxOccupancy: number;
+  beds: number;
+  bedType: string;
+  bathrooms: number;
+  amenities: string[];
+  totalCount: number;
+};
+
+const defaultRoom: HotelRoomDraft = {
+  name: '',
+  roomType: 'standard',
+  description: '',
+  pricePerNight: 0,
+  maxOccupancy: 2,
+  beds: 1,
+  bedType: 'queen',
+  bathrooms: 1,
+  amenities: [],
+  totalCount: 1,
+};
 
 const HIGHLIGHTS = ['Peaceful', 'Unique', 'Family-friendly', 'Stylish', 'Central', 'Spacious'];
 
@@ -233,6 +295,9 @@ export function CreateListing() {
     exteriorCamera: false,
     noiseMonitor: false,
     weaponsOnProperty: false,
+
+    hotelRoomCount: 1,
+    hotelRooms: [{ ...defaultRoom }] as HotelRoomDraft[],
   });
 
   const propertyGroup = useMemo(() => getPropertyGroup(form.propertyType), [form.propertyType]);
@@ -283,6 +348,29 @@ export function CreateListing() {
     : PROPERTY_CATEGORIES.map((category) => ({ id: category.id, name: category.name }));
 
   const update = (patch: Partial<typeof form>) => setForm((prev) => ({ ...prev, ...patch }));
+
+  const setHotelRoomCount = (count: number) => {
+    const clamped = Math.max(1, Math.min(20, count));
+    setForm((prev) => {
+      const rooms = [...prev.hotelRooms];
+      while (rooms.length < clamped) rooms.push({ ...defaultRoom });
+      return { ...prev, hotelRoomCount: clamped, hotelRooms: rooms.slice(0, clamped) };
+    });
+  };
+
+  const updateRoom = (index: number, patch: Partial<HotelRoomDraft>) =>
+    setForm((prev) => {
+      const rooms = [...prev.hotelRooms];
+      rooms[index] = { ...rooms[index], ...patch };
+      return { ...prev, hotelRooms: rooms };
+    });
+
+  const toggleRoomAmenity = (index: number, amenityId: string) =>
+    updateRoom(index, {
+      amenities: form.hotelRooms[index].amenities.includes(amenityId)
+        ? form.hotelRooms[index].amenities.filter((a) => a !== amenityId)
+        : [...form.hotelRooms[index].amenities, amenityId],
+    });
 
   const updateCount = (field: 'guests' | 'bedrooms' | 'beds' | 'bathrooms', delta: number) => {
     update({ [field]: Math.max(1, form[field] + delta) } as Partial<typeof form>);
@@ -352,6 +440,8 @@ export function CreateListing() {
       case 'property_type': return Boolean(form.propertyType);
       case 'privacy_type': return Boolean(form.privacyType);
       case 'location': return Boolean(form.address1 && form.city && form.country);
+      case 'hotel_room_count': return form.hotelRoomCount >= 1;
+      case 'hotel_rooms': return form.hotelRooms.every((r) => r.name.trim() && r.pricePerNight > 0);
       case 'photos': return form.images.length >= minPhotos;
       case 'title': return form.title.trim().length > 0;
       case 'description': return form.description.trim().length > 0;
@@ -390,9 +480,13 @@ export function CreateListing() {
       payload.append('country', form.country);
       payload.append('price', String(form.weekdayBasePrice));
       payload.append('bedrooms', String(propertyGroup === 'hotel' || propertyGroup === 'commercial' ? 0 : form.bedrooms));
-      payload.append('beds', String(propertyGroup === 'land' || propertyGroup === 'commercial' ? 0 : form.beds));
-      payload.append('bathrooms', String(propertyGroup === 'land' ? 0 : form.bathrooms));
-      payload.append('max_guests', String(form.guests));
+      payload.append('beds', String(propertyGroup === 'land' || propertyGroup === 'commercial' ? 0 : propertyGroup === 'hotel' ? 0 : form.beds));
+      payload.append('bathrooms', String(propertyGroup === 'land' ? 0 : propertyGroup === 'hotel' ? 0 : form.bathrooms));
+      payload.append('max_guests', String(
+        propertyGroup === 'hotel'
+          ? Math.max(...form.hotelRooms.map((r) => r.maxOccupancy), 1)
+          : form.guests
+      ));
       payload.append('amenities', JSON.stringify(form.amenities));
       payload.append('highlights', JSON.stringify(form.highlights));
       payload.append('booking_mode', form.bookingMode.startsWith('approve') ? 'approve_first' : 'instant');
@@ -422,6 +516,26 @@ export function CreateListing() {
         const remaining = form.images.slice(1, 11);
         for (const [idx, file] of remaining.entries()) {
           await propertiesAPI.addGalleryImage(created.id, file, '', idx);
+        }
+      }
+
+      if (propertyGroup === 'hotel') {
+        for (const room of form.hotelRooms) {
+          if (room.name.trim() && room.pricePerNight > 0) {
+            await propertiesAPI.createRoom(created.id, {
+              name: room.name,
+              roomType: room.roomType as any,
+              description: room.description,
+              pricePerNight: room.pricePerNight,
+              maxOccupancy: room.maxOccupancy,
+              beds: room.beds,
+              bedType: room.bedType as any,
+              bathrooms: room.bathrooms,
+              amenities: room.amenities,
+              totalCount: room.totalCount,
+              isActive: true,
+            });
+          }
         }
       }
 
@@ -591,6 +705,166 @@ export function CreateListing() {
               <Input placeholder="Province / state / territory" value={form.state} onChange={(e) => update({ state: e.target.value })} />
               <Input placeholder="Postal code" value={form.postalCode} onChange={(e) => update({ postalCode: e.target.value })} />
             </div>
+          </section>
+        )}
+
+        {currentStep === 'hotel_room_count' && (
+          <section className="max-w-3xl mx-auto py-8">
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">How many room types does your hotel have?</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">
+              A room type is a category of rooms with the same specs and price (e.g. Standard, Deluxe Suite). You can add more later.
+            </p>
+            <div className="flex items-center justify-between py-5 border-b">
+              <p className="text-xl sm:text-3xl">Number of room types</p>
+              <div className="flex items-center gap-5">
+                <button
+                  type="button"
+                  aria-label="Decrease room count"
+                  className="w-10 h-10 rounded-full border flex items-center justify-center"
+                  onClick={() => setHotelRoomCount(form.hotelRoomCount - 1)}
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className="text-xl sm:text-3xl font-medium w-8 text-center">{form.hotelRoomCount}</span>
+                <button
+                  type="button"
+                  aria-label="Increase room count"
+                  className="w-10 h-10 rounded-full border flex items-center justify-center"
+                  onClick={() => setHotelRoomCount(form.hotelRoomCount + 1)}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {currentStep === 'hotel_rooms' && (
+          <section className="max-w-3xl mx-auto py-8 space-y-8">
+            <div>
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Tell us about your room types</h2>
+              <p className="text-base sm:text-2xl text-muted-foreground">Fill in the details for each room type. Fields marked * are required.</p>
+            </div>
+            {form.hotelRooms.map((room, idx) => (
+              <div key={idx} className="border rounded-2xl p-6 space-y-5">
+                <h3 className="text-xl sm:text-2xl font-semibold">Room type {idx + 1}</h3>
+
+                {/* Name + type */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Room name *</label>
+                    <Input
+                      placeholder="e.g. Deluxe Ocean View"
+                      value={room.name}
+                      onChange={(e) => updateRoom(idx, { name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Room type</label>
+                    <select
+                      value={room.roomType}
+                      onChange={(e) => updateRoom(idx, { roomType: e.target.value })}
+                      className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      {ROOM_TYPES_WIZARD.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Description</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Describe this room type..."
+                    value={room.description}
+                    onChange={(e) => updateRoom(idx, { description: e.target.value })}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                  />
+                </div>
+
+                {/* Price + inventory */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Price per night (USD) *</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={room.pricePerNight || ''}
+                      onChange={(e) => updateRoom(idx, { pricePerNight: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Number of rooms (inventory)</label>
+                    <div className="flex items-center gap-3">
+                      <button type="button" className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { totalCount: Math.max(1, room.totalCount - 1) })}>
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-base font-medium w-6 text-center">{room.totalCount}</span>
+                      <button type="button" className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { totalCount: room.totalCount + 1 })}>
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Capacity rows */}
+                {[
+                  { label: 'Max guests per room', field: 'maxOccupancy' as const },
+                  { label: 'Beds', field: 'beds' as const },
+                  { label: 'Bathrooms', field: 'bathrooms' as const },
+                ].map(({ label, field }) => (
+                  <div key={field} className="flex items-center justify-between py-3 border-b">
+                    <p className="text-base sm:text-xl">{label}</p>
+                    <div className="flex items-center gap-4">
+                      <button type="button" className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { [field]: Math.max(1, room[field] - 1) })}>
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-base font-medium w-6 text-center">{room[field]}</span>
+                      <button type="button" className="w-8 h-8 rounded-full border flex items-center justify-center" onClick={() => updateRoom(idx, { [field]: room[field] + 1 })}>
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Bed type */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Bed type</label>
+                  <select
+                    value={room.bedType}
+                    onChange={(e) => updateRoom(idx, { bedType: e.target.value })}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    {BED_TYPES_WIZARD.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Room amenities */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Room amenities</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {ROOM_AMENITIES_WIZARD.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => toggleRoomAmenity(idx, a.id)}
+                        className={cn(
+                          'px-3 py-2 rounded-lg border text-sm text-left transition-colors',
+                          room.amenities.includes(a.id)
+                            ? 'border-foreground bg-muted'
+                            : 'hover:border-foreground'
+                        )}
+                      >
+                        {a.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
           </section>
         )}
 
@@ -1011,6 +1285,7 @@ export function CreateListing() {
               <p className="text-base sm:text-2xl text-muted-foreground">Ready to publish</p>
               <p className="text-xl sm:text-3xl mt-2">
                 Your listing has {form.images.length} photos and {form.amenities.length} amenities configured.
+                {propertyGroup === 'hotel' && ` ${form.hotelRooms.length} room type${form.hotelRooms.length !== 1 ? 's' : ''} defined.`}
               </p>
             </div>
           </section>

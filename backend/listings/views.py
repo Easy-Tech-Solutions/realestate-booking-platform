@@ -547,7 +547,10 @@ def hotel_rooms_collection(request, listing_id):
     listing = get_object_or_404(Listing, pk=listing_id)
 
     if request.method == "GET":
-        rooms = listing.hotel_rooms.filter(is_active=True)
+        is_owner = request.user.is_authenticated and (
+            listing.owner == request.user or request.user.is_superuser
+        )
+        rooms = listing.hotel_rooms.all() if is_owner else listing.hotel_rooms.filter(is_active=True)
         return Response(HotelRoomSerializer(rooms, many=True).data)
 
     if not request.user.is_authenticated:
