@@ -66,6 +66,8 @@ export function PropertyDetails() {
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const touchStartX = useRef<number>(0);
 
+  const { propertyQuery, reviewsQuery, availabilityQuery } = usePropertyDetails(id);
+
   const pauseAndResume = useCallback(() => {
     setIsAutoPlaying(false);
     const t = setTimeout(() => setIsAutoPlaying(true), 4000);
@@ -76,12 +78,12 @@ export function PropertyDetails() {
     if (!isAutoPlaying) return;
     const timer = setInterval(() => {
       setMobileSlideIndex(prev => {
-        const total = property?.images?.length ?? 0;
+        const total = propertyQuery.data?.images?.length ?? 0;
         return total > 0 ? (prev + 1) % total : 0;
       });
     }, 4000);
     return () => clearInterval(timer);
-  }, [isAutoPlaying, property?.images?.length]);
+  }, [isAutoPlaying, propertyQuery.data?.images?.length]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [guests, setGuests] = useState(2);
 
@@ -93,8 +95,6 @@ export function PropertyDetails() {
     communication: 0, location_rating: 0, value: 0,
   });
   const [selectedRoom, setSelectedRoom] = useState<HotelRoom | null>(null);
-
-  const { propertyQuery, reviewsQuery, availabilityQuery } = usePropertyDetails(id);
   const pricingQuery = usePropertyPricing(
     id,
     dateRange?.from?.toISOString().split('T')[0],
