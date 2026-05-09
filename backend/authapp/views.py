@@ -104,10 +104,12 @@ def register(request):
             message = "User registered successfully. You can now log in."
         return Response({"message": message}, status=status.HTTP_201_CREATED)
     except Exception:
+        logger.exception("register: failed during user creation or email send")
         return Response(
             {"error": "Registration could not be completed because the verification email could not be sent. Please try again in a moment."},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
+
 
 @api_view(["GET", "POST"])
 @permission_classes([AllowAny])
