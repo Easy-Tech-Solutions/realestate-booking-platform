@@ -256,7 +256,11 @@ _fe_origin = os.environ.get("FRONTEND_ORIGIN", "")
 if _fe_origin and _fe_origin not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(_fe_origin)
 
-CORS_ALLOWED_ORIGIN_REGEXES = env_list("CORS_ALLOWED_ORIGIN_REGEXES", "")
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://realestate-booking-platform[a-z0-9\-]*\.vercel\.app$",
+    r"^https://homekon[a-z0-9\-]*\.vercel\.app$",
+    *env_list("CORS_ALLOWED_ORIGIN_REGEXES", ""),
+]
 CORS_ALLOW_CREDENTIALS = True
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 
@@ -285,6 +289,11 @@ AUTH_REQUIRE_EMAIL_VERIFICATION = env_bool("AUTH_REQUIRE_EMAIL_VERIFICATION", Tr
 
 LOCAL_DOMAIN = os.environ.get("LOCAL_DOMAIN", "localhost:8000")
 SITE_NAME = os.environ.get("SITE_NAME", "Real Estate Booking Platform")
+
+# Web Push (VAPID) — generate keys once with: python manage.py generate_vapid_keys
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", DEFAULT_FROM_EMAIL or "admin@homekonet.com")
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",

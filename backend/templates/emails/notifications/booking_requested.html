@@ -1,30 +1,13 @@
-{% extends "emails/base_email.html" %}
-
-{% block subject %}New Booking Request — {{ data.listing_title }}{% endblock %}
-
+﻿{% extends "emails/notifications/base_email.html" %}
 {% block content %}
-  <h2>New Booking Request</h2>
-  <p>Hi {{ user.get_full_name|default:user.username }},</p>
-  <p>
-    <strong>{{ data.customer_name }}</strong> has requested to book one of your properties.
-  </p>
-
-  <div class="info-box">
-    <p><strong>Property:</strong> {{ data.listing_title }}</p>
-    <p><strong>Guest:</strong> {{ data.customer_name }}</p>
-    <p><strong>Check-in:</strong> {{ data.start_date }}</p>
-    <p><strong>Check-out:</strong> {{ data.end_date }}</p>
-    <p><strong>Total Amount:</strong> {{ data.total_amount }}</p>
-  </div>
-
-  <p>Log in to your dashboard to confirm or decline this request.</p>
-
-  <a class="cta-btn" href="http://{{ site_url }}/bookings/{{ data.booking_id }}">
-    Review Request
-  </a>
-
-  <hr class="divider"/>
-  <p style="font-size:13px; color:#888;">
-    Booking #{{ data.booking_id }} &mdash; {{ site_name }}
-  </p>
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">New Booking Request</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">Someone wants to stay at your property</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:6px;padding:20px;margin:0 0 24px;">
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Property:</strong> {{ data.listing_title }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Guest:</strong> {{ data.customer_name }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Check-in:</strong> {{ data.start_date }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Check-out:</strong> {{ data.end_date }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Total:</strong> ${{ data.total_amount }}</td></tr>
+</table>
+<a href="{{ site_url }}/host" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">Review Request</a>
 {% endblock %}

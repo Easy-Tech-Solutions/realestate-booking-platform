@@ -67,11 +67,11 @@ export function Login() {
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <Button type="submit" disabled={isLoading}>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button type="submit" className="w-full sm:w-auto" disabled={isLoading}>
               {isLoading ? 'Logging in...' : 'Log in'}
             </Button>
-            <Button type="button" variant="outline" onClick={() => navigate('/')}>
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => navigate('/')}>
               Back to home
             </Button>
           </div>

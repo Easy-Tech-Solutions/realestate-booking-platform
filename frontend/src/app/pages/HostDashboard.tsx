@@ -336,7 +336,7 @@ function EditPropertyDialog({
           <Label>Title</Label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Property Type</Label>
             <Select value={propertyType} onValueChange={setPropertyType}>
@@ -364,7 +364,7 @@ function EditPropertyDialog({
           <Label>Address</Label>
           <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street address" />
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>City</Label>
             <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
@@ -507,7 +507,7 @@ function EditPropertyDialog({
       {/* ── Booking Settings ── */}
       <section className="space-y-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Booking Settings</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Booking Mode</Label>
             <Select value={bookingMode} onValueChange={setBookingMode}>
@@ -806,18 +806,18 @@ export function HostDashboard() {
       <CardContent>
         <div className="space-y-4">
           {properties.map((property) => (
-            <div key={property.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-              <div className="flex items-center gap-4">
-                <img src={property.images[0]} alt={property.title} className="w-20 h-16 rounded object-cover" />
-                <div>
-                  <h3 className="font-semibold">{property.title}</h3>
-                  <p className="text-sm text-muted-foreground">
+            <div key={property.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-border rounded-lg">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <img src={property.images[0]} alt={property.title} className="w-20 h-16 rounded object-cover flex-shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="font-semibold truncate">{property.title}</h3>
+                  <p className="text-sm text-muted-foreground truncate">
                     {property.location.city}, {property.location.state} · {property.rating.toFixed(1)}★ · {property.reviewCount} reviews
                   </p>
                   <p className="text-sm font-semibold mt-1">{formatCurrency(property.price)}/night</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <Button variant="outline" size="sm" onClick={() => setEditingProperty(property)}>
                   <Edit className="w-3 h-3 mr-1" /> Edit
                 </Button>
@@ -850,8 +850,8 @@ export function HostDashboard() {
             const property = properties.find((item) => item.id === booking.propertyId);
             const guestName = booking.user?.firstName || booking.userId || 'Guest';
             return (
-              <div key={booking.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                <div>
+              <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-border rounded-lg">
+                <div className="flex-1">
                   <h3 className="font-semibold mb-1">{guestName}</h3>
                   <p className="text-sm text-muted-foreground">
                     {booking.checkIn} - {booking.checkOut} · {booking.guests} guests
@@ -859,7 +859,7 @@ export function HostDashboard() {
                   <p className="text-xs text-muted-foreground mt-0.5">{property?.title || booking.propertyId}</p>
                   <p className="text-sm font-semibold mt-1 capitalize">{booking.status}</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setActiveSection('messages')}>Contact guest</Button>
+                <Button variant="outline" size="sm" className="flex-shrink-0" onClick={() => setActiveSection('messages')}>Contact guest</Button>
               </div>
             );
           })}
@@ -886,7 +886,7 @@ export function HostDashboard() {
                   <p className="text-sm mb-2">{message.message}</p>
                   <p className="text-xs text-muted-foreground">{formatDate(message.timestamp, 'MMM dd, yyyy hh:mm a')}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
                   <Button variant="outline" size="sm" onClick={() => setSelectedMessage(message)}>
                     <MessageSquare className="w-3 h-3 mr-1" /> Reply
                   </Button>

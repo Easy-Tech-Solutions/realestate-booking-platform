@@ -2,6 +2,7 @@ export {
   authAPI,
   bookingToolsAPI,
   bookingsAPI,
+  cardsAPI,
   clearTokens,
   dashboardAPI,
   getAccessToken,
@@ -16,3 +17,4 @@ export {
   usersAPI,
   wishlistsAPI,
 } from './api';
+export type { SavedCard } from './api';

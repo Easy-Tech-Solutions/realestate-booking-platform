@@ -84,7 +84,7 @@ export function FiltersDialog({ open, onClose, onApply }: FiltersDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[780px] max-h-[90vh] overflow-y-auto p-0 gap-0">
+      <DialogContent className="w-full max-w-[95vw] sm:max-w-[780px] max-h-[90vh] overflow-y-auto p-0 gap-0">
         <div className="sticky top-0 bg-white z-10 border-b border-border px-6 py-4">
           <button onClick={onClose} className="absolute left-6 top-4 p-1 rounded-full hover:bg-muted">
             <X className="w-4 h-4" />

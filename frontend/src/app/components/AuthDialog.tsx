@@ -8,7 +8,6 @@ import { Label } from './ui/label';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { authAPI } from '../../services/api.service';
-import appleLogo  from '../../assets/apple.png';
 
 
 
@@ -211,7 +210,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[480px] p-0 gap-0">
+      <DialogContent className="w-full max-w-[95vw] sm:max-w-[480px] p-0 gap-0 max-h-[90vh] overflow-y-auto">
         <div className="relative border-b border-border p-6">
           <button onClick={handleClose} className="absolute left-6 top-6 p-1 rounded-full hover:bg-muted">
             <X className="w-4 h-4" />
@@ -307,23 +306,16 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
 
               {/* Provider buttons. Google's button is rendered by GIS itself
                   so the look and accessibility match Google's spec. */}
-              <div className="space-y-3">
-                <div className="flex justify-center">
-                  <GoogleLogin
-                    onSuccess={handleGoogleCredential}
-                    onError={handleGoogleError}
-                    theme="outline"
-                    size="large"
-                    text="continue_with"
-                    shape="rectangular"
-                    width="376"
-                  />
-                </div>
-
-                <Button type="button" variant="outline" className="w-full">
-                  <img src={appleLogo} alt="Apple" className="w-6 h-6 mr-2" />
-                  Continue with Apple
-                </Button>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleCredential}
+                  onError={handleGoogleError}
+                  theme="outline"
+                  size="large"
+                  text="continue_with"
+                  shape="rectangular"
+                  width="320"
+                />
               </div>
             </div>
           )}

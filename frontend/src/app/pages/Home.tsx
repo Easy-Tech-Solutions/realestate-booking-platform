@@ -224,13 +224,13 @@ export function Home() {
         )}
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 gap-y-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 gap-y-6">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-72 bg-muted rounded-xl animate-pulse" />
+              <div key={i} className="h-60 bg-muted rounded-xl animate-pulse" />
             ))}
           </div>
         ) : properties.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6 gap-4 gap-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 gap-y-6">
             {properties.map((property) => (
               <PropertyCard key={property.id} property={property} />
             ))}

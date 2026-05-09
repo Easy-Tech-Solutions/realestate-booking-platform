@@ -1,21 +1,10 @@
-{% extends "emails/base_email.html" %}
-
-{% block subject %}Stay Complete — Leave a Review for {{ data.listing_title }}{% endblock %}
-
+﻿{% extends "emails/notifications/base_email.html" %}
 {% block content %}
-  <h2 style="color:#27ae60;">Your Stay is Complete!</h2>
-  <p>Hi {{ user.get_full_name|default:user.username }},</p>
-  <p>
-    We hope you had a wonderful stay at <strong>{{ data.listing_title }}</strong>.
-    Your experience matters — leaving a review helps other guests and supports great property owners.
-  </p>
-
-  <a class="cta-btn" href="http://{{ site_url }}/listings/{{ data.listing_id }}/review">
-    Leave a Review
-  </a>
-
-  <hr class="divider"/>
-  <p style="font-size:13px; color:#888;">
-    Booking #{{ data.booking_id }} &mdash; {{ site_name }}
-  </p>
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Your Stay is Complete!</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">We hope you had a wonderful time</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:6px;padding:20px;margin:0 0 24px;">
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Property:</strong> {{ data.listing_title }}</td></tr>
+</table>
+<p style="margin:0 0 24px;color:#444444;font-size:15px;line-height:1.6;">Help future guests by sharing your experience. It only takes a minute!</p>
+<a href="{{ site_url }}/trips" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">Leave a Review</a>
 {% endblock %}

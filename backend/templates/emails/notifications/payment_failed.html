@@ -1,30 +1,11 @@
-{% extends "emails/base_email.html" %}
-
-{% block subject %}Payment Failed — Action Required{% endblock %}
-
+﻿{% extends "emails/notifications/base_email.html" %}
 {% block content %}
-  <h2 style="color:#e74c3c;">Payment Failed</h2>
-  <p>Hi {{ user.get_full_name|default:user.username }},</p>
-  <p>
-    We were unable to process your payment of
-    <strong>{{ data.amount }} {{ data.currency }}</strong>
-    for <strong>{{ data.listing_title }}</strong>.
-  </p>
-
-  <div class="info-box">
-    <p><strong>Property:</strong> {{ data.listing_title }}</p>
-    <p><strong>Amount:</strong> {{ data.amount }} {{ data.currency }}</p>
-    <p><strong>Transaction ID:</strong> {{ data.payment_id }}</p>
-  </div>
-
-  <p>Please retry your payment to secure your booking.</p>
-
-  <a class="cta-btn" href="http://{{ site_url }}/bookings/{{ data.booking_id }}/pay">
-    Retry Payment
-  </a>
-
-  <hr class="divider"/>
-  <p style="font-size:13px; color:#888;">
-    Payment #{{ data.payment_id }} &mdash; {{ site_name }}
-  </p>
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Payment Failed</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">We could not process your payment</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border-radius:6px;padding:20px;margin:0 0 24px;border-left:4px solid #ef4444;">
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Property:</strong> {{ data.listing_title }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Amount:</strong> {{ data.amount }} {{ data.currency }}</td></tr>
+</table>
+<p style="margin:0 0 24px;color:#444444;font-size:15px;line-height:1.6;">Please check your payment details and try again. Your booking is still held for a short time.</p>
+<a href="{{ site_url }}/trips" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">Retry Payment</a>
 {% endblock %}

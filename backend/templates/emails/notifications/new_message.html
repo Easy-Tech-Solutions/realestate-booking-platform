@@ -1,27 +1,9 @@
-{% extends "emails/base_email.html" %}
-
-{% block subject %}New Message from {{ data.sender_name }}{% endblock %}
-
+﻿{% extends "emails/notifications/base_email.html" %}
 {% block content %}
-  <h2>You have a new message</h2>
-  <p>Hi {{ user.get_full_name|default:user.username }},</p>
-  <p>
-    <strong>{{ data.sender_name }}</strong> sent you a message
-    {% if data.listing_title and data.listing_title != "General Chat" %}
-      about <strong>{{ data.listing_title }}</strong>
-    {% endif %}:
-  </p>
-
-  <div class="info-box">
-    <p>{{ notification.message }}</p>
-  </div>
-
-  <a class="cta-btn" href="http://{{ site_url }}/messages/{{ data.conversation_id }}">
-    Reply Now
-  </a>
-
-  <hr class="divider"/>
-  <p style="font-size:13px; color:#888;">
-    {{ site_name }}
-  </p>
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">New Message from {{ data.sender_name }}</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">{% if data.listing_title %}Re: {{ data.listing_title }}{% else %}Direct message{% endif %}</p>
+<div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:0 0 24px;border-left:3px solid #111111;">
+  <p style="margin:0;font-size:15px;color:#333333;line-height:1.6;font-style:italic;">"{{ notification.message }}"</p>
+</div>
+<a href="{{ site_url }}/messages" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">Reply</a>
 {% endblock %}

@@ -1,41 +1,10 @@
-{% extends "emails/base_email.html" %}
-
-{% block subject %}Price {{ data.direction|title }} — {{ data.listing_title }}{% endblock %}
-
+﻿{% extends "emails/notifications/base_email.html" %}
 {% block content %}
-  <h2>
-    Price
-    {% if data.direction == "decreased" %}
-      <span style="color:#27ae60;">Decreased &#8595;</span>
-    {% else %}
-      <span style="color:#e67e22;">Increased &#8593;</span>
-    {% endif %}
-    &mdash; {{ data.listing_title }}
-  </h2>
-  <p>Hi {{ user.get_full_name|default:user.username }},</p>
-  <p>
-    The price for a property on your favourites list has changed.
-  </p>
-
-  <div class="info-box">
-    <p><strong>Property:</strong> {{ data.listing_title }}</p>
-    <p><strong>Previous Price:</strong> {{ data.old_price }}</p>
-    <p>
-      <strong>New Price:</strong>
-      {% if data.direction == "decreased" %}
-        <span style="color:#27ae60;">{{ data.new_price }}</span>
-      {% else %}
-        <span style="color:#e67e22;">{{ data.new_price }}</span>
-      {% endif %}
-    </p>
-  </div>
-
-  <a class="cta-btn" href="http://{{ site_url }}/listings/{{ data.listing_id }}">
-    View Property
-  </a>
-
-  <hr class="divider"/>
-  <p style="font-size:13px; color:#888;">
-    {{ site_name }}
-  </p>
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Price {{ data.direction|title }} — {{ data.listing_title }}</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">A property you saved has updated pricing</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:6px;padding:20px;margin:0 0 24px;">
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Was:</strong> ${{ data.old_price }}/night</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Now:</strong> ${{ data.new_price }}/night</td></tr>
+</table>
+<a href="{{ site_url }}/listings/{{ data.listing_id }}" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">View Property</a>
 {% endblock %}

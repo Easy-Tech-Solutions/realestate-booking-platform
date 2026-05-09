@@ -56,7 +56,7 @@ export function Trips() {
 
   const TripCard = ({ trip, isPast }: { trip: (typeof upcomingTrips)[number]; isPast?: boolean }) => (
     <div className="border border-border rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="grid md:grid-cols-3 gap-6 p-6">
+      <div className="grid md:grid-cols-3 gap-4 md:gap-6 p-4 md:p-6">
         <img
           src={trip.property.images[0]}
           alt={trip.property.title}
@@ -99,7 +99,7 @@ export function Trips() {
               <p className="text-sm text-muted-foreground">Total price</p>
               <p className="text-xl font-semibold">{formatCurrency(trip.estimatedTotal)}</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {!isPast && trip.booking.status !== 'cancelled' && (
                 <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setCancelTarget(trip.booking)}>
                   Cancel

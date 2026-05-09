@@ -45,7 +45,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] p-0 gap-0 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-[95vw] sm:max-w-[900px] p-0 gap-0 max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white z-10 border-b border-border p-6">
           <button
             onClick={onClose}

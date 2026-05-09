@@ -10,7 +10,7 @@ from bookings.serializers import BookingSerializer
 from django.contrib.auth import get_user_model, authenticate
 from django.utils import timezone
 from datetime import timedelta
-from .models import PhoneChangeRequest
+from .models import PhoneChangeRequest, Profile
 from .utils import generate_otp, send_phone_change_email_otp, send_phone_change_sms_otp
 from authapp.throttles import PhoneChangeRateThrottle
 
@@ -294,12 +294,31 @@ def me_dashboard(request):
     })
 
 
-@api_view(['PUT'])
+@api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     user = request.user
-    serializer = UserSerializer(user, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    data = request.data
+
+    # Update user-level fields
+    updatable_fields = ['first_name', 'last_name', 'email']
+    changed = [f for f in updatable_fields if f in data and data[f] != '']
+    if changed:
+        for field in changed:
+            setattr(user, field, data[field])
+        user.save(update_fields=changed)
+
+    # Update profile fields (image + bio)
+    profile, _ = Profile.objects.get_or_create(user=user)
+    profile_changed = False
+    if 'bio' in data:
+        profile.bio = data['bio']
+        profile_changed = True
+    if 'image' in request.FILES:
+        profile.image = request.FILES['image']
+        profile_changed = True
+    if profile_changed:
+        profile.save()
+
+    fresh_user = User.objects.select_related('profile').get(pk=user.pk)
+    return Response(UserSerializer(fresh_user).data)

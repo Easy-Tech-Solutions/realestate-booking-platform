@@ -59,6 +59,9 @@ export const useAppStore = create<AppStoreState>()(
       register: async (data) => authAPI.register(data),
 
       logout: async () => {
+        // Unregister push subscription before clearing auth
+        const { unregisterPushSubscription } = await import('../core/push');
+        await unregisterPushSubscription().catch(() => {});
         await authAPI.logout();
         set({ user: null, isAuthenticated: false, wishlistIds: [] });
         queryClient.removeQueries({ queryKey: queryKeys.properties.favorites });

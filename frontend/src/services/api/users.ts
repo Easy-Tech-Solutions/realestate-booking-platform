@@ -5,9 +5,24 @@ export const usersAPI = {
     return fetchWithAuth(`/api/users/${id}/`);
   },
 
-  updateMyProfile: async (payload: Record<string, any>): Promise<any> => {
+  updateMyProfile: async (payload: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    bio?: string;
+    image?: File;
+  }): Promise<any> => {
+    if (payload.image) {
+      const form = new FormData();
+      if (payload.first_name !== undefined) form.append('first_name', payload.first_name);
+      if (payload.last_name !== undefined) form.append('last_name', payload.last_name);
+      if (payload.email !== undefined) form.append('email', payload.email);
+      if (payload.bio !== undefined) form.append('bio', payload.bio);
+      form.append('image', payload.image);
+      return fetchWithAuth('/api/users/me/profile/', { method: 'PATCH', body: form });
+    }
     return fetchWithAuth('/api/users/me/profile/', {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(payload),
     });
   },
