@@ -25,7 +25,6 @@ django-cors-headers==4.9.0
 django-filter==25.2
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
-django-anymail[sendinblue]>=11.0,<13.0
 google-auth==2.49.2
 hyperlink==21.0.0
 idna==3.11
