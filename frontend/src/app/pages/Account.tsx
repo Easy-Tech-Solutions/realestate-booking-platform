@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import { useApp } from '../../hooks/useApp';
 import { getInitials } from '../../core/utils';
 import { toast } from 'sonner';
-import { cardsAPI, notificationsAPI, usersAPI } from '../../services/api.service';
+import { authAPI, cardsAPI, notificationsAPI, usersAPI } from '../../services/api.service';
 import type { SavedCard } from '../../services/api.service';
 import { normalizeUser } from '../../services/api/shared/normalizers';
 
@@ -678,7 +678,22 @@ export function Account() {
                   <p className="font-medium">Password</p>
                   <p className="text-sm text-muted-foreground">Update your account password</p>
                 </div>
-                <Button variant="outline" onClick={() => toast.info('Password reset email sent')}>Update</Button>
+                <Button variant = "outline" onClick={async () => {
+                  if (!user?.email) {
+                    toast.error("No email on file for this account.");
+                    return;
+                  }
+                  try {
+                    const res = await authAPI.passwordResetRequest(user.email);
+                    toast.success(res.message);
+                  }
+                  catch(err:any) {
+                    toast.error(err.message || "Failed to send reset email");
+                  }
+                }}
+                >
+                  Update 
+                </Button>
               </div>
               <Separator />
               <div className="flex items-center justify-between py-3">

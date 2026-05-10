@@ -46,7 +46,8 @@ def send_password_reset_email(user):
     user.save(update_fields=['password_reset_token', 'password_reset_token_expires_at'])
 
     subject = "Reset your Password"
-    reset_url = f"https://{settings.LOCAL_DOMAIN}/reset-password?token={token}"
+    frontend = getattr(settings, "FRONTEND_ORIGIN", "") or f"https://{settings.LOCAL_DOMAIN}"
+    reset_url = f"{frontend.rstrip('/')}/reset-password?token={token}"
     html_message = render_to_string("auth/password_reset_email.html", {
         "user": user,
         "reset_url": reset_url,
