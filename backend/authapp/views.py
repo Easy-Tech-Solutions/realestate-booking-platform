@@ -25,6 +25,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.http import HttpResponse
+from django.template.loader import render_to_string
 from django.db import transaction
 User = get_user_model()
 
@@ -119,22 +120,30 @@ def verify_email(request):
     if not token:
         return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
 
+    login_url = getattr(settings, "FRONTEND_ORIGIN", "") or f"https://{settings.LOCAL_DOMAIN}"
+
     try:
         user = User.objects.get(email_verification_token=token)
     except User.DoesNotExist:
         if request.method == "GET":
-            return HttpResponse(
-                "<html><body style='font-family: sans-serif; padding: 2rem;'><h1>Invalid verification link</h1><p>This verification link is invalid or has already been used.</p></body></html>",
-                status=400,
-            )
+            html = render_to_string("auth/verification_failure.html", {
+                "heading": "Invalid verification link",
+                "message": "This verification link is invalid or has already been used.",
+                "login_url": login_url,
+                "site_name": settings.SITE_NAME,
+            })
+            return HttpResponse(html, status=400)
         return Response({"error": "Invalid verification token"}, status=status.HTTP_400_BAD_REQUEST)
 
     if user.email_verification_token_expires_at and timezone.now() > user.email_verification_token_expires_at:
         if request.method == "GET":
-            return HttpResponse(
-                "<html><body style='font-family: sans-serif; padding: 2rem;'><h1>Link expired</h1><p>This verification link has expired. Please request a new one.</p></body></html>",
-                status=400,
-            )
+            html = render_to_string("auth/verification_failure.html", {
+                "heading": "Link expired",
+                "message": "This verification link has expired. Please request a new one.",
+                "login_url": login_url,
+                "site_name": settings.SITE_NAME,
+            })
+            return HttpResponse(html, status=400)
         return Response({"error": "Verification link has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
 
     user.email_verified = True
@@ -143,10 +152,11 @@ def verify_email(request):
     user.email_verification_token_expires_at = None
     user.save(update_fields=['email_verified', 'is_active', 'email_verification_token', 'email_verification_token_expires_at'])
     if request.method == "GET":
-        login_url = getattr(settings, "FRONTEND_ORIGIN", "") or f"https://{settings.LOCAL_DOMAIN}"
-        return HttpResponse(
-            f"<html><body style='font-family: sans-serif; padding: 2rem;'><h1>Email verified</h1><p>Your account is now active. You can return to the app and log in.</p><p><a href='{login_url}'>Open app</a></p></body></html>"
-        )
+        html = render_to_string("auth/verification_success.html", {
+            "login_url": login_url,
+            "site_name": settings.SITE_NAME,
+        })
+        return HttpResponse(html)
     return Response({"message": "Email verified successfully"}, status=status.HTTP_200_OK)
 
 @api_view(["POST"])
