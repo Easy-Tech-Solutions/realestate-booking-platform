@@ -1,13 +1,50 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <title>Verify Your Email - {{ site_name }}</title>
 </head>
-<body>
-    <h1>Welcome to {{ site_name }}, {{ user.username }}!</h1>
-    <p>Thank you for registering. Please verify your email address by clicking the link below:</p>
-    <p><a href="{{ verification_url }}">Verify Email</a></p>
-    <p>If you did not register for this account, please ignore this email.</p>
-    <p>Best regards,<br>Home Konet, Easy.Tech Solutions</p>
+<body style="margin:0; padding:0; background-color:#f6f7f6; font-family: Arial, Helvetica, sans-serif; color:#1a1a1a;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f6f7f6;">
+        <tr>
+            <td align="center" style="padding:32px 16px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px; background-color:#ffffff; border-radius:8px;">
+                    <tr>
+                        <td style="padding:32px 32px 16px 32px;">
+                            <h1 style="margin:0 0 16px 0; font-size:22px; line-height:1.3; color:#004406;">Welcome to {{ site_name }}, {{ user.username }}!</h1>
+                            <p style="margin:0 0 24px 0; font-size:15px; line-height:1.5;">Thank you for registering. Please verify your email address by clicking the button below.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center" style="padding:0 32px 32px 32px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td align="center" bgcolor="#004406" style="border-radius:6px;">
+                                        <a href="{{ verification_url }}"
+                                           target="_blank"
+                                           style="display:inline-block; padding:12px 32px; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:6px;">
+                                            Verify Email
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:0 32px 24px 32px;">
+                            <p style="margin:0 0 8px 0; font-size:13px; line-height:1.5; color:#555555;">If the button doesn't work, copy and paste this link into your browser:</p>
+                            <p style="margin:0 0 16px 0; font-size:13px; line-height:1.5; word-break:break-all;"><a href="{{ verification_url }}" style="color:#004406;">{{ verification_url }}</a></p>
+                            <p style="margin:0; font-size:13px; line-height:1.5; color:#555555;">If you did not register for this account, you can ignore this email.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:16px 32px 32px 32px; border-top:1px solid #ececec;">
+                            <p style="margin:0; font-size:12px; line-height:1.5; color:#888888;">Best regards,<br><strong style="color:#004406;">Home Konet</strong> &middot; Easy.Tech Solutions</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
