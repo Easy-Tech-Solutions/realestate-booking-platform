@@ -200,7 +200,12 @@ REDIS_URL = os.environ.get('REDIS_URL')
 # parser refuses to load such URLs and raises ValueError. Append the
 # parameter ourselves so cache, Celery, and channels_redis all stay happy.
 if REDIS_URL and REDIS_URL.startswith('rediss://') and 'ssl_cert_reqs' not in REDIS_URL:
-    REDIS_URL += ('&' if '?' in REDIS_URL else '?') + 'ssl_cert_reqs=CERT_REQUIRED'
+    # redis-py accepts the lowercase short forms "none", "optional", "required"
+    # (NOT the Python ssl.CERT_* constant names, despite a confusingly worded
+    # error message in older versions). "none" is the standard pragmatic
+    # choice for managed Redis providers whose certs don't always chain to a
+    # publicly trusted CA.
+    REDIS_URL += ('&' if '?' in REDIS_URL else '?') + 'ssl_cert_reqs=none'
 
 USE_DB_CACHE = env_bool("DJANGO_USE_DB_CACHE", False)
 
