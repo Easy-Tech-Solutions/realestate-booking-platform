@@ -194,6 +194,14 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "static"
 
 REDIS_URL = os.environ.get('REDIS_URL')
+
+# Managed Redis providers (Render Key Value, Upstash, AWS ElastiCache, etc.)
+# typically hand out rediss:// URLs without ssl_cert_reqs. redis-py's URL
+# parser refuses to load such URLs and raises ValueError. Append the
+# parameter ourselves so cache, Celery, and channels_redis all stay happy.
+if REDIS_URL and REDIS_URL.startswith('rediss://') and 'ssl_cert_reqs' not in REDIS_URL:
+    REDIS_URL += ('&' if '?' in REDIS_URL else '?') + 'ssl_cert_reqs=CERT_REQUIRED'
+
 USE_DB_CACHE = env_bool("DJANGO_USE_DB_CACHE", False)
 
 if REDIS_URL:
