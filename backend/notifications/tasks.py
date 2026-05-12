@@ -43,12 +43,19 @@ def send_notification_email(self, notification_id: int):
         logger.info('send_notification_email: user %s has no email address, skipping', user.pk)
         return
 
+    # Links in notification emails must point at the *frontend* (the app the
+    # user actually uses), not at the API. FRONTEND_ORIGIN is the canonical
+    # source for that; LOCAL_DOMAIN is kept as a last-ditch fallback so local
+    # dev without FRONTEND_ORIGIN still renders something useful.
+    site_url = getattr(settings, 'FRONTEND_ORIGIN', '') \
+        or getattr(settings, 'LOCAL_DOMAIN', 'http://localhost:5173')
+
     context = {
         'user':         user,
         'notification': notification,
         'data':         notification.data,
         'site_name':    getattr(settings, 'SITE_NAME', 'Real Estate Platform'),
-        'site_url':     getattr(settings, 'LOCAL_DOMAIN', 'localhost:8000'),
+        'site_url':     site_url,
     }
 
     # Try the specific template first, fall back to the generic one

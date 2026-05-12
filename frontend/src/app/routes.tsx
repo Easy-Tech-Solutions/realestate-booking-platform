@@ -91,7 +91,14 @@ export const router = createBrowserRouter([
       { path: 'booking/confirmed', Component: BookingConfirmed },
       { path: 'trips', Component: Trips },
       { path: 'wishlists', Component: Wishlists },
-      { path: 'messages', Component: Messages },
+      {
+        path: 'messages',
+        element: (
+          <ProtectedRoute>
+            <Messages />
+          </ProtectedRoute>
+        ),
+      },
       { path: 'account', Component: Account },
       {
         path: 'host',

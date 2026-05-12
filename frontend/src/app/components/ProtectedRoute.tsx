@@ -15,7 +15,8 @@ export function ProtectedRoute({ children, requireHost, requireAdmin }: Protecte
   if (isLoading) return null;
 
   if (!isAuthenticated) {
-    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
+    const target = `${location.pathname}${location.search}`;
+    return <Navigate to={`/login?next=${encodeURIComponent(target)}`} replace />;
   }
 
   if (requireHost && !user?.isHost) {
