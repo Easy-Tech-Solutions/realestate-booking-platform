@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Bell, Calendar, CheckCheck, MessageSquare, Star, Heart,
   ShieldAlert, DollarSign, Trash2, Circle, CheckCircle2, Loader2,
@@ -14,9 +15,25 @@ interface ApiNotification {
   notification_type: string;
   title: string;
   message: string;
+  data?: Record<string, unknown> | null;
   is_read: boolean;
   created_at: string;
   read_at: string | null;
+}
+
+function targetHref(n: ApiNotification): string | null {
+  const d = n.data ?? {};
+  const t = n.notification_type;
+  if (t === 'new_message' && d.conversation_id != null) {
+    return `/messages?conversation=${d.conversation_id}`;
+  }
+  if (t.startsWith('booking_') || t.startsWith('payment_')) {
+    return '/trips';
+  }
+  if ((t === 'price_changed' || t === 'listing_available' || t === 'new_review') && d.listing_id != null) {
+    return `/rooms/${d.listing_id}`;
+  }
+  return null;
 }
 
 function typeToCategory(t: string): 'booking' | 'message' | 'review' | 'payment' | 'system' {
@@ -46,6 +63,7 @@ const colorMap: Record<string, string> = {
 };
 
 export function Notifications() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
@@ -86,6 +104,16 @@ export function Notifications() {
         toast.error('Failed to delete notification');
       }
     });
+  };
+
+  const handleCardClick = async (n: ApiNotification) => {
+    const href = targetHref(n);
+    if (!n.is_read) {
+      // Fire-and-forget; UI updates optimistically and we don't block navigation.
+      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true, read_at: new Date().toISOString() } : x));
+      notificationsAPI.markRead(n.id).catch(() => { /* ignore — backend will catch up */ });
+    }
+    if (href) navigate(href);
   };
 
   const handleMarkAllRead = async () => {
@@ -157,14 +185,25 @@ export function Notifications() {
                 catch { return ''; }
               })();
 
+              const href = targetHref(n);
+              const clickable = href !== null;
+
               return (
                 <div
                   key={n.id}
+                  role={clickable ? 'button' : undefined}
+                  tabIndex={clickable ? 0 : undefined}
+                  onClick={clickable ? () => handleCardClick(n) : undefined}
+                  onKeyDown={clickable
+                    ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(n); } }
+                    : undefined
+                  }
                   className={cn(
                     'flex items-start gap-4 p-4 rounded-xl border transition-colors group',
                     n.is_read
                       ? 'border-border bg-background'
-                      : 'border-primary/20 bg-primary/5 dark:bg-primary/10'
+                      : 'border-primary/20 bg-primary/5 dark:bg-primary/10',
+                    clickable && 'cursor-pointer hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/40',
                   )}
                 >
                   {/* Icon */}
@@ -184,7 +223,7 @@ export function Notifications() {
                     <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         type="button"
-                        onClick={() => handleToggleRead(n)}
+                        onClick={(e) => { e.stopPropagation(); handleToggleRead(n); }}
                         disabled={isBusy}
                         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                       >
@@ -199,7 +238,7 @@ export function Notifications() {
                       <span className="text-muted-foreground/40">·</span>
                       <button
                         type="button"
-                        onClick={() => handleDelete(n.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(n.id); }}
                         disabled={isBusy}
                         className="inline-flex items-center gap-1 text-xs text-destructive/70 hover:text-destructive transition-colors disabled:opacity-50"
                       >
