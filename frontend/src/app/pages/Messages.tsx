@@ -163,7 +163,10 @@ function ChatPane({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
-  // Real-time WebSocket
+  // Real-time WebSocket — receive only. Sending goes through HTTP so
+  // persistence is guaranteed even when the WS handshake fails (e.g. origin
+  // rejected in production). The HTTP endpoint also broadcasts via channels,
+  // so other participants still get instant delivery when WS is healthy.
   const handleWsMessage = useCallback((wsMsg: ChatMessage) => {
     const newMsg: Message = {
       id: String(wsMsg.message_id),
@@ -177,14 +180,14 @@ function ChatPane({
       createdAt: wsMsg.created_at,
     };
     setMessages(prev => {
-      // deduplicate by id
+      // deduplicate by id — our own send already added it via HTTP response
       if (prev.some(m => m.id === newMsg.id)) return prev;
       return [...prev, newMsg];
     });
     queryClient.invalidateQueries({ queryKey: queryKeys.messages.conversations });
   }, [queryClient]);
 
-  const { sendMessage: wsSend, markRead } = useChatSocket({
+  const { markRead } = useChatSocket({
     conversationId: Number(conversation.id),
     onMessage: handleWsMessage,
     onConnected: () => markRead(),
@@ -210,20 +213,13 @@ function ChatPane({
     setMessages(prev => [...prev, optimistic]);
 
     try {
-      // Prefer WS if connected, fall back to HTTP
-      wsSend(text);
+      const sent = await messagesAPI.sendMessage(conversation.id, text);
+      setMessages(prev => prev.map(m => m.id === optimistic.id ? sent : m));
       queryClient.invalidateQueries({ queryKey: queryKeys.messages.conversations });
     } catch {
-      // WS not ready — use HTTP
-      try {
-        const sent = await messagesAPI.sendMessage(conversation.id, text);
-        setMessages(prev => prev.map(m => m.id === optimistic.id ? sent : m));
-        queryClient.invalidateQueries({ queryKey: queryKeys.messages.conversations });
-      } catch {
-        setMessages(prev => prev.filter(m => m.id !== optimistic.id));
-        setInput(text);
-        toast.error('Failed to send message');
-      }
+      setMessages(prev => prev.filter(m => m.id !== optimistic.id));
+      setInput(text);
+      toast.error('Failed to send message');
     } finally {
       setSending(false);
       inputRef.current?.focus();
