@@ -1,6 +1,19 @@
-﻿{% extends "emails/notifications/base_email.html" %}
+{% extends "emails/notifications/base_email.html" %}
 {% block content %}
-<h2 style="margin:0 0 16px;color:#111111;font-size:22px;font-weight:700;">{{ notification.title }}</h2>
-<p style="margin:0 0 24px;color:#444444;font-size:15px;line-height:1.6;">{{ notification.message }}</p>
+<h2 style="margin:0 0 16px;color:#004406;font-size:22px;font-weight:700;">{{ notification.title }}</h2>
+<p style="margin:0 0 28px;color:#444444;font-size:15px;line-height:1.6;">{{ notification.message }}</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+  <tr>
+    <td align="center" bgcolor="#004406" style="border-radius:6px;">
+      <a href="{{ site_url }}"
+         target="_blank"
+         style="display:inline-block;padding:12px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">
+        Open app
+      </a>
+    </td>
+  </tr>
+</table>
+
 <p style="margin:0;font-size:12px;color:#999999;">{{ notification.created_at|date:"N j, Y" }}</p>
 {% endblock %}
