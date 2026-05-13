@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from users.serializers import ProfileSerializer
 from .models import Conversation, Message, MessageAttachment
 
 User = get_user_model()
@@ -8,10 +9,11 @@ User = get_user_model()
 class ParticipantSerializer(serializers.ModelSerializer):
     #Minimal user info shown inside a conversation or message
     full_name = serializers.SerializerMethodField()
+    profile = ProfileSerializer(read_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'full_name']
+        fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'profile']
 
     def get_full_name(self, obj):
         return obj.get_full_name() or obj.email
