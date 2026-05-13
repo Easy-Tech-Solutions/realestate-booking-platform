@@ -38,13 +38,10 @@ export const usersAPI = {
     });
   },
 
-  verifyPhoneChange: async (payload: {
-    email_otp: string;
-    sms_otp: string;
-  }): Promise<{ message: string }> => {
+  verifyPhoneChange: async (otp: string): Promise<{ message: string }> => {
     return fetchWithAuth('/api/users/phone-change/verify/', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ otp }),
     });
   },
 

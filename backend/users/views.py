@@ -46,13 +46,14 @@ def user_detail(request, id):
 #     password is required and re-verified. Google-SSO accounts have no usable
 #     password, so the field is skipped server-side.
 #   • Creates (or resets) a PhoneChangeRequest row.
-#   • Generates two 6-digit OTPs in one go and dispatches them:
-#       – one to the user's email
-#       – one via SMS to the new phone number
+#   • Generates ONE 6-digit OTP and dispatches the same code via both channels:
+#       – the user's email
+#       – SMS to the new phone number
+#     The user only needs to receive it on one channel to proceed.
 #
 # Step 2  POST /api/users/phone-change/verify/
-#   Body: { "email_otp": "123456", "sms_otp": "654321" }
-#   • Both codes must be present and valid (expiry checked server-side).
+#   Body: { "otp": "123456" }
+#   • Validates the OTP (expiry checked server-side).
 #   • Updates Profile.momo_number with the new number.
 #   • Deletes the PhoneChangeRequest row.
 #   • Fires a PHONE_NUMBER_CHANGED in-app + email notification.
@@ -109,9 +110,10 @@ def initiate_phone_change(request):
     except Exception:
         pass
 
-    email_otp = generate_otp()
-    sms_otp   = generate_otp()
-    expiry    = timezone.now() + timedelta(minutes=OTP_VALID_MINUTES)
+    # Same OTP delivered through two channels so the user can use whichever
+    # arrives first. Both columns store the same value for schema consistency.
+    otp    = generate_otp()
+    expiry = timezone.now() + timedelta(minutes=OTP_VALID_MINUTES)
 
     PhoneChangeRequest.objects.update_or_create(
         user=user,
@@ -119,22 +121,22 @@ def initiate_phone_change(request):
             'new_phone_number':   new_phone_number,
             'network_provider':   network_provider,
             'password_verified':  True,
-            'email_otp':          email_otp,
+            'email_otp':          otp,
             'email_otp_expiry':   expiry,
             'email_otp_verified': False,
-            'sms_otp':            sms_otp,
+            'sms_otp':            otp,
             'sms_otp_expiry':     expiry,
             'sms_otp_verified':   False,
         },
     )
 
-    send_phone_change_email_otp(user, email_otp)
-    send_phone_change_sms_otp(new_phone_number, sms_otp, network_provider)
+    send_phone_change_email_otp(user, otp)
+    send_phone_change_sms_otp(new_phone_number, otp, network_provider)
 
     return Response({
         'message': (
-            f'Verification codes have been sent to your email and to '
-            f'{new_phone_number}. They expire in {OTP_VALID_MINUTES} minutes.'
+            f'A verification code has been sent to your email and to '
+            f'{new_phone_number}. It expires in {OTP_VALID_MINUTES} minutes.'
         ),
     }, status=200)
 
@@ -144,16 +146,12 @@ def initiate_phone_change(request):
 @throttle_classes([PhoneChangeRateThrottle])
 def verify_phone_change(request):
     """
-    Step 2: validate both OTPs → update phone number → notify user.
+    Step 2: validate the OTP → update phone number → notify user.
     """
-    email_otp = request.data.get('email_otp', '').strip()
-    sms_otp   = request.data.get('sms_otp', '').strip()
+    otp = request.data.get('otp', '').strip()
 
-    if not email_otp or not sms_otp:
-        return Response(
-            {'error': 'Both email_otp and sms_otp are required.'},
-            status=400,
-        )
+    if not otp:
+        return Response({'error': 'otp is required.'}, status=400)
 
     try:
         req = PhoneChangeRequest.objects.get(user=request.user)
@@ -163,17 +161,15 @@ def verify_phone_change(request):
             status=400,
         )
 
-    if req.is_email_otp_expired() or req.is_sms_otp_expired():
+    if req.is_email_otp_expired():
         req.delete()
         return Response(
-            {'error': 'Verification codes have expired. Please start over.'},
+            {'error': 'Verification code has expired. Please start over.'},
             status=400,
         )
 
-    if req.email_otp != email_otp:
-        return Response({'error': 'Invalid email code.'}, status=400)
-    if req.sms_otp != sms_otp:
-        return Response({'error': 'Invalid SMS code.'}, status=400)
+    if req.email_otp != otp:
+        return Response({'error': 'Invalid verification code.'}, status=400)
 
     new_number       = req.new_phone_number
     network_provider = req.network_provider

@@ -342,8 +342,7 @@ export function Account() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
   const [networkProvider, setNetworkProvider] = useState<'mtn' | 'orange'>('mtn');
-  const [emailOtp, setEmailOtp] = useState('');
-  const [smsOtp, setSmsOtp] = useState('');
+  const [otp, setOtp] = useState('');
   const [phoneFlowLoading, setPhoneFlowLoading] = useState(false);
 
   // Cards state
@@ -441,12 +440,12 @@ export function Account() {
   };
 
   const handleVerifyPhoneChange = async () => {
-    if (!emailOtp || !smsOtp) { toast.error('Enter both the email and SMS codes'); return; }
+    if (!otp) { toast.error('Enter the verification code'); return; }
     setPhoneFlowLoading(true);
     try {
-      const res = await usersAPI.verifyPhoneChange({ email_otp: emailOtp, sms_otp: smsOtp });
+      const res = await usersAPI.verifyPhoneChange(otp);
       setPhone(newPhoneNumber);
-      setCurrentPassword(''); setEmailOtp(''); setSmsOtp(''); setNewPhoneNumber('');
+      setCurrentPassword(''); setOtp(''); setNewPhoneNumber('');
       toast.success(res.message || 'Phone number updated');
     } catch (error: any) {
       toast.error(error?.message || 'Verification failed');
@@ -459,7 +458,7 @@ export function Account() {
     setPhoneFlowLoading(true);
     try {
       const res = await usersAPI.cancelPhoneChange();
-      setEmailOtp(''); setSmsOtp('');
+      setOtp('');
       toast.success(res.message || 'Phone change canceled');
     } catch (error: any) {
       toast.error(error?.message || 'Failed to cancel phone change');
@@ -622,8 +621,8 @@ export function Account() {
             <h2 className="text-xl font-semibold mb-2">Change Mobile Money Number</h2>
             <p className="text-sm text-muted-foreground mb-6">
               {user?.hasPassword === false
-                ? '2-step security flow: codes sent to your email and new number → enter both codes to confirm.'
-                : '2-step security flow: confirm your password and new number → enter the codes we send to your email and new number.'}
+                ? '2-step security flow: we send a 6-digit code to your email and new number → enter it to confirm.'
+                : '2-step security flow: confirm your password and new number → enter the 6-digit code we send to your email and new number.'}
             </p>
             <div className="space-y-4">
               <p className="text-sm font-medium text-muted-foreground">Step 1 — Request codes</p>
@@ -647,19 +646,19 @@ export function Account() {
                 </select>
               </div>
               <Button onClick={handleInitiatePhoneChange} disabled={phoneFlowLoading}>
-                {phoneFlowLoading ? 'Please wait…' : 'Send verification codes'}
+                {phoneFlowLoading ? 'Please wait…' : 'Send verification code'}
               </Button>
               <Separator />
-              <p className="text-sm font-medium text-muted-foreground">Step 2 — Enter the codes</p>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="emailOtp">Email code</Label>
-                  <Input id="emailOtp" placeholder="6-digit email code" value={emailOtp} onChange={e => setEmailOtp(e.target.value)} className="bg-card border-border" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="smsOtp">SMS code</Label>
-                  <Input id="smsOtp" placeholder="6-digit SMS code" value={smsOtp} onChange={e => setSmsOtp(e.target.value)} className="bg-card border-border" />
-                </div>
+              <p className="text-sm font-medium text-muted-foreground">Step 2 — Enter the code</p>
+              <div className="space-y-1.5">
+                <Label htmlFor="otp">Verification code</Label>
+                <Input
+                  id="otp"
+                  placeholder="6-digit code sent to your email and new number"
+                  value={otp}
+                  onChange={e => setOtp(e.target.value)}
+                  className="bg-card border-border"
+                />
               </div>
               <div className="flex gap-3">
                 <Button onClick={handleVerifyPhoneChange} disabled={phoneFlowLoading}>
