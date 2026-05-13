@@ -16,6 +16,7 @@ export function normalizeUser(u: any): User {
     isHost: u.role === 'agent' || u.role === 'admin',
     isAdmin: u.role === 'admin',
     verified: u.email_verified ?? false,
+    hasPassword: u.has_password,
     createdAt: u.date_joined || new Date().toISOString(),
   };
 }

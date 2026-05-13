@@ -12,6 +12,7 @@ export interface User {
   isHost: boolean;
   isAdmin?: boolean;
   verified: boolean;
+  hasPassword?: boolean;
   createdAt: string;
 }
 

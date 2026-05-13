@@ -28,11 +28,15 @@ class PublicUserSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer(read_only=True)
+    has_password = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
-            'role', 'email_verified', 'profile'
+            'role', 'email_verified', 'has_password', 'profile'
         ]
         read_only_fields = ['id', 'email_verified']
+
+    def get_has_password(self, obj):
+        return obj.has_usable_password()

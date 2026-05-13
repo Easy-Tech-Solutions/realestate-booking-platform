@@ -419,11 +419,20 @@ export function Account() {
   };
 
   const handleInitiatePhoneChange = async () => {
-    if (!currentPassword || !newPhoneNumber) { toast.error('Current password and new phone number are required'); return; }
+    if (!newPhoneNumber) { toast.error('New phone number is required'); return; }
+    if (user?.hasPassword !== false && !currentPassword) {
+      toast.error('Current password is required');
+      return;
+    }
     setPhoneFlowLoading(true);
     try {
-      const res = await usersAPI.initiatePhoneChange({ password: currentPassword, new_phone_number: newPhoneNumber, network_provider: networkProvider });
-      toast.success(res.message || 'Email verification code sent');
+      const payload: Parameters<typeof usersAPI.initiatePhoneChange>[0] = {
+        new_phone_number: newPhoneNumber,
+        network_provider: networkProvider,
+      };
+      if (user?.hasPassword !== false) payload.password = currentPassword;
+      const res = await usersAPI.initiatePhoneChange(payload);
+      toast.success(res.message || 'Verification codes sent');
     } catch (error: any) {
       toast.error(error?.message || 'Failed to start phone change');
     } finally {
@@ -431,29 +440,16 @@ export function Account() {
     }
   };
 
-  const handleVerifyEmailOtp = async () => {
-    if (!emailOtp) { toast.error('Enter the email OTP first'); return; }
+  const handleVerifyPhoneChange = async () => {
+    if (!emailOtp || !smsOtp) { toast.error('Enter both the email and SMS codes'); return; }
     setPhoneFlowLoading(true);
     try {
-      const res = await usersAPI.verifyPhoneChangeEmail(emailOtp);
-      toast.success(res.message || 'Email OTP verified');
-    } catch (error: any) {
-      toast.error(error?.message || 'Email OTP verification failed');
-    } finally {
-      setPhoneFlowLoading(false);
-    }
-  };
-
-  const handleVerifySmsOtp = async () => {
-    if (!smsOtp) { toast.error('Enter the SMS OTP first'); return; }
-    setPhoneFlowLoading(true);
-    try {
-      const res = await usersAPI.verifyPhoneChangeSms(smsOtp);
+      const res = await usersAPI.verifyPhoneChange({ email_otp: emailOtp, sms_otp: smsOtp });
       setPhone(newPhoneNumber);
       setCurrentPassword(''); setEmailOtp(''); setSmsOtp(''); setNewPhoneNumber('');
       toast.success(res.message || 'Phone number updated');
     } catch (error: any) {
-      toast.error(error?.message || 'SMS OTP verification failed');
+      toast.error(error?.message || 'Verification failed');
     } finally {
       setPhoneFlowLoading(false);
     }
@@ -625,14 +621,19 @@ export function Account() {
           <div className="border border-border rounded-xl p-6">
             <h2 className="text-xl font-semibold mb-2">Change Mobile Money Number</h2>
             <p className="text-sm text-muted-foreground mb-6">
-              3-step security flow: password verification → email OTP → SMS OTP on the new number.
+              {user?.hasPassword === false
+                ? '2-step security flow: codes sent to your email and new number → enter both codes to confirm.'
+                : '2-step security flow: confirm your password and new number → enter the codes we send to your email and new number.'}
             </p>
             <div className="space-y-4">
+              <p className="text-sm font-medium text-muted-foreground">Step 1 — Request codes</p>
               <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="currentPassword">Current password</Label>
-                  <Input id="currentPassword" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="bg-card border-border" />
-                </div>
+                {user?.hasPassword !== false && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="currentPassword">Current password</Label>
+                    <Input id="currentPassword" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="bg-card border-border" />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label htmlFor="newPhone">New MoMo number</Label>
                   <Input id="newPhone" value={newPhoneNumber} onChange={e => setNewPhoneNumber(e.target.value)} placeholder="e.g. 0880123456" className="bg-card border-border" />
@@ -646,26 +647,28 @@ export function Account() {
                 </select>
               </div>
               <Button onClick={handleInitiatePhoneChange} disabled={phoneFlowLoading}>
-                {phoneFlowLoading ? 'Please wait…' : 'Step 1 — Send Email OTP'}
+                {phoneFlowLoading ? 'Please wait…' : 'Send verification codes'}
               </Button>
               <Separator />
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-muted-foreground">Step 2 — Verify email code</p>
-                <div className="flex gap-3">
-                  <Input placeholder="6-digit email OTP" value={emailOtp} onChange={e => setEmailOtp(e.target.value)} className="bg-card border-border" />
-                  <Button variant="outline" onClick={handleVerifyEmailOtp} disabled={phoneFlowLoading} className="shrink-0">Verify</Button>
+              <p className="text-sm font-medium text-muted-foreground">Step 2 — Enter the codes</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="emailOtp">Email code</Label>
+                  <Input id="emailOtp" placeholder="6-digit email code" value={emailOtp} onChange={e => setEmailOtp(e.target.value)} className="bg-card border-border" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="smsOtp">SMS code</Label>
+                  <Input id="smsOtp" placeholder="6-digit SMS code" value={smsOtp} onChange={e => setSmsOtp(e.target.value)} className="bg-card border-border" />
                 </div>
               </div>
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-muted-foreground">Step 3 — Verify SMS code</p>
-                <div className="flex gap-3">
-                  <Input placeholder="6-digit SMS OTP" value={smsOtp} onChange={e => setSmsOtp(e.target.value)} className="bg-card border-border" />
-                  <Button variant="outline" onClick={handleVerifySmsOtp} disabled={phoneFlowLoading} className="shrink-0">Verify</Button>
-                </div>
+              <div className="flex gap-3">
+                <Button onClick={handleVerifyPhoneChange} disabled={phoneFlowLoading}>
+                  {phoneFlowLoading ? 'Please wait…' : 'Confirm change'}
+                </Button>
+                <Button variant="destructive" size="sm" onClick={handleCancelPhoneChange} disabled={phoneFlowLoading}>
+                  Cancel pending change
+                </Button>
               </div>
-              <Button variant="destructive" size="sm" onClick={handleCancelPhoneChange} disabled={phoneFlowLoading}>
-                Cancel pending change
-              </Button>
             </div>
           </div>
 

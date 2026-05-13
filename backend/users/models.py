@@ -44,13 +44,15 @@ class Profile(models.Model):
 
 class PhoneChangeRequest(models.Model):
     """
-    Tracks a pending phone number change through the 3-step verification flow:
-      Step 1 — Password re-entry    (password_verified = True)
-      Step 2 — Email OTP            (email_otp_verified = True  → SMS sent to new number)
-      Step 3 — SMS OTP on new number (sms_otp_verified = True   → phone updated)
+    Tracks a pending phone number change through the 2-step verification flow:
+      Step 1 — (optional password re-entry for accounts with a usable password)
+               → both email and SMS OTPs are generated and sent at once.
+      Step 2 — User submits both OTPs together; on success the phone is updated.
 
     One active request per user at a time (OneToOneField).  The row is deleted
-    after the change is committed or if the user cancels.
+    after the change is committed or if the user cancels. The *_verified flags
+    are retained for schema compatibility but are no longer used as
+    intermediate gates.
     """
     NETWORK_MTN    = 'mtn'
     NETWORK_ORANGE = 'orange'

@@ -28,7 +28,7 @@ export const usersAPI = {
   },
 
   initiatePhoneChange: async (payload: {
-    password: string;
+    password?: string;
     new_phone_number: string;
     network_provider: 'mtn' | 'orange';
   }): Promise<{ message: string }> => {
@@ -38,17 +38,13 @@ export const usersAPI = {
     });
   },
 
-  verifyPhoneChangeEmail: async (otp: string): Promise<{ message: string }> => {
-    return fetchWithAuth('/api/users/phone-change/verify-email/', {
+  verifyPhoneChange: async (payload: {
+    email_otp: string;
+    sms_otp: string;
+  }): Promise<{ message: string }> => {
+    return fetchWithAuth('/api/users/phone-change/verify/', {
       method: 'POST',
-      body: JSON.stringify({ otp }),
-    });
-  },
-
-  verifyPhoneChangeSms: async (otp: string): Promise<{ message: string }> => {
-    return fetchWithAuth('/api/users/phone-change/verify-sms/', {
-      method: 'POST',
-      body: JSON.stringify({ otp }),
+      body: JSON.stringify(payload),
     });
   },
 
