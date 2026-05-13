@@ -13,6 +13,7 @@ export function normalizeUser(u: any): User {
     lastName,
     avatar: u.profile?.image || undefined,
     bio: u.profile?.bio || undefined,
+    phone: u.profile?.momo_number || undefined,
     isHost: u.role === 'agent' || u.role === 'admin',
     isAdmin: u.role === 'admin',
     verified: u.email_verified ?? false,
