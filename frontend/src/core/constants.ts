@@ -1,6 +1,11 @@
 // Application constants
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// In production, leave VITE_API_URL unset so the frontend hits its own origin
+// (`/api/...`) and Vercel rewrites the request to the Django backend. Routing
+// through Vercel keeps the refresh-token cookie first-party, which is what
+// makes mobile Safari (and Chrome-on-iOS) keep users logged in after refresh.
+// Override with VITE_API_URL only for local dev pointing at a separate Django.
+export const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 // Always use secure WebSocket (wss://) in production; fall back to ws:// only in local dev.
 const _wsEnv = import.meta.env.VITE_WS_URL || '';
