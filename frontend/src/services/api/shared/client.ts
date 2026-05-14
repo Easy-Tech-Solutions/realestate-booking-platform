@@ -1,19 +1,30 @@
 import { API_BASE_URL } from '../../../core/constants';
 import { ApiError } from './errors';
 
-// Access token lives only in JS memory — never in localStorage/sessionStorage.
-// The refresh token is stored as an httpOnly cookie (set by the server).
+// Access token lives only in JS memory.
+// Refresh token is stored in localStorage so it survives page refreshes on
+// every browser — including mobile Safari, which blocks the cross-site
+// httpOnly cookie we used to depend on.
+const REFRESH_TOKEN_KEY = 'auth.refresh';
 let accessToken: string | null = null;
 
-export const setTokens = (access: string, _refresh?: string) => {
+export const setTokens = (access: string, refresh?: string) => {
   accessToken = access;
+  if (refresh) {
+    try { localStorage.setItem(REFRESH_TOKEN_KEY, refresh); } catch { /* storage disabled */ }
+  }
 };
 
 export const clearTokens = () => {
   accessToken = null;
+  try { localStorage.removeItem(REFRESH_TOKEN_KEY); } catch { /* storage disabled */ }
 };
 
 export const getAccessToken = () => accessToken;
+
+const getRefreshToken = (): string | null => {
+  try { return localStorage.getItem(REFRESH_TOKEN_KEY); } catch { return null; }
+};
 
 export async function fetchPublicJson<T>(url: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
@@ -36,11 +47,15 @@ export async function fetchPublicJson<T>(url: string, options: RequestInit = {})
 }
 
 export async function attemptTokenRefresh(): Promise<string | null> {
+  const refresh = getRefreshToken();
+  if (!refresh) return null;
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh-token/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include', // sends httpOnly refresh cookie
+      credentials: 'include', // sends legacy refresh cookie if still present
+      body: JSON.stringify({ refresh }),
     });
 
     if (!response.ok) {
@@ -50,6 +65,10 @@ export async function attemptTokenRefresh(): Promise<string | null> {
 
     const data = await response.json();
     accessToken = data.access;
+    // Backend may rotate the refresh token; persist the new one if so.
+    if (data.refresh) {
+      try { localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh); } catch { /* storage disabled */ }
+    }
     return data.access;
   } catch {
     clearTokens();

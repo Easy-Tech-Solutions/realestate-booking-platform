@@ -37,7 +37,7 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
-    setTokens(data.access);
+    setTokens(data.access, data.refresh);
     return { user: normalizeUser(data.user), access: data.access };
   },
 
@@ -113,7 +113,7 @@ export const authAPI = {
       };
     }
 
-    setTokens(data.access);
+    setTokens(data.access, data.refresh);
     return {
       status: 'success',
       user: normalizeUser(data.user),

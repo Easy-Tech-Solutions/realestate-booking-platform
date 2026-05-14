@@ -1,7 +1,7 @@
 export interface AuthLoginResponse {
   user: unknown;
   access: string;
-  refresh?: string; // no longer sent in JSON body; arrives via httpOnly cookie
+  refresh: string;
 }
 
 export interface ListingPricingResponse {

@@ -189,8 +189,13 @@ def login_view(request):
     access_token = str(refresh.access_token)
     refresh_token = str(refresh)
 
+    # The refresh token is returned in the JSON body so the SPA can persist it
+    # in localStorage. The cookie is kept for now as a soft fallback for
+    # already-issued sessions but the SPA no longer reads it; it can be removed
+    # in a later cleanup once nobody is relying on it.
     response = Response({
         "access": access_token,
+        "refresh": refresh_token,
         "user": UserSerializer(user).data,
     })
     response.set_cookie(
@@ -388,13 +393,18 @@ def _unique_username_from_email(email):
 
 def _issue_tokens_for_user(user, http_status=200):
     refresh = RefreshToken.for_user(user)
+    refresh_token = str(refresh)
     response = Response(
-        {"access": str(refresh.access_token), "user": UserSerializer(user).data},
+        {
+            "access": str(refresh.access_token),
+            "refresh": refresh_token,
+            "user": UserSerializer(user).data,
+        },
         status=http_status,
     )
     response.set_cookie(
         'refresh_token',
-        str(refresh),
+        refresh_token,
         httponly=True,
         secure=not settings.DEBUG,
         samesite='None' if not settings.DEBUG else 'Lax',
