@@ -70,19 +70,13 @@ export function Header() {
               <img src={logo} alt="HomeKonet" className="h-10 w-auto" />
             </Link>
 
-            {/* Search Bar - Desktop */}
+            {/* Search Button - Desktop */}
             <button
               onClick={() => setShowSearchDialog(true)}
-              className="hidden md:flex items-center gap-4 px-6 py-3 border border-border rounded-full shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              className="hidden md:flex items-center gap-3 px-5 py-2.5 bg-primary text-white rounded-full shadow-md hover:bg-primary/90 hover:shadow-lg transition-all cursor-pointer group"
             >
-              <span className="text-sm font-medium">Anywhere</span>
-              <div className="w-px h-6 bg-border" />
-              <span className="text-sm font-medium">Any week</span>
-              <div className="w-px h-6 bg-border" />
-              <span className="text-sm text-muted-foreground">Add guests</span>
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <Search className="w-4 h-4 text-white" />
-              </div>
+              <Search className="w-4 h-4" />
+              <span className="text-sm font-semibold">Find Your Stay</span>
             </button>
 
             {/* Search Icon - Mobile */}
@@ -90,9 +84,9 @@ export function Header() {
               type="button"
               title="Search"
               onClick={() => setShowSearchDialog(true)}
-              className="md:hidden p-2 rounded-full hover:bg-muted"
+              className="md:hidden w-9 h-9 bg-primary text-white rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors"
             >
-              <Search className="w-5 h-5" />
+              <Search className="w-4 h-4" />
             </button>
 
             {/* Right Menu */}

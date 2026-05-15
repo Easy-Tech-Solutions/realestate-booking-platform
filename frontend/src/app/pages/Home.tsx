@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Search, MapPin, Star, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, MapPin, Star, ArrowRight, Quote } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -241,6 +241,157 @@ export function Home() {
           </div>
         )}
       </div>
+
+      {/* ── Testimonials ── */}
+      {!selectedCategory && (
+        <div className="bg-muted/30 border-t border-border">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-20">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-semibold mb-3">What our guests say</h2>
+              <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+                Real experiences from real travelers who found their perfect stay on HomeKonet.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                {
+                  name: 'Amara Kofi',
+                  location: 'Accra, Ghana',
+                  rating: 5,
+                  avatar: 'AK',
+                  color: 'bg-emerald-600',
+                  quote: 'HomeKonet made finding a place in Monrovia so easy. The listing photos were accurate and the host was incredibly responsive. Will definitely book again.',
+                },
+                {
+                  name: 'Fatima Diallo',
+                  location: 'Dakar, Senegal',
+                  rating: 5,
+                  avatar: 'FD',
+                  color: 'bg-blue-600',
+                  quote: 'I was nervous booking online for the first time, but the process was seamless. The MTN MoMo payment worked perfectly and I got instant confirmation.',
+                },
+                {
+                  name: 'James Mensah',
+                  location: 'Lagos, Nigeria',
+                  rating: 5,
+                  avatar: 'JM',
+                  color: 'bg-orange-600',
+                  quote: 'Stayed at a beautiful apartment in Paynesville. The host was a superhost and everything was exactly as described. Highly recommend HomeKonet.',
+                },
+                {
+                  name: 'Grace Osei',
+                  location: 'Kumasi, Ghana',
+                  rating: 4,
+                  avatar: 'GO',
+                  color: 'bg-purple-600',
+                  quote: 'Great selection of properties across Liberia. I found a hotel room with all the amenities I needed at a very fair price. The messaging feature made coordination easy.',
+                },
+                {
+                  name: 'Emmanuel Tetteh',
+                  location: 'Lomé, Togo',
+                  rating: 5,
+                  avatar: 'ET',
+                  color: 'bg-rose-600',
+                  quote: 'The platform is clean and intuitive. I booked a villa for a family trip and the whole experience from search to check-out was flawless. 10/10.',
+                },
+                {
+                  name: 'Mariama Bah',
+                  location: 'Conakry, Guinea',
+                  rating: 5,
+                  avatar: 'MB',
+                  color: 'bg-teal-600',
+                  quote: 'I love that I can pay with Mobile Money. No need for a credit card. HomeKonet is built for us in West Africa and it shows. Excellent service.',
+                },
+              ].map((t) => (
+                <div key={t.name} className="bg-background rounded-2xl border border-border p-6 flex flex-col gap-4">
+                  <Quote className="w-6 h-6 text-primary/40 flex-shrink-0" />
+                  <p className="text-sm leading-relaxed text-foreground flex-1">{t.quote}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className={`w-3.5 h-3.5 ${i < t.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-white text-sm font-semibold flex-shrink-0`}>
+                      {t.avatar}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">{t.location}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Trusted Partners ── */}
+      {!selectedCategory && (
+        <div className="border-t border-border">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-20">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-semibold mb-3">Trusted partners</h2>
+              <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+                We work with leading organisations to ensure every booking is safe, legal, and well-supported.
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-12">
+              {/* Marketing Partners */}
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-6">Marketing &amp; Distribution</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { name: 'MTN Mobile Money', abbr: 'MTN', color: 'bg-yellow-400 text-yellow-900', desc: 'Official payment partner' },
+                    { name: 'Orange Money', abbr: 'OM', color: 'bg-orange-500 text-white', desc: 'Mobile payment network' },
+                    { name: 'Liberia Tourism', abbr: 'LT', color: 'bg-[#004406] text-white', desc: 'National tourism board' },
+                    { name: 'West Africa Travel', abbr: 'WAT', color: 'bg-blue-600 text-white', desc: 'Regional travel network' },
+                  ].map((p) => (
+                    <div key={p.name} className="flex items-center gap-3 p-4 rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-colors">
+                      <div className={`w-12 h-12 rounded-xl ${p.color} flex items-center justify-center text-xs font-bold flex-shrink-0`}>
+                        {p.abbr}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Legal & Compliance Partners */}
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-6">Legal &amp; Compliance</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { name: 'Liberia Revenue Authority', abbr: 'LRA', color: 'bg-slate-700 text-white', desc: 'Tax compliance partner' },
+                    { name: 'Central Bank of Liberia', abbr: 'CBL', color: 'bg-green-800 text-white', desc: 'Financial regulation' },
+                    { name: 'Ministry of Commerce', abbr: 'MC', color: 'bg-red-700 text-white', desc: 'Business licensing' },
+                    { name: 'ECOWAS Trade', abbr: 'ECO', color: 'bg-indigo-600 text-white', desc: 'Regional trade body' },
+                  ].map((p) => (
+                    <div key={p.name} className="flex items-center gap-3 p-4 rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-colors">
+                      <div className={`w-12 h-12 rounded-xl ${p.color} flex items-center justify-center text-xs font-bold flex-shrink-0`}>
+                        {p.abbr}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-center text-xs text-muted-foreground mt-10">
+              HomeKonet operates in full compliance with Liberian commercial law and ECOWAS regional trade regulations.
+              All transactions are processed through licensed financial institutions.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Host CTA Banner */}
       {!selectedCategory && (
