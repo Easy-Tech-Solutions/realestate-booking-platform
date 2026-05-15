@@ -12,4 +12,5 @@ export { usersAPI } from './users';
 export { reportsAPI } from './reports';
 export { suspensionsAPI } from './suspensions';
 export { bookingToolsAPI } from './booking-tools';
+export { newsletterAPI } from './newsletter';
 export { clearTokens, getAccessToken, setTokens, attemptTokenRefresh } from './shared/client';

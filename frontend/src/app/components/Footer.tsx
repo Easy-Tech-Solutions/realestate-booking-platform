@@ -2,11 +2,25 @@ import React from 'react';
 import { Globe } from 'lucide-react';
 import { Link } from 'react-router';
 import { Separator } from './ui/separator';
+import { NewsletterSignup } from './NewsletterSignup';
 import logo from '../../assets/logo2.jpg';
 
 export function Footer() {
   return (
     <footer className="border-t border-border bg-muted/30 mt-20">
+      {/* Newsletter strip */}
+      <div className="border-b border-border">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-8 flex flex-col sm:flex-row items-start sm:items-center gap-6">
+          <div className="shrink-0">
+            <p className="font-semibold text-sm mb-0.5">Stay in the loop</p>
+            <p className="text-xs text-muted-foreground">New listings, hotel deals & exclusive discounts — in your inbox.</p>
+          </div>
+          <div className="flex-1 max-w-sm">
+            <NewsletterSignup variant="footer" />
+          </div>
+        </div>
+      </div>
+
       <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
@@ -22,9 +36,9 @@ export function Footer() {
             <h3 className="font-semibold mb-4">Community</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li><Link to="/search" className="hover:text-foreground">Browse listings</Link></li>
+              <li><Link to="/reviews" className="hover:text-foreground">Guest reviews</Link></li>
               <li><Link to="/privacy#anti-discrimination" className="hover:text-foreground">Anti-discrimination policy</Link></li>
               <li><Link to="/terms" className="hover:text-foreground">Terms of service</Link></li>
-              <li><Link to="/privacy" className="hover:text-foreground">Privacy policy</Link></li>
             </ul>
           </div>
           <div>
@@ -38,8 +52,8 @@ export function Footer() {
           </div>
           <div>
             <h3 className="font-semibold mb-4">
-            <img src={logo} alt="HomeKonet" className="h-8 w-auto" />
-          </h3>
+              <img src={logo} alt="HomeKonet" className="h-8 w-auto" />
+            </h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li><Link to="/help#about" className="hover:text-foreground">About us</Link></li>
               <li><Link to="/notifications" className="hover:text-foreground">Notifications</Link></li>

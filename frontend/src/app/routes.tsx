@@ -75,8 +75,7 @@ const Privacy = lazyPage(() => import('./pages/Privacy').then((module) => ({ def
 const NotFound = lazyPage(() => import('./pages/NotFound').then((module) => ({ default: module.NotFound })));
 const ResetPassword = lazyPage(() => import('./pages/ResetPassword').then((module) => ({ default: module.ResetPassword })));
 const ManageRooms = lazyPage(() => import('./pages/ManageRooms').then((module) => ({ default: module.ManageRooms })));
-
-
+const AllReviews = lazyPage(() => import('./pages/AllReviews').then((module) => ({ default: module.AllReviews })));
 
 export const router = createBrowserRouter([
   {
@@ -158,7 +157,7 @@ export const router = createBrowserRouter([
       { path: 'privacy', Component: Privacy },
       { path: '*', Component: NotFound },
       { path: 'reset-password', Component: ResetPassword },
-
+      { path: 'reviews', Component: AllReviews },
     ],
   },
 ]);

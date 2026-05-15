@@ -190,8 +190,41 @@ def favorite_listing(request, id):
 @api_view(["GET"])
 def listing_reviews(request, listing_id):
     listing = get_object_or_404(Listing, pk=listing_id)
-    reviews = Review.objects.filter(listing=listing)
+    reviews = Review.objects.filter(listing=listing).select_related('reviewer', 'reviewer__profile')
     return Response(ReviewSerializer(reviews, many=True, context={"request": request}).data)
+
+
+@api_view(["GET"])
+def all_reviews(request):
+    """
+    GET /api/listings/reviews/  — public paginated list of all reviews.
+    Query params: ?ordering=-created_at|rating  ?min_rating=4  ?page=1
+    """
+    qs = Review.objects.select_related(
+        'reviewer', 'reviewer__profile', 'listing'
+    ).prefetch_related('images')
+
+    min_rating = request.query_params.get('min_rating')
+    if min_rating:
+        try:
+            qs = qs.filter(rating__gte=int(min_rating))
+        except ValueError:
+            pass
+
+    listing_id_param = request.query_params.get('listing_id')
+    if listing_id_param:
+        qs = qs.filter(listing_id=listing_id_param)
+
+    ordering = request.query_params.get('ordering', '-created_at')
+    if ordering in ('created_at', '-created_at', 'rating', '-rating'):
+        qs = qs.order_by(ordering)
+
+    paginator = _ListingPagination()
+    paginator.page_size = 12
+    page = paginator.paginate_queryset(qs, request)
+    return paginator.get_paginated_response(
+        ReviewSerializer(page, many=True, context={'request': request}).data
+    )
 
 
 @api_view(["POST"])
