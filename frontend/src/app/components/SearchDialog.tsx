@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   X, Search, MapPin, Calendar as CalendarIcon, Users,
-  Minus, Plus, Home, Building2, TreePine, Landmark, SlidersHorizontal,
+  Minus, Plus, SlidersHorizontal, Loader2,
 } from 'lucide-react';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
@@ -10,6 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { format } from 'date-fns';
 import { useApp } from '../../hooks/useApp';
 import { useNavigate } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
+import { propertiesAPI } from '../../services/api.service';
+import { PROPERTY_CATEGORIES } from '../../core/constants';
 import { cn } from '../../core/utils';
 
 interface SearchDialogProps {
@@ -17,33 +20,31 @@ interface SearchDialogProps {
   onClose: () => void;
 }
 
-type StayType = 'stays' | 'hotels';
-
+// Liberian cities for quick-pick
 const LIBERIA_LOCATIONS = [
   'Monrovia', 'Paynesville', 'Gbarnga', 'Buchanan',
   'Kakata', 'Voinjama', 'Zwedru', 'Harper',
   'Robertsport', 'Tubmanburg',
 ];
 
-const PROPERTY_TYPES = [
-  { id: '',          label: 'Any',       icon: SlidersHorizontal },
-  { id: 'apartment', label: 'Apartment', icon: Building2 },
-  { id: 'house',     label: 'House',     icon: Home },
-  { id: 'villa',     label: 'Villa',     icon: Landmark },
-  { id: 'cabin',     label: 'Cabin',     icon: TreePine },
-  { id: 'hotel',     label: 'Hotel',     icon: Building2 },
+// Budget presets in LRD
+const BUDGET_PRESETS = [
+  { label: 'Under L$500',    max: 500 },
+  { label: 'L$500–1,500',    max: 1500 },
+  { label: 'L$1,500–3,000',  max: 3000 },
+  { label: 'L$3,000+',       max: 99999 },
 ];
 
-const BUDGET_PRESETS = [
-  { label: 'Under L$500',   max: 500 },
-  { label: 'L$500–1,500',   max: 1500 },
-  { label: 'L$1,500–3,000', max: 3000 },
-  { label: 'L$3,000+',      max: 99999 },
-];
+// Category icon fallback map
+const CATEGORY_ICONS: Record<string, string> = {
+  apartment: '🏠', hotels: '🏨', lodge: '🛖', beaches: '🏖️',
+  roadside: '🛣️', highway: '🚗', land: '🌿', 'office-space': '🏢',
+  hall: '🏛️', house: '🏡', villa: '🏰', cabin: '🪵',
+  resort: '🌴', hotel: '🏨', suite: '🛎️',
+};
 
 function Counter({
-  label, sub, value, min = 0,
-  onChange,
+  label, sub, value, min = 0, onChange,
 }: {
   label: string; sub: string; value: number; min?: number;
   onChange: (n: number) => void;
@@ -80,28 +81,51 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const navigate = useNavigate();
   const { setSearchFilters } = useApp();
 
-  const [stayType, setStayType]         = useState<StayType>('stays');
   const [location, setLocation]         = useState('');
   const [checkIn, setCheckIn]           = useState<Date>();
   const [checkOut, setCheckOut]         = useState<Date>();
-  const [propertyType, setPropertyType] = useState('');
+  const [selectedType, setSelectedType] = useState('');
   const [budgetMax, setBudgetMax]       = useState<number | null>(null);
   const [guests, setGuests] = useState({ adults: 1, children: 0, infants: 0, pets: 0 });
+
+  // Pull categories from backend; fall back to local constants
+  const categoriesQuery = useQuery({
+    queryKey: ['property-categories'],
+    queryFn: () => propertiesAPI.listCategories(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const categories: { id: string; name: string; icon: string }[] = [
+    { id: '', name: 'Any', icon: '🔍' },
+    ...(categoriesQuery.data && categoriesQuery.data.length > 0
+      ? categoriesQuery.data
+          .filter((c) => c.is_active)
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((c) => ({
+            id: c.slug,
+            name: c.name,
+            icon: CATEGORY_ICONS[c.slug] ??
+              PROPERTY_CATEGORIES.find((p) => p.id === c.slug)?.icon ??
+              '🏷️',
+          }))
+      : PROPERTY_CATEGORIES.map((c) => ({ id: c.id, name: c.name, icon: c.icon }))
+    ),
+  ];
 
   const totalGuests = guests.adults + guests.children;
 
   const handleSearch = () => {
     setSearchFilters({
-      location,
+      location: location.trim() || undefined,
       checkIn,
       checkOut,
       adults: guests.adults,
       children: guests.children,
       infants: guests.infants,
       pets: guests.pets,
-      guests: totalGuests,
-      ...(propertyType ? { propertyType: [propertyType as any] } : {}),
-      ...(budgetMax ? { priceMax: budgetMax } : {}),
+      guests: totalGuests > 0 ? totalGuests : undefined,
+      ...(selectedType ? { propertyType: [selectedType as any] } : {}),
+      ...(budgetMax && budgetMax < 99999 ? { priceMax: budgetMax } : {}),
     });
     navigate('/search');
     onClose();
@@ -111,13 +135,21 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     setLocation('');
     setCheckIn(undefined);
     setCheckOut(undefined);
-    setPropertyType('');
+    setSelectedType('');
     setBudgetMax(null);
     setGuests({ adults: 1, children: 0, infants: 0, pets: 0 });
   };
 
-  const hasAnyFilter = location || checkIn || checkOut || propertyType || budgetMax ||
+  const hasAnyFilter =
+    Boolean(location) || Boolean(checkIn) || Boolean(checkOut) ||
+    Boolean(selectedType) || Boolean(budgetMax) ||
     guests.children > 0 || guests.adults > 1;
+
+  const searchLabel = location.trim()
+    ? `Search in ${location.trim()}`
+    : selectedType
+      ? `Search ${categories.find((c) => c.id === selectedType)?.name ?? 'properties'}`
+      : 'Search all properties';
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -141,35 +173,17 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               Clear all
             </button>
           ) : (
-            <div className="w-10" />
+            <div className="w-14" />
           )}
         </div>
 
         <div className="p-6 space-y-6">
 
-          {/* ── Stay type tabs ── */}
-          <div className="flex gap-1 p-1 bg-muted rounded-xl">
-            {(['stays', 'hotels'] as StayType[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setStayType(t)}
-                className={cn(
-                  'flex-1 py-2 rounded-lg text-sm font-semibold capitalize transition-all',
-                  stayType === t
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {t === 'stays' ? '🏠 Stays' : '🏨 Hotels'}
-              </button>
-            ))}
-          </div>
-
           {/* ── Location ── */}
           <div className="space-y-3">
             <label className="text-sm font-semibold flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-primary" /> Where in Liberia?
+              <MapPin className="w-4 h-4 text-primary" />
+              Where in Liberia?
             </label>
             <div className="relative">
               <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -179,15 +193,16 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 className="w-full pl-11 pr-4 py-3 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               />
             </div>
-            {/* Quick-pick chips */}
+            {/* Quick-pick city chips */}
             <div className="flex flex-wrap gap-2">
               {LIBERIA_LOCATIONS.map((city) => (
                 <button
                   key={city}
                   type="button"
-                  onClick={() => setLocation(city)}
+                  onClick={() => setLocation(location === city ? '' : city)}
                   className={cn(
                     'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
                     location === city
@@ -204,7 +219,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           {/* ── Dates ── */}
           <div className="space-y-3">
             <label className="text-sm font-semibold flex items-center gap-2">
-              <CalendarIcon className="w-4 h-4 text-primary" /> When?
+              <CalendarIcon className="w-4 h-4 text-primary" />
+              When?
             </label>
             <div className="grid grid-cols-2 gap-3">
               <Popover>
@@ -251,26 +267,30 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
             </div>
           </div>
 
-          {/* ── Property type ── */}
+          {/* ── Property type — from backend ── */}
           <div className="space-y-3">
             <label className="text-sm font-semibold flex items-center gap-2">
-              <Home className="w-4 h-4 text-primary" /> Property type
+              <SlidersHorizontal className="w-4 h-4 text-primary" />
+              Property type
+              {categoriesQuery.isLoading && (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+              )}
             </label>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {PROPERTY_TYPES.map(({ id, label, icon: Icon }) => (
+            <div className="flex flex-wrap gap-2">
+              {categories.map(({ id, name, icon }) => (
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setPropertyType(id)}
+                  onClick={() => setSelectedType(selectedType === id ? '' : id)}
                   className={cn(
-                    'flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border text-xs font-medium transition-all',
-                    propertyType === id
+                    'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all',
+                    selectedType === id
                       ? 'border-primary bg-primary/5 text-primary'
                       : 'border-border hover:border-primary/60 text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  <Icon className="w-4 h-4" />
-                  {label}
+                  <span>{icon}</span>
+                  {name}
                 </button>
               ))}
             </div>
@@ -301,28 +321,34 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           {/* ── Guests ── */}
           <div className="space-y-3">
             <label className="text-sm font-semibold flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary" /> Guests
+              <Users className="w-4 h-4 text-primary" />
+              Guests
             </label>
             <div className="border border-border rounded-xl px-4 divide-y divide-border">
-              <Counter label="Adults"   sub="Ages 13+"  value={guests.adults}   min={1} onChange={(n) => setGuests({ ...guests, adults: n })} />
-              <Counter label="Children" sub="Ages 2–12" value={guests.children}         onChange={(n) => setGuests({ ...guests, children: n })} />
-              <Counter label="Infants"  sub="Under 2"   value={guests.infants}          onChange={(n) => setGuests({ ...guests, infants: n })} />
-              <Counter label="Pets"     sub="Bringing a pet?" value={guests.pets}        onChange={(n) => setGuests({ ...guests, pets: n })} />
+              <Counter label="Adults"   sub="Ages 13+"      value={guests.adults}   min={1} onChange={(n) => setGuests({ ...guests, adults: n })} />
+              <Counter label="Children" sub="Ages 2–12"     value={guests.children}         onChange={(n) => setGuests({ ...guests, children: n })} />
+              <Counter label="Infants"  sub="Under 2"       value={guests.infants}          onChange={(n) => setGuests({ ...guests, infants: n })} />
+              <Counter label="Pets"     sub="Bringing a pet?" value={guests.pets}            onChange={(n) => setGuests({ ...guests, pets: n })} />
             </div>
           </div>
 
           {/* ── Search button ── */}
-          <Button onClick={handleSearch} className="w-full h-12 text-base font-semibold rounded-xl" size="lg">
+          <Button
+            onClick={handleSearch}
+            className="w-full h-12 text-base font-semibold rounded-xl"
+            size="lg"
+          >
             <Search className="w-5 h-5 mr-2" />
-            Search{location ? ` in ${location}` : ' properties'}
+            {searchLabel}
           </Button>
 
-          {/* Summary line */}
-          {(checkIn || checkOut || totalGuests > 1) && (
+          {/* Active filter summary */}
+          {(checkIn || checkOut || totalGuests > 1 || budgetMax) && (
             <p className="text-center text-xs text-muted-foreground">
               {[
                 checkIn && checkOut && `${format(checkIn, 'MMM d')} – ${format(checkOut, 'MMM d')}`,
                 totalGuests > 1 && `${totalGuests} guests`,
+                budgetMax && budgetMax < 99999 && `Max L$${budgetMax.toLocaleString()}`,
               ].filter(Boolean).join(' · ')}
             </p>
           )}
