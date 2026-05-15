@@ -324,7 +324,20 @@ export function CreateListing() {
     if (!saved) return;
     try {
       const { form: savedForm, stepIndex: savedStep, draftListingId: savedDraftId } = JSON.parse(saved);
-      setForm((prev) => ({ ...prev, ...savedForm, images: [], imagePreviews: [] }));
+      // Restore rooms with file fields defaulted — File objects can't be serialized
+      const restoredRooms = (savedForm.hotelRooms || []).map((r: any) => ({
+        ...defaultRoom,
+        ...r,
+        roomImages: [],
+        roomImagePreviews: [],
+      }));
+      setForm((prev) => ({
+        ...prev,
+        ...savedForm,
+        hotelRooms: restoredRooms,
+        images: [],
+        imagePreviews: [],
+      }));
       setStepIndex(savedStep ?? 0);
       if (savedDraftId) setDraftListingId(savedDraftId);
       setDraftRestored(true);
