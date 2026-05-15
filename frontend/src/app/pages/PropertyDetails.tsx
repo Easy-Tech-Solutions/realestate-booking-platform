@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
 import {
   Star, Share, Heart, MapPin, Award, Shield,
   ChevronLeft, ChevronRight, X, Minus, Plus, MessageCircle, BedDouble, Users, Check,
@@ -27,6 +25,7 @@ import { usePropertyDetails } from '../../hooks/queries/usePropertyDetails';
 import { usePropertyPricing } from '../../hooks/queries/usePropertyPricing';
 import { fallbackIcon, iconMap } from '../../core/icon-map';
 import { queryKeys } from '../../hooks/queries/keys';
+import { LiberiaMap } from '../components/LiberiaMap';
 
 function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [hovered, setHovered] = useState(0);
@@ -777,30 +776,24 @@ export function PropertyDetails() {
               <Separator />
 
               {/* Location */}
-              {property.location.lat !== 0 && property.location.lng !== 0 && (
-                <div>
-                  <h2 className="text-2xl font-semibold mb-6">Where you'll be</h2>
-                  <p className="text-muted-foreground mb-4">
-                    {property.location.city}, {property.location.state}, {property.location.country}
-                  </p>
-                  <div className="h-[400px] rounded-xl overflow-hidden">
-                    <MapContainer
-                      center={L.latLng(property.location.lat, property.location.lng)}
-                      zoom={13}
-                      style={{ blockSize: '100%', inlineSize: '100%' }}
-                      scrollWheelZoom={false}
-                    >
-                      <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                      />
-                      <Marker position={L.latLng(property.location.lat, property.location.lng)}>
-                        <Popup>{property.title}</Popup>
-                      </Marker>
-                    </MapContainer>
-                  </div>
-                </div>
-              )}
+              <div>
+                <h2 className="text-2xl font-semibold mb-6">Where you'll be</h2>
+                <p className="text-muted-foreground mb-4">
+                  {property.location.city}, {property.location.state}, {property.location.country}
+                </p>
+                <LiberiaMap
+                  lat={property.location.lat}
+                  lng={property.location.lng}
+                  address={[
+                    property.location.address,
+                    property.location.city,
+                    property.location.state,
+                    property.location.country,
+                  ].filter(Boolean).join(', ')}
+                  popupLabel={property.title}
+                  className="h-[400px] w-full rounded-xl overflow-hidden relative"
+                />
+              </div>
 
               <Separator />
 
