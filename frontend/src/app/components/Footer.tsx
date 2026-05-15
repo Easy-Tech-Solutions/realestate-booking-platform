@@ -13,26 +13,27 @@ export function Footer() {
             <h3 className="font-semibold mb-4">Support</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li><Link to="/help" className="hover:text-foreground">Help Center</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">Safety information</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">Cancellation options</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">Our COVID-19 Response</Link></li>
+              <li><Link to="/help#safety" className="hover:text-foreground">Safety information</Link></li>
+              <li><Link to="/help#cancellation" className="hover:text-foreground">Cancellation options</Link></li>
+              <li><a href="mailto:homekonnet@gmail.com" className="hover:text-foreground">Contact us</a></li>
             </ul>
           </div>
           <div>
             <h3 className="font-semibold mb-4">Community</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><Link to="/help" className="hover:text-foreground">Report a problem</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">Anti-discrimination policy</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">Safety resources</Link></li>
+              <li><Link to="/search" className="hover:text-foreground">Browse listings</Link></li>
+              <li><Link to="/privacy#anti-discrimination" className="hover:text-foreground">Anti-discrimination policy</Link></li>
+              <li><Link to="/terms" className="hover:text-foreground">Terms of service</Link></li>
+              <li><Link to="/privacy" className="hover:text-foreground">Privacy policy</Link></li>
             </ul>
           </div>
           <div>
             <h3 className="font-semibold mb-4">Hosting</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><Link to="/host/new" className="hover:text-foreground">Try hosting</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">Explore hosting resources</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">Visit our community forum</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">How to host responsibly</Link></li>
+              <li><Link to="/host/new" className="hover:text-foreground">List your property</Link></li>
+              <li><Link to="/host" className="hover:text-foreground">Host dashboard</Link></li>
+              <li><Link to="/help#hosting" className="hover:text-foreground">Hosting resources</Link></li>
+              <li><Link to="/help#responsible" className="hover:text-foreground">Host responsibly</Link></li>
             </ul>
           </div>
           <div>
@@ -40,10 +41,10 @@ export function Footer() {
             <img src={logo} alt="HomeKonet" className="h-8 w-auto" />
           </h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><Link to="/help" className="hover:text-foreground">About us</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">New features</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">Careers</Link></li>
-              <li><Link to="/help" className="hover:text-foreground">Press</Link></li>
+              <li><Link to="/help#about" className="hover:text-foreground">About us</Link></li>
+              <li><Link to="/notifications" className="hover:text-foreground">Notifications</Link></li>
+              <li><Link to="/account" className="hover:text-foreground">My account</Link></li>
+              <li><Link to="/trips" className="hover:text-foreground">My trips</Link></li>
             </ul>
           </div>
         </div>

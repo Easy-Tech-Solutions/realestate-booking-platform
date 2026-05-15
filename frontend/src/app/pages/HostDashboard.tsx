@@ -878,7 +878,7 @@ export function HostDashboard() {
                     <p className="text-sm font-semibold mt-1">{formatCurrency(property.price)}/night</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex flex-wrap gap-2 flex-shrink-0">
                   <Button variant="outline" size="sm" onClick={() => setEditingProperty(property)}>
                     <Edit className="w-3 h-3 mr-1" /> Edit
                   </Button>
