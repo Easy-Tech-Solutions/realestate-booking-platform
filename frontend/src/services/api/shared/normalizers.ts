@@ -208,6 +208,7 @@ export function normalizeReview(r: any): Review {
   return {
     id: String(r.id),
     propertyId: String(r.listing),
+    listingTitle: r.listing_title || undefined,
     userId: String(r.reviewer),
     user: {
       id: String(r.reviewer),
@@ -226,8 +227,10 @@ export function normalizeReview(r: any): Review {
     communication: Number(r.communication || r.rating || 0),
     location: Number(r.location_rating || r.rating || 0),
     value: Number(r.value || r.rating || 0),
+    title: r.title || undefined,
     comment: r.content,
     response: r.host_response || undefined,
+    isVerified: Boolean(r.is_verified),
     createdAt: r.created_at,
   };
 }

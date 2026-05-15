@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Search, MapPin, Star, ArrowRight, Quote } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, MapPin, Star, ArrowRight, Quote, Mail } from 'lucide-react';
+import { NewsletterSignup } from '../components/NewsletterSignup';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -389,6 +390,27 @@ export function Home() {
               HomeKonet operates in full compliance with Liberian commercial law and ECOWAS regional trade regulations.
               All transactions are processed through licensed financial institutions.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Newsletter Banner */}
+      {!selectedCategory && (
+        <div className="bg-gradient-to-br from-primary via-primary/90 to-primary/70 text-white">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-16">
+            <div className="max-w-2xl mx-auto text-center mb-8">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <Mail className="w-6 h-6 text-white/80" />
+                <span className="text-sm font-semibold uppercase tracking-widest text-white/70">Newsletter</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-semibold mb-3">Never miss a great deal</h2>
+              <p className="text-white/75 text-lg">
+                Get updates on new listings, hotels opening across Liberia, and exclusive discounts — delivered straight to your inbox.
+              </p>
+            </div>
+            <div className="max-w-xl mx-auto">
+              <NewsletterSignup variant="banner" />
+            </div>
           </div>
         </div>
       )}

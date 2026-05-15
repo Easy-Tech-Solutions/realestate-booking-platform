@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     "notifications",
     "reports",
     "suspensions",
+    "newsletter",
 ]
 
 MIDDLEWARE = [

@@ -69,6 +69,7 @@ export interface Amenity {
 export interface Review {
   id: string;
   propertyId: string;
+  listingTitle?: string;
   userId: string;
   user: User;
   rating: number;
@@ -78,8 +79,10 @@ export interface Review {
   communication: number;
   location: number;
   value: number;
+  title?: string;
   comment: string;
   response?: string;
+  isVerified?: boolean;
   createdAt: string;
 }
 
