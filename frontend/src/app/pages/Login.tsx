@@ -20,18 +20,24 @@ export function Login() {
   const [searchParams] = useSearchParams();
   const next = searchParams.get('next') || '/';
   const { login, loginWithGoogle } = useApp();
-  const [username, setUsername] = React.useState('');
+  const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [emailError, setEmailError] = React.useState('');
   const [pendingGoogleSignup, setPendingGoogleSignup] = React.useState<PendingGoogleSignup | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setEmailError('');
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError('Enter a valid email address');
+      return;
+    }
+    if (!password) return;
     setIsLoading(true);
-
     try {
-      await login(username, password);
+      await login(email, password);
       toast.success('Welcome back!');
       navigate(next, { replace: true });
     } catch (error: any) {
@@ -147,7 +153,7 @@ export function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
         <h1 className="text-3xl font-semibold mb-2">Log in</h1>
-        <p className="text-muted-foreground mb-8">Enter your username and password to access your account.</p>
+        <p className="text-muted-foreground mb-8">Enter your email and password to access your account.</p>
 
         <div className="space-y-4 mb-6">
           <div className="flex justify-center">
@@ -173,18 +179,20 @@ export function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="email">Email</Label>
             <div className="relative">
               <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                id="username"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
+                id="email"
+                type="email"
+                value={email}
+                onChange={(event) => { setEmail(event.target.value); setEmailError(''); }}
                 className="pl-10"
-                placeholder="johndoe"
+                placeholder="you@example.com"
                 required
               />
             </div>
+            {emailError && <p className="text-xs text-destructive">{emailError}</p>}
           </div>
 
           <div className="space-y-2">

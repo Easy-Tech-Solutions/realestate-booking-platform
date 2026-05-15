@@ -68,6 +68,8 @@ class Report(models.Model):
     # Report details
     report_type = models.CharField(max_length=30, choices=ReportType.choices, db_index=True)
     description = models.TextField()
+    owner_name  = models.CharField(max_length=255, blank=True, default='')
+    screenshot  = models.ImageField(upload_to='reports/screenshots/', null=True, blank=True)
 
     # Admin workflow
     status = models.CharField(
