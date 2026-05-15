@@ -183,6 +183,13 @@ export const propertiesAPI = {
     return data.map(normalizeListing);
   },
 
+  getNearby: async (lat: number, lng: number, radius = 50): Promise<(Property & { distanceKm: number })[]> => {
+    const data = await fetchWithAuth<any[]>(
+      `/api/listings/nearby/?lat=${lat}&lng=${lng}&radius=${radius}`
+    );
+    return data.map((item) => ({ ...normalizeListing(item), distanceKm: item.distance_km ?? 0 }));
+  },
+
   getRooms: async (listingId: string): Promise<HotelRoom[]> => {
     const data = await fetchWithAuth<unknown[]>(`/api/listings/${listingId}/rooms/`);
     return data.map(normalizeHotelRoom);

@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "reports",
     "suspensions",
     "newsletter",
+    "testimonials",
 ]
 
 MIDDLEWARE = [
