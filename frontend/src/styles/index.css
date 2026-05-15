@@ -2,3 +2,10 @@
 @import './tailwind.css';
 @import './theme.css';
 @import 'leaflet/dist/leaflet.css';
+
+/* Push scrollable content above the fixed mobile nav, accounting for iOS safe area */
+@media (max-width: 767px) {
+  .main-mobile-pb {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+}

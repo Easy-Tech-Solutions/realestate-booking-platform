@@ -21,9 +21,9 @@ export function Footer() {
           <div>
             <h3 className="font-semibold mb-4">Community</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><a href="#" className="hover:text-foreground">Disaster relief housing</a></li>
-              <li><a href="#" className="hover:text-foreground">Support Afghan refugees</a></li>
-              <li><a href="#" className="hover:text-foreground">Combating discrimination</a></li>
+              <li><Link to="/help" className="hover:text-foreground">Report a problem</Link></li>
+              <li><Link to="/help" className="hover:text-foreground">Anti-discrimination policy</Link></li>
+              <li><Link to="/help" className="hover:text-foreground">Safety resources</Link></li>
             </ul>
           </div>
           <div>
@@ -31,7 +31,7 @@ export function Footer() {
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li><Link to="/host/new" className="hover:text-foreground">Try hosting</Link></li>
               <li><Link to="/help" className="hover:text-foreground">Explore hosting resources</Link></li>
-              <li><a href="#" className="hover:text-foreground">Visit our community forum</a></li>
+              <li><Link to="/help" className="hover:text-foreground">Visit our community forum</Link></li>
               <li><Link to="/help" className="hover:text-foreground">How to host responsibly</Link></li>
             </ul>
           </div>
@@ -40,10 +40,10 @@ export function Footer() {
             <img src={logo} alt="HomeKonet" className="h-8 w-auto" />
           </h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><a href="#" className="hover:text-foreground">Newsroom</a></li>
-              <li><a href="#" className="hover:text-foreground">Learn about new features</a></li>
-              <li><a href="#" className="hover:text-foreground">Careers</a></li>
-              <li><a href="#" className="hover:text-foreground">Investors</a></li>
+              <li><Link to="/help" className="hover:text-foreground">About us</Link></li>
+              <li><Link to="/help" className="hover:text-foreground">New features</Link></li>
+              <li><Link to="/help" className="hover:text-foreground">Careers</Link></li>
+              <li><Link to="/help" className="hover:text-foreground">Press</Link></li>
             </ul>
           </div>
         </div>
@@ -58,7 +58,7 @@ export function Footer() {
             <span>·</span>
             <Link to="/terms" className="hover:text-foreground">Terms</Link>
             <span>·</span>
-            <a href="#" className="hover:text-foreground">Sitemap</a>
+            <Link to="/search" className="hover:text-foreground">Sitemap</Link>
           </div>
           <div className="flex items-center gap-4">
             <button className="flex items-center gap-2 hover:text-foreground">

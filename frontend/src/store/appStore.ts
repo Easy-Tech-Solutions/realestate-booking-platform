@@ -41,8 +41,8 @@ export const useAppStore = create<AppStoreState>()(
 
       setUser: (user) => set({ user, isAuthenticated: Boolean(user) }),
 
-      login: async (username, password) => {
-        const { user } = await authAPI.login(username, password);
+      login: async (email, password) => {
+        const { user } = await authAPI.login(email, password);
         set({ user, isAuthenticated: true });
         loadFavoritesIntoStore();
       },

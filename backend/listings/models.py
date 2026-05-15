@@ -226,3 +226,17 @@ class HotelRoom(models.Model):
 
     def __str__(self):
         return f"{self.listing.title} — {self.name}"
+
+
+class HotelRoomImage(models.Model):
+    room = models.ForeignKey(HotelRoom, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='listings/rooms/')
+    caption = models.CharField(max_length=255, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f'{self.room.name} - Image {self.order + 1}'

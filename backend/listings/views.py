@@ -8,9 +8,9 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import IntegrityError
-from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory, HotelRoom
+from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory, HotelRoom, HotelRoomImage
 from bookings.models import Booking
-from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer
+from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer, HotelRoomImageSerializer
 from .filters import ListingFilter
 from django.contrib.auth import get_user_model
 from rest_framework.pagination import PageNumberPagination
@@ -616,6 +616,43 @@ def hotel_room_availability(request, listing_id):
 
     return Response(result)
 
+
+@api_view(["GET", "POST"])
+@parser_classes([MultiPartParser, FormParser])
+def hotel_room_images(request, listing_id, room_id):
+    listing = get_object_or_404(Listing, pk=listing_id)
+    room = get_object_or_404(HotelRoom, pk=room_id, listing=listing)
+
+    if request.method == "GET":
+        return Response(HotelRoomImageSerializer(room.images.all(), many=True).data)
+
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    if listing.owner != request.user and not request.user.is_superuser:
+        return Response({"error": "Only the owner can add room images"}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = HotelRoomImageSerializer(data=request.data)
+    if serializer.is_valid():
+        max_order = room.images.aggregate(models.Max("order"))["order__max"]
+        order = (max_order or 0) + 1
+        image = serializer.save(room=room, order=order)
+        return Response(HotelRoomImageSerializer(image).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["DELETE"])
+def hotel_room_image_detail(request, listing_id, room_id, image_id):
+    listing = get_object_or_404(Listing, pk=listing_id)
+    room = get_object_or_404(HotelRoom, pk=room_id, listing=listing)
+    image = get_object_or_404(HotelRoomImage, pk=image_id, room=room)
+
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    if listing.owner != request.user and not request.user.is_superuser:
+        return Response({"error": "Only the owner can delete room images"}, status=status.HTTP_403_FORBIDDEN)
+
+    image.delete()
+    return Response({"message": "Image deleted"}, status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["GET"])

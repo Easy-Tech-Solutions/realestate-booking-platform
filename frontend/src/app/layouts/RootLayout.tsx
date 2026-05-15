@@ -30,7 +30,7 @@ export function RootLayout() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {showHeader && <Header />}
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 main-mobile-pb md:pb-0">
         <Suspense fallback={<RouteLoadingFallback />}>
           <Outlet />
         </Suspense>

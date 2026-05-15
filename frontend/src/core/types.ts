@@ -110,6 +110,13 @@ export interface Booking {
   createdAt: string;
 }
 
+export interface HotelRoomImage {
+  id: string;
+  imageUrl: string;
+  caption: string;
+  order: number;
+}
+
 export interface HotelRoom {
   id: string;
   listingId: string;
@@ -125,6 +132,7 @@ export interface HotelRoom {
   totalCount: number;
   isActive: boolean;
   createdAt: string;
+  images: HotelRoomImage[];
 }
 
 export interface HotelRoomAvailability extends HotelRoom {

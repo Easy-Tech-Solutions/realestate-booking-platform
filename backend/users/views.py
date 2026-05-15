@@ -26,6 +26,74 @@ def users_collection(request):
     return Response(PublicUserSerializer(items, many=True).data)
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_stats(request):
+    """Aggregate platform stats for the admin dashboard."""
+    if request.user.role != 'admin' and not request.user.is_staff:
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    from django.db.models import Sum, Count
+    from listings.models import Listing
+    from bookings.models import Booking
+    from payments.models import Payment
+
+    total_users = User.objects.count()
+    total_listings = Listing.objects.filter(status='published').count()
+    total_bookings = Booking.objects.count()
+    total_revenue = Payment.objects.filter(status='completed').aggregate(
+        total=Sum('amount')
+    )['total'] or 0
+
+    recent_users = User.objects.order_by('-date_joined')[:5]
+    recent_bookings = Booking.objects.select_related(
+        'customer', 'listing'
+    ).order_by('-requested_at')[:10]
+    recent_payments = Payment.objects.select_related(
+        'user', 'booking'
+    ).order_by('-created_at')[:10]
+
+    bookings_by_status = dict(
+        Booking.objects.values('status').annotate(count=Count('id')).values_list('status', 'count')
+    )
+
+    return Response({
+        'totals': {
+            'users': total_users,
+            'listings': total_listings,
+            'bookings': total_bookings,
+            'revenue': float(total_revenue),
+        },
+        'bookings_by_status': bookings_by_status,
+        'recent_users': PublicUserSerializer(recent_users, many=True).data,
+        'recent_bookings': [
+            {
+                'id': b.id,
+                'customer_username': b.customer.username,
+                'customer_email': b.customer.email,
+                'listing_title': b.listing.title,
+                'start_date': b.start_date.isoformat(),
+                'end_date': b.end_date.isoformat(),
+                'total_price': float(b.total_price),
+                'status': b.status,
+                'requested_at': b.requested_at.isoformat(),
+            }
+            for b in recent_bookings
+        ],
+        'recent_payments': [
+            {
+                'id': str(p.id),
+                'user': p.user.username if p.user else '',
+                'amount': float(p.amount),
+                'status': p.status,
+                'gateway': p.gateway.name if p.gateway else '',
+                'created_at': p.created_at.isoformat(),
+            }
+            for p in recent_payments
+        ],
+    })
+
+
 
 @api_view(["GET"])
 @permission_classes([AllowAny])

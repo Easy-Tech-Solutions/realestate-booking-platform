@@ -1,6 +1,6 @@
 from rest_framework import serializers
 import json
-from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyCategory, HotelRoom
+from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyCategory, HotelRoom, HotelRoomImage
 
 
 class PropertyCategorySerializer(serializers.ModelSerializer):
@@ -36,15 +36,34 @@ class ListingImageCreateSerializer(serializers.ModelSerializer):
         fields = ['image', 'caption', 'order']
 
 
+class HotelRoomImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HotelRoomImage
+        fields = ['id', 'image', 'image_url', 'caption', 'order']
+        read_only_fields = ['id']
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        try:
+            return obj.image.url
+        except Exception:
+            return None
+
+
 class HotelRoomSerializer(serializers.ModelSerializer):
+    images = HotelRoomImageSerializer(many=True, read_only=True)
     class Meta:
         model = HotelRoom
         fields = [
             'id', 'listing', 'name', 'room_type', 'description',
             'price_per_night', 'max_occupancy', 'beds', 'bed_type',
             'bathrooms', 'amenities', 'total_count', 'is_active', 'created_at',
+            'images',
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at', 'images']
 
 
 class ListingSerializer(serializers.ModelSerializer):

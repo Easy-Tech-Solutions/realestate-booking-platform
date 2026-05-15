@@ -1,5 +1,5 @@
 import { AMENITIES } from '../../../core/constants';
-import type { Booking, Conversation, HotelRoom, HotelRoomAvailability, Message, Property, Review, SearchFilters, User } from '../../../core/types';
+import type { Booking, Conversation, HotelRoom, HotelRoomAvailability, HotelRoomImage, Message, Property, Review, SearchFilters, User } from '../../../core/types';
 
 export function normalizeUser(u: any): User {
   const firstName = u.first_name || u.full_name?.split(' ')[0] || u.username || u.email?.split('@')[0] || '';
@@ -96,6 +96,12 @@ export function normalizeHotelRoom(r: any): HotelRoom {
     totalCount: Number(r.total_count || 1),
     isActive: Boolean(r.is_active),
     createdAt: r.created_at,
+    images: Array.isArray(r.images) ? r.images.map((img: any): HotelRoomImage => ({
+      id: String(img.id),
+      imageUrl: img.image_url || img.image || '',
+      caption: img.caption || '',
+      order: Number(img.order || 0),
+    })) : [],
   };
 }
 

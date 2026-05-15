@@ -1,4 +1,4 @@
-import type { Property, Review, SearchFilters, HotelRoom, HotelRoomAvailability } from '../../core/types';
+import type { Property, Review, SearchFilters, HotelRoom, HotelRoomAvailability, HotelRoomImage } from '../../core/types';
 import { fetchWithAuth } from './shared/client';
 import { buildSearchParams, normalizeListing, normalizeReview, normalizeHotelRoom, normalizeHotelRoomAvailability } from './shared/normalizers';
 import type { AvailabilityResponse, ListingPricingResponse } from './shared/contracts';
@@ -232,6 +232,21 @@ export const propertiesAPI = {
 
   deleteRoom: async (listingId: string, roomId: string): Promise<void> => {
     await fetchWithAuth(`/api/listings/${listingId}/rooms/${roomId}/`, { method: 'DELETE' });
+  },
+
+  uploadRoomImage: async (listingId: string, roomId: string, file: File, caption = ''): Promise<HotelRoomImage> => {
+    const form = new FormData();
+    form.append('image', file);
+    if (caption) form.append('caption', caption);
+    const data = await fetchWithAuth<any>(`/api/listings/${listingId}/rooms/${roomId}/images/`, {
+      method: 'POST',
+      body: form,
+    });
+    return { id: String(data.id), imageUrl: data.image_url || data.image || '', caption: data.caption || '', order: Number(data.order || 0) };
+  },
+
+  deleteRoomImage: async (listingId: string, roomId: string, imageId: string): Promise<void> => {
+    await fetchWithAuth(`/api/listings/${listingId}/rooms/${roomId}/images/${imageId}/`, { method: 'DELETE' });
   },
 
   getRoomAvailability: async (listingId: string, startDate: string, endDate: string): Promise<HotelRoomAvailability[]> => {

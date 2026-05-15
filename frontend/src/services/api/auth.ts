@@ -31,18 +31,17 @@ function isNeedsRole(data: GoogleLoginRawResponse): data is GoogleLoginNeedsRole
 }
 
 export const authAPI = {
-  login: async (username: string, password: string): Promise<{ user: User; access: string }> => {
+  login: async (email: string, password: string): Promise<{ user: User; access: string }> => {
     clearTokens();
     const data = await fetchPublicJson<AuthLoginResponse>('/api/auth/login/', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ email, password }),
     });
     setTokens(data.access, data.refresh);
     return { user: normalizeUser(data.user), access: data.access };
   },
 
   register: async (data: {
-    username: string;
     email: string;
     password: string;
     password2: string;
