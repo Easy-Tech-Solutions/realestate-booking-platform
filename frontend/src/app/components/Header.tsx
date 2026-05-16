@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard } from 'lucide-react';
+import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard, Info, HelpCircle, Mail } from 'lucide-react';
 import logo from '../../assets/logo2.jpg';
 import { Button } from './ui/button';
 import {
@@ -88,6 +88,19 @@ export function Header() {
             >
               <Search className="w-4 h-4" />
             </button>
+
+            {/* Nav links - Desktop */}
+            <nav className="hidden lg:flex items-center gap-1">
+              <Link to="/about" className="px-3 py-2 text-sm font-medium text-foreground/70 hover:text-foreground rounded-lg hover:bg-muted transition-colors">
+                About
+              </Link>
+              <Link to="/faq" className="px-3 py-2 text-sm font-medium text-foreground/70 hover:text-foreground rounded-lg hover:bg-muted transition-colors">
+                FAQ
+              </Link>
+              <Link to="/contact" className="px-3 py-2 text-sm font-medium text-foreground/70 hover:text-foreground rounded-lg hover:bg-muted transition-colors">
+                Contact Us
+              </Link>
+            </nav>
 
             {/* Right Menu */}
             <div className="flex items-center gap-2">
@@ -192,8 +205,24 @@ export function Header() {
                       <DropdownMenuItem onClick={() => handleAuthClick('register')}>
                         Sign up
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                     </>
                   )}
+                  {/* Always visible on mobile (lg hides nav links) */}
+                  <div className="lg:hidden">
+                    <DropdownMenuItem onClick={() => navigate('/about')}>
+                      <Info className="w-4 h-4 mr-2" />
+                      About
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/faq')}>
+                      <HelpCircle className="w-4 h-4 mr-2" />
+                      FAQ
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/contact')}>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Contact Us
+                    </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
