@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Search, MapPin, Star, ArrowRight, Quote, Mail, Navigation, Loader2, PenLine, X } from 'lucide-react';
+import bannerImage from '../../assets/banner.jpeg';
 import { NewsletterSignup } from '../components/NewsletterSignup';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
@@ -109,11 +110,15 @@ export function Home() {
 
       {/* ── Hero Banner ── */}
       {!selectedCategory && (
-        <div className="relative overflow-hidden bg-[#004406]">
-          {/* Decorative blobs */}
-          <div className="pointer-events-none absolute -top-32 -right-32 h-[520px] w-[520px] rounded-full bg-white/5" />
-          <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-white/5" />
-          <div className="pointer-events-none absolute top-1/2 right-1/3 h-40 w-40 -translate-y-1/2 rounded-full bg-emerald-500/10" />
+        <div className="relative overflow-hidden">
+          {/* Banner image */}
+          <img
+            src={bannerImage}
+            alt="HomeKonet — Find Your Perfect Stay"
+            className="absolute inset-0 w-full h-full object-cover object-center"
+          />
+          {/* Dark overlay so text stays readable */}
+          <div className="absolute inset-0 bg-black/45" />
 
           <div className="container relative z-10 mx-auto px-4 py-20 sm:px-6 lg:px-20">
             <div className="max-w-3xl">
