@@ -1,4 +1,4 @@
-import { fetchPublicJson } from './shared/client';
+import { fetchPublicJson, fetchWithAuth } from './shared/client';
 
 export interface Testimonial {
   id: number;
@@ -8,6 +8,7 @@ export interface Testimonial {
   quote: string;
   avatar_color: string;
   avatar_initials: string;
+  user_avatar: string | null;
   created_at: string;
 }
 
@@ -17,12 +18,11 @@ export const testimonialsAPI = {
   },
 
   create: async (payload: {
-    name: string;
     location?: string;
     rating: number;
     quote: string;
   }): Promise<Testimonial> => {
-    return fetchPublicJson('/api/testimonials/', {
+    return fetchWithAuth('/api/testimonials/', {
       method: 'POST',
       body: JSON.stringify(payload),
     });

@@ -18,14 +18,26 @@ def testimonials_collection(request):
         qs = Testimonial.objects.filter(is_active=True)
         return Response(TestimonialSerializer(qs, many=True).data)
 
-    # POST — any visitor can submit; admins can target specific fields
+    # POST — authenticated users only
+    if not request.user.is_authenticated:
+        return Response(
+            {'error': 'You must be signed in to share a testimonial.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
     serializer = TestimonialCreateSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     d = serializer.validated_data
+
+    # Build display name from user's profile
+    user = request.user
+    full_name = f'{user.first_name} {user.last_name}'.strip() or user.username
+
     t = Testimonial.objects.create(
-        name=d['name'],
+        user=user,
+        name=full_name,
         location=d.get('location', ''),
         rating=d['rating'],
         quote=d['quote'],

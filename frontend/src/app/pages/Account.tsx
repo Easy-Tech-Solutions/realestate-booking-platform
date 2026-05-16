@@ -677,11 +677,11 @@ export function Account() {
                   className="bg-card border-border"
                 />
               </div>
-              <div className="flex gap-3">
-                <Button onClick={handleVerifyPhoneChange} disabled={phoneFlowLoading}>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button className="w-full sm:w-auto" onClick={handleVerifyPhoneChange} disabled={phoneFlowLoading}>
                   {phoneFlowLoading ? 'Please wait…' : 'Confirm change'}
                 </Button>
-                <Button variant="destructive" size="sm" onClick={handleCancelPhoneChange} disabled={phoneFlowLoading}>
+                <Button variant="destructive" className="w-full sm:w-auto" onClick={handleCancelPhoneChange} disabled={phoneFlowLoading}>
                   Cancel pending change
                 </Button>
               </div>

@@ -76,6 +76,7 @@ const NotFound = lazyPage(() => import('./pages/NotFound').then((module) => ({ d
 const ResetPassword = lazyPage(() => import('./pages/ResetPassword').then((module) => ({ default: module.ResetPassword })));
 const ManageRooms = lazyPage(() => import('./pages/ManageRooms').then((module) => ({ default: module.ManageRooms })));
 const AllReviews = lazyPage(() => import('./pages/AllReviews').then((module) => ({ default: module.AllReviews })));
+const FAQ = lazyPage(() => import('./pages/FAQ').then((module) => ({ default: module.FAQ })));
 
 export const router = createBrowserRouter([
   {
@@ -158,6 +159,7 @@ export const router = createBrowserRouter([
       { path: '*', Component: NotFound },
       { path: 'reset-password', Component: ResetPassword },
       { path: 'reviews', Component: AllReviews },
+      { path: 'faq', Component: FAQ },
     ],
   },
 ]);
