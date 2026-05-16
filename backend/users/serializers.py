@@ -5,7 +5,7 @@ from .models import User, Profile
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        fields = ['image', 'bio', 'momo_number', 'is_superhost']
+        fields = ['image', 'bio', 'momo_number', 'is_superhost', 'last_seen']
         read_only_fields = ['user']
 
 

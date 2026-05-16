@@ -13,6 +13,7 @@ export interface User {
   isAdmin?: boolean;
   verified: boolean;
   hasPassword?: boolean;
+  lastSeen?: string;
   createdAt: string;
 }
 
@@ -142,6 +143,15 @@ export interface HotelRoomAvailability extends HotelRoom {
   availableCount: number;
 }
 
+export interface MessageAttachment {
+  id: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  fileType: 'image' | 'video' | 'document' | 'other';
+  createdAt: string;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -150,7 +160,10 @@ export interface Message {
   receiverId: string;
   receiver: User;
   content: string;
+  messageType: 'text' | 'file' | 'text_file';
   read: boolean;
+  editedAt?: string;
+  attachments: MessageAttachment[];
   createdAt: string;
 }
 

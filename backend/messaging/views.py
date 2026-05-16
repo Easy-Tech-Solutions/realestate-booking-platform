@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -6,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
@@ -17,9 +19,10 @@ from .serializers import (
     StartConversationSerializer,
 )
 
+MESSAGE_EDIT_WINDOW = timedelta(minutes=3)
+
 
 def _detect_file_type(file):
-    #Determine the category of an uploaded file from its MIME type or extension
     content_type = getattr(file, 'content_type', '') or ''
     if content_type.startswith('image/'):
         return 'image'
@@ -35,11 +38,17 @@ def _detect_file_type(file):
     return 'other'
 
 
+def _broadcast(conversation_id, payload):
+    """Push a message to the conversation's channel group, silently failing if Redis is down."""
+    channel_layer = get_channel_layer()
+    if channel_layer:
+        try:
+            async_to_sync(channel_layer.group_send)(f"chat_{conversation_id}", payload)
+        except Exception:
+            pass
+
+
 class ConversationListView(generics.ListAPIView):
-    """
-    Returns all conversations the authenticated user participates in,
-    ordered by most recently updated (newest message first).
-    """
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
 
@@ -47,16 +56,13 @@ class ConversationListView(generics.ListAPIView):
         return (
             Conversation.objects
             .filter(participants=self.request.user)
+            .exclude(deleted_by=self.request.user)
             .prefetch_related('participants', 'messages')
             .select_related('listing')
         )
 
 
 class StartConversationView(APIView):
-    """"
-    If a conversation between the requester and recipient (for the same listing) already
-    exists, it is returned instead of creating a duplicate.
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -77,7 +83,6 @@ class StartConversationView(APIView):
         User = get_user_model()
         recipient = get_object_or_404(User, id=recipient_id)
 
-        # Look for an existing conversation between these two users for this listing
         existing = (
             Conversation.objects
             .filter(participants=request.user)
@@ -87,14 +92,14 @@ class StartConversationView(APIView):
         )
 
         if existing:
+            # Re-show a conversation the user had previously deleted
+            existing.deleted_by.remove(request.user)
             out = ConversationSerializer(existing, context={'request': request})
             return Response(out.data, status=status.HTTP_200_OK)
 
-        # Create a fresh conversation
         conversation = Conversation.objects.create(listing_id=listing_id)
         conversation.participants.add(request.user, recipient)
 
-        # Optionally send the first message right away
         if initial_message:
             Message.objects.create(
                 conversation=conversation,
@@ -107,17 +112,26 @@ class StartConversationView(APIView):
         return Response(out.data, status=status.HTTP_201_CREATED)
 
 
+class DeleteConversationView(APIView):
+    """Soft-delete a conversation for the requesting user (other participant keeps it)."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, conversation_id):
+        conversation = get_object_or_404(
+            Conversation,
+            id=conversation_id,
+            participants=request.user,
+        )
+        conversation.deleted_by.add(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class MessageListView(generics.ListAPIView):
-    """
-    Returns all messages in the conversation (oldest first).
-    Automatically marks all received messages as read.
-    """
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         conversation_id = self.kwargs['conversation_id']
-        # Ensure the user is a participant — raises 404 otherwise
         get_object_or_404(
             Conversation,
             id=conversation_id,
@@ -132,22 +146,22 @@ class MessageListView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
-        # Mark all incoming messages as read when the user opens the thread
-        Message.objects.filter(
-            conversation_id=self.kwargs['conversation_id'],
+        conversation_id = self.kwargs['conversation_id']
+        updated = Message.objects.filter(
+            conversation_id=conversation_id,
             is_read=False
         ).exclude(sender=request.user).update(is_read=True)
+
+        if updated:
+            _broadcast(conversation_id, {
+                'type': 'broadcast_read_receipt',
+                'conversation_id': int(conversation_id),
+                'reader_id': request.user.id,
+            })
         return response
 
 
 class SendMessageView(APIView):
-    """
-    Supports multipart/form-data to carry both text and file attachments.
-
-    Form fields:
-        content   (string, optional if files are attached)
-        files     (one or more file fields, optional)
-    """
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
@@ -164,7 +178,6 @@ class SendMessageView(APIView):
         content = serializer.validated_data.get('content', '').strip()
         uploaded_files = request.FILES.getlist('files')
 
-        # Determine the message type
         if content and uploaded_files:
             msg_type = 'text_file'
         elif uploaded_files:
@@ -179,53 +192,100 @@ class SendMessageView(APIView):
             message_type=msg_type,
         )
 
-        # Save each uploaded file as a separate attachment record
+        attachments = []
         for f in uploaded_files:
-            MessageAttachment.objects.create(
+            att = MessageAttachment.objects.create(
                 message=message,
                 file=f,
                 file_name=f.name,
                 file_size=f.size,
                 file_type=_detect_file_type(f),
             )
+            attachments.append({
+                'id': att.id,
+                'file_name': att.file_name,
+                'file_size': att.file_size,
+                'file_type': att.file_type,
+            })
 
-        # Bump conversation so it appears at the top of all participants' inboxes
         conversation.save(update_fields=['updated_at'])
+        # When a deleted-by user receives a new message the conversation resurfaces
+        conversation.deleted_by.remove(*conversation.deleted_by.all())
 
-        # Push a real-time notification through the channel layer so any
-        # connected WebSocket clients receive the new message instantly.
-        # If Redis is unavailable the message is still saved — we just
-        # skip the live push rather than returning a 500 to the client.
-        channel_layer = get_channel_layer()
-        if channel_layer:
-            try:
-                async_to_sync(channel_layer.group_send)(
-                    f"chat_{conversation_id}",
-                    {
-                        'type': 'broadcast_message',
-                        'message_id': message.id,
-                        'content': message.content,
-                        'sender_id': request.user.id,
-                        'sender_email': request.user.email,
-                        'conversation_id': conversation.id,
-                        'created_at': message.created_at.isoformat(),
-                        'message_type': msg_type,
-                    }
-                )
-            except Exception:
-                # Redis is down or unreachable — the message is saved,
-                # real-time delivery is skipped until Redis comes back.
-                pass
+        _broadcast(conversation_id, {
+            'type': 'broadcast_message',
+            'message_id': message.id,
+            'content': message.content,
+            'sender_id': request.user.id,
+            'sender_email': request.user.email,
+            'conversation_id': conversation.id,
+            'created_at': message.created_at.isoformat(),
+            'message_type': msg_type,
+            'has_attachments': bool(attachments),
+        })
 
         out = MessageSerializer(message, context={'request': request})
         return Response(out.data, status=status.HTTP_201_CREATED)
 
 
+class EditMessageView(APIView):
+    """PATCH to edit own message content within the 3-minute window."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, message_id):
+        message = get_object_or_404(Message, id=message_id, sender=request.user)
+
+        if timezone.now() - message.created_at > MESSAGE_EDIT_WINDOW:
+            return Response(
+                {"detail": "Messages can only be edited within 3 minutes of sending."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        new_content = (request.data.get('content') or '').strip()
+        if not new_content:
+            return Response({"detail": "Content cannot be empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        message.content = new_content
+        message.edited_at = timezone.now()
+        message.save(update_fields=['content', 'edited_at'])
+
+        _broadcast(message.conversation_id, {
+            'type': 'broadcast_message_edited',
+            'message_id': message.id,
+            'content': message.content,
+            'edited_at': message.edited_at.isoformat(),
+            'conversation_id': message.conversation_id,
+        })
+
+        out = MessageSerializer(message, context={'request': request})
+        return Response(out.data)
+
+
+class UserPresenceView(APIView):
+    """GET presence info for a user — is online if last_seen within 2 minutes."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        target = get_object_or_404(User, id=user_id)
+        try:
+            last_seen = target.profile.last_seen
+        except Exception:
+            last_seen = None
+
+        online = (
+            last_seen is not None and
+            timezone.now() - last_seen < timedelta(minutes=2)
+        )
+        return Response({
+            'user_id': user_id,
+            'online': online,
+            'last_seen': last_seen,
+        })
+
+
 class UnreadCountView(APIView):
-    """
-    Returns total number of unread messages across all conversations.
-    Useful for showing a badge in the UI.
-    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):

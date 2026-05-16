@@ -18,6 +18,7 @@ export function normalizeUser(u: any): User {
     isAdmin: u.role === 'admin',
     verified: u.email_verified ?? false,
     hasPassword: u.has_password,
+    lastSeen: u.profile?.last_seen || undefined,
     createdAt: u.date_joined || new Date().toISOString(),
   };
 }
@@ -278,6 +279,15 @@ export function normalizeConversation(conversation: any): Conversation {
 export function normalizeMessage(message: any): Message {
   const sender = normalizeUser(message.sender || {});
 
+  const attachments = (message.attachments || []).map((a: any) => ({
+    id: String(a.id),
+    fileUrl: a.file_url || '',
+    fileName: a.file_name || '',
+    fileSize: Number(a.file_size || 0),
+    fileType: a.file_type || 'other',
+    createdAt: a.created_at || message.created_at,
+  }));
+
   return {
     id: String(message.id),
     conversationId: String(message.conversation),
@@ -294,7 +304,10 @@ export function normalizeMessage(message: any): Message {
       createdAt: message.created_at,
     },
     content: message.content || '',
+    messageType: message.message_type || 'text',
     read: Boolean(message.is_read),
+    editedAt: message.edited_at || undefined,
+    attachments,
     createdAt: message.created_at,
   };
 }

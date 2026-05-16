@@ -11,15 +11,38 @@ export type ChatMessage = {
   conversation_id: number;
   created_at: string;
   message_type: string;
+  has_attachments?: boolean;
+};
+
+export type EditedMessage = {
+  type: 'message_edited';
+  message_id: number;
+  content: string;
+  edited_at: string;
+  conversation_id: number;
+};
+
+export type ReadReceipt = {
+  type: 'read_receipt';
+  conversation_id: number;
+  reader_id: number;
 };
 
 type ChatSocketOptions = {
   conversationId: number | null;
   onMessage: (msg: ChatMessage) => void;
+  onMessageEdited?: (edit: EditedMessage) => void;
+  onReadReceipt?: (receipt: ReadReceipt) => void;
   onConnected?: () => void;
 };
 
-export function useChatSocket({ conversationId, onMessage, onConnected }: ChatSocketOptions) {
+export function useChatSocket({
+  conversationId,
+  onMessage,
+  onMessageEdited,
+  onReadReceipt,
+  onConnected,
+}: ChatSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const authenticatedRef = useRef(false);
@@ -59,6 +82,10 @@ export function useChatSocket({ conversationId, onMessage, onConnected }: ChatSo
             onConnected?.();
           } else if (data.type === 'chat_message') {
             onMessage(data as ChatMessage);
+          } else if (data.type === 'message_edited') {
+            onMessageEdited?.(data as EditedMessage);
+          } else if (data.type === 'read_receipt') {
+            onReadReceipt?.(data as ReadReceipt);
           }
         } catch {
           // ignore
@@ -81,7 +108,7 @@ export function useChatSocket({ conversationId, onMessage, onConnected }: ChatSo
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       wsRef.current?.close(1000, 'unmount');
     };
-  }, [conversationId, onMessage, onConnected]);
+  }, [conversationId, onMessage, onMessageEdited, onReadReceipt, onConnected]);
 
   return { sendMessage, markRead };
 }
