@@ -13,4 +13,6 @@ export { reportsAPI } from './reports';
 export { suspensionsAPI } from './suspensions';
 export { bookingToolsAPI } from './booking-tools';
 export { newsletterAPI } from './newsletter';
+export { testimonialsAPI } from './testimonials';
+export type { Testimonial } from './testimonials';
 export { clearTokens, getAccessToken, setTokens, attemptTokenRefresh } from './shared/client';

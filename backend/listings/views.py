@@ -8,6 +8,7 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import IntegrityError
+import math
 from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory, HotelRoom, HotelRoomImage
 from bookings.models import Booking
 from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer, HotelRoomImageSerializer
@@ -449,6 +450,58 @@ def platform_stats(request):
         "total_locations": total_locations,
         "happy_guests": happy_guests,
     })
+
+
+def _haversine(lat1, lon1, lat2, lon2):
+    """Return distance in km between two (lat, lng) points."""
+    R = 6371.0
+    lat1, lon1, lat2, lon2 = (math.radians(float(v)) for v in (lat1, lon1, lat2, lon2))
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+@api_view(["GET"])
+def nearby_listings(request):
+    """
+    GET /api/listings/nearby/?lat=X&lng=Y&radius=50
+    Returns published listings within `radius` km (default 50, max 200), sorted by distance.
+    """
+    try:
+        user_lat = float(request.query_params["lat"])
+        user_lng = float(request.query_params["lng"])
+    except (KeyError, ValueError):
+        return Response({"error": "lat and lng query params are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        radius_km = min(float(request.query_params.get("radius", 50)), 200)
+    except ValueError:
+        radius_km = 50
+
+    qs = (
+        Listing.objects
+        .filter(status="published", latitude__isnull=False, longitude__isnull=False)
+        .exclude(latitude=0, longitude=0)
+        .select_related("owner")
+    )
+
+    nearby = []
+    for listing in qs:
+        dist = _haversine(user_lat, user_lng, listing.latitude, listing.longitude)
+        if dist <= radius_km:
+            nearby.append((dist, listing))
+
+    nearby.sort(key=lambda x: x[0])
+    nearby = nearby[:12]
+
+    results = []
+    for dist, listing in nearby:
+        data = ListingSerializer(listing, context={"request": request}).data
+        data["distance_km"] = round(dist, 1)
+        results.append(data)
+
+    return Response(results)
 
 
 @api_view(["GET"])

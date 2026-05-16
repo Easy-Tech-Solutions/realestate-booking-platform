@@ -1,14 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Search, MapPin, Star, ArrowRight, Quote, Mail } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, MapPin, Star, ArrowRight, Quote, Mail, Navigation, Loader2, PenLine, X } from 'lucide-react';
 import { NewsletterSignup } from '../components/NewsletterSignup';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PropertyCard } from '../components/PropertyCard';
 import { PROPERTY_CATEGORIES } from '../../core/constants';
 import { cn } from '../../core/utils';
 import { useHomeProperties } from '../../hooks/queries/useHomeProperties';
+import { useUserLocation } from '../../hooks/useUserLocation';
 import { propertiesAPI } from '../../services/api.service';
+import { testimonialsAPI } from '../../services/api/testimonials';
 
 export function Home() {
   const navigate = useNavigate();
@@ -42,6 +44,48 @@ export function Home() {
     if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k+`;
     return `${n}+`;
   };
+
+  const queryClient = useQueryClient();
+  const testimonialsQuery = useQuery({
+    queryKey: ['testimonials'],
+    queryFn: () => testimonialsAPI.getAll(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const testimonials = testimonialsQuery.data ?? [];
+
+  const [showTestimonialForm, setShowTestimonialForm] = useState(false);
+  const [tForm, setTForm] = useState({ name: '', location: '', rating: 5, quote: '' });
+  const [tSubmitting, setTSubmitting] = useState(false);
+  const [tError, setTError] = useState('');
+  const [tSuccess, setTSuccess] = useState(false);
+
+  const submitTestimonial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTError('');
+    if (!tForm.name.trim() || !tForm.quote.trim()) { setTError('Name and message are required.'); return; }
+    if (tForm.quote.trim().length < 20) { setTError('Message must be at least 20 characters.'); return; }
+    setTSubmitting(true);
+    try {
+      await testimonialsAPI.create({ name: tForm.name.trim(), location: tForm.location.trim(), rating: tForm.rating, quote: tForm.quote.trim() });
+      setTSuccess(true);
+      setTForm({ name: '', location: '', rating: 5, quote: '' });
+      queryClient.invalidateQueries({ queryKey: ['testimonials'] });
+      setTimeout(() => { setTSuccess(false); setShowTestimonialForm(false); }, 3000);
+    } catch (err: any) {
+      setTError(err.message || 'Failed to submit. Please try again.');
+    } finally {
+      setTSubmitting(false);
+    }
+  };
+
+  const { location: userLocation } = useUserLocation();
+  const nearbyQuery = useQuery({
+    queryKey: ['nearby-listings', userLocation?.lat, userLocation?.lng],
+    queryFn: () => propertiesAPI.getNearby(userLocation!.lat, userLocation!.lng),
+    enabled: !!userLocation,
+    staleTime: 5 * 60 * 1000,
+  });
+  const nearbyProperties = nearbyQuery.data ?? [];
 
   const propertiesSectionRef = useRef<HTMLDivElement>(null);
 
@@ -211,6 +255,27 @@ export function Home() {
         </div>
       </div>
 
+      {/* Near You */}
+      {!selectedCategory && nearbyProperties.length > 0 && (
+        <div className="container mx-auto px-4 sm:px-6 lg:px-20 pt-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Navigation className="w-4 h-4 text-primary" />
+            <h2 className="text-lg font-semibold">Near you</h2>
+            <span className="text-xs text-muted-foreground ml-1">within 50 km</span>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+            {nearbyProperties.map((property) => (
+              <div key={property.id} className="relative shrink-0 w-52">
+                <PropertyCard property={property} />
+                <div className="absolute top-2 left-2 bg-black/60 text-white text-xs font-medium px-2 py-0.5 rounded-full backdrop-blur-sm pointer-events-none">
+                  {property.distanceKm} km
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Properties Grid */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-8">
         {selectedCategory && (
@@ -247,83 +312,140 @@ export function Home() {
       {!selectedCategory && (
         <div className="bg-muted/30 border-t border-border">
           <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-20">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-semibold mb-3">What our guests say</h2>
-              <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-                Real experiences from real travelers who found their perfect stay on HomeKonet.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-semibold mb-3">What our guests say</h2>
+                <p className="text-muted-foreground text-lg max-w-xl">
+                  Real experiences from real travelers who found their perfect stay on HomeKonet.
+                </p>
+              </div>
+              {!showTestimonialForm && (
+                <button
+                  type="button"
+                  onClick={() => setShowTestimonialForm(true)}
+                  className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl border border-primary text-primary text-sm font-semibold hover:bg-primary hover:text-primary-foreground transition-colors"
+                >
+                  <PenLine className="w-4 h-4" /> Share your experience
+                </button>
+              )}
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                {
-                  name: 'Amara Kofi',
-                  location: 'Accra, Ghana',
-                  rating: 5,
-                  avatar: 'AK',
-                  color: 'bg-emerald-600',
-                  quote: 'HomeKonet made finding a place in Monrovia so easy. The listing photos were accurate and the host was incredibly responsive. Will definitely book again.',
-                },
-                {
-                  name: 'Fatima Diallo',
-                  location: 'Dakar, Senegal',
-                  rating: 5,
-                  avatar: 'FD',
-                  color: 'bg-blue-600',
-                  quote: 'I was nervous booking online for the first time, but the process was seamless. The MTN MoMo payment worked perfectly and I got instant confirmation.',
-                },
-                {
-                  name: 'James Mensah',
-                  location: 'Lagos, Nigeria',
-                  rating: 5,
-                  avatar: 'JM',
-                  color: 'bg-orange-600',
-                  quote: 'Stayed at a beautiful apartment in Paynesville. The host was a superhost and everything was exactly as described. Highly recommend HomeKonet.',
-                },
-                {
-                  name: 'Grace Osei',
-                  location: 'Kumasi, Ghana',
-                  rating: 4,
-                  avatar: 'GO',
-                  color: 'bg-purple-600',
-                  quote: 'Great selection of properties across Liberia. I found a hotel room with all the amenities I needed at a very fair price. The messaging feature made coordination easy.',
-                },
-                {
-                  name: 'Emmanuel Tetteh',
-                  location: 'Lomé, Togo',
-                  rating: 5,
-                  avatar: 'ET',
-                  color: 'bg-rose-600',
-                  quote: 'The platform is clean and intuitive. I booked a villa for a family trip and the whole experience from search to check-out was flawless. 10/10.',
-                },
-                {
-                  name: 'Mariama Bah',
-                  location: 'Conakry, Guinea',
-                  rating: 5,
-                  avatar: 'MB',
-                  color: 'bg-teal-600',
-                  quote: 'I love that I can pay with Mobile Money. No need for a credit card. HomeKonet is built for us in West Africa and it shows. Excellent service.',
-                },
-              ].map((t) => (
-                <div key={t.name} className="bg-background rounded-2xl border border-border p-6 flex flex-col gap-4">
-                  <Quote className="w-6 h-6 text-primary/40 flex-shrink-0" />
-                  <p className="text-sm leading-relaxed text-foreground flex-1">{t.quote}</p>
-                  <div className="flex items-center gap-1 mt-1">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className={`w-3.5 h-3.5 ${i < t.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-white text-sm font-semibold flex-shrink-0`}>
-                      {t.avatar}
+
+            {/* Submit form */}
+            {showTestimonialForm && (
+              <div className="mb-10 bg-background rounded-2xl border border-border p-6 max-w-xl">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-semibold text-lg">Share your experience</h3>
+                  <button type="button" aria-label="Close form" onClick={() => { setShowTestimonialForm(false); setTError(''); setTSuccess(false); }} className="text-muted-foreground hover:text-foreground">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                {tSuccess ? (
+                  <p className="text-green-700 font-medium text-sm">Thank you! Your testimonial has been posted.</p>
+                ) : (
+                  <form onSubmit={submitTestimonial} className="space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1">Your name *</label>
+                        <input
+                          type="text"
+                          value={tForm.name}
+                          onChange={e => setTForm(f => ({ ...f, name: e.target.value }))}
+                          placeholder="e.g. Amara Kofi"
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1">Location (optional)</label>
+                        <input
+                          type="text"
+                          value={tForm.location}
+                          onChange={e => setTForm(f => ({ ...f, location: e.target.value }))}
+                          placeholder="e.g. Accra, Ghana"
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                        />
+                      </div>
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">{t.location}</p>
+                      <label className="text-xs font-medium text-muted-foreground block mb-2">Rating *</label>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <button
+                            key={n}
+                            type="button"
+                            aria-label={`Rate ${n} star${n !== 1 ? 's' : ''}`}
+                            onClick={() => setTForm(f => ({ ...f, rating: n }))}
+                            className="p-0.5"
+                          >
+                            <Star className={cn('w-6 h-6 transition-colors', n <= tForm.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/40 hover:text-yellow-300')} />
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block mb-1">Your message * <span className="text-muted-foreground/60">(min 20 chars)</span></label>
+                      <textarea
+                        value={tForm.quote}
+                        onChange={e => setTForm(f => ({ ...f, quote: e.target.value }))}
+                        rows={4}
+                        placeholder="Tell us about your experience on HomeKonet…"
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+                        required
+                      />
+                    </div>
+                    {tError && <p className="text-destructive text-xs">{tError}</p>}
+                    <button
+                      type="submit"
+                      disabled={tSubmitting}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground text-sm font-semibold rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-60"
+                    >
+                      {tSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : 'Submit testimonial'}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* Testimonials grid */}
+            {testimonialsQuery.isLoading ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-48 bg-muted rounded-2xl animate-pulse" />
+                ))}
+              </div>
+            ) : testimonials.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Quote className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                <p className="font-medium">No testimonials yet.</p>
+                <p className="text-sm mt-1">Be the first to share your experience!</p>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {testimonials.map((t) => {
+                  const colorClass = `bg-${t.avatar_color}-600`;
+                  return (
+                    <div key={t.id} className="bg-background rounded-2xl border border-border p-6 flex flex-col gap-4">
+                      <Quote className="w-6 h-6 text-primary/40 flex-shrink-0" />
+                      <p className="text-sm leading-relaxed text-foreground flex-1">{t.quote}</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className={cn('w-3.5 h-3.5', i < t.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground')} />
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0', colorClass)}>
+                          {t.avatar_initials}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm">{t.name}</p>
+                          {t.location && <p className="text-xs text-muted-foreground">{t.location}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -338,16 +460,13 @@ export function Home() {
                 We work with leading organisations to ensure every booking is safe, legal, and well-supported.
               </p>
             </div>
-            <div className="grid md:grid-cols-2 gap-12">
-              {/* Marketing Partners */}
+            <div className="grid md:grid-cols-2 gap-12 max-w-2xl mx-auto">
+              {/* Payment Partners */}
               <div>
-                <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-6">Marketing &amp; Distribution</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-6">Payment</h3>
+                <div className="grid grid-cols-1 gap-4">
                   {[
-                    { name: 'MTN Mobile Money', abbr: 'MTN', color: 'bg-yellow-400 text-yellow-900', desc: 'Official payment partner' },
-                    { name: 'Orange Money', abbr: 'OM', color: 'bg-orange-500 text-white', desc: 'Mobile payment network' },
-                    { name: 'Liberia Tourism', abbr: 'LT', color: 'bg-[#004406] text-white', desc: 'National tourism board' },
-                    { name: 'West Africa Travel', abbr: 'WAT', color: 'bg-blue-600 text-white', desc: 'Regional travel network' },
+                    { name: 'MTN Mobile Money', abbr: 'MTN', color: 'bg-yellow-400 text-yellow-900', desc: 'Official mobile money partner' },
                   ].map((p) => (
                     <div key={p.name} className="flex items-center gap-3 p-4 rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-colors">
                       <div className={`w-12 h-12 rounded-xl ${p.color} flex items-center justify-center text-xs font-bold flex-shrink-0`}>
@@ -362,15 +481,13 @@ export function Home() {
                 </div>
               </div>
 
-              {/* Legal & Compliance Partners */}
+              {/* Legal & Compliance */}
               <div>
                 <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-6">Legal &amp; Compliance</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   {[
-                    { name: 'Liberia Revenue Authority', abbr: 'LRA', color: 'bg-slate-700 text-white', desc: 'Tax compliance partner' },
-                    { name: 'Central Bank of Liberia', abbr: 'CBL', color: 'bg-green-800 text-white', desc: 'Financial regulation' },
+                    { name: 'Liberia Revenue Authority', abbr: 'LRA', color: 'bg-slate-700 text-white', desc: 'Tax compliance' },
                     { name: 'Ministry of Commerce', abbr: 'MC', color: 'bg-red-700 text-white', desc: 'Business licensing' },
-                    { name: 'ECOWAS Trade', abbr: 'ECO', color: 'bg-indigo-600 text-white', desc: 'Regional trade body' },
                   ].map((p) => (
                     <div key={p.name} className="flex items-center gap-3 p-4 rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-colors">
                       <div className={`w-12 h-12 rounded-xl ${p.color} flex items-center justify-center text-xs font-bold flex-shrink-0`}>
@@ -387,7 +504,7 @@ export function Home() {
             </div>
 
             <p className="text-center text-xs text-muted-foreground mt-10">
-              HomeKonet operates in full compliance with Liberian commercial law and ECOWAS regional trade regulations.
+              HomeKonet operates in full compliance with Liberian commercial law and all applicable regulations.
               All transactions are processed through licensed financial institutions.
             </p>
           </div>
