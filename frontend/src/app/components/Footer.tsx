@@ -16,7 +16,7 @@ export function Footer() {
             <p className="text-xs text-muted-foreground">New listings, hotel deals & exclusive discounts — in your inbox.</p>
           </div>
           <div className="flex-1 max-w-sm">
-            <NewsletterSignup variant="footer" />
+            <NewsletterSignup />
           </div>
         </div>
       </div>
@@ -29,6 +29,7 @@ export function Footer() {
               <li><Link to="/help" className="hover:text-foreground">Help Center</Link></li>
               <li><Link to="/help#safety" className="hover:text-foreground">Safety information</Link></li>
               <li><Link to="/help#cancellation" className="hover:text-foreground">Cancellation options</Link></li>
+              <li><Link to="/faq" className="hover:text-foreground">FAQ</Link></li>
               <li><a href="mailto:homekonnet@gmail.com" className="hover:text-foreground">Contact us</a></li>
             </ul>
           </div>

@@ -27,13 +27,6 @@ const LIBERIA_LOCATIONS = [
   'Robertsport', 'Tubmanburg',
 ];
 
-// Budget presets in LRD
-const BUDGET_PRESETS = [
-  { label: 'Under L$500',    max: 500 },
-  { label: 'L$500–1,500',    max: 1500 },
-  { label: 'L$1,500–3,000',  max: 3000 },
-  { label: 'L$3,000+',       max: 99999 },
-];
 
 // Category icon fallback map
 const CATEGORY_ICONS: Record<string, string> = {
@@ -85,7 +78,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const [checkIn, setCheckIn]           = useState<Date>();
   const [checkOut, setCheckOut]         = useState<Date>();
   const [selectedType, setSelectedType] = useState('');
-  const [budgetMax, setBudgetMax]       = useState<number | null>(null);
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
   const [guests, setGuests] = useState({ adults: 1, children: 0, infants: 0, pets: 0 });
 
   // Pull categories from backend; fall back to local constants
@@ -125,7 +119,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       pets: guests.pets,
       guests: totalGuests > 0 ? totalGuests : undefined,
       ...(selectedType ? { propertyType: [selectedType as any] } : {}),
-      ...(budgetMax && budgetMax < 99999 ? { priceMax: budgetMax } : {}),
+      ...(priceMin ? { priceMin: Number(priceMin) } : {}),
+      ...(priceMax ? { priceMax: Number(priceMax) } : {}),
     });
     navigate('/search');
     onClose();
@@ -136,13 +131,14 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     setCheckIn(undefined);
     setCheckOut(undefined);
     setSelectedType('');
-    setBudgetMax(null);
+    setPriceMin('');
+    setPriceMax('');
     setGuests({ adults: 1, children: 0, infants: 0, pets: 0 });
   };
 
   const hasAnyFilter =
     Boolean(location) || Boolean(checkIn) || Boolean(checkOut) ||
-    Boolean(selectedType) || Boolean(budgetMax) ||
+    Boolean(selectedType) || Boolean(priceMin) || Boolean(priceMax) ||
     guests.children > 0 || guests.adults > 1;
 
   const searchLabel = location.trim()
@@ -298,23 +294,30 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
           {/* ── Budget ── */}
           <div className="space-y-3">
-            <label className="text-sm font-semibold">Budget (LRD / night)</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {BUDGET_PRESETS.map(({ label, max }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setBudgetMax(budgetMax === max ? null : max)}
-                  className={cn(
-                    'py-2.5 px-3 rounded-xl border text-xs font-medium transition-all',
-                    budgetMax === max
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-border hover:border-primary/60 text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
+            <label className="text-sm font-semibold">Budget (USD / night)</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Min"
+                  value={priceMin}
+                  onChange={(e) => setPriceMin(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Max"
+                  value={priceMax}
+                  onChange={(e) => setPriceMax(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
             </div>
           </div>
 
@@ -348,7 +351,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               {[
                 checkIn && checkOut && `${format(checkIn, 'MMM d')} – ${format(checkOut, 'MMM d')}`,
                 totalGuests > 1 && `${totalGuests} guests`,
-                budgetMax && budgetMax < 99999 && `Max L$${budgetMax.toLocaleString()}`,
+                (priceMin || priceMax) && [priceMin && `From $${priceMin}`, priceMax && `To $${priceMax}`].filter(Boolean).join(' '),
               ].filter(Boolean).join(' · ')}
             </p>
           )}

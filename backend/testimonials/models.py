@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 
 AVATAR_COLORS = [
     'emerald', 'blue', 'orange', 'purple', 'rose', 'teal',
@@ -7,6 +8,12 @@ AVATAR_COLORS = [
 
 
 class Testimonial(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='testimonials',
+    )
     name = models.CharField(max_length=100)
     location = models.CharField(max_length=150, blank=True)
     rating = models.PositiveSmallIntegerField(default=5)

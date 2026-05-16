@@ -239,6 +239,8 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 class ReviewCreateSerializer(serializers.ModelSerializer):
     images = serializers.ListField(child=serializers.ImageField(), write_only=True, required=False)
+    content = serializers.CharField(required=False, allow_blank=True, default='')
+    title = serializers.CharField(required=False, allow_blank=True, default='')
 
     class Meta:
         model = Review

@@ -56,7 +56,7 @@ export function Trips() {
 
   const TripCard = ({ trip, isPast }: { trip: (typeof upcomingTrips)[number]; isPast?: boolean }) => (
     <div className="border border-border rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="grid md:grid-cols-3 gap-4 md:gap-6 p-4 md:p-6">
+      <div className="grid sm:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6">
         <img
           src={trip.property.images[0]}
           alt={trip.property.title}
@@ -94,7 +94,7 @@ export function Trips() {
             </span>
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-border">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-border">
             <div>
               <p className="text-sm text-muted-foreground">Total price</p>
               <p className="text-xl font-semibold">{formatCurrency(trip.estimatedTotal)}</p>

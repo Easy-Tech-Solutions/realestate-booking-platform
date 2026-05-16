@@ -660,7 +660,18 @@ export function PropertyDetails() {
                 {(() => {
                   const canReview = isAuthenticated && user?.id !== property.hostId;
                   const alreadyReviewed = reviews.some(r => r.userId === String(user?.id));
+
+                  if (!isAuthenticated) {
+                    return (
+                      <div className="mt-8 p-4 rounded-xl bg-muted/50 border border-border text-sm text-center">
+                        <p className="text-muted-foreground mb-2">Have you stayed here? Share your experience.</p>
+                        <Button variant="outline" size="sm" onClick={() => navigate('/login')}>Sign in to rate this property</Button>
+                      </div>
+                    );
+                  }
+
                   if (!canReview) return null;
+
                   if (alreadyReviewed) {
                     return (
                       <div className="mt-8 p-4 rounded-xl bg-muted text-sm text-muted-foreground">
@@ -668,23 +679,59 @@ export function PropertyDetails() {
                       </div>
                     );
                   }
+
+                  const submitReview = async () => {
+                    if (reviewForm.rating === 0) { toast.error('Please select an overall rating'); return; }
+                    setReviewSubmitting(true);
+                    try {
+                      await propertiesAPI.createReview({
+                        listing: id!,
+                        rating: reviewForm.rating,
+                        title: reviewForm.title,
+                        content: reviewForm.content,
+                        cleanliness: reviewForm.cleanliness || reviewForm.rating,
+                        accuracy: reviewForm.accuracy || reviewForm.rating,
+                        check_in_rating: reviewForm.check_in_rating || reviewForm.rating,
+                        communication: reviewForm.communication || reviewForm.rating,
+                        location_rating: reviewForm.location_rating || reviewForm.rating,
+                        value: reviewForm.value || reviewForm.rating,
+                      });
+                      toast.success('Review submitted!');
+                      setShowReviewForm(false);
+                      setReviewForm({ rating: 0, title: '', content: '', cleanliness: 0, accuracy: 0, check_in_rating: 0, communication: 0, location_rating: 0, value: 0 });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.properties.reviews(id!) });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.properties.detail(id!) });
+                    } catch (err: any) {
+                      toast.error(err.message || 'Failed to submit review');
+                    } finally {
+                      setReviewSubmitting(false);
+                    }
+                  };
+
                   return (
                     <div className="mt-8">
                       {!showReviewForm ? (
-                        <Button variant="outline" onClick={() => setShowReviewForm(true)}>
-                          Write a review
-                        </Button>
+                        <div className="border border-border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div>
+                            <p className="font-medium text-sm">Rate this property</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Click the stars to leave your rating</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <StarPicker value={reviewForm.rating} onChange={v => { setReviewForm(f => ({ ...f, rating: v })); setShowReviewForm(true); }} />
+                            <Button variant="outline" size="sm" onClick={() => setShowReviewForm(true)}>
+                              Write a review
+                            </Button>
+                          </div>
+                        </div>
                       ) : (
-                        <div className="border border-border rounded-xl p-6 space-y-6">
-                          <h3 className="text-lg font-semibold">Write a review</h3>
+                        <div className="border border-border rounded-xl p-6 space-y-5">
+                          <h3 className="text-lg font-semibold">Rate this property</h3>
 
-                          {/* Overall rating */}
                           <div className="space-y-2">
                             <Label>Overall rating <span className="text-destructive">*</span></Label>
                             <StarPicker value={reviewForm.rating} onChange={v => setReviewForm(f => ({ ...f, rating: v }))} />
                           </div>
 
-                          {/* Sub-ratings */}
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             {([
                               ['Cleanliness', 'cleanliness'],
@@ -695,7 +742,7 @@ export function PropertyDetails() {
                               ['Value', 'value'],
                             ] as [string, keyof typeof reviewForm][]).map(([label, field]) => (
                               <div key={field} className="space-y-1">
-                                <Label className="text-xs">{label}</Label>
+                                <Label className="text-xs">{label} <span className="text-muted-foreground">(optional)</span></Label>
                                 <StarPicker
                                   value={reviewForm[field] as number}
                                   onChange={v => setReviewForm(f => ({ ...f, [field]: v }))}
@@ -704,24 +751,12 @@ export function PropertyDetails() {
                             ))}
                           </div>
 
-                          {/* Title */}
                           <div className="space-y-2">
-                            <Label htmlFor="review-title">Title</Label>
-                            <Input
-                              id="review-title"
-                              placeholder="Summarise your stay"
-                              value={reviewForm.title}
-                              onChange={e => setReviewForm(f => ({ ...f, title: e.target.value }))}
-                            />
-                          </div>
-
-                          {/* Comment */}
-                          <div className="space-y-2">
-                            <Label htmlFor="review-content">Your review <span className="text-destructive">*</span></Label>
+                            <Label htmlFor="review-content">Comment <span className="text-muted-foreground text-xs">(optional)</span></Label>
                             <Textarea
                               id="review-content"
                               placeholder="Tell others what you liked or didn't like about your stay..."
-                              rows={5}
+                              rows={4}
                               value={reviewForm.content}
                               onChange={e => setReviewForm(f => ({ ...f, content: e.target.value }))}
                             />
@@ -730,35 +765,8 @@ export function PropertyDetails() {
                           <div className="flex gap-3">
                             <Button
                               type="button"
-                              disabled={reviewSubmitting || reviewForm.rating === 0 || !reviewForm.content.trim()}
-                              onClick={async () => {
-                                if (reviewForm.rating === 0) { toast.error('Please select an overall rating'); return; }
-                                if (!reviewForm.content.trim()) { toast.error('Please write a review comment'); return; }
-                                setReviewSubmitting(true);
-                                try {
-                                  await propertiesAPI.createReview({
-                                    listing: id!,
-                                    rating: reviewForm.rating,
-                                    title: reviewForm.title,
-                                    content: reviewForm.content,
-                                    cleanliness: reviewForm.cleanliness || reviewForm.rating,
-                                    accuracy: reviewForm.accuracy || reviewForm.rating,
-                                    check_in_rating: reviewForm.check_in_rating || reviewForm.rating,
-                                    communication: reviewForm.communication || reviewForm.rating,
-                                    location_rating: reviewForm.location_rating || reviewForm.rating,
-                                    value: reviewForm.value || reviewForm.rating,
-                                  });
-                                  toast.success('Review submitted!');
-                                  setShowReviewForm(false);
-                                  setReviewForm({ rating: 0, title: '', content: '', cleanliness: 0, accuracy: 0, check_in_rating: 0, communication: 0, location_rating: 0, value: 0 });
-                                  queryClient.invalidateQueries({ queryKey: queryKeys.properties.reviews(id!) });
-                                  queryClient.invalidateQueries({ queryKey: queryKeys.properties.detail(id!) });
-                                } catch (err: any) {
-                                  toast.error(err.message || 'Failed to submit review');
-                                } finally {
-                                  setReviewSubmitting(false);
-                                }
-                              }}
+                              disabled={reviewSubmitting || reviewForm.rating === 0}
+                              onClick={submitReview}
                             >
                               {reviewSubmitting ? 'Submitting…' : 'Submit review'}
                             </Button>

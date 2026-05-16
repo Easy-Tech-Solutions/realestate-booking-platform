@@ -121,7 +121,7 @@ function RoomForm({
         />
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="price">Price per night *</Label>
           <Input
@@ -156,7 +156,7 @@ function RoomForm({
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="beds">Beds</Label>
           <Input

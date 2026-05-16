@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Search, MapPin, Star, ArrowRight, Quote, Mail, Navigation, Loader2, PenLine, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, MapPin, Star, ArrowRight, Quote, Navigation, Loader2, PenLine, X } from 'lucide-react';
 import bannerImage from '../../assets/banner.jpeg';
-import { NewsletterSignup } from '../components/NewsletterSignup';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,9 +11,12 @@ import { useHomeProperties } from '../../hooks/queries/useHomeProperties';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { propertiesAPI } from '../../services/api.service';
 import { testimonialsAPI } from '../../services/api/testimonials';
+import { useApp } from '../../hooks/useApp';
+import { Link } from 'react-router';
 
 export function Home() {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [scrollPosition, setScrollPosition] = useState(0);
   const categoryScrollRef = React.useRef<HTMLDivElement>(null);
@@ -55,7 +57,7 @@ export function Home() {
   const testimonials = testimonialsQuery.data ?? [];
 
   const [showTestimonialForm, setShowTestimonialForm] = useState(false);
-  const [tForm, setTForm] = useState({ name: '', location: '', rating: 5, quote: '' });
+  const [tForm, setTForm] = useState({ rating: 5, quote: '' });
   const [tSubmitting, setTSubmitting] = useState(false);
   const [tError, setTError] = useState('');
   const [tSuccess, setTSuccess] = useState(false);
@@ -63,13 +65,13 @@ export function Home() {
   const submitTestimonial = async (e: React.FormEvent) => {
     e.preventDefault();
     setTError('');
-    if (!tForm.name.trim() || !tForm.quote.trim()) { setTError('Name and message are required.'); return; }
-    if (tForm.quote.trim().length < 20) { setTError('Message must be at least 20 characters.'); return; }
+    if (!tForm.quote.trim()) { setTError('Please write a message.'); return; }
+    if (tForm.quote.trim().length < 5) { setTError('Message must be at least 5 characters.'); return; }
     setTSubmitting(true);
     try {
-      await testimonialsAPI.create({ name: tForm.name.trim(), location: tForm.location.trim(), rating: tForm.rating, quote: tForm.quote.trim() });
+      await testimonialsAPI.create({ rating: tForm.rating, quote: tForm.quote.trim() });
       setTSuccess(true);
-      setTForm({ name: '', location: '', rating: 5, quote: '' });
+      setTForm({ rating: 5, quote: '' });
       queryClient.invalidateQueries({ queryKey: ['testimonials'] });
       setTimeout(() => { setTSuccess(false); setShowTestimonialForm(false); }, 3000);
     } catch (err: any) {
@@ -325,13 +327,22 @@ export function Home() {
                 </p>
               </div>
               {!showTestimonialForm && (
-                <button
-                  type="button"
-                  onClick={() => setShowTestimonialForm(true)}
-                  className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl border border-primary text-primary text-sm font-semibold hover:bg-primary hover:text-primary-foreground transition-colors"
-                >
-                  <PenLine className="w-4 h-4" /> Share your experience
-                </button>
+                isAuthenticated ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowTestimonialForm(true)}
+                    className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl border border-primary text-primary text-sm font-semibold hover:bg-primary hover:text-primary-foreground transition-colors"
+                  >
+                    <PenLine className="w-4 h-4" /> Share your experience
+                  </button>
+                ) : (
+                  <Link
+                    to="/login"
+                    className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border text-muted-foreground text-sm font-medium hover:border-primary hover:text-primary transition-colors"
+                  >
+                    Sign in to share your experience
+                  </Link>
+                )
               )}
             </div>
 
@@ -348,27 +359,18 @@ export function Home() {
                   <p className="text-green-700 font-medium text-sm">Thank you! Your testimonial has been posted.</p>
                 ) : (
                   <form onSubmit={submitTestimonial} className="space-y-4">
-                    <div className="grid sm:grid-cols-2 gap-4">
+                    {/* Posting as */}
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                      {user?.avatar ? (
+                        <img src={user.avatar} alt={user.firstName} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-primary/20 text-primary flex items-center justify-center text-sm font-semibold shrink-0">
+                          {(user?.firstName?.[0] ?? '') + (user?.lastName?.[0] ?? '')}
+                        </div>
+                      )}
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground block mb-1">Your name *</label>
-                        <input
-                          type="text"
-                          value={tForm.name}
-                          onChange={e => setTForm(f => ({ ...f, name: e.target.value }))}
-                          placeholder="e.g. Amara Kofi"
-                          className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground block mb-1">Location (optional)</label>
-                        <input
-                          type="text"
-                          value={tForm.location}
-                          onChange={e => setTForm(f => ({ ...f, location: e.target.value }))}
-                          placeholder="e.g. Accra, Ghana"
-                          className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                        />
+                        <p className="text-xs text-muted-foreground">Posting as</p>
+                        <p className="text-sm font-medium">{user?.firstName} {user?.lastName}</p>
                       </div>
                     </div>
                     <div>
@@ -388,7 +390,7 @@ export function Home() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground block mb-1">Your message * <span className="text-muted-foreground/60">(min 20 chars)</span></label>
+                      <label className="text-xs font-medium text-muted-foreground block mb-1">Your message *</label>
                       <textarea
                         value={tForm.quote}
                         onChange={e => setTForm(f => ({ ...f, quote: e.target.value }))}
@@ -438,9 +440,13 @@ export function Home() {
                         ))}
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0', colorClass)}>
-                          {t.avatar_initials}
-                        </div>
+                        {t.user_avatar ? (
+                          <img src={t.user_avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0', colorClass)}>
+                            {t.avatar_initials}
+                          </div>
+                        )}
                         <div>
                           <p className="font-semibold text-sm">{t.name}</p>
                           {t.location && <p className="text-xs text-muted-foreground">{t.location}</p>}
@@ -512,27 +518,6 @@ export function Home() {
               HomeKonet operates in full compliance with Liberian commercial law and all applicable regulations.
               All transactions are processed through licensed financial institutions.
             </p>
-          </div>
-        </div>
-      )}
-
-      {/* Newsletter Banner */}
-      {!selectedCategory && (
-        <div className="bg-gradient-to-br from-primary via-primary/90 to-primary/70 text-white">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-16">
-            <div className="max-w-2xl mx-auto text-center mb-8">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <Mail className="w-6 h-6 text-white/80" />
-                <span className="text-sm font-semibold uppercase tracking-widest text-white/70">Newsletter</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-semibold mb-3">Never miss a great deal</h2>
-              <p className="text-white/75 text-lg">
-                Get updates on new listings, hotels opening across Liberia, and exclusive discounts — delivered straight to your inbox.
-              </p>
-            </div>
-            <div className="max-w-xl mx-auto">
-              <NewsletterSignup variant="banner" />
-            </div>
           </div>
         </div>
       )}
