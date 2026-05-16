@@ -247,12 +247,30 @@ export function Home() {
 
       {/* ── Hero Banner ── */}
       {!selectedCategory && (
-        <div className="relative overflow-hidden">
+        <div className="relative overflow-hidden max-h-[520px]">
           <img
             src={bannerImage}
             alt="HomeKonet — Find Your Perfect Stay"
-            className="block w-full max-h-[520px] object-cover object-center"
+            className="block w-full h-[520px] object-cover object-center"
           />
+          {/* gradient overlay so text is always readable */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/30 to-transparent" />
+          {/* hero text */}
+          <div className="absolute inset-0 flex flex-col justify-center px-8 sm:px-16 lg:px-28 max-w-2xl">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight drop-shadow-md">
+              Find Your Perfect Stay
+            </h1>
+            <p className="mt-3 text-base sm:text-lg text-white/85 drop-shadow">
+              Browse thousands of unique homes, hotels, and lodges — book with confidence.
+            </p>
+            <button
+              onClick={scrollToProperties}
+              className="mt-6 self-start flex items-center gap-2 px-6 py-3 bg-primary text-white font-semibold rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+            >
+              Explore listings
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
