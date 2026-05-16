@@ -30,7 +30,8 @@ export function Footer() {
               <li><Link to="/help#safety" className="hover:text-foreground">Safety information</Link></li>
               <li><Link to="/help#cancellation" className="hover:text-foreground">Cancellation options</Link></li>
               <li><Link to="/faq" className="hover:text-foreground">FAQ</Link></li>
-              <li><a href="mailto:homekonnet@gmail.com" className="hover:text-foreground">Contact us</a></li>
+              <li><Link to="/contact" className="hover:text-foreground">Contact us</Link></li>
+              <li><Link to="/support" className="hover:text-foreground">Support tickets</Link></li>
             </ul>
           </div>
           <div>
