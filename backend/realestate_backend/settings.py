@@ -101,6 +101,7 @@ INSTALLED_APPS = [
     "suspensions",
     "newsletter",
     "testimonials",
+    "support",
 ]
 
 MIDDLEWARE = [

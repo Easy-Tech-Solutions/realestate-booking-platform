@@ -77,6 +77,9 @@ const ResetPassword = lazyPage(() => import('./pages/ResetPassword').then((modul
 const ManageRooms = lazyPage(() => import('./pages/ManageRooms').then((module) => ({ default: module.ManageRooms })));
 const AllReviews = lazyPage(() => import('./pages/AllReviews').then((module) => ({ default: module.AllReviews })));
 const FAQ = lazyPage(() => import('./pages/FAQ').then((module) => ({ default: module.FAQ })));
+const Contact = lazyPage(() => import('./pages/Contact').then((module) => ({ default: module.Contact })));
+const Support = lazyPage(() => import('./pages/Support').then((module) => ({ default: module.Support })));
+const MyTickets = lazyPage(() => import('./pages/MyTickets').then((module) => ({ default: module.MyTickets })));
 
 export const router = createBrowserRouter([
   {
@@ -160,6 +163,9 @@ export const router = createBrowserRouter([
       { path: 'reset-password', Component: ResetPassword },
       { path: 'reviews', Component: AllReviews },
       { path: 'faq', Component: FAQ },
+      { path: 'contact', Component: Contact },
+      { path: 'support', Component: Support },
+      { path: 'support/tickets', Component: MyTickets },
     ],
   },
 ]);

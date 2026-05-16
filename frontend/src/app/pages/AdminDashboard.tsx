@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router';
 import {
   Ban, Building2, CheckCircle, DollarSign, Home, TrendingUp, Users,
   Search, Eye, X, Shield, Settings, BarChart3, Calendar,
-  CreditCard, RefreshCw,
+  CreditCard, RefreshCw, Headphones, Mail, ChevronDown, ChevronUp, UserCheck,
 } from 'lucide-react';
+import { supportAPI, SupportTicket, ContactInquiry } from '../../services/api/support';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -28,6 +29,7 @@ const menuItems = [
   { id: 'properties',  label: 'Property Management', icon: Building2 },
   { id: 'bookings',    label: 'Bookings',             icon: Calendar },
   { id: 'payments',    label: 'Payments',             icon: CreditCard },
+  { id: 'support',     label: 'Support Tickets',      icon: Headphones },
   { id: 'security',    label: 'Security',             icon: Shield },
   { id: 'settings',    label: 'Settings',             icon: Settings },
 ];
@@ -72,6 +74,16 @@ export function AdminDashboard() {
   const [loading, setLoading]       = useState(true);
   const [userSearch, setUserSearch] = useState('');
   const [propSearch, setPropSearch] = useState('');
+
+  // Support state
+  const [supportTickets, setSupportTickets]     = useState<SupportTicket[]>([]);
+  const [supportStats, setSupportStats]         = useState<any>(null);
+  const [contactInquiries, setContactInquiries] = useState<ContactInquiry[]>([]);
+  const [supportLoading, setSupportLoading]     = useState(false);
+  const [ticketFilter, setTicketFilter]         = useState('');
+  const [expandedTicket, setExpandedTicket]     = useState<number | null>(null);
+  const [assignInput, setAssignInput]           = useState('');
+  const [supportTab, setSupportTab]             = useState<'tickets' | 'contact'>('tickets');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -527,6 +539,302 @@ export function AdminDashboard() {
     </div>
   );
 
+  const loadSupport = useCallback(async () => {
+    setSupportLoading(true);
+    try {
+      const [ticketsRes, statsRes, contactRes] = await Promise.all([
+        supportAPI.adminGetTickets(ticketFilter ? { status: ticketFilter } : undefined),
+        supportAPI.adminGetStats(),
+        supportAPI.adminGetContacts(),
+      ]);
+      setSupportTickets(ticketsRes.results);
+      setSupportStats(statsRes);
+      setContactInquiries(contactRes);
+    } catch {
+      toast.error('Failed to load support data');
+    } finally {
+      setSupportLoading(false);
+    }
+  }, [ticketFilter]);
+
+  useEffect(() => {
+    if (activeSection === 'support') loadSupport();
+  }, [activeSection, loadSupport]);
+
+  const ticketStatusColor: Record<string, string> = {
+    open:         'bg-blue-100 text-blue-700',
+    in_progress:  'bg-yellow-100 text-yellow-700',
+    pending_user: 'bg-orange-100 text-orange-700',
+    resolved:     'bg-green-100 text-green-700',
+    closed:       'bg-gray-100 text-gray-600',
+  };
+  const priorityColor: Record<string, string> = {
+    low: 'bg-slate-100 text-slate-600',
+    medium: 'bg-blue-100 text-blue-600',
+    high: 'bg-orange-100 text-orange-700',
+    urgent: 'bg-red-100 text-red-700',
+  };
+
+  const handleUpdateTicket = async (id: number, payload: Record<string, any>) => {
+    try {
+      const updated = await supportAPI.adminUpdateTicket(id, payload);
+      setSupportTickets(prev => prev.map(t => t.id === id ? updated : t));
+      toast.success('Ticket updated');
+    } catch {
+      toast.error('Failed to update ticket');
+    }
+  };
+
+  const handleMarkContactRead = async (id: number) => {
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/support/admin/contact/${id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        body: JSON.stringify({ is_read: true }),
+      });
+      setContactInquiries(prev => prev.map(c => c.id === id ? { ...c, isRead: true } : c));
+    } catch {
+      toast.error('Failed to mark as read');
+    }
+  };
+
+  const renderSupport = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2 className="text-2xl font-semibold">Support Center</h2>
+        <Button variant="outline" size="sm" onClick={loadSupport} className="w-fit">
+          <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+        </Button>
+      </div>
+
+      {/* Stats row */}
+      {supportStats && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[
+            { label: 'Open',           value: supportStats.open,         color: 'text-blue-600' },
+            { label: 'In Progress',    value: supportStats.in_progress,  color: 'text-yellow-600' },
+            { label: 'Pending User',   value: supportStats.pending_user, color: 'text-orange-600' },
+            { label: 'Resolved',       value: supportStats.resolved,     color: 'text-green-600' },
+            { label: 'Closed',         value: supportStats.closed,       color: 'text-gray-500' },
+            { label: 'Unread Contact', value: supportStats.unread_contact, color: 'text-destructive' },
+          ].map(s => (
+            <Card key={s.label}>
+              <CardContent className="p-4 text-center">
+                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-border pb-0">
+        {(['tickets', 'contact'] as const).map(tab => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setSupportTab(tab)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+              supportTab === tab ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {tab === 'tickets' ? 'Support Tickets' : 'Contact Inquiries'}
+            {tab === 'contact' && supportStats?.unread_contact > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 text-xs bg-destructive text-white rounded-full">{supportStats.unread_contact}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {supportTab === 'tickets' && (
+        <div className="space-y-4">
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2">
+            {['', 'open', 'in_progress', 'pending_user', 'resolved', 'closed'].map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setTicketFilter(s)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  ticketFilter === s ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary'
+                }`}
+              >
+                {s === '' ? 'All' : s.replace('_', ' ')}
+              </button>
+            ))}
+          </div>
+
+          {supportLoading ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
+            </div>
+          ) : supportTickets.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">No tickets found.</div>
+          ) : (
+            <div className="space-y-3">
+              {supportTickets.map(ticket => (
+                <Card key={ticket.id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    {/* Ticket header row */}
+                    <button
+                      type="button"
+                      className="w-full flex items-start justify-between gap-4 p-4 text-left hover:bg-muted/30 transition-colors"
+                      onClick={() => setExpandedTicket(expandedTicket === ticket.id ? null : ticket.id)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-mono text-xs text-muted-foreground">{ticket.ticketNumber}</span>
+                          <Badge className={ticketStatusColor[ticket.status] ?? ''}>{ticket.status.replace('_', ' ')}</Badge>
+                          <Badge className={priorityColor[ticket.priority] ?? ''}>{ticket.priority}</Badge>
+                          <span className="text-xs text-muted-foreground capitalize">{ticket.category.replace('_', ' ')}</span>
+                        </div>
+                        <p className="font-medium text-sm truncate">{ticket.subject}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {ticket.requesterName} · {ticket.requesterEmail} · {new Date(ticket.createdAt).toLocaleDateString()}
+                          {ticket.assignedToName && <span className="ml-2 text-primary">Assigned: {ticket.assignedToName}</span>}
+                        </p>
+                      </div>
+                      {expandedTicket === ticket.id ? <ChevronUp className="w-4 h-4 shrink-0 mt-1" /> : <ChevronDown className="w-4 h-4 shrink-0 mt-1" />}
+                    </button>
+
+                    {/* Expanded panel */}
+                    {expandedTicket === ticket.id && (
+                      <div className="border-t border-border p-4 space-y-4">
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.description}</p>
+
+                        {/* Admin controls */}
+                        <div className="flex flex-wrap gap-3 items-end">
+                          {/* Status */}
+                          <div className="space-y-1">
+                            <label htmlFor={`status-${ticket.id}`} className="text-xs font-medium text-muted-foreground">Status</label>
+                            <select
+                              id={`status-${ticket.id}`}
+                              title="Ticket status"
+                              className="text-sm border border-border rounded-lg px-2 py-1.5 bg-background"
+                              value={ticket.status}
+                              onChange={e => handleUpdateTicket(ticket.id, { status: e.target.value })}
+                            >
+                              {['open', 'in_progress', 'pending_user', 'resolved', 'closed'].map(s => (
+                                <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {/* Priority */}
+                          <div className="space-y-1">
+                            <label htmlFor={`priority-${ticket.id}`} className="text-xs font-medium text-muted-foreground">Priority</label>
+                            <select
+                              id={`priority-${ticket.id}`}
+                              title="Ticket priority"
+                              className="text-sm border border-border rounded-lg px-2 py-1.5 bg-background"
+                              value={ticket.priority}
+                              onChange={e => handleUpdateTicket(ticket.id, { priority: e.target.value })}
+                            >
+                              {['low', 'medium', 'high', 'urgent'].map(p => (
+                                <option key={p} value={p}>{p}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {/* Assign */}
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-muted-foreground">Assign to (user ID)</label>
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                placeholder="User ID"
+                                className="w-24 h-9 text-sm"
+                                value={assignInput}
+                                onChange={e => setAssignInput(e.target.value)}
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  if (assignInput) {
+                                    handleUpdateTicket(ticket.id, { assigned_to: Number(assignInput) });
+                                    setAssignInput('');
+                                  }
+                                }}
+                              >
+                                <UserCheck className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Attachments */}
+                        {ticket.attachments && ticket.attachments.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-2">Attachments</p>
+                            <div className="flex flex-wrap gap-2">
+                              {ticket.attachments.map(a => (
+                                <a
+                                  key={a.id}
+                                  href={a.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted transition-colors"
+                                >
+                                  📎 {a.filename}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {supportTab === 'contact' && (
+        <div className="space-y-3">
+          {supportLoading ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+            </div>
+          ) : contactInquiries.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">No contact inquiries.</div>
+          ) : (
+            contactInquiries.map(c => (
+              <Card key={c.id} className={c.isRead ? 'opacity-70' : ''}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {!c.isRead && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+                        <span className="font-medium text-sm">{c.subject}</span>
+                        <Badge variant="outline" className="text-xs capitalize">{c.category.replace('_', ' ')}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">{c.name} · <a href={`mailto:${c.email}`} className="hover:underline">{c.email}</a> · {new Date(c.createdAt).toLocaleDateString()}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-3">{c.message}</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <Button size="sm" variant="outline" asChild>
+                        <a href={`mailto:${c.email}?subject=Re: ${encodeURIComponent(c.subject)}`}>
+                          <Mail className="w-3.5 h-3.5 mr-1" /> Reply
+                        </a>
+                      </Button>
+                      {!c.isRead && (
+                        <Button size="sm" variant="ghost" onClick={() => handleMarkContactRead(c.id)}>
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   const renderContent = () => {
     switch (activeSection) {
       case 'overview':   return renderOverview();
@@ -534,6 +842,7 @@ export function AdminDashboard() {
       case 'properties': return renderPropertyManagement();
       case 'bookings':   return renderBookings();
       case 'payments':   return renderPayments();
+      case 'support':    return renderSupport();
       case 'security':   return renderSecurity();
       case 'settings':   return renderSettings();
       default:           return renderOverview();
