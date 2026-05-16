@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Search, Star, Quote, Navigation, Loader2, PenLine, X, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Star, Quote, Navigation, Loader2, PenLine, X, ArrowRight, Car, Leaf, Landmark } from 'lucide-react';
 import bannerImage from '../../assets/banner.jpeg';
 import { useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,142 @@ import { propertiesAPI } from '../../services/api.service';
 import { testimonialsAPI } from '../../services/api/testimonials';
 import { useApp } from '../../hooks/useApp';
 import { Link } from 'react-router';
+
+function CategorySvgIcon({ id, className = 'w-8 h-8' }: { id: string; className?: string }) {
+  const s = {
+    viewBox: '0 0 24 24',
+    fill: 'none' as const,
+    stroke: 'currentColor' as const,
+    strokeWidth: 1.5,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    className,
+  };
+  switch (id) {
+    case 'apartment':
+      return (
+        <svg {...s}>
+          {/* ground */}
+          <path d="M1 22h22" />
+          {/* building body */}
+          <rect x="4" y="9" width="16" height="13" rx="0.5" />
+          {/* roof */}
+          <path d="M2 9L12 2L22 9" />
+          {/* top windows */}
+          <rect x="6" y="11" width="4" height="3" rx="0.3" />
+          <rect x="14" y="11" width="4" height="3" rx="0.3" />
+          {/* bottom windows */}
+          <rect x="6" y="16" width="4" height="3" rx="0.3" />
+          <rect x="14" y="16" width="4" height="3" rx="0.3" />
+          {/* door */}
+          <path d="M10 22v-5h4v5" />
+        </svg>
+      );
+    case 'hotels':
+      return (
+        <svg {...s}>
+          {/* building */}
+          <rect x="2" y="3" width="20" height="19" rx="0.5" />
+          {/* floor lines */}
+          <line x1="2" y1="9" x2="22" y2="9" />
+          <line x1="2" y1="14" x2="22" y2="14" />
+          {/* top-row windows */}
+          <rect x="5" y="5" width="3" height="3" rx="0.3" />
+          <rect x="11" y="5" width="3" height="3" rx="0.3" />
+          <rect x="17" y="5" width="3" height="3" rx="0.3" />
+          {/* mid-row windows */}
+          <rect x="5" y="10" width="3" height="3" rx="0.3" />
+          <rect x="11" y="10" width="3" height="3" rx="0.3" />
+          <rect x="17" y="10" width="3" height="3" rx="0.3" />
+          {/* door */}
+          <rect x="9" y="17" width="6" height="5" rx="0.3" />
+          {/* canopy */}
+          <path d="M6 15q6-4 12 0" strokeWidth="1.2" />
+        </svg>
+      );
+    case 'lodge':
+      return (
+        <svg {...s}>
+          {/* ground */}
+          <path d="M1 22h22" />
+          {/* walls */}
+          <rect x="4" y="13" width="16" height="9" rx="0.5" />
+          {/* roof */}
+          <path d="M1 13L12 4L23 13" />
+          {/* chimney */}
+          <rect x="15" y="5" width="3" height="8" />
+          {/* windows */}
+          <rect x="6" y="15" width="4" height="4" rx="0.3" />
+          <rect x="14" y="15" width="4" height="4" rx="0.3" />
+          {/* door */}
+          <path d="M10 22v-5h4v5" />
+        </svg>
+      );
+    case 'beaches':
+      return (
+        <svg {...s}>
+          {/* umbrella dome */}
+          <path d="M3 14a9 9 0 0 1 18 0" />
+          {/* pole */}
+          <line x1="12" y1="5" x2="12" y2="20" />
+          {/* pole curl */}
+          <path d="M12 18q3 2 1 4" />
+          {/* waves */}
+          <path d="M2 17q2-2 4 0t4 0" />
+          <path d="M14 17q2-2 4 0t4 0" />
+        </svg>
+      );
+    case 'roadside':
+      return (
+        <svg {...s}>
+          {/* road */}
+          <path d="M10 22L13 4M14 22L11 4" />
+          <line x1="10" y1="22" x2="14" y2="22" />
+          <line x1="11" y1="4" x2="13" y2="4" />
+          {/* center dashes */}
+          <line x1="12" y1="8" x2="12" y2="11" strokeDasharray="2 2" />
+          <line x1="12" y1="14" x2="12" y2="17" strokeDasharray="2 2" />
+          {/* trees */}
+          <circle cx="5" cy="16" r="3" />
+          <line x1="5" y1="19" x2="5" y2="22" />
+          <circle cx="19" cy="16" r="3" />
+          <line x1="19" y1="19" x2="19" y2="22" />
+        </svg>
+      );
+    case 'office-space':
+      return (
+        <svg {...s}>
+          {/* building tower */}
+          <rect x="3" y="2" width="18" height="20" rx="0.5" />
+          {/* window grid 3×3 */}
+          <rect x="6" y="5" width="3" height="2.5" rx="0.3" />
+          <rect x="11" y="5" width="3" height="2.5" rx="0.3" />
+          <rect x="16" y="5" width="3" height="2.5" rx="0.3" />
+          <rect x="6" y="10" width="3" height="2.5" rx="0.3" />
+          <rect x="11" y="10" width="3" height="2.5" rx="0.3" />
+          <rect x="16" y="10" width="3" height="2.5" rx="0.3" />
+          <rect x="6" y="15" width="3" height="2.5" rx="0.3" />
+          <rect x="11" y="15" width="3" height="2.5" rx="0.3" />
+          <rect x="16" y="15" width="3" height="2.5" rx="0.3" />
+          {/* door */}
+          <rect x="9" y="19" width="6" height="3" rx="0.3" />
+        </svg>
+      );
+    case 'highway':
+      return <Car {...{ className, strokeWidth: 1.5 }} />;
+    case 'land':
+      return <Leaf {...{ className, strokeWidth: 1.5 }} />;
+    case 'hall':
+      return <Landmark {...{ className, strokeWidth: 1.5 }} />;
+    default:
+      return (
+        <svg {...s}>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 9h18M9 22V9" />
+        </svg>
+      );
+  }
+}
 
 export function Home() {
   const navigate = useNavigate();
@@ -149,7 +285,7 @@ export function Home() {
                       : 'border-transparent opacity-60 hover:opacity-100 hover:border-muted'
                   )}
                 >
-                  <span className="text-2xl">{category.icon}</span>
+                  <CategorySvgIcon id={category.id} className="w-8 h-8" />
                   <span className="text-xs font-semibold whitespace-nowrap">{category.name}</span>
                 </button>
               ))}

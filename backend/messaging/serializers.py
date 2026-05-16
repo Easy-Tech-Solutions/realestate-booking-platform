@@ -33,15 +33,28 @@ class MessageAttachmentSerializer(serializers.ModelSerializer):
         return obj.file.url
 
 
+class ReplySnippetSerializer(serializers.ModelSerializer):
+    sender_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Message
+        fields = ['id', 'content', 'sender_name', 'message_type']
+
+    def get_sender_name(self, obj):
+        return obj.sender.get_full_name() or obj.sender.email
+
+
 class MessageSerializer(serializers.ModelSerializer):
     sender = ParticipantSerializer(read_only=True)
     attachments = MessageAttachmentSerializer(many=True, read_only=True)
+    reply_to = ReplySnippetSerializer(read_only=True)
 
     class Meta:
         model = Message
         fields = [
             'id', 'conversation', 'sender', 'content',
-            'message_type', 'is_read', 'attachments', 'created_at', 'edited_at'
+            'message_type', 'is_read', 'attachments',
+            'reply_to', 'created_at', 'edited_at',
         ]
         read_only_fields = ['id', 'sender', 'message_type', 'is_read', 'created_at']
 

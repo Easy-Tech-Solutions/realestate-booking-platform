@@ -2,7 +2,9 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from django.core.paginator import Paginator
+from django.db import models
 from django.db.models import Q
+from django.contrib.auth import get_user_model
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -10,6 +12,41 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .models import ContactInquiry, SupportTicket, TicketMessage, TicketAttachment
+
+User = get_user_model()
+
+
+def _get_support_admin():
+    """Return the first staff/admin user to act as the support participant, or None."""
+    return User.objects.filter(
+        models.Q(role='admin') | models.Q(is_staff=True)
+    ).order_by('id').first()
+
+
+def _create_support_conversation(user, subject, opening_message):
+    """
+    Create a messaging Conversation between `user` and the support admin,
+    with `opening_message` as the first message.
+    Returns the Conversation or None if no admin user exists.
+    """
+    try:
+        from messaging.models import Conversation, Message
+        admin = _get_support_admin()
+        if admin is None or admin == user:
+            return None
+
+        conv = Conversation.objects.create()
+        conv.participants.add(user, admin)
+
+        Message.objects.create(
+            conversation=conv,
+            sender=user,
+            content=opening_message,
+            message_type='text',
+        )
+        return conv
+    except Exception:
+        return None
 from .serializers import (
     ContactInquirySerializer,
     ContactInquiryCreateSerializer,
@@ -54,7 +91,8 @@ def contact_create(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    inquiry = serializer.save()
+    auth_user = request.user if request.user.is_authenticated else None
+    inquiry = serializer.save(user=auth_user)
 
     email_body = (
         f'New Contact Inquiry\n'
@@ -69,10 +107,24 @@ def contact_create(request):
         body=email_body,
     )
 
+    conversation_id = None
+    if auth_user:
+        opening = (
+            f'[Contact Inquiry] {inquiry.subject}\n\n'
+            f'Category: {inquiry.get_category_display()}\n\n'
+            f'{inquiry.message}'
+        )
+        conv = _create_support_conversation(auth_user, inquiry.subject, opening)
+        if conv:
+            inquiry.conversation = conv
+            inquiry.save(update_fields=['conversation'])
+            conversation_id = conv.id
+
     return Response(
         {
             'message': 'Your inquiry has been received. We will get back to you shortly.',
             'id': inquiry.id,
+            'conversation_id': conversation_id,
         },
         status=status.HTTP_201_CREATED,
     )
@@ -155,6 +207,18 @@ def ticket_list_create(request):
             content_type=uploaded_file.content_type or '',
             uploaded_by=user,
         )
+
+    # Create a messaging conversation for authenticated users
+    if user:
+        opening = (
+            f'[{ticket.ticket_number}] {ticket.subject}\n\n'
+            f'Category: {ticket.get_category_display()}\n\n'
+            f'{ticket.description}'
+        )
+        conv = _create_support_conversation(user, ticket.subject, opening)
+        if conv:
+            ticket.conversation = conv
+            ticket.save(update_fields=['conversation'])
 
     # Notify support
     requester = ticket.requester_name

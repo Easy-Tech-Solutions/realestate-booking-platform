@@ -63,6 +63,10 @@ class Message(models.Model):
         blank=True,
         help_text="The text body of the message. Can be empty if only a file is attached."
     )
+    reply_to = models.ForeignKey(
+        'self', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='replies',
+    )
     message_type = models.CharField(max_length=10, choices=MESSAGE_TYPES, default='text')
     is_read = models.BooleanField(default=False)
     edited_at = models.DateTimeField(null=True, blank=True)

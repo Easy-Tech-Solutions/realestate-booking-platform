@@ -185,11 +185,20 @@ class SendMessageView(APIView):
         else:
             msg_type = 'text'
 
+        reply_to_id = request.data.get('reply_to_id')
+        reply_to = None
+        if reply_to_id:
+            try:
+                reply_to = Message.objects.get(id=reply_to_id, conversation=conversation)
+            except Message.DoesNotExist:
+                pass
+
         message = Message.objects.create(
             conversation=conversation,
             sender=request.user,
             content=content,
             message_type=msg_type,
+            reply_to=reply_to,
         )
 
         attachments = []

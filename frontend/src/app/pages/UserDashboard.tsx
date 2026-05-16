@@ -69,8 +69,8 @@ export function UserDashboard() {
         {/* Stats */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {[
-            { label: 'Upcoming Trips', value: upcomingTrips.length, icon: Calendar },
-            { label: 'Past Trips', value: pastTrips.length, icon: MapPin },
+            { label: 'Upcoming Bookings', value: upcomingTrips.length, icon: Calendar },
+            { label: 'Past Bookings', value: pastTrips.length, icon: MapPin },
             { label: 'Wishlists', value: favoriteProperties.length, icon: Heart },
             { label: 'Total Spent', value: formatCurrency(totalSpent), icon: Wallet },
           ].map(({ label, value, icon: Icon }) => (
@@ -89,18 +89,18 @@ export function UserDashboard() {
         {/* Tabs */}
         <Tabs defaultValue="upcoming">
           <TabsList className="mb-6 flex overflow-x-auto w-full sm:w-auto">
-            <TabsTrigger value="upcoming" className="flex-shrink-0">Upcoming Trips</TabsTrigger>
-            <TabsTrigger value="past" className="flex-shrink-0">Past Trips</TabsTrigger>
+            <TabsTrigger value="upcoming" className="flex-shrink-0">Upcoming Bookings</TabsTrigger>
+            <TabsTrigger value="past" className="flex-shrink-0">Past Bookings</TabsTrigger>
             <TabsTrigger value="wishlists" className="flex-shrink-0">Wishlists</TabsTrigger>
             <TabsTrigger value="reviews" className="flex-shrink-0">My Reviews</TabsTrigger>
           </TabsList>
 
           <TabsContent value="upcoming">
             <Card>
-              <CardHeader><CardTitle>Upcoming Trips</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Upcoming Bookings</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 {upcomingTrips.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No upcoming trips yet.</p>
+                  <p className="text-sm text-muted-foreground">No upcoming bookings yet.</p>
                 )}
                 {upcomingTrips.map((trip) => (
                   <div key={trip.booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-border rounded-lg">
@@ -126,10 +126,10 @@ export function UserDashboard() {
 
           <TabsContent value="past">
             <Card>
-              <CardHeader><CardTitle>Past Trips</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Past Bookings</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 {pastTrips.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No past trips yet.</p>
+                  <p className="text-sm text-muted-foreground">No past bookings yet.</p>
                 )}
                 {pastTrips.map((trip) => (
                   <div key={trip.booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-border rounded-lg">

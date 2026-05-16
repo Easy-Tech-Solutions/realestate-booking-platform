@@ -152,6 +152,13 @@ export interface MessageAttachment {
   createdAt: string;
 }
 
+export interface MessageReplySnippet {
+  id: string;
+  content: string;
+  senderName: string;
+  messageType: string;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -164,6 +171,7 @@ export interface Message {
   read: boolean;
   editedAt?: string;
   attachments: MessageAttachment[];
+  replyTo?: MessageReplySnippet;
   createdAt: string;
 }
 

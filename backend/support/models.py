@@ -5,6 +5,11 @@ import random
 import string
 
 
+def _get_conversation_model():
+    from messaging.models import Conversation
+    return Conversation
+
+
 def _gen_ticket_number():
     prefix = timezone.now().strftime('%Y%m%d')
     suffix = ''.join(random.choices(string.digits, k=6))
@@ -21,6 +26,14 @@ class ContactInquiry(models.Model):
         ('other', 'Other'),
     ]
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='contact_inquiries',
+    )
+    conversation = models.OneToOneField(
+        'messaging.Conversation', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='contact_inquiry',
+    )
     name = models.CharField(max_length=100)
     email = models.EmailField()
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='general')
@@ -79,6 +92,10 @@ class SupportTicket(models.Model):
         on_delete=models.SET_NULL, related_name='assigned_tickets',
     )
 
+    conversation = models.OneToOneField(
+        'messaging.Conversation', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='support_ticket',
+    )
     resolved_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

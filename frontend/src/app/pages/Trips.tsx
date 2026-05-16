@@ -23,7 +23,7 @@ export function Trips() {
 
   useEffect(() => {
     if (isError) {
-      toast.error('Failed to load your trips');
+      toast.error('Failed to load your bookings');
     }
   }, [isError]);
 
@@ -131,9 +131,9 @@ export function Trips() {
   return (
     <div className="min-h-screen bg-background py-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-20">
-        <h1 className="text-3xl font-semibold mb-8">Trips</h1>
+        <h1 className="text-3xl font-semibold mb-8">My Bookings</h1>
 
-        {isLoading && <p className="text-muted-foreground mb-6">Loading your trips...</p>}
+        {isLoading && <p className="text-muted-foreground mb-6">Loading your bookings...</p>}
 
         <Tabs defaultValue="upcoming" className="w-full">
           <TabsList className="mb-8">
@@ -148,8 +148,8 @@ export function Trips() {
               upcomingTrips.map(trip => <TripCard key={trip.booking.id} trip={trip} />)
             ) : (
               <EmptyState
-                message="No trips booked...yet!"
-                sub="Time to dust off your bags and start planning your next adventure"
+                message="No bookings yet!"
+                sub="Browse our listings and make your first booking today"
               />
             )}
           </TabsContent>
@@ -159,8 +159,8 @@ export function Trips() {
               pastTrips.map(trip => <TripCard key={trip.booking.id} trip={trip} isPast />)
             ) : (
               <EmptyState
-                message="No past trips"
-                sub="Your past trips will appear here"
+                message="No past bookings"
+                sub="Your completed bookings will appear here"
               />
             )}
           </TabsContent>

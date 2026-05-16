@@ -61,6 +61,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.send_error("Not authenticated.")
                 return
             await self.handle_mark_read()
+        elif msg_type == 'typing':
+            if not self.user:
+                await self.send_error("Not authenticated.")
+                return
+            await self.handle_typing()
         else:
             await self.send_error(f"Unknown message type: {msg_type}")
 
@@ -117,6 +122,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
         )
 
+    async def handle_typing(self):
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'broadcast_typing',
+                'user_id': self.user.id,
+                'user_name': self.user.get_full_name() or self.user.email,
+                'conversation_id': int(self.conversation_id),
+            }
+        )
+
     async def handle_mark_read(self):
         updated = await self.mark_messages_read(self.conversation_id, self.user)
         await self.send(text_data=json.dumps({'type': 'messages_marked_read'}))
@@ -162,6 +178,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'type': 'read_receipt',
             'conversation_id': event['conversation_id'],
             'reader_id': event['reader_id'],
+        }))
+
+    async def broadcast_typing(self, event):
+        # Don't echo typing back to the sender
+        if self.user and event['user_id'] == self.user.id:
+            return
+        await self.send(text_data=json.dumps({
+            'type': 'typing',
+            'user_id': event['user_id'],
+            'user_name': event['user_name'],
+            'conversation_id': event['conversation_id'],
         }))
 
     # ------------------------------------------------------------------ #

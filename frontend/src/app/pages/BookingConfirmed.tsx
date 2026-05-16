@@ -151,7 +151,7 @@ export function BookingConfirmed() {
             Message your host
           </Button>
           <Button variant="outline" className="flex-1" onClick={() => navigate('/trips')}>
-            View my trips
+            View my bookings
           </Button>
           <Button variant="outline" size="icon" title="Download receipt">
             <Download className="w-4 h-4" />

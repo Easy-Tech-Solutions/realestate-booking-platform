@@ -117,6 +117,7 @@ class SupportTicketDetailSerializer(serializers.ModelSerializer):
     assigned_to_name = serializers.SerializerMethodField()
     messages = TicketMessageSerializer(many=True, read_only=True)
     attachments = TicketAttachmentSerializer(many=True, read_only=True)
+    conversation_id = serializers.SerializerMethodField()
 
     class Meta:
         model = SupportTicket
@@ -126,13 +127,20 @@ class SupportTicketDetailSerializer(serializers.ModelSerializer):
             'requester_name', 'requester_email',
             'assigned_to', 'assigned_to_name',
             'messages', 'attachments',
+            'conversation_id',
             'resolved_at', 'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'ticket_number', 'user', 'guest_name', 'guest_email',
             'requester_name', 'requester_email', 'assigned_to_name',
-            'messages', 'attachments', 'resolved_at', 'created_at', 'updated_at',
+            'messages', 'attachments', 'conversation_id',
+            'resolved_at', 'created_at', 'updated_at',
         ]
+
+    def get_conversation_id(self, obj):
+        if obj.conversation_id:
+            return obj.conversation_id
+        return None
 
     def get_assigned_to_name(self, obj):
         if obj.assigned_to:
