@@ -2,6 +2,7 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 
@@ -12,45 +13,34 @@ class ChatConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer for a single conversation room.
 
-    Connection URL pattern:
-        ws://your-domain/ws/chat/<conversation_id>/
+    Connection URL:  ws://domain/ws/chat/<conversation_id>/
 
-    The client MUST send a JWT access token immediately after connecting
-    (within the first message) as:
+    After connecting send:
         { "type": "authenticate", "token": "<access_token>" }
 
-    Once authenticated, the client can send:
-        { "type": "chat_message", "content": "Hello!" }
+    Then you can send:
+        { "type": "chat_message",  "content": "Hello!" }
+        { "type": "mark_read" }
 
-    The server broadcasts to the room:
-        {
-            "type": "chat_message",
-            "message_id": 42,
-            "content": "Hello!",
-            "sender_id": 5,
-            "sender_email": "user@example.com",
-            "conversation_id": 3,
-            "created_at": "2026-03-15T10:00:00Z"
-        }
+    Server broadcasts:
+        chat_message        — new message in room
+        message_edited      — a message was edited
+        read_receipt        — other participant opened/read the thread
     """
 
     async def connect(self):
         self.conversation_id = self.scope['url_route']['kwargs']['conversation_id']
         self.room_group_name = f"chat_{self.conversation_id}"
-        self.user = None  # Will be set after authentication message
-
-        # Accept the connection immediately; we authenticate via first message
+        self.user = None
         await self.accept()
 
     async def disconnect(self, close_code):
+        if self.user:
+            await self.update_last_seen(self.user)
         if hasattr(self, 'room_group_name'):
-            await self.channel_layer.group_discard(
-                self.room_group_name,
-                self.channel_name
-            )
+            await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def receive(self, text_data):
-        #Handle incoming messages from the WebSocket client
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
@@ -59,24 +49,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         msg_type = data.get('type')
 
-        # --- Authentication handshake ---
         if msg_type == 'authenticate':
             await self.handle_authenticate(data)
-
-        # --- Regular chat message ---
         elif msg_type == 'chat_message':
             if not self.user:
                 await self.send_error("Not authenticated.")
                 return
             await self.handle_chat_message(data)
-
-        # --- Mark messages as read ---
         elif msg_type == 'mark_read':
             if not self.user:
                 await self.send_error("Not authenticated.")
                 return
             await self.handle_mark_read()
-
         else:
             await self.send_error(f"Unknown message type: {msg_type}")
 
@@ -93,7 +77,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        # Make sure this user is actually a participant
         is_participant = await self.check_participant(user, self.conversation_id)
         if not is_participant:
             await self.send_error("You are not a participant in this conversation.")
@@ -101,12 +84,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         self.user = user
+        await self.update_last_seen(user)
 
-        # Join the channel group now that we know the user is valid
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
 
         await self.send(text_data=json.dumps({
             'type': 'authenticated',
@@ -122,11 +102,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         message = await self.save_message(self.conversation_id, self.user, content)
 
-        # Broadcast to all connected clients in the group (including sender)
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'broadcast_message',   # maps to broadcast_message() below
+                'type': 'broadcast_message',
                 'message_id': message['id'],
                 'content': message['content'],
                 'sender_id': message['sender_id'],
@@ -134,19 +113,29 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'conversation_id': int(self.conversation_id),
                 'created_at': message['created_at'],
                 'message_type': 'text',
+                'has_attachments': False,
             }
         )
 
     async def handle_mark_read(self):
-        await self.mark_messages_read(self.conversation_id, self.user)
+        updated = await self.mark_messages_read(self.conversation_id, self.user)
         await self.send(text_data=json.dumps({'type': 'messages_marked_read'}))
 
+        if updated:
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'broadcast_read_receipt',
+                    'conversation_id': int(self.conversation_id),
+                    'reader_id': self.user.id,
+                }
+            )
+
     # ------------------------------------------------------------------ #
-    #  Group broadcast handler — called when group_send fires             #
+    #  Group broadcast handlers — called when group_send fires            #
     # ------------------------------------------------------------------ #
 
     async def broadcast_message(self, event):
-        """Forward a group-sent message to the individual WebSocket client."""
         await self.send(text_data=json.dumps({
             'type': 'chat_message',
             'message_id': event['message_id'],
@@ -156,10 +145,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'conversation_id': event['conversation_id'],
             'created_at': event['created_at'],
             'message_type': event.get('message_type', 'text'),
+            'has_attachments': event.get('has_attachments', False),
+        }))
+
+    async def broadcast_message_edited(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message_edited',
+            'message_id': event['message_id'],
+            'content': event['content'],
+            'edited_at': event['edited_at'],
+            'conversation_id': event['conversation_id'],
+        }))
+
+    async def broadcast_read_receipt(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'read_receipt',
+            'conversation_id': event['conversation_id'],
+            'reader_id': event['reader_id'],
         }))
 
     # ------------------------------------------------------------------ #
-    #  Database helpers (must be async via database_sync_to_async)        #
+    #  Database helpers                                                    #
     # ------------------------------------------------------------------ #
 
     @database_sync_to_async
@@ -174,10 +180,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def check_participant(self, user, conversation_id):
         from .models import Conversation
-        return Conversation.objects.filter(
-            id=conversation_id,
-            participants=user
-        ).exists()
+        return Conversation.objects.filter(id=conversation_id, participants=user).exists()
 
     @database_sync_to_async
     def save_message(self, conversation_id, user, content):
@@ -189,7 +192,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             content=content,
             message_type='text',
         )
-        # Bump conversation updated_at so it sorts to top of inbox
         conversation.save(update_fields=['updated_at'])
         return {
             'id': msg.id,
@@ -202,10 +204,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def mark_messages_read(self, conversation_id, user):
         from .models import Message
-        Message.objects.filter(
+        return Message.objects.filter(
             conversation_id=conversation_id,
             is_read=False
         ).exclude(sender=user).update(is_read=True)
+
+    @database_sync_to_async
+    def update_last_seen(self, user):
+        try:
+            user.profile.last_seen = timezone.now()
+            user.profile.save(update_fields=['last_seen'])
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ #
     #  Utility                                                             #

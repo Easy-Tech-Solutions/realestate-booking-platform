@@ -13,6 +13,12 @@ class Conversation(models.Model):
         related_name='conversations',
         help_text="All users who are part of this conversation."
     )
+    deleted_by = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='deleted_conversations',
+        help_text="Users who have soft-deleted this conversation from their inbox."
+    )
     listing = models.ForeignKey(
         'listings.Listing',
         null=True,
@@ -59,6 +65,7 @@ class Message(models.Model):
     )
     message_type = models.CharField(max_length=10, choices=MESSAGE_TYPES, default='text')
     is_read = models.BooleanField(default=False)
+    edited_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

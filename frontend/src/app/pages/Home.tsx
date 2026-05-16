@@ -256,15 +256,15 @@ export function Home() {
                 {platformStatsQuery.data ? (
                   <>
                     <div>
-                      <p className="text-3xl font-bold text-primary">{formatStat(platformStatsQuery.data.locations)}</p>
+                      <p className="text-3xl font-bold text-primary">{formatStat(platformStatsQuery.data.total_locations)}</p>
                       <p className="text-xs text-muted-foreground mt-1 font-medium uppercase tracking-wide">Locations</p>
                     </div>
                     <div>
-                      <p className="text-3xl font-bold text-primary">{formatStat(platformStatsQuery.data.properties)}</p>
+                      <p className="text-3xl font-bold text-primary">{formatStat(platformStatsQuery.data.total_properties)}</p>
                       <p className="text-xs text-muted-foreground mt-1 font-medium uppercase tracking-wide">Properties</p>
                     </div>
                     <div>
-                      <p className="text-3xl font-bold text-primary">{formatStat(platformStatsQuery.data.guests)}</p>
+                      <p className="text-3xl font-bold text-primary">{formatStat(platformStatsQuery.data.happy_guests)}</p>
                       <p className="text-xs text-muted-foreground mt-1 font-medium uppercase tracking-wide">Happy Guests</p>
                     </div>
                   </>
