@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link } from 'react-router';
 import { toast } from 'sonner';
 import {
   Upload,
@@ -10,6 +10,7 @@ import {
   Loader2,
   TicketIcon,
   ArrowLeft,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -118,6 +119,7 @@ export function Support() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [ticketNumber, setTicketNumber] = useState('');
+  const [conversationId, setConversationId] = useState<number | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -204,6 +206,7 @@ export function Support() {
         : await supportAPI.createGuestTicket(fd);
 
       setTicketNumber(ticket.ticketNumber);
+      setConversationId(ticket.conversationId ?? null);
       setSubmitted(true);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to submit ticket. Please try again.');
@@ -256,6 +259,7 @@ export function Support() {
                   setGuestName('');
                   setGuestEmail('');
                   setTicketNumber('');
+                  setConversationId(null);
                 }}
               >
                 Create another ticket
@@ -263,6 +267,16 @@ export function Support() {
               {isAuthenticated && (
                 <Button onClick={() => navigate('/support/tickets')}>
                   View my tickets
+                </Button>
+              )}
+              {isAuthenticated && conversationId && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/messages?conversation=${conversationId}`)}
+                  className="flex items-center gap-2"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Open in Messages
                 </Button>
               )}
             </div>

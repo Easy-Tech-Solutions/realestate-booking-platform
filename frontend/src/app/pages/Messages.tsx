@@ -5,18 +5,17 @@ import { useNavigate, useSearchParams } from 'react-router';
 import {
   Send, ArrowLeft, Search, X, MessageSquare,
   Check, CheckCheck, MoreVertical, Home, Paperclip,
-  FileText, ImageIcon, Download, Pencil, Trash2, AlertTriangle,
+  FileText, Download, Pencil, Trash2, AlertTriangle, Reply,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { ScrollArea } from '../components/ui/scroll-area';
 import { cn, formatDate, getInitials } from '../../core/utils';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { messagesAPI } from '../../services/api.service';
-import type { Conversation, Message, MessageAttachment } from '../../core/types';
+import type { Conversation, Message, MessageAttachment, MessageReplySnippet } from '../../core/types';
 import { useChatSocket } from '../../hooks/useChatSocket';
-import type { ChatMessage, EditedMessage, ReadReceipt } from '../../hooks/useChatSocket';
+import type { ChatMessage, EditedMessage, ReadReceipt, TypingEvent } from '../../hooks/useChatSocket';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../hooks/queries/keys';
 import { isToday, isYesterday, parseISO, format, differenceInMinutes } from 'date-fns';
@@ -114,6 +113,25 @@ function AttachmentView({ att }: { att: MessageAttachment }) {
   );
 }
 
+// ── Reply quote (shown inside a bubble) ──────────────────────────────────────
+
+function ReplyQuote({ reply, isMine }: { reply: MessageReplySnippet; isMine: boolean }) {
+  const preview = reply.content
+    ? (reply.content.length > 60 ? reply.content.slice(0, 60) + '…' : reply.content)
+    : (reply.messageType !== 'text' ? '📎 Attachment' : '');
+  return (
+    <div className={cn(
+      'flex flex-col border-l-2 pl-2 pb-1 mb-1 text-xs rounded',
+      isMine
+        ? 'border-primary-foreground/50 bg-primary-foreground/10'
+        : 'border-primary/50 bg-primary/5',
+    )}>
+      <span className="font-semibold truncate">{reply.senderName}</span>
+      <span className="opacity-75 truncate">{preview || 'Message'}</span>
+    </div>
+  );
+}
+
 // ── Conversation list item ────────────────────────────────────────────────────
 
 function ConvItem({
@@ -123,9 +141,7 @@ function ConvItem({
   const name = [other?.firstName, other?.lastName].filter(Boolean).join(' ') || other?.email || 'Conversation';
   const preview = conv.lastMessage?.content
     ? (conv.lastMessage.content.length > 50 ? conv.lastMessage.content.slice(0, 50) + '…' : conv.lastMessage.content)
-    : conv.lastMessage?.attachments?.length
-      ? '📎 Attachment'
-      : 'No messages yet';
+    : '📎 Attachment';
   const ts = conv.lastMessage?.createdAt ?? conv.updatedAt;
   const online = isOnline(other?.lastSeen);
 
@@ -138,7 +154,6 @@ function ConvItem({
         active ? 'bg-primary/10' : 'hover:bg-muted/60',
       )}
     >
-      {/* Avatar */}
       <div className="relative flex-shrink-0">
         {other?.avatar
           ? <img src={other.avatar} alt={name} className="w-12 h-12 rounded-full object-cover" />
@@ -154,7 +169,6 @@ function ConvItem({
         )}
       </div>
 
-      {/* Text */}
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-baseline gap-1">
           <p className={cn('font-semibold text-sm truncate', conv.unreadCount > 0 && 'text-foreground')}>{name}</p>
@@ -176,10 +190,11 @@ function ConvItem({
 // ── Message bubble ────────────────────────────────────────────────────────────
 
 function Bubble({
-  msg, isMine, isLastInThread, myId, onEdit,
+  msg, isMine, isLastInThread, myId, onEdit, onReply,
 }: {
   msg: Message; isMine: boolean; isLastInThread: boolean; myId?: string;
   onEdit: (msg: Message) => void;
+  onReply: (msg: Message) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const editable = canEdit(msg, myId);
@@ -191,18 +206,31 @@ function Bubble({
       onMouseLeave={() => setHovered(false)}
     >
       <div className={cn('max-w-[72%] sm:max-w-[60%] space-y-0.5 relative', isMine && 'items-end flex flex-col')}>
-        {/* Edit pencil */}
-        {isMine && editable && hovered && (
-          <button
-            type="button"
-            aria-label="Edit message"
-            onClick={() => onEdit(msg)}
-            className={cn(
-              'absolute -left-7 top-1 p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors',
+        {/* Action buttons shown on hover */}
+        {hovered && (
+          <div className={cn(
+            'absolute top-1 flex items-center gap-0.5',
+            isMine ? '-left-16' : '-right-16',
+          )}>
+            <button
+              type="button"
+              aria-label="Reply"
+              onClick={() => onReply(msg)}
+              className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Reply className="w-3.5 h-3.5" />
+            </button>
+            {isMine && editable && (
+              <button
+                type="button"
+                aria-label="Edit message"
+                onClick={() => onEdit(msg)}
+                className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
             )}
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
+          </div>
         )}
 
         {/* Bubble */}
@@ -212,6 +240,8 @@ function Bubble({
             ? 'bg-primary text-primary-foreground rounded-br-sm'
             : 'bg-muted text-foreground rounded-bl-sm',
         )}>
+          {/* Reply quote */}
+          {msg.replyTo && <ReplyQuote reply={msg.replyTo} isMine={isMine} />}
           {msg.content}
           {msg.editedAt && (
             <span className="ml-1.5 text-[10px] opacity-60">(edited)</span>
@@ -234,6 +264,25 @@ function Bubble({
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Typing indicator bubble ───────────────────────────────────────────────────
+
+function TypingBubble({ name }: { name: string }) {
+  return (
+    <div className="flex items-end gap-2 justify-start">
+      <div className="max-w-[72%]">
+        <div className="px-4 py-3 rounded-2xl rounded-bl-sm bg-muted flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">{name} is typing</span>
+          <span className="flex gap-0.5 items-end pb-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -325,23 +374,62 @@ function ChatPane({
   const [editContent, setEditContent] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [otherOnline, setOtherOnline] = useState(false);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [otherTyping, setOtherTyping] = useState(false);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const editRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingSendTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const latestMsgId = useRef<string | null>(null);
 
   const other = getOtherParticipant(conversation, myId);
   const otherName = [other?.firstName, other?.lastName].filter(Boolean).join(' ') || other?.email || 'User';
 
-  // Load messages
+  // Load messages on mount
   useEffect(() => {
     setLoading(true);
     messagesAPI.getMessages(conversation.id)
-      .then(setMessages)
+      .then(msgs => {
+        setMessages(msgs);
+        latestMsgId.current = msgs.length ? msgs[msgs.length - 1].id : null;
+      })
       .catch(() => toast.error('Failed to load messages'))
       .finally(() => setLoading(false));
+  }, [conversation.id]);
+
+  // Polling fallback every 5s — merges new messages without clobbering optimistic ones
+  useEffect(() => {
+    pollTimer.current = setInterval(() => {
+      messagesAPI.getMessages(conversation.id)
+        .then(fresh => {
+          setMessages(prev => {
+            const ids = new Set(prev.map(m => m.id));
+            const merged = [...prev];
+            for (const m of fresh) {
+              const idx = merged.findIndex(x => x.id === m.id);
+              if (idx === -1) {
+                merged.push(m);
+              } else {
+                // Update existing (read status, edits, etc.)
+                merged[idx] = m;
+              }
+            }
+            // Remove optimistic entries that didn't get a real ID back and are old
+            return merged.filter(m => !m.id.startsWith('opt-') || Date.now() - new Date(m.createdAt).getTime() < 10_000);
+          });
+        })
+        .catch(() => {}); // silent
+    }, 5_000);
+
+    return () => {
+      if (pollTimer.current) clearInterval(pollTimer.current);
+    };
   }, [conversation.id]);
 
   // Poll presence every 30s
@@ -357,9 +445,13 @@ function ChatPane({
     return () => clearInterval(t);
   }, [other?.id]);
 
-  // Auto-scroll
+  // Auto-scroll to bottom only when new messages arrive (not on edits)
+  const prevLengthRef = useRef(0);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > prevLengthRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevLengthRef.current = messages.length;
   }, [messages.length]);
 
   // Close menu on outside click
@@ -373,6 +465,12 @@ function ChatPane({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [menuOpen]);
+
+  // Typing indicator auto-clear after 3s of silence
+  const clearTyping = useCallback(() => {
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => setOtherTyping(false), 3_000);
+  }, []);
 
   // WS callbacks
   const handleWsMessage = useCallback((wsMsg: ChatMessage) => {
@@ -398,9 +496,9 @@ function ChatPane({
       return [...prev, newMsg];
     });
     queryClient.invalidateQueries({ queryKey: queryKeys.messages.conversations });
-    // Reload if has attachments so we get proper attachment URLs
+    // Reload to get proper attachment URLs and replyTo snippets
     if (wsMsg.has_attachments) {
-      messagesAPI.getMessages(conversation.id).then(setMessages).catch(() => {});
+      messagesAPI.getMessages(conversation.id).then(msgs => setMessages(msgs)).catch(() => {});
     }
   }, [queryClient, conversation.id]);
 
@@ -413,19 +511,35 @@ function ChatPane({
   }, []);
 
   const handleWsReadReceipt = useCallback((_receipt: ReadReceipt) => {
-    // Mark all my sent messages as read
     setMessages(prev => prev.map(m =>
       m.senderId === myId ? { ...m, read: true } : m
     ));
   }, [myId]);
 
-  const { markRead } = useChatSocket({
+  const handleWsTyping = useCallback((_event: TypingEvent) => {
+    setOtherTyping(true);
+    clearTyping();
+  }, [clearTyping]);
+
+  const { markRead, sendTyping } = useChatSocket({
     conversationId: Number(conversation.id),
     onMessage: handleWsMessage,
     onMessageEdited: handleWsEdit,
     onReadReceipt: handleWsReadReceipt,
+    onTyping: handleWsTyping,
     onConnected: () => markRead(),
   });
+
+  // Debounced typing signal — send at most every 2s while user types
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    if (!typingSendTimer.current) {
+      sendTyping();
+      typingSendTimer.current = setTimeout(() => {
+        typingSendTimer.current = null;
+      }, 2_000);
+    }
+  };
 
   // Send
   const doSend = async () => {
@@ -434,6 +548,8 @@ function ChatPane({
     setInput('');
     const sentFiles = [...files];
     setFiles([]);
+    const replyToMsg = replyTo;
+    setReplyTo(null);
     setSending(true);
 
     const optimistic: Message = {
@@ -446,20 +562,24 @@ function ChatPane({
       messageType: sentFiles.length ? (text ? 'text_file' : 'file') : 'text',
       read: false,
       attachments: [],
+      replyTo: replyToMsg
+        ? { id: replyToMsg.id, content: replyToMsg.content, senderName: replyToMsg.sender?.firstName || 'User', messageType: replyToMsg.messageType }
+        : undefined,
       createdAt: new Date().toISOString(),
     };
     setMessages(prev => [...prev, optimistic]);
 
     try {
       const sent = sentFiles.length
-        ? await messagesAPI.sendMessageWithFiles(conversation.id, text, sentFiles)
-        : await messagesAPI.sendMessage(conversation.id, text);
+        ? await messagesAPI.sendMessageWithFiles(conversation.id, text, sentFiles, replyToMsg?.id)
+        : await messagesAPI.sendMessage(conversation.id, text, replyToMsg?.id);
       setMessages(prev => prev.map(m => m.id === optimistic.id ? sent : m));
       queryClient.invalidateQueries({ queryKey: queryKeys.messages.conversations });
     } catch {
       setMessages(prev => prev.filter(m => m.id !== optimistic.id));
       setInput(text);
       setFiles(sentFiles);
+      setReplyTo(replyToMsg);
       toast.error('Failed to send message');
     } finally {
       setSending(false);
@@ -510,10 +630,10 @@ function ChatPane({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
+    if (e.key === 'Escape' && replyTo) { setReplyTo(null); }
   };
 
   const groups = groupByDate(messages);
-  // The last message sent by me (for accurate read receipt positioning)
   const lastMyMsgId = [...messages].reverse().find(m => m.senderId === myId)?.id;
 
   return (
@@ -524,7 +644,6 @@ function ChatPane({
           <ArrowLeft className="w-5 h-5" />
         </button>
 
-        {/* Avatar with online dot */}
         <div className="relative flex-shrink-0">
           {other?.avatar
             ? <img src={other.avatar} alt={otherName} className="w-10 h-10 rounded-full object-cover" />
@@ -538,7 +657,9 @@ function ChatPane({
         <div className="flex-1 min-w-0">
           <p className="font-semibold truncate">{otherName}</p>
           <p className="text-xs text-muted-foreground">
-            {otherOnline ? (
+            {otherTyping ? (
+              <span className="text-primary font-medium">typing…</span>
+            ) : otherOnline ? (
               <span className="text-green-600 font-medium">Active now</span>
             ) : other?.lastSeen ? (
               `Last seen ${msgTime(other.lastSeen)}`
@@ -550,7 +671,6 @@ function ChatPane({
           </p>
         </div>
 
-        {/* Three-dot menu */}
         <div className="relative" ref={menuRef}>
           <Button type="button" variant="ghost" size="icon" className="flex-shrink-0" onClick={() => setMenuOpen(v => !v)} aria-label="More options">
             <MoreVertical className="w-4 h-4" />
@@ -569,8 +689,11 @@ function ChatPane({
         </div>
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 px-4 py-6">
+      {/* Messages — native scroll div instead of ScrollArea */}
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-6"
+      >
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -613,19 +736,23 @@ function ChatPane({
                       <Bubble
                         msg={msg}
                         isMine={isMine}
-                        isLastInThread={isLastInThread && msg.id === lastMyMsgId ? true : isLastInThread && !isMine ? true : msg.id === lastMyMsgId}
+                        isLastInThread={msg.id === lastMyMsgId ? true : isLastInThread}
                         myId={myId}
                         onEdit={startEdit}
+                        onReply={setReplyTo}
                       />
                     </div>
                   );
                 })}
               </div>
             ))}
+
+            {/* Typing indicator */}
+            {otherTyping && <TypingBubble name={otherName} />}
           </div>
         )}
         <div ref={bottomRef} />
-      </ScrollArea>
+      </div>
 
       {/* Edit bar */}
       {editingMsg && (
@@ -651,13 +778,30 @@ function ChatPane({
         </div>
       )}
 
+      {/* Reply preview bar */}
+      {replyTo && (
+        <div className="border-t border-border bg-muted/40 px-4 py-2 flex items-center gap-3 flex-shrink-0">
+          <Reply className="w-4 h-4 text-primary flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-primary truncate">
+              Replying to {replyTo.sender?.firstName || 'User'}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {replyTo.content || '📎 Attachment'}
+            </p>
+          </div>
+          <button type="button" aria-label="Cancel reply" onClick={() => setReplyTo(null)} className="p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* File preview */}
       {files.length > 0 && <FilePreview files={files} onRemove={i => setFiles(prev => prev.filter((_, j) => j !== i))} />}
 
       {/* Input */}
       <div className="border-t border-border bg-card/50 p-3 flex-shrink-0">
         <div className="flex items-end gap-2 rounded-2xl border border-border bg-background px-3 py-2 focus-within:ring-2 focus-within:ring-ring/50 focus-within:border-ring transition-[box-shadow]">
-          {/* Paperclip */}
           <button
             type="button"
             aria-label="Attach file"
@@ -672,13 +816,15 @@ function ChatPane({
             multiple
             accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx"
             className="hidden"
+            title="Attach files"
+            aria-label="Attach files"
             onChange={onFileChange}
           />
 
           <textarea
             ref={inputRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
             rows={1}
@@ -813,7 +959,7 @@ export function Messages() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="p-2 space-y-0.5">
             {loadingConvs ? (
               Array.from({ length: 4 }).map((_, i) => (
@@ -844,7 +990,7 @@ export function Messages() {
               ))
             )}
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Chat pane */}

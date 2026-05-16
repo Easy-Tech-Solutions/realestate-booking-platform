@@ -141,7 +141,7 @@ export function Header() {
                     <>
                       <DropdownMenuItem onClick={() => navigate('/trips')}>
                         <HomeIcon className="w-4 h-4 mr-2" />
-                        My Trips
+                        My Bookings
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate('/wishlists')}>
                         <Heart className="w-4 h-4 mr-2" />

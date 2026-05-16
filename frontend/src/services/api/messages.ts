@@ -13,17 +13,20 @@ export const messagesAPI = {
     return data.map(normalizeMessage);
   },
 
-  sendMessage: async (conversationId: string, content: string): Promise<Message> => {
+  sendMessage: async (conversationId: string, content: string, replyToId?: string): Promise<Message> => {
+    const body: Record<string, string> = { content };
+    if (replyToId) body.reply_to_id = replyToId;
     const data = await fetchWithAuth(`/api/messaging/conversations/${conversationId}/messages/send/`, {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(body),
     });
     return normalizeMessage(data);
   },
 
-  sendMessageWithFiles: async (conversationId: string, content: string, files: File[]): Promise<Message> => {
+  sendMessageWithFiles: async (conversationId: string, content: string, files: File[], replyToId?: string): Promise<Message> => {
     const form = new FormData();
     if (content.trim()) form.append('content', content.trim());
+    if (replyToId) form.append('reply_to_id', replyToId);
     files.forEach(f => form.append('files', f));
     const data = await fetchWithAuth(`/api/messaging/conversations/${conversationId}/messages/send/`, {
       method: 'POST',

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { CheckCircle, Mail, MessageSquare, ArrowRight } from 'lucide-react';
+import { useApp } from '../../hooks/useApp';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -41,11 +42,14 @@ const INITIAL_FORM: FormState = {
 };
 
 export function Contact() {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useApp();
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<FormState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submittedSubject, setSubmittedSubject] = useState('');
+  const [conversationId, setConversationId] = useState<number | null>(null);
 
   const set = (field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -72,7 +76,7 @@ export function Contact() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      await supportAPI.submitContact({
+      const result = await supportAPI.submitContact({
         name: form.name.trim(),
         email: form.email.trim(),
         category: form.category,
@@ -80,6 +84,7 @@ export function Contact() {
         message: form.message.trim(),
       });
       setSubmittedSubject(form.subject.trim());
+      setConversationId(result.conversation_id ?? null);
       setSubmitted(true);
       setForm(INITIAL_FORM);
     } catch (err: any) {
@@ -120,15 +125,22 @@ export function Contact() {
               Our team will review your inquiry and respond to your email within 24 hours.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button variant="outline" onClick={() => setSubmitted(false)}>
+              <Button variant="outline" onClick={() => { setSubmitted(false); setConversationId(null); }}>
                 Send another message
               </Button>
-              <Button asChild>
-                <Link to="/support">
-                  Create a support ticket
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Link>
-              </Button>
+              {isAuthenticated && conversationId ? (
+                <Button onClick={() => navigate(`/messages?conversation=${conversationId}`)} className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  Open in Messages
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link to="/support">
+                    Create a support ticket
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         ) : (

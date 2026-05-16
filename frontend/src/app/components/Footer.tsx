@@ -60,7 +60,7 @@ export function Footer() {
               <li><Link to="/help#about" className="hover:text-foreground">About us</Link></li>
               <li><Link to="/notifications" className="hover:text-foreground">Notifications</Link></li>
               <li><Link to="/account" className="hover:text-foreground">My account</Link></li>
-              <li><Link to="/trips" className="hover:text-foreground">My trips</Link></li>
+              <li><Link to="/trips" className="hover:text-foreground">My bookings</Link></li>
             </ul>
           </div>
         </div>

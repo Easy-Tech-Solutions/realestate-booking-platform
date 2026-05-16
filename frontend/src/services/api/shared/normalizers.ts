@@ -1,5 +1,5 @@
 import { AMENITIES } from '../../../core/constants';
-import type { Booking, Conversation, HotelRoom, HotelRoomAvailability, HotelRoomImage, Message, Property, Review, SearchFilters, User } from '../../../core/types';
+import type { Booking, Conversation, HotelRoom, HotelRoomAvailability, HotelRoomImage, Message, MessageReplySnippet, Property, Review, SearchFilters, User } from '../../../core/types';
 
 export function normalizeUser(u: any): User {
   const firstName = u.first_name || u.full_name?.split(' ')[0] || u.username || u.email?.split('@')[0] || '';
@@ -288,6 +288,15 @@ export function normalizeMessage(message: any): Message {
     createdAt: a.created_at || message.created_at,
   }));
 
+  const replyTo: MessageReplySnippet | undefined = message.reply_to
+    ? {
+        id: String(message.reply_to.id),
+        content: message.reply_to.content || '',
+        senderName: message.reply_to.sender_name || '',
+        messageType: message.reply_to.message_type || 'text',
+      }
+    : undefined;
+
   return {
     id: String(message.id),
     conversationId: String(message.conversation),
@@ -308,6 +317,7 @@ export function normalizeMessage(message: any): Message {
     read: Boolean(message.is_read),
     editedAt: message.edited_at || undefined,
     attachments,
+    replyTo,
     createdAt: message.created_at,
   };
 }

@@ -14,6 +14,7 @@ export interface SupportTicket {
   messageCount: number;
   messages?: TicketMessage[];
   attachments?: TicketAttachment[];
+  conversationId?: number | null;
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
@@ -67,6 +68,7 @@ function normalizeTicket(d: any): SupportTicket {
     requesterEmail: d.requester_email,
     assignedToName: d.assigned_to_name,
     messageCount: d.message_count ?? 0,
+    conversationId: d.conversation_id ?? null,
     messages: d.messages?.map((m: any) => ({
       id: m.id,
       senderName: m.sender_name,
@@ -95,7 +97,7 @@ export const supportAPI = {
     subject: string;
     message: string;
   }) =>
-    fetchPublicJson<{ message: string }>('/api/support/contact/', {
+    fetchPublicJson<{ message: string; id: number; conversation_id: number | null }>('/api/support/contact/', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

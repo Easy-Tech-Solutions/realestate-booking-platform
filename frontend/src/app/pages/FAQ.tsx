@@ -88,7 +88,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I cancel a booking?',
         answer:
-          'Go to My Trips, find the booking you want to cancel, and click "Cancel booking." You\'ll see the refund amount based on the host\'s cancellation policy before you confirm the cancellation.',
+          'Go to My Bookings, find the booking you want to cancel, and click "Cancel booking." You\'ll see the refund amount based on the host\'s cancellation policy before you confirm the cancellation.',
       },
       {
         question: 'How long does a refund take?',

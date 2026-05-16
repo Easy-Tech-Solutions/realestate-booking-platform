@@ -28,11 +28,19 @@ export type ReadReceipt = {
   reader_id: number;
 };
 
+export type TypingEvent = {
+  type: 'typing';
+  user_id: number;
+  user_name: string;
+  conversation_id: number;
+};
+
 type ChatSocketOptions = {
   conversationId: number | null;
   onMessage: (msg: ChatMessage) => void;
   onMessageEdited?: (edit: EditedMessage) => void;
   onReadReceipt?: (receipt: ReadReceipt) => void;
+  onTyping?: (event: TypingEvent) => void;
   onConnected?: () => void;
 };
 
@@ -41,6 +49,7 @@ export function useChatSocket({
   onMessage,
   onMessageEdited,
   onReadReceipt,
+  onTyping,
   onConnected,
 }: ChatSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -56,6 +65,12 @@ export function useChatSocket({
   const markRead = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN && authenticatedRef.current) {
       wsRef.current.send(JSON.stringify({ type: 'mark_read' }));
+    }
+  }, []);
+
+  const sendTyping = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN && authenticatedRef.current) {
+      wsRef.current.send(JSON.stringify({ type: 'typing' }));
     }
   }, []);
 
@@ -86,6 +101,8 @@ export function useChatSocket({
             onMessageEdited?.(data as EditedMessage);
           } else if (data.type === 'read_receipt') {
             onReadReceipt?.(data as ReadReceipt);
+          } else if (data.type === 'typing') {
+            onTyping?.(data as TypingEvent);
           }
         } catch {
           // ignore
@@ -108,7 +125,7 @@ export function useChatSocket({
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       wsRef.current?.close(1000, 'unmount');
     };
-  }, [conversationId, onMessage, onMessageEdited, onReadReceipt, onConnected]);
+  }, [conversationId, onMessage, onMessageEdited, onReadReceipt, onTyping, onConnected]);
 
-  return { sendMessage, markRead };
+  return { sendMessage, markRead, sendTyping };
 }
