@@ -272,20 +272,20 @@ export function Home() {
             )}
             <div
               ref={categoryScrollRef}
-              className="flex gap-8 py-4 overflow-x-auto scrollbar-hide scroll-smooth"
+              className="flex justify-center gap-4 sm:gap-6 md:gap-8 py-4 overflow-x-auto scrollbar-hide scroll-smooth"
             >
               {categories.map((category) => (
                 <button
                   key={category.id}
                   onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
                   className={cn(
-                    'flex flex-col items-center gap-2 pb-2 border-b-2 transition-colors flex-shrink-0',
+                    'flex flex-col items-center gap-1.5 pb-2 border-b-2 transition-all flex-shrink-0',
                     selectedCategory === category.id
-                      ? 'border-foreground opacity-100'
-                      : 'border-transparent opacity-60 hover:opacity-100 hover:border-muted'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-primary/50 hover:text-primary hover:border-primary/30'
                   )}
                 >
-                  <CategorySvgIcon id={category.id} className="w-8 h-8" />
+                  <CategorySvgIcon id={category.id} className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8" />
                   <span className="text-xs font-semibold whitespace-nowrap">{category.name}</span>
                 </button>
               ))}
