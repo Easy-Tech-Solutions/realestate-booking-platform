@@ -346,7 +346,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           </Button>
 
           {/* Active filter summary */}
-          {(checkIn || checkOut || totalGuests > 1 || budgetMax) && (
+          {(checkIn || checkOut || totalGuests > 1 || priceMin || priceMax) && (
             <p className="text-center text-xs text-muted-foreground">
               {[
                 checkIn && checkOut && `${format(checkIn, 'MMM d')} – ${format(checkOut, 'MMM d')}`,
