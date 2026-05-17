@@ -304,7 +304,7 @@ export function CreateListing() {
     }
   };
 
-  const guestPriceBeforeTaxes = Math.round(form.weekdayBasePrice * 1.14);
+  const guestPriceBeforeTaxes = Math.round(form.weekdayBasePrice * 1.04);
   const weekendPrice = Math.round(form.weekdayBasePrice * (1 + form.weekendPremiumPercent / 100));
 
   return (
@@ -678,7 +678,7 @@ export function CreateListing() {
             <h2 className="text-6xl font-semibold mb-3">Set a weekend price</h2>
             <p className="text-2xl text-muted-foreground mb-8">Add a premium for Fridays and Saturdays.</p>
             <div className="text-[120px] font-semibold leading-none">${weekendPrice}</div>
-            <p className="text-3xl text-muted-foreground mt-3">Guest price before taxes ${Math.round(weekendPrice * 1.14)} <ChevronDown className="inline w-5 h-5" /></p>
+            <p className="text-3xl text-muted-foreground mt-3">Guest price before taxes ${Math.round(weekendPrice * 1.04)} <ChevronDown className="inline w-5 h-5" /></p>
             <div className="max-w-xl mx-auto mt-10 text-left">
               <p className="text-3xl font-medium mb-2">Weekend premium</p>
               <div className="flex items-center gap-4">
