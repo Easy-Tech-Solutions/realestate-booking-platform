@@ -4,7 +4,6 @@ from datetime import timedelta
 #from dotenv import load_dotenv
 from urllib.parse import urlparse, parse_qsl
 
-#oad_dotenv() 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -24,7 +23,7 @@ def load_env_file(path: Path) -> None:
         os.environ.setdefault(key, value)
 
 
-#load_env_file(BASE_DIR / ".env")
+load_env_file(BASE_DIR / ".env")
 
 
 def env_bool(name: str, default: bool = False) -> bool:
