@@ -28,7 +28,7 @@ export function calculateTotalPrice(
   basePrice: number,
   nights: number,
   cleaningFee: number = 0,
-  serviceFeePercent: number = 0.14,
+  serviceFeePercent: number = 0.04,
   taxPercent: number = 0.12
 ): {
   subtotal: number;

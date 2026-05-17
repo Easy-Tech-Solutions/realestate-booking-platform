@@ -1,3 +1,20 @@
+{% extends "emails/notifications/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 16px;color:#004406;font-size:22px;font-weight:700;">New Booking Request</h2>
+<p style="margin:0 0 16px;color:#444444;font-size:15px;line-height:1.6;">
+  Hi {{ user.get_full_name|default:user.username }}, someone wants to stay at your property.
+</p>
+
+<div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:0 0 24px;border-left:3px solid #004406;">
+  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Property:</strong> {{ data.listing_title }}</p>
+  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Guest:</strong> {{ data.customer_name }}</p>
+  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Check-in:</strong> {{ data.start_date }}</p>
+  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Check-out:</strong> {{ data.end_date }}</p>
+  <p style="margin:0;font-size:14px;color:#333333;line-height:1.6;"><strong>Total:</strong> {{ data.total_amount }}</p>
+</div>
+
+<a href="{{ site_url }}/host" style="display:inline-block;background:#004406;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">Review Request</a>
+{% endblock %}
 ﻿{% extends "emails/notifications/base_email.html" %}
 {% block content %}
 <h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">New Booking Request</h2>
