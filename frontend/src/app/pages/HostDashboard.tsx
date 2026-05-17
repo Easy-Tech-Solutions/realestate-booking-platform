@@ -963,7 +963,11 @@ export function HostDashboard() {
         <div className="space-y-4">
           {bookings.map((booking) => {
             const property = properties.find((item) => item.id === booking.propertyId);
-            const guestName = booking.user?.firstName || booking.userId || 'Guest';
+            const guestName =
+              [booking.user?.firstName, booking.user?.lastName].filter(Boolean).join(' ').trim() ||
+              booking.user?.firstName ||
+              booking.userId ||
+              'Guest';
             const isPending = booking.status === 'pending';
             const isBusy = bookingActionId === booking.id;
             return (
