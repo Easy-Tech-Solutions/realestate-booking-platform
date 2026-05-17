@@ -240,10 +240,11 @@ export type PropertyType =
   | 'lighthouse'
   | 'yurt';
 
-export type BookingStatus = 
-  | 'pending' 
-  | 'confirmed' 
-  | 'cancelled' 
+export type BookingStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'declined'
+  | 'cancelled'
   | 'completed';
 
 export type PaymentStatus = 

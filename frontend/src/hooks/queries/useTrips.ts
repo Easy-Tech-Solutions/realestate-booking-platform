@@ -82,12 +82,22 @@ export function useUserTrips(enabled: boolean) {
 
   const upcomingTrips = trips.filter(({ booking }) => {
     const checkOutDate = new Date(booking.checkOut);
-    return booking.status !== 'cancelled' && booking.status !== 'completed' && checkOutDate >= today;
+    return (
+      booking.status !== 'cancelled' &&
+      booking.status !== 'declined' &&
+      booking.status !== 'completed' &&
+      checkOutDate >= today
+    );
   });
 
   const pastTrips = trips.filter(({ booking }) => {
     const checkOutDate = new Date(booking.checkOut);
-    return booking.status === 'cancelled' || booking.status === 'completed' || checkOutDate < today;
+    return (
+      booking.status === 'cancelled' ||
+      booking.status === 'declined' ||
+      booking.status === 'completed' ||
+      checkOutDate < today
+    );
   });
 
   const cancelMutation = useMutation({

@@ -992,8 +992,8 @@ export function HostDashboard() {
                   <p className="text-xs text-muted-foreground mt-0.5">{property?.title || booking.propertyId}</p>
                   <p className="text-sm font-semibold mt-1 capitalize">{booking.status}</p>
                 </div>
-                <div className="flex flex-wrap gap-2 sm:flex-nowrap flex-shrink-0">
-                  {isPending && (
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap flex-shrink-0">
+                  {isPending ? (
                     <>
                       <Button
                         size="sm"
@@ -1011,6 +1011,18 @@ export function HostDashboard() {
                         Decline
                       </Button>
                     </>
+                  ) : (
+                    <span
+                      className={cn(
+                        'inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold capitalize select-none',
+                        booking.status === 'confirmed' && 'bg-primary/10 text-primary',
+                        booking.status === 'declined' && 'bg-destructive/10 text-destructive',
+                        booking.status === 'cancelled' && 'bg-muted text-muted-foreground',
+                        booking.status === 'completed' && 'bg-muted text-foreground',
+                      )}
+                    >
+                      {booking.status === 'confirmed' ? 'Accepted' : booking.status}
+                    </span>
                   )}
                   <Button variant="outline" size="sm" onClick={() => setActiveSection('messages')}>
                     Contact guest

@@ -11,6 +11,8 @@ import { useUserDashboardData } from '../../hooks/queries/useUserDashboard';
 const statusColor: Record<string, string> = {
   confirmed: 'bg-primary/10 text-primary',
   pending: 'bg-yellow-100 text-yellow-700',
+  declined: 'bg-destructive/10 text-destructive',
+  cancelled: 'bg-gray-100 text-gray-600',
   completed: 'bg-gray-100 text-gray-600',
 };
 
