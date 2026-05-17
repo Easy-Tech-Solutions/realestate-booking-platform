@@ -8,9 +8,10 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import IntegrityError
-from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory, HotelRoom
+import math
+from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory, HotelRoom, HotelRoomImage
 from bookings.models import Booking
-from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer
+from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer, HotelRoomImageSerializer
 from .filters import ListingFilter
 from django.contrib.auth import get_user_model
 from rest_framework.pagination import PageNumberPagination
@@ -190,8 +191,41 @@ def favorite_listing(request, id):
 @api_view(["GET"])
 def listing_reviews(request, listing_id):
     listing = get_object_or_404(Listing, pk=listing_id)
-    reviews = Review.objects.filter(listing=listing)
+    reviews = Review.objects.filter(listing=listing).select_related('reviewer', 'reviewer__profile')
     return Response(ReviewSerializer(reviews, many=True, context={"request": request}).data)
+
+
+@api_view(["GET"])
+def all_reviews(request):
+    """
+    GET /api/listings/reviews/  — public paginated list of all reviews.
+    Query params: ?ordering=-created_at|rating  ?min_rating=4  ?page=1
+    """
+    qs = Review.objects.select_related(
+        'reviewer', 'reviewer__profile', 'listing'
+    ).prefetch_related('images')
+
+    min_rating = request.query_params.get('min_rating')
+    if min_rating:
+        try:
+            qs = qs.filter(rating__gte=int(min_rating))
+        except ValueError:
+            pass
+
+    listing_id_param = request.query_params.get('listing_id')
+    if listing_id_param:
+        qs = qs.filter(listing_id=listing_id_param)
+
+    ordering = request.query_params.get('ordering', '-created_at')
+    if ordering in ('created_at', '-created_at', 'rating', '-rating'):
+        qs = qs.order_by(ordering)
+
+    paginator = _ListingPagination()
+    paginator.page_size = 12
+    page = paginator.paginate_queryset(qs, request)
+    return paginator.get_paginated_response(
+        ReviewSerializer(page, many=True, context={'request': request}).data
+    )
 
 
 @api_view(["POST"])
@@ -418,6 +452,58 @@ def platform_stats(request):
     })
 
 
+def _haversine(lat1, lon1, lat2, lon2):
+    """Return distance in km between two (lat, lng) points."""
+    R = 6371.0
+    lat1, lon1, lat2, lon2 = (math.radians(float(v)) for v in (lat1, lon1, lat2, lon2))
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+@api_view(["GET"])
+def nearby_listings(request):
+    """
+    GET /api/listings/nearby/?lat=X&lng=Y&radius=50
+    Returns published listings within `radius` km (default 50, max 200), sorted by distance.
+    """
+    try:
+        user_lat = float(request.query_params["lat"])
+        user_lng = float(request.query_params["lng"])
+    except (KeyError, ValueError):
+        return Response({"error": "lat and lng query params are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        radius_km = min(float(request.query_params.get("radius", 50)), 200)
+    except ValueError:
+        radius_km = 50
+
+    qs = (
+        Listing.objects
+        .filter(status="published", latitude__isnull=False, longitude__isnull=False)
+        .exclude(latitude=0, longitude=0)
+        .select_related("owner")
+    )
+
+    nearby = []
+    for listing in qs:
+        dist = _haversine(user_lat, user_lng, listing.latitude, listing.longitude)
+        if dist <= radius_km:
+            nearby.append((dist, listing))
+
+    nearby.sort(key=lambda x: x[0])
+    nearby = nearby[:12]
+
+    results = []
+    for dist, listing in nearby:
+        data = ListingSerializer(listing, context={"request": request}).data
+        data["distance_km"] = round(dist, 1)
+        results.append(data)
+
+    return Response(results)
+
+
 @api_view(["GET"])
 def listing_availability(request, listing_id):
     from datetime import timedelta as _td
@@ -616,6 +702,43 @@ def hotel_room_availability(request, listing_id):
 
     return Response(result)
 
+
+@api_view(["GET", "POST"])
+@parser_classes([MultiPartParser, FormParser])
+def hotel_room_images(request, listing_id, room_id):
+    listing = get_object_or_404(Listing, pk=listing_id)
+    room = get_object_or_404(HotelRoom, pk=room_id, listing=listing)
+
+    if request.method == "GET":
+        return Response(HotelRoomImageSerializer(room.images.all(), many=True).data)
+
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    if listing.owner != request.user and not request.user.is_superuser:
+        return Response({"error": "Only the owner can add room images"}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = HotelRoomImageSerializer(data=request.data)
+    if serializer.is_valid():
+        max_order = room.images.aggregate(models.Max("order"))["order__max"]
+        order = (max_order or 0) + 1
+        image = serializer.save(room=room, order=order)
+        return Response(HotelRoomImageSerializer(image).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["DELETE"])
+def hotel_room_image_detail(request, listing_id, room_id, image_id):
+    listing = get_object_or_404(Listing, pk=listing_id)
+    room = get_object_or_404(HotelRoom, pk=room_id, listing=listing)
+    image = get_object_or_404(HotelRoomImage, pk=image_id, room=room)
+
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    if listing.owner != request.user and not request.user.is_superuser:
+        return Response({"error": "Only the owner can delete room images"}, status=status.HTTP_403_FORBIDDEN)
+
+    image.delete()
+    return Response({"message": "Image deleted"}, status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["GET"])

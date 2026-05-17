@@ -2,10 +2,11 @@ from django.urls import path
 from .views import (
     categories_collection, category_detail,
     listings_collection, listing_detail, listing_images, listing_image_detail,
-    favorite_listing, favorites_collection, listing_reviews, create_review,
+    favorite_listing, favorites_collection, listing_reviews, all_reviews, create_review,
     review_detail, user_reviews, listing_stats, agent_analytics, popular_listings,
-    platform_stats, listing_availability, listing_pricing, review_response,
+    platform_stats, nearby_listings, listing_availability, listing_pricing, review_response,
     hotel_rooms_collection, hotel_room_detail, hotel_room_availability,
+    hotel_room_images, hotel_room_image_detail,
     my_drafts,
 )
 
@@ -13,6 +14,7 @@ urlpatterns = [
     path('categories/', categories_collection, name='categories_collection'),
     path('categories/<int:id>/', category_detail, name='category_detail'),
     path('my-drafts/', my_drafts, name='my_drafts'),
+    path('reviews/', all_reviews, name='all_reviews'),
     path('', listings_collection, name='listings_collection'),
     path('<int:id>/', listing_detail, name='listing_detail'),
     path('<int:listing_id>/images/', listing_images, name='listing_images'),
@@ -26,6 +28,7 @@ urlpatterns = [
     path('<int:listing_id>/stats/', listing_stats, name='listing_stats'),
     path('analytics/agent/', agent_analytics, name='agent_analytics'),
     path('analytics/popular/', popular_listings, name='popular_listings'),
+    path('nearby/', nearby_listings, name='nearby_listings'),
     path('<int:listing_id>/availability/', listing_availability, name='listing_availability'),
     path('<int:listing_id>/pricing/', listing_pricing, name='listing_pricing'),
     path('reviews/<int:id>/respond/', review_response, name='review_response'),
@@ -33,4 +36,6 @@ urlpatterns = [
     path('<int:listing_id>/rooms/', hotel_rooms_collection, name='hotel_rooms_collection'),
     path('<int:listing_id>/rooms/<int:room_id>/', hotel_room_detail, name='hotel_room_detail'),
     path('<int:listing_id>/rooms/availability/', hotel_room_availability, name='hotel_room_availability'),
+    path('<int:listing_id>/rooms/<int:room_id>/images/', hotel_room_images, name='hotel_room_images'),
+    path('<int:listing_id>/rooms/<int:room_id>/images/<int:image_id>/', hotel_room_image_detail, name='hotel_room_image_detail'),
 ]

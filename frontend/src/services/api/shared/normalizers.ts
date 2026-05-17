@@ -1,5 +1,5 @@
 import { AMENITIES } from '../../../core/constants';
-import type { Booking, Conversation, HotelRoom, HotelRoomAvailability, Message, Property, Review, SearchFilters, User } from '../../../core/types';
+import type { Booking, Conversation, HotelRoom, HotelRoomAvailability, HotelRoomImage, Message, MessageReplySnippet, Property, Review, SearchFilters, User } from '../../../core/types';
 
 export function normalizeUser(u: any): User {
   const firstName = u.first_name || u.full_name?.split(' ')[0] || u.username || u.email?.split('@')[0] || '';
@@ -18,6 +18,7 @@ export function normalizeUser(u: any): User {
     isAdmin: u.role === 'admin',
     verified: u.email_verified ?? false,
     hasPassword: u.has_password,
+    lastSeen: u.profile?.last_seen || undefined,
     createdAt: u.date_joined || new Date().toISOString(),
   };
 }
@@ -96,6 +97,12 @@ export function normalizeHotelRoom(r: any): HotelRoom {
     totalCount: Number(r.total_count || 1),
     isActive: Boolean(r.is_active),
     createdAt: r.created_at,
+    images: Array.isArray(r.images) ? r.images.map((img: any): HotelRoomImage => ({
+      id: String(img.id),
+      imageUrl: img.image_url || img.image || '',
+      caption: img.caption || '',
+      order: Number(img.order || 0),
+    })) : [],
   };
 }
 
@@ -202,6 +209,7 @@ export function normalizeReview(r: any): Review {
   return {
     id: String(r.id),
     propertyId: String(r.listing),
+    listingTitle: r.listing_title || undefined,
     userId: String(r.reviewer),
     user: {
       id: String(r.reviewer),
@@ -220,8 +228,10 @@ export function normalizeReview(r: any): Review {
     communication: Number(r.communication || r.rating || 0),
     location: Number(r.location_rating || r.rating || 0),
     value: Number(r.value || r.rating || 0),
+    title: r.title || undefined,
     comment: r.content,
     response: r.host_response || undefined,
+    isVerified: Boolean(r.is_verified),
     createdAt: r.created_at,
   };
 }
@@ -269,6 +279,24 @@ export function normalizeConversation(conversation: any): Conversation {
 export function normalizeMessage(message: any): Message {
   const sender = normalizeUser(message.sender || {});
 
+  const attachments = (message.attachments || []).map((a: any) => ({
+    id: String(a.id),
+    fileUrl: a.file_url || '',
+    fileName: a.file_name || '',
+    fileSize: Number(a.file_size || 0),
+    fileType: a.file_type || 'other',
+    createdAt: a.created_at || message.created_at,
+  }));
+
+  const replyTo: MessageReplySnippet | undefined = message.reply_to
+    ? {
+        id: String(message.reply_to.id),
+        content: message.reply_to.content || '',
+        senderName: message.reply_to.sender_name || '',
+        messageType: message.reply_to.message_type || 'text',
+      }
+    : undefined;
+
   return {
     id: String(message.id),
     conversationId: String(message.conversation),
@@ -285,7 +313,11 @@ export function normalizeMessage(message: any): Message {
       createdAt: message.created_at,
     },
     content: message.content || '',
+    messageType: message.message_type || 'text',
     read: Boolean(message.is_read),
+    editedAt: message.edited_at || undefined,
+    attachments,
+    replyTo,
     createdAt: message.created_at,
   };
 }
@@ -296,8 +328,13 @@ export function buildSearchParams(filters: SearchFilters): string {
   if (filters.priceMin) params.set('min_price', String(filters.priceMin));
   if (filters.priceMax) params.set('max_price', String(filters.priceMax));
   if (filters.bedrooms) params.set('min_bedrooms', String(filters.bedrooms));
-  if (filters.propertyType?.length) params.set('property_type_in', filters.propertyType.join(','));
   if (filters.guests) params.set('min_guests', String(filters.guests));
+  if (filters.propertyType?.length === 1) {
+    params.set('property_type', filters.propertyType[0]);
+  } else if (filters.propertyType && filters.propertyType.length > 1) {
+    params.set('property_type_in', filters.propertyType.join(','));
+  }
+  params.set('ordering', '-created_at');
   return params.toString();
 }
 

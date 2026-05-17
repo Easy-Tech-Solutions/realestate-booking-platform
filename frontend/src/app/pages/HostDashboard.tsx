@@ -293,7 +293,7 @@ function EditPropertyDialog({
         </div>
 
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-5 mb-3">Gallery Photos</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {galleryImages.map((img) => (
             <div key={img.id} className="relative group">
               <img src={img.image_url ?? ''} alt="Gallery" className="h-20 w-full rounded-lg object-cover border border-border" />
@@ -401,7 +401,7 @@ function EditPropertyDialog({
       {/* ── Amenities ── */}
       <section>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Amenities</p>
-        <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
           {AMENITIES.map((amenity) => (
             <div key={amenity.id} className="flex items-center gap-2">
               <Checkbox
@@ -445,7 +445,7 @@ function EditPropertyDialog({
       {/* ── Pricing ── */}
       <section className="space-y-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pricing</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Base price / night (USD)</Label>
             <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
@@ -462,40 +462,40 @@ function EditPropertyDialog({
             <label htmlFor="edit-new-promo" className="text-sm cursor-pointer">New listing promo</label>
           </div>
           {/* Last-minute */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Checkbox id="edit-last-minute" checked={lastMinuteEnabled} onCheckedChange={(v) => setLastMinuteEnabled(Boolean(v))} />
               <label htmlFor="edit-last-minute" className="text-sm cursor-pointer">Last-minute discount</label>
             </div>
             {lastMinuteEnabled && (
               <div className="flex items-center gap-1">
-                <Input type="number" value={lastMinutePercent} onChange={(e) => setLastMinutePercent(Number(e.target.value))} className="h-7 w-16 text-sm" />
+                <Input type="number" value={lastMinutePercent} onChange={(e) => setLastMinutePercent(Number(e.target.value))} className="h-7 w-20 text-sm" />
                 <span className="text-sm">%</span>
               </div>
             )}
           </div>
           {/* Weekly */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Checkbox id="edit-weekly" checked={weeklyEnabled} onCheckedChange={(v) => setWeeklyEnabled(Boolean(v))} />
               <label htmlFor="edit-weekly" className="text-sm cursor-pointer">Weekly discount</label>
             </div>
             {weeklyEnabled && (
               <div className="flex items-center gap-1">
-                <Input type="number" value={weeklyPercent} onChange={(e) => setWeeklyPercent(Number(e.target.value))} className="h-7 w-16 text-sm" />
+                <Input type="number" value={weeklyPercent} onChange={(e) => setWeeklyPercent(Number(e.target.value))} className="h-7 w-20 text-sm" />
                 <span className="text-sm">%</span>
               </div>
             )}
           </div>
           {/* Monthly */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Checkbox id="edit-monthly" checked={monthlyEnabled} onCheckedChange={(v) => setMonthlyEnabled(Boolean(v))} />
               <label htmlFor="edit-monthly" className="text-sm cursor-pointer">Monthly discount</label>
             </div>
             {monthlyEnabled && (
               <div className="flex items-center gap-1">
-                <Input type="number" value={monthlyPercent} onChange={(e) => setMonthlyPercent(Number(e.target.value))} className="h-7 w-16 text-sm" />
+                <Input type="number" value={monthlyPercent} onChange={(e) => setMonthlyPercent(Number(e.target.value))} className="h-7 w-20 text-sm" />
                 <span className="text-sm">%</span>
               </div>
             )}
@@ -560,9 +560,9 @@ function EditPropertyDialog({
       </section>
 
       {/* ── Actions ── */}
-      <div className="sticky bottom-0 flex gap-2 bg-background pt-2 pb-1">
-        <Button onClick={handleSubmit}>Save changes</Button>
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+      <div className="sticky bottom-0 flex flex-col sm:flex-row gap-2 bg-background pt-2 pb-1">
+        <Button className="w-full sm:w-auto" onClick={handleSubmit}>Save changes</Button>
+        <Button className="w-full sm:w-auto" variant="outline" onClick={onCancel}>Cancel</Button>
       </div>
     </div>
   );
@@ -878,7 +878,7 @@ export function HostDashboard() {
                     <p className="text-sm font-semibold mt-1">{formatCurrency(property.price)}/night</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex flex-wrap gap-2 flex-shrink-0">
                   <Button variant="outline" size="sm" onClick={() => setEditingProperty(property)}>
                     <Edit className="w-3 h-3 mr-1" /> Edit
                   </Button>

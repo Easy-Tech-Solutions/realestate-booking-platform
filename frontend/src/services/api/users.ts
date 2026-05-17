@@ -5,6 +5,25 @@ export const usersAPI = {
     return fetchWithAuth(`/api/users/${id}/`);
   },
 
+  listAll: async (): Promise<any[]> => {
+    return fetchWithAuth('/api/users/');
+  },
+
+  adminStats: async (): Promise<any> => {
+    return fetchWithAuth('/api/users/admin/stats/');
+  },
+
+  suspendUser: async (userId: string, payload: { suspension_type: string; reason: string; ends_at?: string | null }): Promise<any> => {
+    return fetchWithAuth('/api/suspensions/', {
+      method: 'POST',
+      body: JSON.stringify({ user: Number(userId), ...payload }),
+    });
+  },
+
+  deleteListing: async (listingId: string): Promise<void> => {
+    await fetchWithAuth(`/api/listings/${listingId}/`, { method: 'DELETE' });
+  },
+
   updateMyProfile: async (payload: {
     first_name?: string;
     last_name?: string;

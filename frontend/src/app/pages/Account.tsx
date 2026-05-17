@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, CreditCard, Plus, Star, Trash2, Pencil } from 'lucide-react';
+import { Camera, CreditCard, Eye, EyeOff, Plus, Star, Trash2, Pencil } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -340,6 +340,7 @@ export function Account() {
   const [marketingNotif, setMarketingNotif] = useState(true);
 
   const [currentPassword, setCurrentPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
   const [networkProvider, setNetworkProvider] = useState<'mtn' | 'orange'>('mtn');
   const [otp, setOtp] = useState('');
@@ -630,7 +631,23 @@ export function Account() {
                 {user?.hasPassword !== false && (
                   <div className="space-y-1.5">
                     <Label htmlFor="currentPassword">Current password</Label>
-                    <Input id="currentPassword" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="bg-card border-border" />
+                    <div className="relative">
+                      <Input
+                        id="currentPassword"
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={e => setCurrentPassword(e.target.value)}
+                        className="bg-card border-border pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 )}
                 <div className="space-y-1.5">
@@ -660,11 +677,11 @@ export function Account() {
                   className="bg-card border-border"
                 />
               </div>
-              <div className="flex gap-3">
-                <Button onClick={handleVerifyPhoneChange} disabled={phoneFlowLoading}>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button className="w-full sm:w-auto" onClick={handleVerifyPhoneChange} disabled={phoneFlowLoading}>
                   {phoneFlowLoading ? 'Please wait…' : 'Confirm change'}
                 </Button>
-                <Button variant="destructive" size="sm" onClick={handleCancelPhoneChange} disabled={phoneFlowLoading}>
+                <Button variant="destructive" className="w-full sm:w-auto" onClick={handleCancelPhoneChange} disabled={phoneFlowLoading}>
                   Cancel pending change
                 </Button>
               </div>

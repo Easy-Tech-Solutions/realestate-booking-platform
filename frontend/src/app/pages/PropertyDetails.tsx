@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
 import {
   Star, Share, Heart, MapPin, Award, Shield,
   ChevronLeft, ChevronRight, X, Minus, Plus, MessageCircle, BedDouble, Users, Check,
@@ -27,6 +25,7 @@ import { usePropertyDetails } from '../../hooks/queries/usePropertyDetails';
 import { usePropertyPricing } from '../../hooks/queries/usePropertyPricing';
 import { fallbackIcon, iconMap } from '../../core/icon-map';
 import { queryKeys } from '../../hooks/queries/keys';
+import { LiberiaMap } from '../components/LiberiaMap';
 
 function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [hovered, setHovered] = useState(0);
@@ -470,7 +469,7 @@ export function PropertyDetails() {
                           <div
                             key={room.id}
                             onClick={() => !isUnavailable && setSelectedRoom(isSelected ? null : room)}
-                            className={`border rounded-xl p-4 transition-all cursor-pointer ${
+                            className={`border rounded-xl overflow-hidden transition-all cursor-pointer ${
                               isUnavailable
                                 ? 'opacity-50 cursor-not-allowed border-border'
                                 : isSelected
@@ -478,41 +477,72 @@ export function PropertyDetails() {
                                 : 'border-border hover:border-primary/60'
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-4 flex-wrap">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <h3 className="font-semibold">{room.name}</h3>
-                                  <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground capitalize">
-                                    {room.roomType}
-                                  </span>
-                                  {isSelected && <Check className="w-4 h-4 text-primary" />}
+                            {room.images && room.images.length > 0 && (
+                              <div className="flex gap-1 h-40 overflow-hidden">
+                                <div className="flex-1 overflow-hidden">
+                                  <img
+                                    src={room.images[0].imageUrl}
+                                    alt={room.images[0].caption || room.name}
+                                    className="w-full h-full object-cover"
+                                  />
                                 </div>
-                                <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2 flex-wrap">
-                                  <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5" /> {room.beds} {room.bedType} bed{room.beds > 1 ? 's' : ''}</span>
-                                  <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Up to {room.maxOccupancy} guests</span>
-                                  <span>{room.bathrooms} bath{room.bathrooms !== 1 ? 's' : ''}</span>
-                                </div>
-                                {room.description ? <p className="text-sm text-muted-foreground mb-2">{room.description}</p> : null}
-                                {room.amenities.length > 0 && (
-                                  <div className="flex flex-wrap gap-1">
-                                    {room.amenities.slice(0, 5).map((a) => (
-                                      <span key={a} className="text-xs bg-muted px-2 py-0.5 rounded-full">{a}</span>
+                                {room.images.length > 1 && (
+                                  <div className="flex flex-col gap-1 w-24 shrink-0">
+                                    {room.images.slice(1, 3).map((img, i) => (
+                                      <div key={img.id} className="flex-1 overflow-hidden relative">
+                                        <img
+                                          src={img.imageUrl}
+                                          alt={img.caption || room.name}
+                                          className="w-full h-full object-cover"
+                                        />
+                                        {i === 1 && room.images.length > 3 && (
+                                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                            <span className="text-white text-sm font-semibold">+{room.images.length - 3}</span>
+                                          </div>
+                                        )}
+                                      </div>
                                     ))}
-                                    {room.amenities.length > 5 && (
-                                      <span className="text-xs text-muted-foreground">+{room.amenities.length - 5} more</span>
-                                    )}
                                   </div>
                                 )}
                               </div>
-                              <div className="text-right shrink-0">
-                                <p className="font-semibold">{formatCurrency(room.pricePerNight)}<span className="text-sm font-normal text-muted-foreground"> / night</span></p>
-                                {startDateStr && endDateStr ? (
-                                  isUnavailable
-                                    ? <p className="text-xs text-destructive mt-1">Not available</p>
-                                    : <p className="text-xs text-green-700 mt-1">{available} of {room.totalCount} available</p>
-                                ) : (
-                                  <p className="text-xs text-muted-foreground mt-1">{room.totalCount} room{room.totalCount !== 1 ? 's' : ''}</p>
-                                )}
+                            )}
+                            <div className="p-4">
+                              <div className="flex items-start justify-between gap-4 flex-wrap">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                    <h3 className="font-semibold">{room.name}</h3>
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground capitalize">
+                                      {room.roomType}
+                                    </span>
+                                    {isSelected && <Check className="w-4 h-4 text-primary" />}
+                                  </div>
+                                  <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2 flex-wrap">
+                                    <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5" /> {room.beds} {room.bedType} bed{room.beds > 1 ? 's' : ''}</span>
+                                    <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Up to {room.maxOccupancy} guests</span>
+                                    <span>{room.bathrooms} bath{room.bathrooms !== 1 ? 's' : ''}</span>
+                                  </div>
+                                  {room.description ? <p className="text-sm text-muted-foreground mb-2">{room.description}</p> : null}
+                                  {room.amenities.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {room.amenities.slice(0, 5).map((a) => (
+                                        <span key={a} className="text-xs bg-muted px-2 py-0.5 rounded-full">{a}</span>
+                                      ))}
+                                      {room.amenities.length > 5 && (
+                                        <span className="text-xs text-muted-foreground">+{room.amenities.length - 5} more</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="font-semibold">{formatCurrency(room.pricePerNight)}<span className="text-sm font-normal text-muted-foreground"> / night</span></p>
+                                  {startDateStr && endDateStr ? (
+                                    isUnavailable
+                                      ? <p className="text-xs text-destructive mt-1">Not available</p>
+                                      : <p className="text-xs text-green-700 mt-1">{available} of {room.totalCount} available</p>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground mt-1">{room.totalCount} room{room.totalCount !== 1 ? 's' : ''}</p>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -630,7 +660,18 @@ export function PropertyDetails() {
                 {(() => {
                   const canReview = isAuthenticated && user?.id !== property.hostId;
                   const alreadyReviewed = reviews.some(r => r.userId === String(user?.id));
+
+                  if (!isAuthenticated) {
+                    return (
+                      <div className="mt-8 p-4 rounded-xl bg-muted/50 border border-border text-sm text-center">
+                        <p className="text-muted-foreground mb-2">Have you stayed here? Share your experience.</p>
+                        <Button variant="outline" size="sm" onClick={() => navigate('/login')}>Sign in to rate this property</Button>
+                      </div>
+                    );
+                  }
+
                   if (!canReview) return null;
+
                   if (alreadyReviewed) {
                     return (
                       <div className="mt-8 p-4 rounded-xl bg-muted text-sm text-muted-foreground">
@@ -638,23 +679,59 @@ export function PropertyDetails() {
                       </div>
                     );
                   }
+
+                  const submitReview = async () => {
+                    if (reviewForm.rating === 0) { toast.error('Please select an overall rating'); return; }
+                    setReviewSubmitting(true);
+                    try {
+                      await propertiesAPI.createReview({
+                        listing: id!,
+                        rating: reviewForm.rating,
+                        title: reviewForm.title,
+                        content: reviewForm.content,
+                        cleanliness: reviewForm.cleanliness || reviewForm.rating,
+                        accuracy: reviewForm.accuracy || reviewForm.rating,
+                        check_in_rating: reviewForm.check_in_rating || reviewForm.rating,
+                        communication: reviewForm.communication || reviewForm.rating,
+                        location_rating: reviewForm.location_rating || reviewForm.rating,
+                        value: reviewForm.value || reviewForm.rating,
+                      });
+                      toast.success('Review submitted!');
+                      setShowReviewForm(false);
+                      setReviewForm({ rating: 0, title: '', content: '', cleanliness: 0, accuracy: 0, check_in_rating: 0, communication: 0, location_rating: 0, value: 0 });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.properties.reviews(id!) });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.properties.detail(id!) });
+                    } catch (err: any) {
+                      toast.error(err.message || 'Failed to submit review');
+                    } finally {
+                      setReviewSubmitting(false);
+                    }
+                  };
+
                   return (
                     <div className="mt-8">
                       {!showReviewForm ? (
-                        <Button variant="outline" onClick={() => setShowReviewForm(true)}>
-                          Write a review
-                        </Button>
+                        <div className="border border-border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div>
+                            <p className="font-medium text-sm">Rate this property</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Click the stars to leave your rating</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <StarPicker value={reviewForm.rating} onChange={v => { setReviewForm(f => ({ ...f, rating: v })); setShowReviewForm(true); }} />
+                            <Button variant="outline" size="sm" onClick={() => setShowReviewForm(true)}>
+                              Write a review
+                            </Button>
+                          </div>
+                        </div>
                       ) : (
-                        <div className="border border-border rounded-xl p-6 space-y-6">
-                          <h3 className="text-lg font-semibold">Write a review</h3>
+                        <div className="border border-border rounded-xl p-6 space-y-5">
+                          <h3 className="text-lg font-semibold">Rate this property</h3>
 
-                          {/* Overall rating */}
                           <div className="space-y-2">
                             <Label>Overall rating <span className="text-destructive">*</span></Label>
                             <StarPicker value={reviewForm.rating} onChange={v => setReviewForm(f => ({ ...f, rating: v }))} />
                           </div>
 
-                          {/* Sub-ratings */}
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             {([
                               ['Cleanliness', 'cleanliness'],
@@ -665,7 +742,7 @@ export function PropertyDetails() {
                               ['Value', 'value'],
                             ] as [string, keyof typeof reviewForm][]).map(([label, field]) => (
                               <div key={field} className="space-y-1">
-                                <Label className="text-xs">{label}</Label>
+                                <Label className="text-xs">{label} <span className="text-muted-foreground">(optional)</span></Label>
                                 <StarPicker
                                   value={reviewForm[field] as number}
                                   onChange={v => setReviewForm(f => ({ ...f, [field]: v }))}
@@ -674,24 +751,12 @@ export function PropertyDetails() {
                             ))}
                           </div>
 
-                          {/* Title */}
                           <div className="space-y-2">
-                            <Label htmlFor="review-title">Title</Label>
-                            <Input
-                              id="review-title"
-                              placeholder="Summarise your stay"
-                              value={reviewForm.title}
-                              onChange={e => setReviewForm(f => ({ ...f, title: e.target.value }))}
-                            />
-                          </div>
-
-                          {/* Comment */}
-                          <div className="space-y-2">
-                            <Label htmlFor="review-content">Your review <span className="text-destructive">*</span></Label>
+                            <Label htmlFor="review-content">Comment <span className="text-muted-foreground text-xs">(optional)</span></Label>
                             <Textarea
                               id="review-content"
                               placeholder="Tell others what you liked or didn't like about your stay..."
-                              rows={5}
+                              rows={4}
                               value={reviewForm.content}
                               onChange={e => setReviewForm(f => ({ ...f, content: e.target.value }))}
                             />
@@ -700,35 +765,8 @@ export function PropertyDetails() {
                           <div className="flex gap-3">
                             <Button
                               type="button"
-                              disabled={reviewSubmitting || reviewForm.rating === 0 || !reviewForm.content.trim()}
-                              onClick={async () => {
-                                if (reviewForm.rating === 0) { toast.error('Please select an overall rating'); return; }
-                                if (!reviewForm.content.trim()) { toast.error('Please write a review comment'); return; }
-                                setReviewSubmitting(true);
-                                try {
-                                  await propertiesAPI.createReview({
-                                    listing: id!,
-                                    rating: reviewForm.rating,
-                                    title: reviewForm.title,
-                                    content: reviewForm.content,
-                                    cleanliness: reviewForm.cleanliness || reviewForm.rating,
-                                    accuracy: reviewForm.accuracy || reviewForm.rating,
-                                    check_in_rating: reviewForm.check_in_rating || reviewForm.rating,
-                                    communication: reviewForm.communication || reviewForm.rating,
-                                    location_rating: reviewForm.location_rating || reviewForm.rating,
-                                    value: reviewForm.value || reviewForm.rating,
-                                  });
-                                  toast.success('Review submitted!');
-                                  setShowReviewForm(false);
-                                  setReviewForm({ rating: 0, title: '', content: '', cleanliness: 0, accuracy: 0, check_in_rating: 0, communication: 0, location_rating: 0, value: 0 });
-                                  queryClient.invalidateQueries({ queryKey: queryKeys.properties.reviews(id!) });
-                                  queryClient.invalidateQueries({ queryKey: queryKeys.properties.detail(id!) });
-                                } catch (err: any) {
-                                  toast.error(err.message || 'Failed to submit review');
-                                } finally {
-                                  setReviewSubmitting(false);
-                                }
-                              }}
+                              disabled={reviewSubmitting || reviewForm.rating === 0}
+                              onClick={submitReview}
                             >
                               {reviewSubmitting ? 'Submitting…' : 'Submit review'}
                             </Button>
@@ -746,30 +784,24 @@ export function PropertyDetails() {
               <Separator />
 
               {/* Location */}
-              {property.location.lat !== 0 && property.location.lng !== 0 && (
-                <div>
-                  <h2 className="text-2xl font-semibold mb-6">Where you'll be</h2>
-                  <p className="text-muted-foreground mb-4">
-                    {property.location.city}, {property.location.state}, {property.location.country}
-                  </p>
-                  <div className="h-[400px] rounded-xl overflow-hidden">
-                    <MapContainer
-                      center={L.latLng(property.location.lat, property.location.lng)}
-                      zoom={13}
-                      style={{ blockSize: '100%', inlineSize: '100%' }}
-                      scrollWheelZoom={false}
-                    >
-                      <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                      />
-                      <Marker position={L.latLng(property.location.lat, property.location.lng)}>
-                        <Popup>{property.title}</Popup>
-                      </Marker>
-                    </MapContainer>
-                  </div>
-                </div>
-              )}
+              <div>
+                <h2 className="text-2xl font-semibold mb-6">Where you'll be</h2>
+                <p className="text-muted-foreground mb-4">
+                  {property.location.city}, {property.location.state}, {property.location.country}
+                </p>
+                <LiberiaMap
+                  lat={property.location.lat}
+                  lng={property.location.lng}
+                  address={[
+                    property.location.address,
+                    property.location.city,
+                    property.location.state,
+                    property.location.country,
+                  ].filter(Boolean).join(', ')}
+                  popupLabel={property.title}
+                  className="h-[400px] w-full rounded-xl overflow-hidden relative"
+                />
+              </div>
 
               <Separator />
 

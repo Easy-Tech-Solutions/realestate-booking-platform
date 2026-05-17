@@ -167,6 +167,8 @@ type HotelRoomDraft = {
   bathrooms: number;
   amenities: string[];
   totalCount: number;
+  roomImages: File[];
+  roomImagePreviews: string[];
 };
 
 const defaultRoom: HotelRoomDraft = {
@@ -180,6 +182,8 @@ const defaultRoom: HotelRoomDraft = {
   bathrooms: 1,
   amenities: [],
   totalCount: 1,
+  roomImages: [],
+  roomImagePreviews: [],
 };
 
 const HIGHLIGHTS = ['Peaceful', 'Unique', 'Family-friendly', 'Stylish', 'Central', 'Spacious'];
@@ -252,6 +256,7 @@ export function CreateListing() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [draftListingId, setDraftListingId] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const [form, setForm] = useState({
     propertyType: 'apartment',
@@ -319,9 +324,23 @@ export function CreateListing() {
     if (!saved) return;
     try {
       const { form: savedForm, stepIndex: savedStep, draftListingId: savedDraftId } = JSON.parse(saved);
-      setForm((prev) => ({ ...prev, ...savedForm, images: [], imagePreviews: [] }));
+      // Restore rooms with file fields defaulted — File objects can't be serialized
+      const restoredRooms = (savedForm.hotelRooms || []).map((r: any) => ({
+        ...defaultRoom,
+        ...r,
+        roomImages: [],
+        roomImagePreviews: [],
+      }));
+      setForm((prev) => ({
+        ...prev,
+        ...savedForm,
+        hotelRooms: restoredRooms,
+        images: [],
+        imagePreviews: [],
+      }));
       setStepIndex(savedStep ?? 0);
       if (savedDraftId) setDraftListingId(savedDraftId);
+      setDraftRestored(true);
       toast.info('Draft restored — please re-add your photos.');
     } catch {
       localStorage.removeItem(DRAFT_KEY);
@@ -338,8 +357,15 @@ export function CreateListing() {
   const saveAndExit = async () => {
     // Always persist form state to localStorage immediately
     const { images, imagePreviews, ...serializableForm } = form;
+    const serializableRooms = serializableForm.hotelRooms.map(
+      ({ roomImages, roomImagePreviews, ...rest }) => rest
+    );
     const localDraftId = draftListingId;
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ form: serializableForm, stepIndex, draftListingId: localDraftId }));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      form: { ...serializableForm, hotelRooms: serializableRooms },
+      stepIndex,
+      draftListingId: localDraftId,
+    }));
 
     setIsSavingDraft(true);
     try {
@@ -416,6 +442,23 @@ export function CreateListing() {
         ? form.hotelRooms[index].amenities.filter((a) => a !== amenityId)
         : [...form.hotelRooms[index].amenities, amenityId],
     });
+
+  const onRoomPhotosSelected = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    const room = form.hotelRooms[index];
+    const nextImages = [...room.roomImages, ...files].slice(0, 10);
+    const nextPreviews = nextImages.map((f) => URL.createObjectURL(f));
+    updateRoom(index, { roomImages: nextImages, roomImagePreviews: nextPreviews });
+  };
+
+  const removeRoomPhoto = (roomIndex: number, photoIndex: number) => {
+    const room = form.hotelRooms[roomIndex];
+    updateRoom(roomIndex, {
+      roomImages: room.roomImages.filter((_, i) => i !== photoIndex),
+      roomImagePreviews: room.roomImagePreviews.filter((_, i) => i !== photoIndex),
+    });
+  };
 
   const updateCount = (field: 'guests' | 'bedrooms' | 'beds' | 'bathrooms', delta: number) => {
     update({ [field]: Math.max(1, form[field] + delta) } as Partial<typeof form>);
@@ -512,6 +555,13 @@ export function CreateListing() {
   const publish = async () => {
     if (!canContinue || isSubmitting) return;
 
+    if (form.images.length === 0) {
+      toast.error('Please add at least one photo before publishing.');
+      const photosIdx = steps.indexOf('photos');
+      if (photosIdx !== -1) setStepIndex(photosIdx);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const payload = new FormData();
@@ -570,7 +620,7 @@ export function CreateListing() {
       if (propertyGroup === 'hotel') {
         for (const room of form.hotelRooms) {
           if (room.name.trim() && room.pricePerNight > 0) {
-            await propertiesAPI.createRoom(created.id, {
+            const createdRoom = await propertiesAPI.createRoom(created.id, {
               name: room.name,
               roomType: room.roomType as any,
               description: room.description,
@@ -583,6 +633,9 @@ export function CreateListing() {
               totalCount: room.totalCount,
               isActive: true,
             });
+            for (const file of room.roomImages) {
+              await propertiesAPI.uploadRoomImage(created.id, createdRoom.id, file);
+            }
           }
         }
       }
@@ -917,6 +970,40 @@ export function CreateListing() {
                     ))}
                   </div>
                 </div>
+
+                {/* Room photos */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Room photos (optional, up to 10)</label>
+                  <label className="border-2 border-dashed rounded-xl flex flex-col items-center justify-center py-6 cursor-pointer hover:border-foreground transition">
+                    <Camera className="w-8 h-8 mb-2 text-muted-foreground" />
+                    <span className="text-sm font-medium">Add photos for this room type</span>
+                    <span className="text-xs text-muted-foreground mt-1">{room.roomImages.length} selected</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => onRoomPhotosSelected(idx, e)}
+                    />
+                  </label>
+                  {room.roomImagePreviews.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-2">
+                      {room.roomImagePreviews.map((preview, photoIdx) => (
+                        <div key={photoIdx} className="relative group border rounded-lg overflow-hidden">
+                          <img src={preview} alt={`Room ${idx + 1} photo ${photoIdx + 1}`} className="w-full h-20 object-cover" />
+                          <button
+                            type="button"
+                            aria-label={`Remove photo ${photoIdx + 1}`}
+                            className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 text-white text-xs"
+                            onClick={() => removeRoomPhoto(idx, photoIdx)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </section>
@@ -1087,6 +1174,12 @@ export function CreateListing() {
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">
               You'll need at least {minPhotos} photo{minPhotos !== 1 ? 's' : ''} to get started.
             </p>
+
+            {draftRestored && form.images.length === 0 && (
+              <div className="mb-6 rounded-xl border border-yellow-400 bg-yellow-50 dark:bg-yellow-950/30 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300">
+                ⚠️ Photos are not saved in drafts. Please re-upload your photos before publishing.
+              </div>
+            )}
 
             <label className="border-2 border-dashed rounded-2xl min-h-[340px] flex flex-col items-center justify-center cursor-pointer hover:border-foreground transition">
               <Camera className="w-14 h-14 mb-4 text-muted-foreground" />

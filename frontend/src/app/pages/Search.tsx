@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Filter, Map as MapIcon } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { createPriceMarker, LIBERIA_CENTER, LIBERIA_ZOOM } from '../components/LiberiaMap';
 import { Button } from '../components/ui/button';
 import { PropertyCard } from '../components/PropertyCard';
 import { FiltersDialog, ActiveFilters } from '../components/FiltersDialog';
@@ -10,25 +11,6 @@ import { useApp } from '../../hooks/useApp';
 import { useNavigate } from 'react-router';
 import { formatCurrency } from '../../core/utils';
 import { useSearchProperties } from '../../hooks/queries/useSearchProperties';
-
-function createPriceIcon(price: number, hovered: boolean) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="
-      background:${hovered ? '#004406' : '#fff'};
-      color:${hovered ? '#fff' : '#000'};
-      border:2px solid #004406;
-      border-radius:20px;
-      padding:4px 10px;
-      font-size:13px;
-      font-weight:700;
-      white-space:nowrap;
-      box-shadow:0 2px 8px rgba(0,0,0,0.2);
-      cursor:pointer;
-    ">${formatCurrency(price)}</div>`,
-    iconAnchor: [30, 16],
-  });
-}
 
 function MapAutoFit({ positions }: { positions: [number, number][] }) {
   const map = useMap();
@@ -161,13 +143,15 @@ export function Search() {
             {showMap && (
               <div className="sticky top-24 h-[calc(100vh-8rem)] rounded-xl overflow-hidden">
                 <MapContainer
-                  center={[6.3, -10.8]}
-                  zoom={7}
-                  style={{ blockSize: '100%', inlineSize: '100%' }}
+                  center={LIBERIA_CENTER}
+                  zoom={LIBERIA_ZOOM}
+                  style={{ height: '100%', width: '100%' }}
                   scrollWheelZoom={false}
+                  maxBounds={[[2, -15], [10, -6]]}
+                  maxBoundsViscosity={0.8}
                 >
                   <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
                   {(() => {
@@ -181,7 +165,7 @@ export function Search() {
                           <Marker
                             key={p.id}
                             position={[p.location.lat, p.location.lng]}
-                            icon={createPriceIcon(p.price, hoveredId === p.id)}
+                            icon={createPriceMarker(p.price, hoveredId === p.id)}
                           >
                             <Popup>
                               <button

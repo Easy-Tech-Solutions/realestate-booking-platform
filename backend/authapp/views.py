@@ -55,7 +55,6 @@ def _suspension_response(suspension):
 @permission_classes([AllowAny])
 @throttle_classes([RegisterRateThrottle])
 def register(request):
-    username = request.data.get("username")
     email = request.data.get("email")
     password = request.data.get("password")
     password2 = request.data.get("password2")
@@ -63,8 +62,8 @@ def register(request):
     last_name = request.data.get("last_name")
 
     # Input validation
-    if not all([username, password, email, password2]):
-        return Response({"error": "username, email, password, and password2 required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not all([password, email, password2]):
+        return Response({"error": "email, password, and password2 required"}, status=status.HTTP_400_BAD_REQUEST)
 
     # Password confirmation check
     if password != password2:
@@ -80,12 +79,10 @@ def register(request):
     if len(password) < 8:
         return Response({"error": "password must be at least 8 characters long"}, status=status.HTTP_400_BAD_REQUEST)
 
-    #Username and email availability check
-    if User.objects.filter(username=username).exists():
-        return Response({"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
-
     if User.objects.filter(email=email).exists():
         return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+
+    username = _unique_username_from_email(email)
 
     try:
         with transaction.atomic():
@@ -163,13 +160,18 @@ def verify_email(request):
 @permission_classes([AllowAny])
 @throttle_classes([LoginRateThrottle])
 def login_view(request):
-    username = request.data.get("username")
+    email = request.data.get("email")
     password = request.data.get("password")
 
-    if not username or not password:
-        return Response({"error": "username and password required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not email or not password:
+        return Response({"error": "email and password required"}, status=status.HTTP_400_BAD_REQUEST)
 
-    user = authenticate(request, username=username, password=password)
+    try:
+        user_obj = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user = authenticate(request, username=user_obj.username, password=password)
     if user is None:
         return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 

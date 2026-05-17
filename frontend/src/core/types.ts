@@ -13,6 +13,7 @@ export interface User {
   isAdmin?: boolean;
   verified: boolean;
   hasPassword?: boolean;
+  lastSeen?: string;
   createdAt: string;
 }
 
@@ -69,6 +70,7 @@ export interface Amenity {
 export interface Review {
   id: string;
   propertyId: string;
+  listingTitle?: string;
   userId: string;
   user: User;
   rating: number;
@@ -78,8 +80,10 @@ export interface Review {
   communication: number;
   location: number;
   value: number;
+  title?: string;
   comment: string;
   response?: string;
+  isVerified?: boolean;
   createdAt: string;
 }
 
@@ -110,6 +114,13 @@ export interface Booking {
   createdAt: string;
 }
 
+export interface HotelRoomImage {
+  id: string;
+  imageUrl: string;
+  caption: string;
+  order: number;
+}
+
 export interface HotelRoom {
   id: string;
   listingId: string;
@@ -125,10 +136,27 @@ export interface HotelRoom {
   totalCount: number;
   isActive: boolean;
   createdAt: string;
+  images: HotelRoomImage[];
 }
 
 export interface HotelRoomAvailability extends HotelRoom {
   availableCount: number;
+}
+
+export interface MessageAttachment {
+  id: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  fileType: 'image' | 'video' | 'document' | 'other';
+  createdAt: string;
+}
+
+export interface MessageReplySnippet {
+  id: string;
+  content: string;
+  senderName: string;
+  messageType: string;
 }
 
 export interface Message {
@@ -139,7 +167,11 @@ export interface Message {
   receiverId: string;
   receiver: User;
   content: string;
+  messageType: 'text' | 'file' | 'text_file';
   read: boolean;
+  editedAt?: string;
+  attachments: MessageAttachment[];
+  replyTo?: MessageReplySnippet;
   createdAt: string;
 }
 

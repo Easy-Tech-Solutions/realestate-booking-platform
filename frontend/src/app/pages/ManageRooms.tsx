@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
+import React, { useRef, useState } from 'react';
+import { useParams, useNavigate } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Plus, Pencil, Trash2, BedDouble, Users, Check, X } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, BedDouble, Users, Check, Camera, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -10,7 +10,7 @@ import { Separator } from '../components/ui/separator';
 import { toast } from 'sonner';
 import { propertiesAPI } from '../../services/api.service';
 import { formatCurrency } from '../../core/utils';
-import type { HotelRoom } from '../../core/types';
+import type { HotelRoom, HotelRoomImage } from '../../core/types';
 
 const ROOM_TYPES = [
   { value: 'standard', label: 'Standard' },
@@ -121,7 +121,7 @@ function RoomForm({
         />
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="price">Price per night *</Label>
           <Input
@@ -156,7 +156,7 @@ function RoomForm({
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="beds">Beds</Label>
           <Input
@@ -232,6 +232,81 @@ function RoomForm({
           {saving ? 'Saving…' : 'Save room'}
         </Button>
         <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
+
+function RoomImageManager({ room, listingId }: { room: HotelRoom; listingId: string }) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return; }
+
+    setUploading(true);
+    try {
+      await propertiesAPI.uploadRoomImage(listingId, room.id, file);
+      queryClient.invalidateQueries({ queryKey: ['hotel-rooms', listingId] });
+      toast.success('Image uploaded');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to upload image');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDelete = async (img: HotelRoomImage) => {
+    if (!window.confirm('Remove this image?')) return;
+    try {
+      await propertiesAPI.deleteRoomImage(listingId, room.id, img.id);
+      queryClient.invalidateQueries({ queryKey: ['hotel-rooms', listingId] });
+      toast.success('Image removed');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to remove image');
+    }
+  };
+
+  return (
+    <div className="mt-3 pt-3 border-t border-border">
+      <p className="text-xs font-medium text-muted-foreground mb-2">Room photos</p>
+      <div className="flex flex-wrap gap-2">
+        {room.images.map(img => (
+          <div key={img.id} className="relative w-20 h-20 rounded-lg overflow-hidden group border border-border">
+            <img src={img.imageUrl} alt={img.caption || room.name} className="w-full h-full object-cover" />
+            <button
+              type="button"
+              onClick={() => handleDelete(img)}
+              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="Remove image"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="w-20 h-20 rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+        >
+          <Camera className="w-4 h-4" />
+          <span className="text-xs">{uploading ? 'Uploading…' : 'Add photo'}</span>
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleUpload}
+        />
       </div>
     </div>
   );
@@ -327,13 +402,10 @@ export function ManageRooms() {
           </Button>
           <div>
             <h1 className="text-2xl font-semibold">Manage Rooms</h1>
-            {listing && (
-              <p className="text-sm text-muted-foreground">{listing.title}</p>
-            )}
+            {listing && <p className="text-sm text-muted-foreground">{listing.title}</p>}
           </div>
         </div>
 
-        {/* Add room button */}
         {!showForm && !editingRoom && (
           <Button onClick={() => setShowForm(true)} className="mb-6 gap-2">
             <Plus className="w-4 h-4" />
@@ -341,7 +413,6 @@ export function ManageRooms() {
           </Button>
         )}
 
-        {/* Add room form */}
         {showForm && !editingRoom && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold mb-3">New room type</h2>
@@ -356,7 +427,6 @@ export function ManageRooms() {
 
         <Separator className="mb-6" />
 
-        {/* Room list */}
         {roomsQuery.isLoading ? (
           <p className="text-muted-foreground">Loading rooms…</p>
         ) : rooms.length === 0 ? (
@@ -392,6 +462,20 @@ export function ManageRooms() {
                   </div>
                 ) : (
                   <div className="border border-border rounded-xl p-4">
+                    {/* Room images strip */}
+                    {room.images.length > 0 && (
+                      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+                        {room.images.map(img => (
+                          <img
+                            key={img.id}
+                            src={img.imageUrl}
+                            alt={img.caption || room.name}
+                            className="w-20 h-16 rounded-lg object-cover flex-shrink-0 border border-border"
+                          />
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -445,6 +529,9 @@ export function ManageRooms() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Image manager */}
+                    <RoomImageManager room={room} listingId={id!} />
                   </div>
                 )}
               </div>

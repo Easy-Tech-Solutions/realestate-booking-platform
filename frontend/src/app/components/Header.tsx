@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard } from 'lucide-react';
+import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard, Info, HelpCircle, Mail } from 'lucide-react';
 import logo from '../../assets/logo2.jpg';
 import { Button } from './ui/button';
 import {
@@ -70,19 +70,13 @@ export function Header() {
               <img src={logo} alt="HomeKonet" className="h-10 w-auto" />
             </Link>
 
-            {/* Search Bar - Desktop */}
+            {/* Search Button - Desktop */}
             <button
               onClick={() => setShowSearchDialog(true)}
-              className="hidden md:flex items-center gap-4 px-6 py-3 border border-border rounded-full shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              className="hidden md:flex items-center gap-3 px-5 py-2.5 bg-primary text-white rounded-full shadow-md hover:bg-primary/90 hover:shadow-lg transition-all cursor-pointer group"
             >
-              <span className="text-sm font-medium">Anywhere</span>
-              <div className="w-px h-6 bg-border" />
-              <span className="text-sm font-medium">Any week</span>
-              <div className="w-px h-6 bg-border" />
-              <span className="text-sm text-muted-foreground">Add guests</span>
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <Search className="w-4 h-4 text-white" />
-              </div>
+              <Search className="w-4 h-4" />
+              <span className="text-sm font-semibold">Find Your Stay</span>
             </button>
 
             {/* Search Icon - Mobile */}
@@ -90,10 +84,23 @@ export function Header() {
               type="button"
               title="Search"
               onClick={() => setShowSearchDialog(true)}
-              className="md:hidden p-2 rounded-full hover:bg-muted"
+              className="md:hidden w-9 h-9 bg-primary text-white rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors"
             >
-              <Search className="w-5 h-5" />
+              <Search className="w-4 h-4" />
             </button>
+
+            {/* Nav links - Desktop */}
+            <nav className="hidden lg:flex items-center gap-1">
+              <Link to="/about" className="px-3 py-2 text-sm font-medium text-foreground/70 hover:text-foreground rounded-lg hover:bg-muted transition-colors">
+                About
+              </Link>
+              <Link to="/faq" className="px-3 py-2 text-sm font-medium text-foreground/70 hover:text-foreground rounded-lg hover:bg-muted transition-colors">
+                FAQ
+              </Link>
+              <Link to="/contact" className="px-3 py-2 text-sm font-medium text-foreground/70 hover:text-foreground rounded-lg hover:bg-muted transition-colors">
+                Contact Us
+              </Link>
+            </nav>
 
             {/* Right Menu */}
             <div className="flex items-center gap-2">
@@ -147,7 +154,7 @@ export function Header() {
                     <>
                       <DropdownMenuItem onClick={() => navigate('/trips')}>
                         <HomeIcon className="w-4 h-4 mr-2" />
-                        My Trips
+                        My Bookings
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate('/wishlists')}>
                         <Heart className="w-4 h-4 mr-2" />
@@ -198,8 +205,24 @@ export function Header() {
                       <DropdownMenuItem onClick={() => handleAuthClick('register')}>
                         Sign up
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                     </>
                   )}
+                  {/* Always visible on mobile (lg hides nav links) */}
+                  <div className="lg:hidden">
+                    <DropdownMenuItem onClick={() => navigate('/about')}>
+                      <Info className="w-4 h-4 mr-2" />
+                      About
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/faq')}>
+                      <HelpCircle className="w-4 h-4 mr-2" />
+                      FAQ
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/contact')}>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Contact Us
+                    </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

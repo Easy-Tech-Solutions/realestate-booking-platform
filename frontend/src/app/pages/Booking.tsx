@@ -341,7 +341,7 @@ function BookingForm() {
 
                 {/* Trip dates & guests */}
                 <div className="space-y-4">
-                  <h2 className="text-lg font-semibold">Your trip</h2>
+                  <h2 className="text-lg font-semibold">Your booking</h2>
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-medium">Dates</p>
