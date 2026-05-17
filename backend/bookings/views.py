@@ -159,7 +159,10 @@ def confirm_booking(request, id):
     if booking.listing.owner != request.user:
         return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
 
-    if booking.status != 'requested':
+    # 'pending' is legacy data from the original migration (before the model
+    # default was changed to 'requested'); accept both so old bookings can
+    # still be actioned.
+    if booking.status not in ('requested', 'pending'):
         return Response({'error': 'Booking cannot be confirmed'}, status=status.HTTP_400_BAD_REQUEST)
 
     booking.status = 'confirmed'
@@ -183,7 +186,7 @@ def decline_booking(request, id):
     if booking.listing.owner != request.user:
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-    if booking.status != 'requested':
+    if booking.status not in ('requested', 'pending'):
         return Response({"error": "Booking cannot be declined"}, status=status.HTTP_400_BAD_REQUEST)
 
     serializer = BookingConfrimationSerializer(data=request.data)

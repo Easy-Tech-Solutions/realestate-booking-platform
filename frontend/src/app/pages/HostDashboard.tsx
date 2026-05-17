@@ -612,9 +612,20 @@ export function HostDashboard() {
     }
   };
 
-  const handleDeclineBooking = async (id: string) => {
-    const reason = window.prompt('Reason for declining (optional):') ?? undefined;
+  const [declineDialogBookingId, setDeclineDialogBookingId] = useState<string | null>(null);
+  const [declineReason, setDeclineReason] = useState('');
+
+  const openDeclineDialog = (id: string) => {
+    setDeclineReason('');
+    setDeclineDialogBookingId(id);
+  };
+
+  const submitDecline = async () => {
+    if (!declineDialogBookingId) return;
+    const id = declineDialogBookingId;
+    const reason = declineReason.trim() || undefined;
     setBookingActionId(id);
+    setDeclineDialogBookingId(null);
     try {
       await bookingsAPI.decline(id, reason);
       toast.success('Booking declined');
@@ -623,6 +634,7 @@ export function HostDashboard() {
       toast.error(getErrorMessage(error, 'Failed to decline booking'));
     } finally {
       setBookingActionId(null);
+      setDeclineReason('');
     }
   };
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
@@ -993,7 +1005,7 @@ export function HostDashboard() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => handleDeclineBooking(booking.id)}
+                        onClick={() => openDeclineDialog(booking.id)}
                         disabled={isBusy}
                       >
                         Decline
@@ -1010,6 +1022,32 @@ export function HostDashboard() {
           {bookings.length === 0 && <p className="text-sm text-muted-foreground">No bookings yet.</p>}
         </div>
       </CardContent>
+
+      <Dialog open={declineDialogBookingId !== null} onOpenChange={(open) => !open && setDeclineDialogBookingId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Decline booking</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Add a reason (optional). The guest will see this message.
+          </p>
+          <Textarea
+            value={declineReason}
+            onChange={(e) => setDeclineReason(e.target.value)}
+            placeholder="e.g. The property is no longer available for these dates."
+            rows={3}
+            className="bg-card border-border"
+          />
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="outline" onClick={() => setDeclineDialogBookingId(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={submitDecline}>
+              Decline booking
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 
