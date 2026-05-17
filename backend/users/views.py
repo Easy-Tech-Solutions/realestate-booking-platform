@@ -10,7 +10,7 @@ from bookings.serializers import BookingSerializer
 from django.contrib.auth import get_user_model, authenticate
 from django.utils import timezone
 from datetime import timedelta
-from .models import PhoneChangeRequest
+from .models import PhoneChangeRequest, Profile
 from .utils import generate_otp, send_phone_change_email_otp, send_phone_change_sms_otp
 from authapp.throttles import PhoneChangeRateThrottle
 
@@ -26,6 +26,74 @@ def users_collection(request):
     return Response(PublicUserSerializer(items, many=True).data)
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_stats(request):
+    """Aggregate platform stats for the admin dashboard."""
+    if request.user.role != 'admin' and not request.user.is_staff:
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    from django.db.models import Sum, Count
+    from listings.models import Listing
+    from bookings.models import Booking
+    from payments.models import Payment
+
+    total_users = User.objects.count()
+    total_listings = Listing.objects.filter(status='published').count()
+    total_bookings = Booking.objects.count()
+    total_revenue = Payment.objects.filter(status='completed').aggregate(
+        total=Sum('amount')
+    )['total'] or 0
+
+    recent_users = User.objects.order_by('-date_joined')[:5]
+    recent_bookings = Booking.objects.select_related(
+        'customer', 'listing'
+    ).order_by('-requested_at')[:10]
+    recent_payments = Payment.objects.select_related(
+        'user', 'booking'
+    ).order_by('-created_at')[:10]
+
+    bookings_by_status = dict(
+        Booking.objects.values('status').annotate(count=Count('id')).values_list('status', 'count')
+    )
+
+    return Response({
+        'totals': {
+            'users': total_users,
+            'listings': total_listings,
+            'bookings': total_bookings,
+            'revenue': float(total_revenue),
+        },
+        'bookings_by_status': bookings_by_status,
+        'recent_users': PublicUserSerializer(recent_users, many=True).data,
+        'recent_bookings': [
+            {
+                'id': b.id,
+                'customer_username': b.customer.username,
+                'customer_email': b.customer.email,
+                'listing_title': b.listing.title,
+                'start_date': b.start_date.isoformat(),
+                'end_date': b.end_date.isoformat(),
+                'total_price': float(b.total_price),
+                'status': b.status,
+                'requested_at': b.requested_at.isoformat(),
+            }
+            for b in recent_bookings
+        ],
+        'recent_payments': [
+            {
+                'id': str(p.id),
+                'user': p.user.username if p.user else '',
+                'amount': float(p.amount),
+                'status': p.status,
+                'gateway': p.gateway.name if p.gateway else '',
+                'created_at': p.created_at.isoformat(),
+            }
+            for p in recent_payments
+        ],
+    })
+
+
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
@@ -37,23 +105,23 @@ def user_detail(request, id):
 
     return Response(PublicUserSerializer(u).data)
 
-# ── Phone Number Change — 3-step verification flow ────────────────────────────
+# ── Phone Number Change — 2-step verification flow ────────────────────────────
 #
 # Step 1  POST /api/users/phone-change/initiate/
-#   Body: { "password": "...", "new_phone_number": "...", "network_provider": "mtn"|"orange" }
-#   • Re-authenticates the user with their current password.
+#   Body: { "password": "..." (optional for SSO accounts), "new_phone_number": "...",
+#           "network_provider": "mtn"|"orange" }
+#   • If the user has a usable password (i.e. registered the classic way), the
+#     password is required and re-verified. Google-SSO accounts have no usable
+#     password, so the field is skipped server-side.
 #   • Creates (or resets) a PhoneChangeRequest row.
-#   • Generates a 6-digit OTP, stores its hash-equivalent (plain for dev), sends to email.
+#   • Generates ONE 6-digit OTP and dispatches the same code via both channels:
+#       – the user's email
+#       – SMS to the new phone number
+#     The user only needs to receive it on one channel to proceed.
 #
-# Step 2  POST /api/users/phone-change/verify-email/
+# Step 2  POST /api/users/phone-change/verify/
 #   Body: { "otp": "123456" }
-#   • Validates the email OTP (expiry checked server-side).
-#   • Marks email_otp_verified = True.
-#   • Generates a new SMS OTP and sends it to the *new* phone number.
-#
-# Step 3  POST /api/users/phone-change/verify-sms/
-#   Body: { "otp": "654321" }
-#   • Validates the SMS OTP (expiry checked server-side).
+#   • Validates the OTP (expiry checked server-side).
 #   • Updates Profile.momo_number with the new number.
 #   • Deletes the PhoneChangeRequest row.
 #   • Fires a PHONE_NUMBER_CHANGED in-app + email notification.
@@ -69,15 +137,15 @@ OTP_VALID_MINUTES = 10
 @throttle_classes([PhoneChangeRateThrottle])
 def initiate_phone_change(request):
     """
-    Step 1: verify password → send email OTP.
+    Step 1: (optionally verify password) → send email OTP and SMS OTP together.
     """
     password         = request.data.get('password', '').strip()
     new_phone_number = request.data.get('new_phone_number', '').strip()
     network_provider = request.data.get('network_provider', '').strip().lower()
 
-    if not password or not new_phone_number or not network_provider:
+    if not new_phone_number or not network_provider:
         return Response(
-            {'error': 'password, new_phone_number, and network_provider are required.'},
+            {'error': 'new_phone_number and network_provider are required.'},
             status=400,
         )
 
@@ -87,10 +155,17 @@ def initiate_phone_change(request):
             status=400,
         )
 
-    # Re-authenticate with current password
-    user = authenticate(request, username=request.user.username, password=password)
-    if user is None:
-        return Response({'error': 'Incorrect password.'}, status=400)
+    user = request.user
+    requires_password = user.has_usable_password()
+
+    if requires_password:
+        if not password:
+            return Response(
+                {'error': 'Current password is required.', 'code': 'password_required'},
+                status=400,
+            )
+        if authenticate(request, username=user.username, password=password) is None:
+            return Response({'error': 'Incorrect password.'}, status=400)
 
     # Prevent linking the same number that's already on the profile
     try:
@@ -103,43 +178,46 @@ def initiate_phone_change(request):
     except Exception:
         pass
 
-    # Create or reset the pending request
+    # Same OTP delivered through two channels so the user can use whichever
+    # arrives first. Both columns store the same value for schema consistency.
     otp    = generate_otp()
     expiry = timezone.now() + timedelta(minutes=OTP_VALID_MINUTES)
 
     PhoneChangeRequest.objects.update_or_create(
         user=user,
         defaults={
-            'new_phone_number':  new_phone_number,
-            'network_provider':  network_provider,
-            'password_verified': True,
-            'email_otp':         otp,
-            'email_otp_expiry':  expiry,
+            'new_phone_number':   new_phone_number,
+            'network_provider':   network_provider,
+            'password_verified':  True,
+            'email_otp':          otp,
+            'email_otp_expiry':   expiry,
             'email_otp_verified': False,
-            'sms_otp':           '',
-            'sms_otp_expiry':    None,
-            'sms_otp_verified':  False,
+            'sms_otp':            otp,
+            'sms_otp_expiry':     expiry,
+            'sms_otp_verified':   False,
         },
     )
 
     send_phone_change_email_otp(user, otp)
+    send_phone_change_sms_otp(new_phone_number, otp, network_provider)
 
     return Response({
         'message': (
-            f'A verification code has been sent to your email address. '
-            f'It expires in {OTP_VALID_MINUTES} minutes.'
-        )
+            f'A verification code has been sent to your email and to '
+            f'{new_phone_number}. It expires in {OTP_VALID_MINUTES} minutes.'
+        ),
     }, status=200)
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @throttle_classes([PhoneChangeRateThrottle])
-def verify_phone_change_email(request):
+def verify_phone_change(request):
     """
-    Step 2: validate email OTP → send SMS OTP to new number.
+    Step 2: validate the OTP → update phone number → notify user.
     """
     otp = request.data.get('otp', '').strip()
+
     if not otp:
         return Response({'error': 'otp is required.'}, status=400)
 
@@ -148,18 +226,6 @@ def verify_phone_change_email(request):
     except PhoneChangeRequest.DoesNotExist:
         return Response(
             {'error': 'No pending phone change request. Please start from Step 1.'},
-            status=400,
-        )
-
-    if not req.password_verified:
-        return Response(
-            {'error': 'Password step not completed. Please start from Step 1.'},
-            status=400,
-        )
-
-    if req.email_otp_verified:
-        return Response(
-            {'error': 'Email already verified. Please submit your SMS code.'},
             status=400,
         )
 
@@ -173,67 +239,6 @@ def verify_phone_change_email(request):
     if req.email_otp != otp:
         return Response({'error': 'Invalid verification code.'}, status=400)
 
-    # Email verified — generate and send SMS OTP to the new number
-    sms_otp    = generate_otp()
-    sms_expiry = timezone.now() + timedelta(minutes=OTP_VALID_MINUTES)
-
-    req.email_otp_verified = True
-    req.sms_otp            = sms_otp
-    req.sms_otp_expiry     = sms_expiry
-    req.save()
-
-    send_phone_change_sms_otp(req.new_phone_number, sms_otp, req.network_provider)
-
-    return Response({
-        'message': (
-            f'Email verified. A confirmation code has been sent via SMS to '
-            f'{req.new_phone_number}. It expires in {OTP_VALID_MINUTES} minutes.'
-        )
-    }, status=200)
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-@throttle_classes([PhoneChangeRateThrottle])
-def verify_phone_change_sms(request):
-    """
-    Step 3: validate SMS OTP → update phone number → notify user.
-    """
-    otp = request.data.get('otp', '').strip()
-    if not otp:
-        return Response({'error': 'otp is required.'}, status=400)
-
-    try:
-        req = PhoneChangeRequest.objects.get(user=request.user)
-    except PhoneChangeRequest.DoesNotExist:
-        return Response(
-            {'error': 'No pending phone change request. Please start from Step 1.'},
-            status=400,
-        )
-
-    if not req.email_otp_verified:
-        return Response(
-            {'error': 'Email step not completed. Please complete Step 2 first.'},
-            status=400,
-        )
-
-    if not req.sms_otp:
-        return Response(
-            {'error': 'SMS code not yet sent. Please complete Step 2 first.'},
-            status=400,
-        )
-
-    if req.is_sms_otp_expired():
-        req.delete()
-        return Response(
-            {'error': 'SMS code has expired. Please start over.'},
-            status=400,
-        )
-
-    if req.sms_otp != otp:
-        return Response({'error': 'Invalid SMS code.'}, status=400)
-
-    # All 3 steps passed — commit the new phone number
     new_number       = req.new_phone_number
     network_provider = req.network_provider
 
@@ -244,7 +249,6 @@ def verify_phone_change_sms(request):
 
     req.delete()
 
-    # Fire notification (imported lazily to avoid circular import)
     try:
         from notifications.services import notify_phone_number_changed
         notify_phone_number_changed(request.user, old_number, new_number, network_provider)
@@ -253,9 +257,7 @@ def verify_phone_change_sms(request):
 
     network_label = 'MTN Mobile Money' if network_provider == 'mtn' else 'Orange Money'
     return Response({
-        'message': (
-            f'Your {network_label} number has been updated to {new_number}.'
-        )
+        'message': f'Your {network_label} number has been updated to {new_number}.',
     }, status=200)
 
 
@@ -294,12 +296,31 @@ def me_dashboard(request):
     })
 
 
-@api_view(['PUT'])
+@api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     user = request.user
-    serializer = UserSerializer(user, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    data = request.data
+
+    # Update user-level fields
+    updatable_fields = ['first_name', 'last_name', 'email']
+    changed = [f for f in updatable_fields if f in data and data[f] != '']
+    if changed:
+        for field in changed:
+            setattr(user, field, data[field])
+        user.save(update_fields=changed)
+
+    # Update profile fields (image + bio)
+    profile, _ = Profile.objects.get_or_create(user=user)
+    profile_changed = False
+    if 'bio' in data:
+        profile.bio = data['bio']
+        profile_changed = True
+    if 'image' in request.FILES:
+        profile.image = request.FILES['image']
+        profile_changed = True
+    if profile_changed:
+        profile.save()
+
+    fresh_user = User.objects.select_related('profile').get(pk=user.pk)
+    return Response(UserSerializer(fresh_user).data)

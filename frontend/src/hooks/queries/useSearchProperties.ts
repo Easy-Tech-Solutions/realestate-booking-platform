@@ -6,5 +6,6 @@ export function useSearchProperties(searchFilters: SearchFilters) {
   return useQuery({
     queryKey: ['properties', 'search', searchFilters],
     queryFn: () => propertiesAPI.search(searchFilters),
+    staleTime: 30_000,
   });
 }

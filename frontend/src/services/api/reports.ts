@@ -5,10 +5,15 @@ export const reportsAPI = {
     return fetchWithAuth('/api/reports/');
   },
 
-  create: async (payload: Record<string, any>): Promise<any> => {
+  create: async (payload: Record<string, any>, screenshot?: File): Promise<any> => {
+    const form = new FormData();
+    for (const [key, val] of Object.entries(payload)) {
+      if (val !== undefined && val !== null) form.append(key, String(val));
+    }
+    if (screenshot) form.append('screenshot', screenshot);
     return fetchWithAuth('/api/reports/', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: form,
     });
   },
 

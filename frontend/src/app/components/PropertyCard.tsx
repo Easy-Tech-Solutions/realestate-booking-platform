@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, Star } from 'lucide-react';
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
@@ -17,6 +17,16 @@ export function PropertyCard({ property }: PropertyCardProps) {
   const { wishlistIds, toggleWishlist } = useApp();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const isWishlisted = wishlistIds.includes(property.id);
+
+  useEffect(() => {
+    if (property.images.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentImageIndex((prev) =>
+        prev === property.images.length - 1 ? 0 : prev + 1
+      );
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [property.images.length]);
 
   const handlePrevImage = (e: React.MouseEvent) => {
     e.preventDefault();

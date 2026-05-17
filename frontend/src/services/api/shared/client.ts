@@ -1,24 +1,30 @@
 import { API_BASE_URL } from '../../../core/constants';
 import { ApiError } from './errors';
 
-let accessToken: string | null = localStorage.getItem('accessToken');
-let refreshToken: string | null = localStorage.getItem('refreshToken');
+// Access token lives only in JS memory.
+// Refresh token is stored in localStorage so it survives page refreshes on
+// every browser — including mobile Safari, which blocks the cross-site
+// httpOnly cookie we used to depend on.
+const REFRESH_TOKEN_KEY = 'auth.refresh';
+let accessToken: string | null = null;
 
-export const setTokens = (access: string, refresh: string) => {
+export const setTokens = (access: string, refresh?: string) => {
   accessToken = access;
-  refreshToken = refresh;
-  localStorage.setItem('accessToken', access);
-  localStorage.setItem('refreshToken', refresh);
+  if (refresh) {
+    try { localStorage.setItem(REFRESH_TOKEN_KEY, refresh); } catch { /* storage disabled */ }
+  }
 };
 
 export const clearTokens = () => {
   accessToken = null;
-  refreshToken = null;
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
+  try { localStorage.removeItem(REFRESH_TOKEN_KEY); } catch { /* storage disabled */ }
 };
 
 export const getAccessToken = () => accessToken;
+
+const getRefreshToken = (): string | null => {
+  try { return localStorage.getItem(REFRESH_TOKEN_KEY); } catch { return null; }
+};
 
 export async function fetchPublicJson<T>(url: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
@@ -26,7 +32,7 @@ export async function fetchPublicJson<T>(url: string, options: RequestInit = {})
     ...(options.headers as Record<string, string>),
   };
 
-  const response = await fetch(`${API_BASE_URL}${url}`, { ...options, headers });
+  const response = await fetch(`${API_BASE_URL}${url}`, { ...options, headers, credentials: 'include' });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: response.statusText }));
@@ -40,14 +46,16 @@ export async function fetchPublicJson<T>(url: string, options: RequestInit = {})
   return response.json() as Promise<T>;
 }
 
-async function refreshAccessToken(): Promise<string | null> {
-  if (!refreshToken) return null;
+export async function attemptTokenRefresh(): Promise<string | null> {
+  const refresh = getRefreshToken();
+  if (!refresh) return null;
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh-token/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh: refreshToken }),
+      credentials: 'include', // sends legacy refresh cookie if still present
+      body: JSON.stringify({ refresh }),
     });
 
     if (!response.ok) {
@@ -57,7 +65,10 @@ async function refreshAccessToken(): Promise<string | null> {
 
     const data = await response.json();
     accessToken = data.access;
-    localStorage.setItem('accessToken', data.access);
+    // Backend may rotate the refresh token; persist the new one if so.
+    if (data.refresh) {
+      try { localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh); } catch { /* storage disabled */ }
+    }
     return data.access;
   } catch {
     clearTokens();
@@ -73,13 +84,13 @@ export async function fetchWithAuth<T>(url: string, options: RequestInit = {}): 
       ...(options.headers as Record<string, string>),
     };
 
-    return fetch(`${API_BASE_URL}${url}`, { ...options, headers });
+    return fetch(`${API_BASE_URL}${url}`, { ...options, headers, credentials: 'include' });
   };
 
   let response = await makeRequest(accessToken);
 
-  if (response.status === 401 && refreshToken) {
-    const newToken = await refreshAccessToken();
+  if (response.status === 401) {
+    const newToken = await attemptTokenRefresh();
     if (newToken) {
       response = await makeRequest(newToken);
     }

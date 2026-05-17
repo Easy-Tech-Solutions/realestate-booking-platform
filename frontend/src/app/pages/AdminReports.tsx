@@ -13,6 +13,8 @@ interface AdminReport {
   content_type: string;
   report_type: string;
   description: string;
+  owner_name?: string;
+  screenshot_url?: string | null;
   status: 'pending' | 'under_review' | 'resolved' | 'dismissed';
   created_at: string;
 }
@@ -87,9 +89,9 @@ export function AdminReports() {
         </div>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <CardTitle>All Reports</CardTitle>
-            <div className="w-52">
+            <div className="w-full sm:w-52">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by status" />
@@ -123,7 +125,30 @@ export function AdminReports() {
 
                     <p className="text-sm">{report.description}</p>
 
-                    <div className="grid lg:grid-cols-[220px,1fr,120px] gap-3">
+                    {(report.owner_name || report.screenshot_url) && (
+                      <div className="flex flex-wrap items-start gap-4 p-3 rounded-lg bg-muted/50 border">
+                        {report.owner_name && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-0.5">Owner name</p>
+                            <p className="text-sm">{report.owner_name}</p>
+                          </div>
+                        )}
+                        {report.screenshot_url && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Screenshot</p>
+                            <a href={report.screenshot_url} target="_blank" rel="noopener noreferrer">
+                              <img
+                                src={report.screenshot_url}
+                                alt="Report screenshot"
+                                className="h-24 rounded border object-contain hover:opacity-80 transition-opacity"
+                              />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="grid sm:grid-cols-[1fr,120px] lg:grid-cols-[220px,1fr,120px] gap-3">
                       <Select
                         value={draftStatus[report.id] || ''}
                         onValueChange={(val) => setDraftStatus(prev => ({ ...prev, [report.id]: val }))}

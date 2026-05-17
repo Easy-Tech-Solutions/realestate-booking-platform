@@ -142,6 +142,41 @@ class Refund(models.Model):
         return f'Payment {self.id} - {self.amount} for Payment {self.payment.id}'
     
 
+class SavedCard(models.Model):
+    CARD_TYPE_CHOICES = [
+        ('visa', 'Visa'),
+        ('mastercard', 'Mastercard'),
+        ('amex', 'American Express'),
+        ('discover', 'Discover'),
+        ('other', 'Other'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='saved_cards',
+    )
+    cardholder_name = models.CharField(max_length=100)
+    last4 = models.CharField(max_length=4)
+    card_type = models.CharField(max_length=20, choices=CARD_TYPE_CHOICES, default='other')
+    expiry_month = models.CharField(max_length=2)
+    expiry_year = models.CharField(max_length=4)
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-is_default', '-created_at']
+
+    def __str__(self):
+        return f'{self.get_card_type_display()} •••• {self.last4} ({self.user.username})'
+
+    def save(self, *args, **kwargs):
+        # Ensure only one default card per user
+        if self.is_default:
+            SavedCard.objects.filter(user=self.user, is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
 class WebhookLog(models.Model):
     gateway = models.ForeignKey(PaymentGateway, on_delete=models.CASCADE)
     event_type = models.CharField(max_length=50)

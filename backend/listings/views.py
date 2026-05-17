@@ -8,13 +8,21 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import IntegrityError
-from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory
+import math
+from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory, HotelRoom, HotelRoomImage
 from bookings.models import Booking
-from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer
+from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer, HotelRoomImageSerializer
 from .filters import ListingFilter
 from django.contrib.auth import get_user_model
+from rest_framework.pagination import PageNumberPagination
 
 User = get_user_model()
+
+
+class _ListingPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 def _is_admin(user):
@@ -61,8 +69,11 @@ def category_detail(request, id):
 @parser_classes([MultiPartParser, FormParser])
 def listings_collection(request):
     if request.method == "GET":
-        items = ListingFilter(request.GET, queryset=Listing.objects.all())
-        return Response(ListingSerializer(items.qs, many=True, context={"request": request}).data)
+        items = ListingFilter(request.GET, queryset=Listing.objects.filter(status='published'))
+        paginator = _ListingPagination()
+        page = paginator.paginate_queryset(items.qs, request)
+        serialized = ListingSerializer(page, many=True, context={"request": request}).data
+        return paginator.get_paginated_response(serialized)
 
     elif request.method == "POST":
         if not request.user.is_authenticated:
@@ -180,8 +191,41 @@ def favorite_listing(request, id):
 @api_view(["GET"])
 def listing_reviews(request, listing_id):
     listing = get_object_or_404(Listing, pk=listing_id)
-    reviews = Review.objects.filter(listing=listing)
+    reviews = Review.objects.filter(listing=listing).select_related('reviewer', 'reviewer__profile')
     return Response(ReviewSerializer(reviews, many=True, context={"request": request}).data)
+
+
+@api_view(["GET"])
+def all_reviews(request):
+    """
+    GET /api/listings/reviews/  — public paginated list of all reviews.
+    Query params: ?ordering=-created_at|rating  ?min_rating=4  ?page=1
+    """
+    qs = Review.objects.select_related(
+        'reviewer', 'reviewer__profile', 'listing'
+    ).prefetch_related('images')
+
+    min_rating = request.query_params.get('min_rating')
+    if min_rating:
+        try:
+            qs = qs.filter(rating__gte=int(min_rating))
+        except ValueError:
+            pass
+
+    listing_id_param = request.query_params.get('listing_id')
+    if listing_id_param:
+        qs = qs.filter(listing_id=listing_id_param)
+
+    ordering = request.query_params.get('ordering', '-created_at')
+    if ordering in ('created_at', '-created_at', 'rating', '-rating'):
+        qs = qs.order_by(ordering)
+
+    paginator = _ListingPagination()
+    paginator.page_size = 12
+    page = paginator.paginate_queryset(qs, request)
+    return paginator.get_paginated_response(
+        ReviewSerializer(page, many=True, context={'request': request}).data
+    )
 
 
 @api_view(["POST"])
@@ -190,6 +234,9 @@ def create_review(request):
         return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
 
     listing = get_object_or_404(Listing, pk=request.data.get("listing"))
+
+    if not Booking.objects.filter(listing=listing, customer=request.user, status='completed').exists():
+        return Response({"error": "You must complete a stay before leaving a review"}, status=status.HTTP_400_BAD_REQUEST)
 
     if Review.objects.filter(listing=listing, reviewer=request.user).exists():
         return Response({"error": "You have already reviewed this listing"}, status=status.HTTP_400_BAD_REQUEST)
@@ -242,7 +289,10 @@ def listing_stats(request, listing_id):
     if listing.owner != request.user and not request.user.is_superuser:
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-    days = int(request.GET.get("days", 30))
+    try:
+        days = min(int(request.GET.get("days", 30)), 365)
+    except (ValueError, TypeError):
+        return Response({"error": "days must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
     end_date = timezone.now().date()
     start_date = end_date - timedelta(days=days)
 
@@ -251,7 +301,7 @@ def listing_stats(request, listing_id):
     total_favorites = Favorite.objects.filter(listing=listing).count()
     total_bookings = Booking.objects.filter(listing=listing).count()
     total_revenue = Booking.objects.filter(listing=listing, status="confirmed").aggregate(
-        total=Sum("listing__price"))["total"] or 0
+        total=Sum("total_price"))["total"] or 0
 
     daily_stats = PropertyStats.objects.filter(listing=listing, date__gte=start_date, date__lte=end_date).order_by("date")
 
@@ -293,34 +343,37 @@ def agent_analytics(request):
     if user.role not in ["agent", "admin"]:
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-    days = int(request.GET.get("days", 30))
+    try:
+        days = min(int(request.GET.get("days", 30)), 365)
+    except (ValueError, TypeError):
+        return Response({"error": "days must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
     end_date = timezone.now().date()
     start_date = end_date - timedelta(days=days)
 
-    listings = Listing.objects.filter(owner=user)
+    listings = Listing.objects.filter(owner=user).annotate(
+        view_count=Count('property_views', distinct=True),
+        favorite_count=Count('favorited_by', distinct=True),
+        booking_count=Count('bookings', distinct=True),
+        confirmed_revenue=Sum('bookings__total_price', filter=Q(bookings__status='confirmed')),
+    )
     total_listings = listings.count()
-    total_views = PropertyView.objects.filter(listing__in=listings).count()
-    total_favorites = Favorite.objects.filter(listing__in=listings).count()
-    total_bookings = Booking.objects.filter(listing__in=listings).count()
-    total_revenue = Booking.objects.filter(listing__in=listings, status="confirmed").aggregate(
-        total=Sum("listing__price"))["total"] or 0
+    total_views = sum(l.view_count for l in listings)
+    total_favorites = sum(l.favorite_count for l in listings)
+    total_bookings = sum(l.booking_count for l in listings)
+    total_revenue = sum(l.confirmed_revenue or 0 for l in listings)
 
-    property_stats = []
-    for listing in listings:
-        views = PropertyView.objects.filter(listing=listing).count()
-        favorites = Favorite.objects.filter(listing=listing).count()
-        bookings_count = Booking.objects.filter(listing=listing).count()
-        revenue = Booking.objects.filter(listing=listing, status="confirmed").aggregate(
-            total=Sum("listing__price"))["total"] or 0
-        property_stats.append({
-            "id": listing.id,
-            "title": listing.title,
-            "price": str(listing.price),
-            "views": views,
-            "favorites": favorites,
-            "bookings": bookings_count,
-            "revenue": str(revenue),
-        })
+    property_stats = [
+        {
+            "id": l.id,
+            "title": l.title,
+            "price": str(l.price),
+            "views": l.view_count,
+            "favorites": l.favorite_count,
+            "bookings": l.booking_count,
+            "revenue": str(l.confirmed_revenue or 0),
+        }
+        for l in listings
+    ]
 
     property_stats.sort(key=lambda x: float(x["revenue"]), reverse=True)
 
@@ -352,23 +405,103 @@ def popular_listings(request):
         .order_by("-view_count")[:20]
     )
 
+    listing_ids = [item["listing"] for item in view_counts]
+    listings_map = {
+        l.id: l
+        for l in Listing.objects.filter(pk__in=listing_ids)
+        .select_related('owner')
+        .annotate(favorite_count=Count('favorited_by', distinct=True))
+    }
+
     result = []
     for item in view_counts:
-        listing = Listing.objects.get(pk=item["listing"])
-        favorite_count = Favorite.objects.filter(listing=listing).count()
+        listing = listings_map.get(item["listing"])
+        if not listing:
+            continue
         result.append({
             "id": listing.id,
             "title": listing.title,
             "price": str(listing.price),
             "property_type": listing.property_type,
             "address": listing.address,
-            "main_image_url": listing.main_image.url if listing.main_image else None,
+            "main_image_url": request.build_absolute_uri(listing.main_image.url) if listing.main_image else None,
             "owner_username": listing.owner.username,
             "views": item["view_count"],
-            "favorites": favorite_count,
+            "favorites": listing.favorite_count,
         })
 
     return Response({"popular_listings": result})
+
+
+@api_view(["GET"])
+def platform_stats(request):
+    """Public endpoint returning site-wide stats for the landing page."""
+    total_properties = Listing.objects.filter(is_available=True).count()
+    total_locations = (
+        Listing.objects.filter(is_available=True, address__isnull=False)
+        .exclude(address="")
+        .values("address")
+        .distinct()
+        .count()
+    )
+    happy_guests = Review.objects.values("reviewer").distinct().count()
+    return Response({
+        "total_properties": total_properties,
+        "total_locations": total_locations,
+        "happy_guests": happy_guests,
+    })
+
+
+def _haversine(lat1, lon1, lat2, lon2):
+    """Return distance in km between two (lat, lng) points."""
+    R = 6371.0
+    lat1, lon1, lat2, lon2 = (math.radians(float(v)) for v in (lat1, lon1, lat2, lon2))
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+@api_view(["GET"])
+def nearby_listings(request):
+    """
+    GET /api/listings/nearby/?lat=X&lng=Y&radius=50
+    Returns published listings within `radius` km (default 50, max 200), sorted by distance.
+    """
+    try:
+        user_lat = float(request.query_params["lat"])
+        user_lng = float(request.query_params["lng"])
+    except (KeyError, ValueError):
+        return Response({"error": "lat and lng query params are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        radius_km = min(float(request.query_params.get("radius", 50)), 200)
+    except ValueError:
+        radius_km = 50
+
+    qs = (
+        Listing.objects
+        .filter(status="published", latitude__isnull=False, longitude__isnull=False)
+        .exclude(latitude=0, longitude=0)
+        .select_related("owner")
+    )
+
+    nearby = []
+    for listing in qs:
+        dist = _haversine(user_lat, user_lng, listing.latitude, listing.longitude)
+        if dist <= radius_km:
+            nearby.append((dist, listing))
+
+    nearby.sort(key=lambda x: x[0])
+    nearby = nearby[:12]
+
+    results = []
+    for dist, listing in nearby:
+        data = ListingSerializer(listing, context={"request": request}).data
+        data["distance_km"] = round(dist, 1)
+        results.append(data)
+
+    return Response(results)
 
 
 @api_view(["GET"])
@@ -412,6 +545,15 @@ def listing_pricing(request, listing_id):
 
     nights = (end - start).days
     base_price = float(listing.price)
+
+    room_id = request.GET.get("room_id")
+    if room_id:
+        try:
+            room = HotelRoom.objects.get(pk=room_id, listing=listing, is_active=True)
+            base_price = float(room.price_per_night)
+        except HotelRoom.DoesNotExist:
+            pass
+
     weekend_premium = listing.weekend_premium_percent / 100.0
 
     subtotal = 0.0
@@ -474,3 +616,134 @@ def review_response(request, id):
     review.save()
 
     return Response(ReviewSerializer(review, context={"request": request}).data)
+
+
+def _get_available_room_count(room, start_date, end_date):
+    overlapping = Booking.objects.filter(
+        hotel_room=room,
+        status__in=['requested', 'confirmed'],
+        start_date__lt=end_date,
+        end_date__gt=start_date,
+    ).count()
+    return max(0, room.total_count - overlapping)
+
+
+@api_view(["GET", "POST"])
+def hotel_rooms_collection(request, listing_id):
+    listing = get_object_or_404(Listing, pk=listing_id)
+
+    if request.method == "GET":
+        is_owner = request.user.is_authenticated and (
+            listing.owner == request.user or request.user.is_superuser
+        )
+        rooms = listing.hotel_rooms.all() if is_owner else listing.hotel_rooms.filter(is_active=True)
+        return Response(HotelRoomSerializer(rooms, many=True).data)
+
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    if listing.owner != request.user and not request.user.is_superuser:
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = HotelRoomSerializer(data={**request.data, 'listing': listing.id})
+    if serializer.is_valid():
+        room = serializer.save(listing=listing)
+        return Response(HotelRoomSerializer(room).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET", "PUT", "DELETE"])
+def hotel_room_detail(request, listing_id, room_id):
+    listing = get_object_or_404(Listing, pk=listing_id)
+    room = get_object_or_404(HotelRoom, pk=room_id, listing=listing)
+
+    if request.method == "GET":
+        return Response(HotelRoomSerializer(room).data)
+
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    if listing.owner != request.user and not request.user.is_superuser:
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == "PUT":
+        serializer = HotelRoomSerializer(room, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(HotelRoomSerializer(room).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    room.delete()
+    return Response({"message": "Room deleted"}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET"])
+def hotel_room_availability(request, listing_id):
+    from datetime import date as _date
+
+    listing = get_object_or_404(Listing, pk=listing_id)
+    start_str = request.GET.get("start_date")
+    end_str = request.GET.get("end_date")
+
+    if not start_str or not end_str:
+        return Response({"error": "start_date and end_date are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        start = _date.fromisoformat(start_str)
+        end = _date.fromisoformat(end_str)
+    except ValueError:
+        return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=status.HTTP_400_BAD_REQUEST)
+
+    rooms = listing.hotel_rooms.filter(is_active=True)
+    result = []
+    for room in rooms:
+        available_count = _get_available_room_count(room, start, end)
+        data = HotelRoomSerializer(room).data
+        data['available_count'] = available_count
+        result.append(data)
+
+    return Response(result)
+
+
+@api_view(["GET", "POST"])
+@parser_classes([MultiPartParser, FormParser])
+def hotel_room_images(request, listing_id, room_id):
+    listing = get_object_or_404(Listing, pk=listing_id)
+    room = get_object_or_404(HotelRoom, pk=room_id, listing=listing)
+
+    if request.method == "GET":
+        return Response(HotelRoomImageSerializer(room.images.all(), many=True).data)
+
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    if listing.owner != request.user and not request.user.is_superuser:
+        return Response({"error": "Only the owner can add room images"}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = HotelRoomImageSerializer(data=request.data)
+    if serializer.is_valid():
+        max_order = room.images.aggregate(models.Max("order"))["order__max"]
+        order = (max_order or 0) + 1
+        image = serializer.save(room=room, order=order)
+        return Response(HotelRoomImageSerializer(image).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["DELETE"])
+def hotel_room_image_detail(request, listing_id, room_id, image_id):
+    listing = get_object_or_404(Listing, pk=listing_id)
+    room = get_object_or_404(HotelRoom, pk=room_id, listing=listing)
+    image = get_object_or_404(HotelRoomImage, pk=image_id, room=room)
+
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    if listing.owner != request.user and not request.user.is_superuser:
+        return Response({"error": "Only the owner can delete room images"}, status=status.HTTP_403_FORBIDDEN)
+
+    image.delete()
+    return Response({"message": "Image deleted"}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET"])
+def my_drafts(request):
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    drafts = Listing.objects.filter(owner=request.user, status='draft').order_by('-updated_at')
+    return Response(ListingSerializer(drafts, many=True, context={"request": request}).data)

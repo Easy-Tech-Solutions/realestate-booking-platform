@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { toast } from 'sonner';
 import type { User, SearchFilters } from '../core/types';
-import { authAPI, propertiesAPI, clearTokens, getAccessToken } from '../services/api.service';
+import { authAPI, propertiesAPI, clearTokens, attemptTokenRefresh } from '../services/api.service';
+import type { GoogleLoginResult, GoogleSignupRole } from '../services/api/auth';
 import { queryClient } from '../providers/QueryProvider';
 import { queryKeys } from '../hooks/queries/keys';
 
@@ -11,6 +12,7 @@ export interface AppStoreState {
   setUser: (user: User | null) => void;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string, role?: GoogleSignupRole) => Promise<GoogleLoginResult>;
   register: (data: {
     username: string;
     email: string;
@@ -39,15 +41,27 @@ export const useAppStore = create<AppStoreState>()(
 
       setUser: (user) => set({ user, isAuthenticated: Boolean(user) }),
 
-      login: async (username, password) => {
-        const { user } = await authAPI.login(username, password);
+      login: async (email, password) => {
+        const { user } = await authAPI.login(email, password);
         set({ user, isAuthenticated: true });
         loadFavoritesIntoStore();
+      },
+
+      loginWithGoogle: async (idToken, role) => {
+        const result = await authAPI.loginWithGoogle(idToken, role);
+        if (result.status === 'success') {
+          set({ user: result.user, isAuthenticated: true });
+          loadFavoritesIntoStore();
+        }
+        return result;
       },
 
       register: async (data) => authAPI.register(data),
 
       logout: async () => {
+        // Unregister push subscription before clearing auth
+        const { unregisterPushSubscription } = await import('../core/push');
+        await unregisterPushSubscription().catch(() => {});
         await authAPI.logout();
         set({ user: null, isAuthenticated: false, wishlistIds: [] });
         queryClient.removeQueries({ queryKey: queryKeys.properties.favorites });
@@ -81,14 +95,15 @@ export const useAppStore = create<AppStoreState>()(
       },
 
       initialize: async () => {
-        const token = getAccessToken();
-        if (!token) {
-          set({ user: null, isAuthenticated: false, isLoading: false });
-          return;
-        }
-
         set({ isLoading: true });
         try {
+          // On page load, access token is gone (in-memory only).
+          // Try to get a fresh one using the httpOnly refresh cookie.
+          const newAccess = await attemptTokenRefresh();
+          if (!newAccess) {
+            set({ user: null, isAuthenticated: false, isLoading: false });
+            return;
+          }
           const user = await authAPI.getCurrentUser();
           set({ user, isAuthenticated: true, isLoading: false });
           loadFavoritesIntoStore();

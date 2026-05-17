@@ -1,5 +1,5 @@
 import { AMENITIES } from '../../../core/constants';
-import type { Booking, Conversation, Message, Property, Review, SearchFilters, User } from '../../../core/types';
+import type { Booking, Conversation, HotelRoom, HotelRoomAvailability, HotelRoomImage, Message, MessageReplySnippet, Property, Review, SearchFilters, User } from '../../../core/types';
 
 export function normalizeUser(u: any): User {
   const firstName = u.first_name || u.full_name?.split(' ')[0] || u.username || u.email?.split('@')[0] || '';
@@ -13,9 +13,12 @@ export function normalizeUser(u: any): User {
     lastName,
     avatar: u.profile?.image || undefined,
     bio: u.profile?.bio || undefined,
+    phone: u.profile?.momo_number || undefined,
     isHost: u.role === 'agent' || u.role === 'admin',
     isAdmin: u.role === 'admin',
     verified: u.email_verified ?? false,
+    hasPassword: u.has_password,
+    lastSeen: u.profile?.last_seen || undefined,
     createdAt: u.date_joined || new Date().toISOString(),
   };
 }
@@ -37,12 +40,12 @@ export function normalizeListing(l: any): Property {
     price: parseFloat(l.price) || 0,
     location: {
       address: l.address || '',
-      city: locationParts[0] || l.address || '',
-      state: locationParts[1] || '',
-      country: locationParts[2] || '',
+      city: l.city || locationParts[0] || '',
+      state: l.state || locationParts[1] || '',
+      country: l.country || locationParts[2] || '',
       zipCode: '',
-      lat: 0,
-      lng: 0,
+      lat: parseFloat(l.latitude || l.lat || 0) || 0,
+      lng: parseFloat(l.longitude || l.lng || 0) || 0,
     },
     amenities,
     bedrooms: l.bedrooms || 0,
@@ -53,8 +56,9 @@ export function normalizeListing(l: any): Property {
     host: {
       id: String(l.owner_id || ''),
       email: '',
-      firstName: l.owner_username || '',
-      lastName: '',
+      firstName: l.owner_first_name || l.owner_username || '',
+      lastName: l.owner_last_name || '',
+      avatar: l.owner_avatar || undefined,
       isHost: true,
       verified: true,
       createdAt: l.created_at,
@@ -63,14 +67,49 @@ export function normalizeListing(l: any): Property {
     reviewCount: Number(l.review_count || 0),
     isSuperhost: Boolean(l.owner_is_superhost),
     instantBook: l.booking_mode === 'instant',
+    selfCheckin: Boolean(l.self_checkin),
     cancellationPolicy: l.cancellation_policy || 'flexible',
     houseRules: buildHouseRules(l),
-    checkIn: '15:00',
-    checkOut: '11:00',
+    checkIn: l.check_in_time || '15:00',
+    checkOut: l.check_out_time || '11:00',
     minNights: 1,
     maxNights: 365,
     bookedDates: [],
     createdAt: l.created_at,
+    status: l.status as 'draft' | 'published' | undefined,
+    hotelRooms: Array.isArray(l.hotel_rooms) ? l.hotel_rooms.map(normalizeHotelRoom) : undefined,
+  };
+}
+
+export function normalizeHotelRoom(r: any): HotelRoom {
+  return {
+    id: String(r.id),
+    listingId: String(r.listing),
+    name: r.name,
+    roomType: r.room_type,
+    description: r.description || '',
+    pricePerNight: parseFloat(r.price_per_night) || 0,
+    maxOccupancy: Number(r.max_occupancy || 2),
+    beds: Number(r.beds || 1),
+    bedType: r.bed_type || 'queen',
+    bathrooms: Number(r.bathrooms || 1),
+    amenities: Array.isArray(r.amenities) ? r.amenities : [],
+    totalCount: Number(r.total_count || 1),
+    isActive: Boolean(r.is_active),
+    createdAt: r.created_at,
+    images: Array.isArray(r.images) ? r.images.map((img: any): HotelRoomImage => ({
+      id: String(img.id),
+      imageUrl: img.image_url || img.image || '',
+      caption: img.caption || '',
+      order: Number(img.order || 0),
+    })) : [],
+  };
+}
+
+export function normalizeHotelRoomAvailability(r: any): HotelRoomAvailability {
+  return {
+    ...normalizeHotelRoom(r),
+    availableCount: Number(r.available_count ?? r.total_count ?? 0),
   };
 }
 
@@ -118,6 +157,7 @@ export function normalizeBooking(b: any): Booking {
     reviewCount: 0,
     isSuperhost: false,
     instantBook: false,
+    selfCheckin: false,
     cancellationPolicy: 'flexible',
     houseRules: [],
     checkIn: '15:00',
@@ -157,9 +197,10 @@ export function normalizeBooking(b: any): Booking {
     serviceFee: 0,
     taxes: 0,
     status: statusMap[b.status] || 'pending',
-    paymentStatus: 'pending' as const,
-    paymentMethod: 'stripe' as const,
+    paymentStatus: (b.payment_status as Booking['paymentStatus']) || 'pending',
+    paymentMethod: (b.payment_method as Booking['paymentMethod']) || 'stripe',
     specialRequests: b.notes,
+    hotelRoomId: b.hotel_room ? String(b.hotel_room) : undefined,
     createdAt: b.requested_at,
   };
 }
@@ -168,6 +209,7 @@ export function normalizeReview(r: any): Review {
   return {
     id: String(r.id),
     propertyId: String(r.listing),
+    listingTitle: r.listing_title || undefined,
     userId: String(r.reviewer),
     user: {
       id: String(r.reviewer),
@@ -186,8 +228,10 @@ export function normalizeReview(r: any): Review {
     communication: Number(r.communication || r.rating || 0),
     location: Number(r.location_rating || r.rating || 0),
     value: Number(r.value || r.rating || 0),
+    title: r.title || undefined,
     comment: r.content,
     response: r.host_response || undefined,
+    isVerified: Boolean(r.is_verified),
     createdAt: r.created_at,
   };
 }
@@ -235,6 +279,24 @@ export function normalizeConversation(conversation: any): Conversation {
 export function normalizeMessage(message: any): Message {
   const sender = normalizeUser(message.sender || {});
 
+  const attachments = (message.attachments || []).map((a: any) => ({
+    id: String(a.id),
+    fileUrl: a.file_url || '',
+    fileName: a.file_name || '',
+    fileSize: Number(a.file_size || 0),
+    fileType: a.file_type || 'other',
+    createdAt: a.created_at || message.created_at,
+  }));
+
+  const replyTo: MessageReplySnippet | undefined = message.reply_to
+    ? {
+        id: String(message.reply_to.id),
+        content: message.reply_to.content || '',
+        senderName: message.reply_to.sender_name || '',
+        messageType: message.reply_to.message_type || 'text',
+      }
+    : undefined;
+
   return {
     id: String(message.id),
     conversationId: String(message.conversation),
@@ -251,18 +313,28 @@ export function normalizeMessage(message: any): Message {
       createdAt: message.created_at,
     },
     content: message.content || '',
+    messageType: message.message_type || 'text',
     read: Boolean(message.is_read),
+    editedAt: message.edited_at || undefined,
+    attachments,
+    replyTo,
     createdAt: message.created_at,
   };
 }
 
 export function buildSearchParams(filters: SearchFilters): string {
   const params = new URLSearchParams();
-  if (filters.location) params.set('address', filters.location);
+  if (filters.location) params.set('location', filters.location);
   if (filters.priceMin) params.set('min_price', String(filters.priceMin));
   if (filters.priceMax) params.set('max_price', String(filters.priceMax));
   if (filters.bedrooms) params.set('min_bedrooms', String(filters.bedrooms));
-  if (filters.propertyType?.length) params.set('property_type', filters.propertyType[0]);
+  if (filters.guests) params.set('min_guests', String(filters.guests));
+  if (filters.propertyType?.length === 1) {
+    params.set('property_type', filters.propertyType[0]);
+  } else if (filters.propertyType && filters.propertyType.length > 1) {
+    params.set('property_type_in', filters.propertyType.join(','));
+  }
+  params.set('ordering', '-created_at');
   return params.toString();
 }
 

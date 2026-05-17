@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Lock } from 'lucide-react';
+import { Eye, EyeOff, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { authAPI } from '../../services/api.service';
 import { Button } from '../components/ui/button';
@@ -15,6 +15,8 @@ export function ResetPassword() {
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword2, setShowPassword2] = useState(false);
 
   const hasToken = token.trim().length > 0;
 
@@ -70,13 +72,21 @@ export function ResetPassword() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className="pl-10"
+                  className="pl-10 pr-10"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -86,13 +96,21 @@ export function ResetPassword() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   id="password2"
-                  type="password"
+                  type={showPassword2 ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className="pl-10"
+                  className="pl-10 pr-10"
                   value={password2}
                   onChange={(e) => setPassword2(e.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword2(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword2 ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword2 ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 

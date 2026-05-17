@@ -1,24 +1,10 @@
-{% extends "emails/base_email.html" %}
-
-{% block subject %}Refund Processed — {{ data.listing_title }}{% endblock %}
-
+﻿{% extends "emails/notifications/base_email.html" %}
 {% block content %}
-  <h2>Refund Processed</h2>
-  <p>Hi {{ user.get_full_name|default:user.username }},</p>
-  <p>
-    A refund of <strong>{{ data.amount }} {{ data.currency }}</strong>
-    for <strong>{{ data.listing_title }}</strong> has been processed.
-    Please allow 3–5 business days for the amount to appear in your account.
-  </p>
-
-  <div class="info-box">
-    <p><strong>Property:</strong> {{ data.listing_title }}</p>
-    <p><strong>Refund Amount:</strong> {{ data.amount }} {{ data.currency }}</p>
-    <p><strong>Original Transaction:</strong> {{ data.payment_id }}</p>
-  </div>
-
-  <hr class="divider"/>
-  <p style="font-size:13px; color:#888;">
-    {{ site_name }}
-  </p>
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Refund Processed</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">Your refund is on its way</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:6px;padding:20px;margin:0 0 24px;">
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Property:</strong> {{ data.listing_title }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Refund Amount:</strong> {{ data.amount }} {{ data.currency }}</td></tr>
+</table>
+<p style="margin:0;color:#444444;font-size:15px;line-height:1.6;">Refunds typically appear within 5–10 business days depending on your payment provider.</p>
 {% endblock %}

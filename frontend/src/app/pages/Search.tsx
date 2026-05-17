@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Filter, Map as MapIcon } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { createPriceMarker, LIBERIA_CENTER, LIBERIA_ZOOM } from '../components/LiberiaMap';
 import { Button } from '../components/ui/button';
 import { PropertyCard } from '../components/PropertyCard';
 import { FiltersDialog, ActiveFilters } from '../components/FiltersDialog';
@@ -11,23 +12,17 @@ import { useNavigate } from 'react-router';
 import { formatCurrency } from '../../core/utils';
 import { useSearchProperties } from '../../hooks/queries/useSearchProperties';
 
-function createPriceIcon(price: number, hovered: boolean) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="
-      background:${hovered ? '#004406' : '#fff'};
-      color:${hovered ? '#fff' : '#000'};
-      border:2px solid #004406;
-      border-radius:20px;
-      padding:4px 10px;
-      font-size:13px;
-      font-weight:700;
-      white-space:nowrap;
-      box-shadow:0 2px 8px rgba(0,0,0,0.2);
-      cursor:pointer;
-    ">${formatCurrency(price)}</div>`,
-    iconAnchor: [30, 16],
-  });
+function MapAutoFit({ positions }: { positions: [number, number][] }) {
+  const map = useMap();
+  React.useEffect(() => {
+    if (positions.length === 0) return;
+    if (positions.length === 1) {
+      map.setView(positions[0], 13);
+    } else {
+      map.fitBounds(L.latLngBounds(positions), { padding: [40, 40] });
+    }
+  }, [positions, map]);
+  return null;
 }
 
 export function Search() {
@@ -77,18 +72,18 @@ export function Search() {
     <>
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div>
               <p className="text-sm text-muted-foreground mb-1">
                 {searchFilters.location && `${searchFilters.location} · `}
                 {searchFilters.guests && `${searchFilters.guests} guests`}
               </p>
-              <h1 className="text-2xl font-semibold">
+              <h1 className="text-xl sm:text-2xl font-semibold">
                 {filtered.length} stay{filtered.length !== 1 ? 's' : ''}
-                {hasActiveFilters && <span className="text-base font-normal text-muted-foreground ml-2">· Filters applied</span>}
+                {hasActiveFilters && <span className="text-sm sm:text-base font-normal text-muted-foreground ml-2">· Filters applied</span>}
               </h1>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3">
               <Button
                 variant={hasActiveFilters ? 'default' : 'outline'}
                 size="sm"
@@ -131,7 +126,7 @@ export function Search() {
                   </Button>
                 </div>
               ) : (
-                <div className={`grid ${showMap ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} gap-6 gap-y-8`}>
+                <div className={`grid ${showMap ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'} gap-3 gap-y-6`}>
                   {filtered.map((property) => (
                     <div
                       key={property.id}
@@ -148,32 +143,44 @@ export function Search() {
             {showMap && (
               <div className="sticky top-24 h-[calc(100vh-8rem)] rounded-xl overflow-hidden">
                 <MapContainer
-                  center={[6.3, -10.8]}
-                  zoom={7}
-                  style={{ blockSize: '100%', inlineSize: '100%' }}
+                  center={LIBERIA_CENTER}
+                  zoom={LIBERIA_ZOOM}
+                  style={{ height: '100%', width: '100%' }}
                   scrollWheelZoom={false}
+                  maxBounds={[[2, -15], [10, -6]]}
+                  maxBoundsViscosity={0.8}
                 >
                   <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  {filtered.map(p => p.location.lat && p.location.lng ? (
-                    <Marker
-                      key={p.id}
-                      position={[p.location.lat, p.location.lng]}
-                      icon={createPriceIcon(p.price, hoveredId === p.id)}
-                    >
-                      <Popup>
-                        <button
-                          onClick={() => navigate(`/rooms/${p.id}`)}
-                          className="font-semibold text-sm hover:underline block mb-1"
-                        >
-                          {p.title}
-                        </button>
-                        <p className="text-xs text-gray-500">{formatCurrency(p.price)}/night</p>
-                      </Popup>
-                    </Marker>
-                  ) : null)}
+                  {(() => {
+                    const positions = filtered
+                      .filter(p => p.location.lat && p.location.lng)
+                      .map(p => [p.location.lat, p.location.lng] as [number, number]);
+                    return (
+                      <>
+                        <MapAutoFit positions={positions} />
+                        {filtered.map(p => p.location.lat && p.location.lng ? (
+                          <Marker
+                            key={p.id}
+                            position={[p.location.lat, p.location.lng]}
+                            icon={createPriceMarker(p.price, hoveredId === p.id)}
+                          >
+                            <Popup>
+                              <button
+                                onClick={() => navigate(`/rooms/${p.id}`)}
+                                className="font-semibold text-sm hover:underline block mb-1"
+                              >
+                                {p.title}
+                              </button>
+                              <p className="text-xs text-gray-500">{formatCurrency(p.price)}/night</p>
+                            </Popup>
+                          </Marker>
+                        ) : null)}
+                      </>
+                    );
+                  })()}
                 </MapContainer>
               </div>
             )}

@@ -1,12 +1,54 @@
 import { lazy } from 'react';
 import type { ComponentType } from 'react';
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, useRouteError } from 'react-router';
 import { RootLayout } from './layouts/RootLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
+function ChunkErrorFallback() {
+  const error = useRouteError() as Error | undefined;
+  const isChunkError = /Failed to fetch dynamically imported module|Importing a module script failed/i.test(
+    error?.message ?? ''
+  );
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="text-center space-y-4 max-w-sm">
+        <h1 className="text-2xl font-semibold">
+          {isChunkError ? 'Update available' : 'Something went wrong'}
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          {isChunkError
+            ? 'A new version of the app was deployed. Reload to continue.'
+            : 'An unexpected error occurred.'}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+        >
+          Reload
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const CHUNK_RELOAD_KEY = 'chunk-load-reload';
+
 const lazyPage = <TProps extends object>(
   factory: () => Promise<{ default: ComponentType<TProps> }>
-) => lazy(factory);
+) =>
+  lazy(() =>
+    factory().catch((err: Error) => {
+      const isChunkError = /Failed to fetch dynamically imported module|Importing a module script failed/i.test(
+        err?.message ?? ''
+      );
+      if (isChunkError && !sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+        window.location.reload();
+        return new Promise<never>(() => {});
+      }
+      throw err;
+    })
+  );
 
 const Home = lazyPage(() => import('./pages/Home').then((module) => ({ default: module.Home })));
 const PropertyDetails = lazyPage(() => import('./pages/PropertyDetails').then((module) => ({ default: module.PropertyDetails })));
@@ -32,13 +74,19 @@ const Terms = lazyPage(() => import('./pages/Terms').then((module) => ({ default
 const Privacy = lazyPage(() => import('./pages/Privacy').then((module) => ({ default: module.Privacy })));
 const NotFound = lazyPage(() => import('./pages/NotFound').then((module) => ({ default: module.NotFound })));
 const ResetPassword = lazyPage(() => import('./pages/ResetPassword').then((module) => ({ default: module.ResetPassword })));
-
-
+const ManageRooms = lazyPage(() => import('./pages/ManageRooms').then((module) => ({ default: module.ManageRooms })));
+const AllReviews = lazyPage(() => import('./pages/AllReviews').then((module) => ({ default: module.AllReviews })));
+const FAQ = lazyPage(() => import('./pages/FAQ').then((module) => ({ default: module.FAQ })));
+const Contact = lazyPage(() => import('./pages/Contact').then((module) => ({ default: module.Contact })));
+const About = lazyPage(() => import('./pages/About').then((module) => ({ default: module.About })));
+const Support = lazyPage(() => import('./pages/Support').then((module) => ({ default: module.Support })));
+const MyTickets = lazyPage(() => import('./pages/MyTickets').then((module) => ({ default: module.MyTickets })));
 
 export const router = createBrowserRouter([
   {
     path: '/',
     Component: RootLayout,
+    errorElement: <ChunkErrorFallback />,
     children: [
       { index: true, Component: Home },
       { path: 'rooms/:id', Component: PropertyDetails },
@@ -47,7 +95,14 @@ export const router = createBrowserRouter([
       { path: 'booking/confirmed', Component: BookingConfirmed },
       { path: 'trips', Component: Trips },
       { path: 'wishlists', Component: Wishlists },
-      { path: 'messages', Component: Messages },
+      {
+        path: 'messages',
+        element: (
+          <ProtectedRoute>
+            <Messages />
+          </ProtectedRoute>
+        ),
+      },
       { path: 'account', Component: Account },
       {
         path: 'host',
@@ -62,6 +117,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requireHost>
             <CreateListing />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'host/listings/:id/rooms',
+        element: (
+          <ProtectedRoute requireHost>
+            <ManageRooms />
           </ProtectedRoute>
         ),
       },
@@ -99,7 +162,12 @@ export const router = createBrowserRouter([
       { path: 'privacy', Component: Privacy },
       { path: '*', Component: NotFound },
       { path: 'reset-password', Component: ResetPassword },
-
+      { path: 'reviews', Component: AllReviews },
+      { path: 'faq', Component: FAQ },
+      { path: 'contact', Component: Contact },
+      { path: 'about', Component: About },
+      { path: 'support', Component: Support },
+      { path: 'support/tickets', Component: MyTickets },
     ],
   },
 ]);

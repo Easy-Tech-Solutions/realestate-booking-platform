@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+#from dotenv import load_dotenv
+from urllib.parse import urlparse, parse_qsl
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -45,12 +48,27 @@ def env_origins(name: str, default: str = "") -> list[str]:
             origins.append(item)
     return origins
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "change-me-in-prod")
-DEBUG = env_bool("DJANGO_DEBUG", True)
-ALLOWED_HOSTS = env_list(
-    "DJANGO_ALLOWED_HOSTS",
-    "localhost,127.0.0.1" if DEBUG else "",
-)
+_secret_key = os.environ.get("DJANGO_SECRET_KEY", "")
+if not _secret_key:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY environment variable is not set. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(50))\""
+    )
+SECRET_KEY = _secret_key
+
+DEBUG = env_bool("DJANGO_DEBUG", False)
+
+# If DJANGO_ALLOWED_HOSTS is explicitly set, use it.
+# Otherwise allow localhost + any *.onrender.com subdomain automatically.
+_render_host = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+_default_hosts = "localhost,127.0.0.1" + (f",{_render_host}" if _render_host else "")
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", _default_hosts)
+
+# Always trust every *.onrender.com hostname so Render custom-domain
+# routing and health-check pings never produce a DisallowedHost 400.
+if not os.environ.get("DJANGO_ALLOWED_HOSTS"):
+    ALLOWED_HOSTS += [".onrender.com"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -67,6 +85,9 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
+    "cloudinary",
+    "cloudinary_storage",
+    "anymail",
     # Local apps
     "authapp",
     "listings",
@@ -77,12 +98,19 @@ INSTALLED_APPS = [
     "notifications",
     "reports",
     "suspensions",
+    "newsletter",
+    "testimonials",
+    "support",
 ]
 
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    # WhiteNoise serves /static/* directly from STATIC_ROOT in production so
+    # Django admin's CSS/JS/icons load without a separate web server.
+    # Must come immediately after SecurityMiddleware per WhiteNoise docs.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -113,16 +141,32 @@ TEMPLATES = [
 WSGI_APPLICATION = "realestate_backend.wsgi.application"
 ASGI_APPLICATION = "realestate_backend.asgi.application"
 
-DB_ENGINE = os.environ.get("DB_ENGINE", "sqlite").lower()
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-if DB_ENGINE == "postgres":
+if DATABASE_URL:
+    # Hosted environments (Render, Vercel, etc.) typically inject a single
+    # DATABASE_URL. Parse it into the per-field config Django expects.
+    tmpPostgres = urlparse(DATABASE_URL)
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.environ.get("POSTGRES_DB", "realestate"),
-            "USER": os.environ.get("POSTGRES_USER", "postgres"),
-            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
-            "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+            "NAME": tmpPostgres.path.lstrip("/"),
+            "USER": tmpPostgres.username,
+            "PASSWORD": tmpPostgres.password,
+            "HOST": tmpPostgres.hostname,
+            "PORT": tmpPostgres.port or 5432,
+            "OPTIONS": dict(parse_qsl(tmpPostgres.query)),
+        }
+    }
+elif os.environ.get("DB_ENGINE", "sqlite").lower() == "postgres":
+    # Local dev with discrete POSTGRES_* env vars.
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ["POSTGRES_DB"],
+            "USER": os.environ["POSTGRES_USER"],
+            "PASSWORD": os.environ["POSTGRES_PASSWORD"],
+            "HOST": os.environ["POSTGRES_HOST"],
             "PORT": os.environ.get("POSTGRES_PORT", "5432"),
             "CONN_MAX_AGE": int(os.environ.get("POSTGRES_CONN_MAX_AGE", "60")),
             "OPTIONS": {
@@ -132,6 +176,7 @@ if DB_ENGINE == "postgres":
         }
     }
 else:
+    # Fresh checkout with no DB config — fall back to SQLite for local dev.
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -154,9 +199,30 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "static"
 
-USE_DB_CACHE = os.environ.get("DJANGO_USE_DB_CACHE", "false").lower() == "true"
+REDIS_URL = os.environ.get('REDIS_URL')
 
-if USE_DB_CACHE:
+# Managed Redis providers (Render Key Value, Upstash, AWS ElastiCache, etc.)
+# typically hand out rediss:// URLs without ssl_cert_reqs. redis-py's URL
+# parser refuses to load such URLs and raises ValueError. Append the
+# parameter ourselves so cache, Celery, and channels_redis all stay happy.
+if REDIS_URL and REDIS_URL.startswith('rediss://') and 'ssl_cert_reqs' not in REDIS_URL:
+    # redis-py accepts the lowercase short forms "none", "optional", "required"
+    # (NOT the Python ssl.CERT_* constant names, despite a confusingly worded
+    # error message in older versions). "none" is the standard pragmatic
+    # choice for managed Redis providers whose certs don't always chain to a
+    # publicly trusted CA.
+    REDIS_URL += ('&' if '?' in REDIS_URL else '?') + 'ssl_cert_reqs=none'
+
+USE_DB_CACHE = env_bool("DJANGO_USE_DB_CACHE", False)
+
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+        }
+    }
+elif USE_DB_CACHE:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
@@ -168,22 +234,6 @@ else:
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
             'LOCATION': 'realestate-booking-platform',
-        }
-    }
-REDIS_URL = os.environ.get('REDIS_URL')
-
-if REDIS_URL:
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': REDIS_URL,
-        }
-    }
-else:
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-            'LOCATION': 'rate_limit_cache',
         }
     }
 
@@ -216,18 +266,30 @@ REST_FRAMEWORK = {
     },
 }
 
-if DEBUG:
-    CORS_ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-    ]
-    if os.environ.get("FRONTEND_ORIGIN"):
-        CORS_ALLOWED_ORIGINS.append(os.environ["FRONTEND_ORIGIN"])
-else:
-    CORS_ALLOWED_ORIGINS = env_origins("CORS_ALLOWED_ORIGINS", os.environ.get("FRONTEND_ORIGIN", ""))
-CORS_ALLOWED_ORIGIN_REGEXES = env_list("CORS_ALLOWED_ORIGIN_REGEXES", "")
+# Base allowed origins — always present regardless of DEBUG
+# Exact origins only — no wildcard regex; credentials must never be sent to unknown subdomains.
+_dev_origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+] if DEBUG else []
+
+CORS_ALLOWED_ORIGINS = [
+    *_dev_origins,
+    "https://homekonet.vercel.app",
+    "https://realestate-booking-platform.vercel.app",
+]
+
+# Additional origins supplied via environment (comma-separated, must be exact https:// URLs)
+for _origin in env_origins("CORS_ALLOWED_ORIGINS", ""):
+    if _origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(_origin)
+_fe_origin = os.environ.get("FRONTEND_ORIGIN", "")
+if _fe_origin and _fe_origin not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(_fe_origin)
+
+CORS_ALLOWED_ORIGIN_REGEXES: list[str] = []  # no regex patterns — exact origins only
 CORS_ALLOW_CREDENTIALS = True
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 
@@ -238,33 +300,28 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
-EMAIL_BACKEND_MODE = os.environ.get("EMAIL_BACKEND_MODE", "console").lower()
-if EMAIL_BACKEND_MODE == "smtp":
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-else:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
 EMAIL_BACKEND = os.environ.get(
     "EMAIL_BACKEND",
-    "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend",
+    "django.core.mail.backends.console.EmailBackend"
+    if DEBUG
+    else "anymail.backends.sendinblue.EmailBackend",
 )
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
-EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
-EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+ANYMAIL = {
+    "SENDINBLUE_API_KEY": os.environ.get("BREVO_API_KEY", ""),
+}
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "homekonnet@gmail.com")
 EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "15"))
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL") or EMAIL_HOST_USER or "no-reply@localhost"
 SITE_ID = 1
 
 AUTH_REQUIRE_EMAIL_VERIFICATION = env_bool("AUTH_REQUIRE_EMAIL_VERIFICATION", True)
 
 LOCAL_DOMAIN = os.environ.get("LOCAL_DOMAIN", "localhost:8000")
 SITE_NAME = os.environ.get("SITE_NAME", "Real Estate Booking Platform")
+
+# Web Push (VAPID) — generate keys once with: python manage.py generate_vapid_keys
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", DEFAULT_FROM_EMAIL or "admin@homekonet.com")
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
@@ -274,9 +331,33 @@ AUTH_USER_MODEL = "users.User"
 
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-os.makedirs(MEDIA_ROOT, exist_ok=True)
+CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '')
+
+if CLOUDINARY_URL:
+    import cloudinary
+    cloudinary.config(cloudinary_url=CLOUDINARY_URL)
+    STORAGES = {
+        "default": {
+            "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+    MEDIA_URL = '/media/'
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+    os.makedirs(MEDIA_ROOT, exist_ok=True)
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 PAYMENT_GATEWAYS = {
@@ -309,6 +390,10 @@ else:
     }
 
 MESSAGE_ATTACHMENT_MAX_SIZE = 10 * 1024 * 1024
+
+# Max file upload size: 10 MB per file
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
 CELERY_BROKER_URL = REDIS_URL or 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = REDIS_URL or 'redis://localhost:6379/0'

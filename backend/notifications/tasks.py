@@ -43,12 +43,19 @@ def send_notification_email(self, notification_id: int):
         logger.info('send_notification_email: user %s has no email address, skipping', user.pk)
         return
 
+    # Links in notification emails must point at the *frontend* (the app the
+    # user actually uses), not at the API. FRONTEND_ORIGIN is the canonical
+    # source for that; LOCAL_DOMAIN is kept as a last-ditch fallback so local
+    # dev without FRONTEND_ORIGIN still renders something useful.
+    site_url = getattr(settings, 'FRONTEND_ORIGIN', '') \
+        or getattr(settings, 'LOCAL_DOMAIN', 'http://localhost:5173')
+
     context = {
         'user':         user,
         'notification': notification,
         'data':         notification.data,
         'site_name':    getattr(settings, 'SITE_NAME', 'Real Estate Platform'),
-        'site_url':     getattr(settings, 'LOCAL_DOMAIN', 'localhost:8000'),
+        'site_url':     site_url,
     }
 
     # Try the specific template first, fall back to the generic one
@@ -85,4 +92,32 @@ def send_notification_email(self, notification_id: int):
 
     except Exception as exc:
         logger.error('Failed to send notification email id=%s: %s', notification_id, exc)
+        raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_push_notification_task(self, notification_id: int):
+    """Send a Web Push notification for the given Notification pk."""
+    from .models import Notification
+    from .push_service import send_push_to_user
+
+    try:
+        notification = Notification.objects.select_related('user').get(pk=notification_id)
+    except Notification.DoesNotExist:
+        logger.warning('send_push_notification_task: Notification %s not found', notification_id)
+        return
+
+    try:
+        send_push_to_user(
+            user=notification.user,
+            title=notification.title,
+            body=notification.message,
+            data={
+                'notification_id': str(notification.id),
+                'notification_type': notification.notification_type,
+            },
+            url='/',
+        )
+    except Exception as exc:
+        logger.error('Failed to send push notification id=%s: %s', notification_id, exc)
         raise self.retry(exc=exc)

@@ -13,12 +13,40 @@ export const messagesAPI = {
     return data.map(normalizeMessage);
   },
 
-  sendMessage: async (conversationId: string, content: string): Promise<Message> => {
+  sendMessage: async (conversationId: string, content: string, replyToId?: string): Promise<Message> => {
+    const body: Record<string, string> = { content };
+    if (replyToId) body.reply_to_id = replyToId;
     const data = await fetchWithAuth(`/api/messaging/conversations/${conversationId}/messages/send/`, {
       method: 'POST',
+      body: JSON.stringify(body),
+    });
+    return normalizeMessage(data);
+  },
+
+  sendMessageWithFiles: async (conversationId: string, content: string, files: File[], replyToId?: string): Promise<Message> => {
+    const form = new FormData();
+    if (content.trim()) form.append('content', content.trim());
+    if (replyToId) form.append('reply_to_id', replyToId);
+    files.forEach(f => form.append('files', f));
+    const data = await fetchWithAuth(`/api/messaging/conversations/${conversationId}/messages/send/`, {
+      method: 'POST',
+      body: form,
+    });
+    return normalizeMessage(data);
+  },
+
+  editMessage: async (messageId: string, content: string): Promise<Message> => {
+    const data = await fetchWithAuth(`/api/messaging/messages/${messageId}/edit/`, {
+      method: 'PATCH',
       body: JSON.stringify({ content }),
     });
     return normalizeMessage(data);
+  },
+
+  deleteConversation: async (conversationId: string): Promise<void> => {
+    await fetchWithAuth(`/api/messaging/conversations/${conversationId}/`, {
+      method: 'DELETE',
+    });
   },
 
   startConversation: async (recipientId: string, initialMessage: string, listingId?: string): Promise<Conversation> => {
@@ -31,5 +59,9 @@ export const messagesAPI = {
 
   getUnreadCount: async (): Promise<{ unread_count: number }> => {
     return fetchWithAuth('/api/messaging/unread-count/');
+  },
+
+  getPresence: async (userId: string): Promise<{ online: boolean; last_seen: string | null }> => {
+    return fetchWithAuth(`/api/messaging/users/${userId}/presence/`);
   },
 };

@@ -9,10 +9,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Payment, PaymentGateway, WebhookLog
+from .models import Payment, PaymentGateway, WebhookLog, SavedCard
 from .serializers import (
     PaymentInitiateSerializer, PaymentVerifySerializer, RefundSerializer,
-    PaymentSerializer, RefundDetailSerializer,
+    PaymentSerializer, RefundDetailSerializer, SavedCardSerializer,
 )
 from .services import PaymentService
 
@@ -240,14 +240,19 @@ def mtn_momo_webhook(request):
         processed=False,
     )
 
-    # Validate HMAC signature when webhook_secret is configured
-    if gateway_config.webhook_secret:
-        signature = request.headers.get('X-Signature', '')
-        gateway = PaymentService.get_gateway('mtn_momo')
-        if not gateway or not gateway.validate_webhook(payload, signature):
-            webhook_log.error_message = 'Invalid webhook signature'
+    # Signature validation is mandatory — reject the request if the secret is not configured.
+    if not gateway_config.webhook_secret:
+        if webhook_log:
+            webhook_log.error_message = 'webhook_secret not configured; refusing to process unsigned webhook'
             webhook_log.save(update_fields=['error_message'])
-            return JsonResponse({'error': 'Invalid signature'}, status=401)
+        return JsonResponse({'error': 'Webhook secret not configured'}, status=500)
+
+    signature = request.headers.get('X-Signature', '')
+    gateway = PaymentService.get_gateway('mtn_momo')
+    if not gateway or not gateway.validate_webhook(payload, signature):
+        webhook_log.error_message = 'Invalid webhook signature'
+        webhook_log.save(update_fields=['error_message'])
+        return JsonResponse({'error': 'Invalid signature'}, status=401)
 
     # Look up the payment by our UUID embedded as externalId
     external_id = payload.get('externalId')
@@ -267,3 +272,80 @@ def mtn_momo_webhook(request):
     webhook_log.save(update_fields=['processed'])
 
     return JsonResponse({'status': 'ok'})
+
+
+# ── Stripe PaymentIntent ───────────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_stripe_payment_intent(request):
+    """
+    Creates a Stripe PaymentIntent for the given amount and returns the client_secret.
+    The frontend uses this to confirm payment without raw card data touching our server.
+    """
+    import stripe
+    from django.conf import settings as django_settings
+
+    stripe_secret = getattr(django_settings, 'STRIPE_SECRET_KEY', '') or ''
+    if not stripe_secret:
+        return Response({'error': 'Stripe is not configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    amount_cents = request.data.get('amount_cents')
+    currency = request.data.get('currency', 'usd').lower()
+
+    if not amount_cents or not isinstance(amount_cents, int) or amount_cents <= 0:
+        return Response({'error': 'amount_cents must be a positive integer'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        stripe.api_key = stripe_secret
+        intent = stripe.PaymentIntent.create(
+            amount=amount_cents,
+            currency=currency,
+            metadata={'user_id': str(request.user.id)},
+        )
+        return Response({'client_secret': intent.client_secret})
+    except stripe.error.StripeError as e:
+        return Response({'error': str(e.user_message or e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception:
+        return Response({'error': 'Could not create payment intent'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ── Saved Cards ───────────────────────────────────────────────────────────────
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def saved_cards(request):
+    if request.method == 'GET':
+        cards = SavedCard.objects.filter(user=request.user)
+        return Response(SavedCardSerializer(cards, many=True).data)
+
+    serializer = SavedCardSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # If this is the user's first card, make it default automatically
+    is_first = not SavedCard.objects.filter(user=request.user).exists()
+    card = serializer.save(user=request.user, is_default=serializer.validated_data.get('is_default', False) or is_first)
+    return Response(SavedCardSerializer(card).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def saved_card_detail(request, card_id):
+    card = get_object_or_404(SavedCard, pk=card_id, user=request.user)
+
+    if request.method == 'DELETE':
+        card.delete()
+        # If no cards remain or if we just deleted the default, promote the newest remaining card
+        remaining = SavedCard.objects.filter(user=request.user)
+        if remaining.exists() and not remaining.filter(is_default=True).exists():
+            newest = remaining.first()
+            newest.is_default = True
+            newest.save(update_fields=['is_default'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    serializer = SavedCardSerializer(card, data=request.data, partial=(request.method == 'PATCH'))
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    card = serializer.save()
+    return Response(SavedCardSerializer(card).data)

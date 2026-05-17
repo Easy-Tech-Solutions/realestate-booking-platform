@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { X, Mail, Lock, User as UserIcon } from 'lucide-react';
+import { X, Mail, Lock, User as UserIcon, Eye, EyeOff } from 'lucide-react';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,13 +8,6 @@ import { Label } from './ui/label';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { authAPI } from '../../services/api.service';
-import googleLogo  from '../../assets/google.png';
-import appleLogo  from '../../assets/apple.png';
-import { API_BASE_URL } from '../../core/constants';
-
-
-
-/* Props passed in from the parent header/menu that opens this dialog */
 
 interface AuthDialogProps {
   open: boolean;
@@ -22,62 +16,100 @@ interface AuthDialogProps {
   onModeChange: (mode: 'login' | 'register') => void;
 }
 
-/* Local dialog modes, including forgot-password */
+type AuthView = 'login' | 'register' | 'forgot-password' | 'choose-role';
 
-type AuthView = 'login' | 'register' | 'forgot-password';
+interface PendingGoogleSignup {
+  idToken: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface FormErrors {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  password?: string;
+  password2?: string;
+}
+
+function validatePassword(password: string): string | undefined {
+  if (!password) return 'Password is required';
+  if (password.length < 8) return 'At least 8 characters';
+  if (!/[A-Z]/.test(password)) return 'Must contain an uppercase letter';
+  if (!/[a-z]/.test(password)) return 'Must contain a lowercase letter';
+  if (!/[0-9]/.test(password)) return 'Must contain a number';
+  return undefined;
+}
 
 export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProps) {
-  const { login, register } = useApp();
+  const { login, register, loginWithGoogle } = useApp();
 
-    /* Local UI state for which auth screen is showing */
   const [view, setView] = useState<AuthView>(mode);
-
-   /* Loading state for async submit actions */
   const [isLoading, setIsLoading] = useState(false);
-
-  /* Shared form state used by login, register, and forgot-password */
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
     password: '',
     password2: '',
     first_name: '',
     last_name: '',
   });
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [pendingGoogleSignup, setPendingGoogleSignup] = useState<PendingGoogleSignup | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword2, setShowPassword2] = useState(false);
 
-  /* Keep the local dialog view in sync with the parent mode */
   useEffect(() => {
-    setView(mode);
+    if (view !== 'choose-role') {
+      setView(mode);
+    }
   }, [mode, open]);
 
- { /* Clear all form inputs */}
   const resetForm = () => {
-    setFormData({
-      username: '',
-      email: '',
-      password: '',
-      password2: '',
-      first_name: '',
-      last_name: '',
-    });
+    setFormData({ email: '', password: '', password2: '', first_name: '', last_name: '' });
+    setErrors({});
   };
 
-  
-  {/* Close dialog and restore its default state */}
   const handleClose = () => {
     setView(mode);
+    setPendingGoogleSignup(null);
     resetForm();
     onClose();
   };
 
-  {/* Handle submit for login, register, and forgot-password */}
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
+
+    if (view === 'register') {
+      if (!formData.first_name.trim()) newErrors.first_name = 'First name is required';
+      if (!formData.last_name.trim()) newErrors.last_name = 'Last name is required';
+    }
+
+    if (view === 'login' || view === 'register' || view === 'forgot-password') {
+      if (!formData.email.trim()) newErrors.email = 'Email is required';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Enter a valid email address';
+    }
+
+    if (view === 'login' || view === 'register') {
+      const pwErr = validatePassword(formData.password);
+      if (pwErr) newErrors.password = pwErr;
+    }
+
+    if (view === 'register') {
+      if (!formData.password2) newErrors.password2 = 'Please confirm your password';
+      else if (formData.password !== formData.password2) newErrors.password2 = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) return;
+
     setIsLoading(true);
-
     try {
-
-      {/* Forgot-password flow: request reset email */}
       if (view === 'forgot-password') {
         const result = await authAPI.passwordResetRequest(formData.email);
         toast.success(result.message);
@@ -86,21 +118,12 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
         return;
       }
 
-      { /* Login flow */}
       if (view === 'login') {
-        await login(formData.username, formData.password);
+        await login(formData.email, formData.password);
         toast.success('Welcome back!');
         handleClose();
       } else {
-         { /* Register flow: validate passwords match before calling register API */}
-        if (formData.password !== formData.password2) {
-          toast.error('Passwords do not match');
-          return;
-        }
-
-          { /* Register flow request */}
         const result = await register({
-          username: formData.username,
           email: formData.email,
           password: formData.password,
           password2: formData.password2,
@@ -111,10 +134,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
         onModeChange('login');
         handleClose();
       }
-
-    } 
-    
-    catch (error: any) {
+    } catch (error: any) {
       toast.error(
         error.message ||
           (view === 'forgot-password'
@@ -128,245 +148,202 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     }
   };
 
-const handleGoogleSignIn = () => {
-  window.location.href = `${API_BASE_URL}/api/auth/google/`;
-};
+  const handleGoogleCredential = async (credentialResponse: CredentialResponse) => {
+    const idToken = credentialResponse.credential;
+    if (!idToken) { toast.error('Google sign-in was cancelled.'); return; }
 
+    setIsLoading(true);
+    try {
+      const result = await loginWithGoogle(idToken);
+      if (result.status === 'success') {
+        toast.success('Welcome!');
+        handleClose();
+        return;
+      }
+      setPendingGoogleSignup({
+        idToken: result.idToken,
+        email: result.email,
+        firstName: result.firstName,
+        lastName: result.lastName,
+      });
+      setView('choose-role');
+    } catch (error: any) {
+      toast.error(error.message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    toast.error('Google sign-in failed. Please try again.');
+  };
+
+  const handleRoleChoice = async (role: 'user' | 'agent') => {
+    if (!pendingGoogleSignup) return;
+    setIsLoading(true);
+    try {
+      const result = await loginWithGoogle(pendingGoogleSignup.idToken, role);
+      if (result.status === 'success') {
+        toast.success('Welcome to the platform!');
+        handleClose();
+      } else {
+        toast.error('Could not complete sign-up. Please try again.');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Could not complete sign-up.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const cancelRoleChoice = () => {
+    setPendingGoogleSignup(null);
+    setView(mode);
+  };
+
+  const field = (id: keyof typeof formData) => ({
+    value: formData[id],
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData(prev => ({ ...prev, [id]: e.target.value }));
+      if (errors[id as keyof FormErrors]) setErrors(prev => ({ ...prev, [id]: undefined }));
+    },
+  });
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[480px] p-0 gap-0">
+      <DialogContent className="w-full max-w-[95vw] sm:max-w-[480px] p-0 gap-0 max-h-[90vh] overflow-y-auto">
         <div className="relative border-b border-border p-6">
-          <button onClick={handleClose} className="absolute left-6 top-6 p-1 rounded-full hover:bg-muted">
+          <button type="button" title="Close dialog" onClick={handleClose} className="absolute left-6 top-6 p-1 rounded-full hover:bg-muted">
             <X className="w-4 h-4" />
           </button>
           <h2 className="text-center font-semibold">
-            {view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Forgot password'}
+            {view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : view === 'forgot-password' ? 'Forgot password' : 'Choose your role'}
           </h2>
         </div>
 
         <div className="p-6 space-y-4">
-
-          {/* Heading and helper text for the current auth view */}
-
           <div>
             <h3 className="text-lg font-semibold mb-2">
-              {view === 'login'
-                ? 'Welcome back'
-                : view === 'register'
-                  ? 'Create your account'
-                  : 'Reset your password'}
+              {view === 'login' ? 'Welcome back' : view === 'register' ? 'Create your account' : view === 'forgot-password' ? 'Reset your password' : `Welcome${pendingGoogleSignup?.firstName ? `, ${pendingGoogleSignup.firstName}` : ''}!`}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {view === 'login'
-                ? 'Log in to continue your journey'
-                : view === 'register'
-                  ? 'Create an account to get started'
-                  : 'Enter your email and we will send you a password reset link'}
+              {view === 'login' ? 'Log in to continue your journey' : view === 'register' ? 'Create an account to get started' : view === 'forgot-password' ? 'Enter your email and we will send you a password reset link' : 'How do you plan to use the platform? You can change this later in settings.'}
             </p>
           </div>
 
-
-
-        {/* Social sign-in section: shown for login/register, hidden for forgot-password */}
-          {view !== 'forgot-password' && (
+          {view === 'choose-role' && (
             <div className="space-y-3">
-              {/* Divider label */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-                </div>
-              </div>
-
-              {/* Placeholder provider buttons for Google and Apple */}
-              <div className="space-y-3">
-
-                <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn}>
-  <img src={googleLogo} alt="Google" className="w-4 h-4 mr-2" />
-  Continue with Google
-</Button>
-
-<Button type="button" variant="outline" className="w-full">
-  <img src={appleLogo} alt="Apple" className="w-6 h-6 mr-2" />
-  Continue with Apple
-</Button>
-
-
+              <button type="button" onClick={() => handleRoleChoice('user')} disabled={isLoading} className="w-full text-left border rounded-lg p-4 hover:bg-muted transition disabled:opacity-50">
+                <div className="font-semibold">I'm here to book</div>
+                <div className="text-xs text-muted-foreground mt-1">Find and book properties listed by agents.</div>
+              </button>
+              <button type="button" onClick={() => handleRoleChoice('agent')} disabled={isLoading} className="w-full text-left border rounded-lg p-4 hover:bg-muted transition disabled:opacity-50">
+                <div className="font-semibold">I'm an agent</div>
+                <div className="text-xs text-muted-foreground mt-1">List and manage properties for booking.</div>
+              </button>
+              <div className="text-center">
+                <button type="button" onClick={cancelRoleChoice} disabled={isLoading} className="text-sm text-muted-foreground hover:underline">Cancel</button>
               </div>
             </div>
           )}
 
-   {/* Main auth form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {view !== 'forgot-password' && view !== 'choose-role' && (
+            <div className="space-y-3">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <GoogleLogin onSuccess={handleGoogleCredential} onError={handleGoogleError} theme="outline" size="large" text="continue_with" shape="rectangular" width="320" />
+              </div>
+            </div>
+          )}
 
-            {/* Register and forgot-password both need email */}
-            {(view === 'register' || view === 'forgot-password') && (
-              <>
-
-                {/* Extra profile fields shown only on registration */}
-                {view === 'register' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="first_name">First name</Label>
-                      <Input
-                        id="first_name"
-                        type="text"
-                        placeholder="John"
-                        value={formData.first_name}
-                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                      />
-    
-
+          {view !== 'choose-role' && (
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              {view === 'register' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="first_name">First name</Label>
+                    <div className="relative">
+                      <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input id="first_name" type="text" placeholder="John" className="pl-10" {...field('first_name')} />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="last_name">Last name</Label>
-                      <Input
-                        id="last_name"
-                        type="text"
-                        placeholder="Doe"
-                        value={formData.last_name}
-                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                      />
-                    </div>
+                    {errors.first_name && <p className="text-xs text-destructive">{errors.first_name}</p>}
                   </div>
-                )}
-{/* Email field */}
+                  <div className="space-y-2">
+                    <Label htmlFor="last_name">Last name</Label>
+                    <div className="relative">
+                      <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input id="last_name" type="text" placeholder="Doe" className="pl-10" {...field('last_name')} />
+                    </div>
+                    {errors.last_name && <p className="text-xs text-destructive">{errors.last_name}</p>}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input id="email" type="email" placeholder="you@example.com" className="pl-10" {...field('email')} />
+                </div>
+                {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+              </div>
+
+              {view !== 'forgot-password' && (
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="password">Password</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="you@example.com"
-                      className="pl-10"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      required
-                    />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" className="pl-10 pr-10" {...field('password')} />
+                    <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" tabIndex={-1} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
+                  {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
                 </div>
-              </>
-            )}
+              )}
 
-{/* Username field for login/register only */}
-
-            {view !== 'forgot-password' && (
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="johndoe"
-                    className="pl-10"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    required
-                  />
+              {view === 'login' && (
+                <div className="flex justify-end">
+                  <button type="button" onClick={() => setView('forgot-password')} className="text-sm text-primary font-semibold hover:underline">Forgot password?</button>
                 </div>
-              </div>
-            )}
+              )}
 
- {/* Confirm password shown only in register mode */}
-            {view !== 'forgot-password' && (
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    className="pl-10"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    required
-                  />
+              {view === 'register' && (
+                <div className="space-y-2">
+                  <Label htmlFor="password2">Confirm password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="password2" type={showPassword2 ? 'text' : 'password'} placeholder="••••••••" className="pl-10 pr-10" {...field('password2')} />
+                    <button type="button" onClick={() => setShowPassword2(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" tabIndex={-1} aria-label={showPassword2 ? 'Hide password' : 'Show password'}>
+                      {showPassword2 ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {errors.password2 && <p className="text-xs text-destructive">{errors.password2}</p>}
                 </div>
-              </div>
-            )}
+              )}
 
- {/* Forgot-password shortcut shown only in login mode */}
-            {view === 'login' && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setView('forgot-password')}
-                  className="text-sm text-primary font-semibold hover:underline"
-                >
-                  Forgot password?
-                </button>
-              </div>
-            )}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Please wait...' : view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Send reset link'}
+              </Button>
+            </form>
+          )}
 
-            {view === 'register' && (
-              <div className="space-y-2">
-                <Label htmlFor="password2">Confirm password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="password2"
-                    type="password"
-                    placeholder="••••••••"
-                    className="pl-10"
-                    value={formData.password2}
-                    onChange={(e) => setFormData({ ...formData, password2: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-            )}
-
-{/* Submit button changes label based on current auth view */}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Please wait...' : view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Send reset link'}
-            </Button>
-          </form>
-
-{/* Bottom links for switching between login/register/forgot-password */}
-          <div className="text-center text-sm">
-            {view === 'login' ? (
-              <span>
-                Don't have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onModeChange('register');
-                    setView('register');
-                  }}
-                  className="text-primary font-semibold hover:underline"
-                >
-                  Sign up
-                </button>
-              </span>
-            ) : view === 'register' ? (
-              <span>
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onModeChange('login');
-                    setView('login');
-                  }}
-                  className="text-primary font-semibold hover:underline"
-                >
-                  Log in
-                </button>
-              </span>
-            ) : (
-              <span>
-                Remembered your password?{' '}
-                <button type="button" onClick={() => setView('login')} className="text-primary font-semibold hover:underline">
-                  Back to log in
-                </button>
-              </span>
-            )}
-          </div>
+          {view !== 'choose-role' && (
+            <div className="text-center text-sm">
+              {view === 'login' ? (
+                <span>Don't have an account?{' '}<button type="button" onClick={() => { onModeChange('register'); setView('register'); }} className="text-primary font-semibold hover:underline">Sign up</button></span>
+              ) : view === 'register' ? (
+                <span>Already have an account?{' '}<button type="button" onClick={() => { onModeChange('login'); setView('login'); }} className="text-primary font-semibold hover:underline">Log in</button></span>
+              ) : (
+                <span>Remembered your password?{' '}<button type="button" onClick={() => setView('login')} className="text-primary font-semibold hover:underline">Back to log in</button></span>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

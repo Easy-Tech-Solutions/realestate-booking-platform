@@ -1,6 +1,6 @@
 from rest_framework import serializers
 import json
-from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyCategory
+from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyCategory, HotelRoom, HotelRoomImage
 
 
 class PropertyCategorySerializer(serializers.ModelSerializer):
@@ -22,17 +22,59 @@ class ListingImageSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def get_image_url(self, obj):
-        request = self.context.get('request')
-        if obj.image and request:
-            return request.build_absolute_uri(obj.image.url)
-        return obj.image.url if obj.image else None
+        if not obj.image:
+            return None
+        try:
+            return obj.image.url
+        except Exception:
+            return None
+
+
+class ListingImageCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ListingImage
+        fields = ['image', 'caption', 'order']
+
+
+class HotelRoomImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HotelRoomImage
+        fields = ['id', 'image', 'image_url', 'caption', 'order']
+        read_only_fields = ['id']
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        try:
+            return obj.image.url
+        except Exception:
+            return None
+
+
+class HotelRoomSerializer(serializers.ModelSerializer):
+    images = HotelRoomImageSerializer(many=True, read_only=True)
+    class Meta:
+        model = HotelRoom
+        fields = [
+            'id', 'listing', 'name', 'room_type', 'description',
+            'price_per_night', 'max_occupancy', 'beds', 'bed_type',
+            'bathrooms', 'amenities', 'total_count', 'is_active', 'created_at',
+            'images',
+        ]
+        read_only_fields = ['id', 'created_at', 'images']
 
 
 class ListingSerializer(serializers.ModelSerializer):
     gallery_images = ListingImageSerializer(many=True, read_only=True)
+    hotel_rooms = serializers.SerializerMethodField()
     main_image_url = serializers.SerializerMethodField()
     owner_username = serializers.CharField(source='owner.username', read_only=True)
     owner_id = serializers.IntegerField(source='owner.id', read_only=True)
+    owner_first_name = serializers.CharField(source='owner.first_name', read_only=True)
+    owner_last_name = serializers.CharField(source='owner.last_name', read_only=True)
+    owner_avatar = serializers.SerializerMethodField()
     owner_is_superhost = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
@@ -41,7 +83,9 @@ class ListingSerializer(serializers.ModelSerializer):
         model = Listing
         fields = [
             "id", "title", "description", "price", "property_type", "privacy_type",
-            "address", "square_footage", "bedrooms", "beds", "bathrooms", "max_guests",
+            "address", "city", "state", "country", "latitude", "longitude",
+            "check_in_time", "check_out_time", "self_checkin",
+            "square_footage", "bedrooms", "beds", "bathrooms", "max_guests",
             "amenities", "highlights", "booking_mode", "cancellation_policy",
             "weekend_premium_percent",
             "new_listing_promo",
@@ -49,18 +93,43 @@ class ListingSerializer(serializers.ModelSerializer):
             "weekly_discount_enabled", "weekly_discount_percent",
             "monthly_discount_enabled", "monthly_discount_percent",
             "exterior_camera", "noise_monitor", "weapons_on_property",
-            "is_available", "created_at", "updated_at",
-            "gallery_images", "main_image", "main_image_url",
-            "owner_username", "owner_id", "owner_is_superhost",
+            "is_available", "status", "created_at", "updated_at",
+            "gallery_images", "hotel_rooms", "main_image", "main_image_url",
+            "owner_username", "owner_id", "owner_first_name", "owner_last_name",
+            "owner_avatar", "owner_is_superhost",
             "average_rating", "review_count",
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'owner_username', 'owner_id']
+        extra_kwargs = {
+            'title': {'required': False, 'allow_blank': True},
+            'address': {'required': False, 'allow_blank': True},
+            'city': {'required': False, 'allow_blank': True},
+        }
+
+    def validate(self, attrs):
+        # For new listings being published, enforce required fields
+        if self.instance is None and attrs.get('status', 'published') != 'draft':
+            if not str(attrs.get('title', '')).strip():
+                raise serializers.ValidationError({'title': 'Title is required'})
+            if not str(attrs.get('address', '')).strip():
+                raise serializers.ValidationError({'address': 'Address is required'})
+        return attrs
 
     def get_main_image_url(self, obj):
-        request = self.context.get('request')
-        if obj.main_image and request:
-            return request.build_absolute_uri(obj.main_image.url)
-        return obj.main_image.url if obj.main_image else None
+        if not obj.main_image:
+            return None
+        try:
+            return obj.main_image.url
+        except Exception:
+            return None
+
+    def get_owner_avatar(self, obj):
+        try:
+            if obj.owner.profile.image:
+                return obj.owner.profile.image.url
+        except Exception:
+            pass
+        return None
 
     def get_owner_is_superhost(self, obj):
         try:
@@ -75,6 +144,10 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def get_review_count(self, obj):
         return obj.reviews.count()
+
+    def get_hotel_rooms(self, obj):
+        active_rooms = obj.hotel_rooms.filter(is_active=True)
+        return HotelRoomSerializer(active_rooms, many=True).data
 
     def _normalize_list_field(self, value, field_name):
         if value is None or value == '':
@@ -100,8 +173,7 @@ class ListingSerializer(serializers.ModelSerializer):
     def validate_property_type(self, value):
         category_slug = (value or '').strip().lower()
         if not category_slug:
-            # Default to 'homes' if the field is empty or None
-            return 'homes'
+            return 'apartment'
 
         if not PropertyCategory.objects.filter(slug=category_slug, is_active=True).exists():
             active_slugs = list(PropertyCategory.objects.filter(is_active=True).values_list('slug', flat=True))
@@ -109,12 +181,6 @@ class ListingSerializer(serializers.ModelSerializer):
                 f"Invalid property_type '{value}'. Valid options are: {', '.join(active_slugs)}"
             )
         return category_slug
-
-
-class ListingImageCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ListingImage
-        fields = ['image', 'caption', 'order']
 
 
 class FavoriteSerializer(serializers.ModelSerializer):
@@ -136,21 +202,24 @@ class ReviewImageSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
     def get_image_url(self, obj):
-        request = self.context.get('request')
-        if obj.image and request:
-            return request.build_absolute_uri(obj.image.url)
-        return obj.image.url if obj.image else None
+        if not obj.image:
+            return None
+        try:
+            return obj.image.url
+        except Exception:
+            return None
 
 
 class ReviewSerializer(serializers.ModelSerializer):
     reviewer_username = serializers.CharField(source='reviewer.username', read_only=True)
     reviewer_avatar = serializers.SerializerMethodField()
+    listing_title = serializers.CharField(source='listing.title', read_only=True)
     images = ReviewImageSerializer(many=True, read_only=True)
 
     class Meta:
         model = Review
         fields = [
-            'id', 'listing', 'reviewer', 'reviewer_username', 'reviewer_avatar',
+            'id', 'listing', 'listing_title', 'reviewer', 'reviewer_username', 'reviewer_avatar',
             'rating', 'cleanliness', 'accuracy', 'check_in_rating',
             'communication', 'location_rating', 'value',
             'title', 'content', 'host_response', 'host_response_at',
@@ -160,16 +229,18 @@ class ReviewSerializer(serializers.ModelSerializer):
                             'host_response', 'host_response_at']
 
     def get_reviewer_avatar(self, obj):
-        request = self.context.get('request')
-        if hasattr(obj.reviewer, 'profile') and obj.reviewer.profile.image:
-            if request:
-                return request.build_absolute_uri(obj.reviewer.profile.image.url)
-            return obj.reviewer.profile.image.url
+        try:
+            if hasattr(obj.reviewer, 'profile') and obj.reviewer.profile.image:
+                return obj.reviewer.profile.image.url
+        except Exception:
+            pass
         return None
 
 
 class ReviewCreateSerializer(serializers.ModelSerializer):
     images = serializers.ListField(child=serializers.ImageField(), write_only=True, required=False)
+    content = serializers.CharField(required=False, allow_blank=True, default='')
+    title = serializers.CharField(required=False, allow_blank=True, default='')
 
     class Meta:
         model = Review

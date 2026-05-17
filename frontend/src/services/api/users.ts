@@ -5,15 +5,49 @@ export const usersAPI = {
     return fetchWithAuth(`/api/users/${id}/`);
   },
 
-  updateMyProfile: async (payload: Record<string, any>): Promise<any> => {
+  listAll: async (): Promise<any[]> => {
+    return fetchWithAuth('/api/users/');
+  },
+
+  adminStats: async (): Promise<any> => {
+    return fetchWithAuth('/api/users/admin/stats/');
+  },
+
+  suspendUser: async (userId: string, payload: { suspension_type: string; reason: string; ends_at?: string | null }): Promise<any> => {
+    return fetchWithAuth('/api/suspensions/', {
+      method: 'POST',
+      body: JSON.stringify({ user: Number(userId), ...payload }),
+    });
+  },
+
+  deleteListing: async (listingId: string): Promise<void> => {
+    await fetchWithAuth(`/api/listings/${listingId}/`, { method: 'DELETE' });
+  },
+
+  updateMyProfile: async (payload: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    bio?: string;
+    image?: File;
+  }): Promise<any> => {
+    if (payload.image) {
+      const form = new FormData();
+      if (payload.first_name !== undefined) form.append('first_name', payload.first_name);
+      if (payload.last_name !== undefined) form.append('last_name', payload.last_name);
+      if (payload.email !== undefined) form.append('email', payload.email);
+      if (payload.bio !== undefined) form.append('bio', payload.bio);
+      form.append('image', payload.image);
+      return fetchWithAuth('/api/users/me/profile/', { method: 'PATCH', body: form });
+    }
     return fetchWithAuth('/api/users/me/profile/', {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(payload),
     });
   },
 
   initiatePhoneChange: async (payload: {
-    password: string;
+    password?: string;
     new_phone_number: string;
     network_provider: 'mtn' | 'orange';
   }): Promise<{ message: string }> => {
@@ -23,15 +57,8 @@ export const usersAPI = {
     });
   },
 
-  verifyPhoneChangeEmail: async (otp: string): Promise<{ message: string }> => {
-    return fetchWithAuth('/api/users/phone-change/verify-email/', {
-      method: 'POST',
-      body: JSON.stringify({ otp }),
-    });
-  },
-
-  verifyPhoneChangeSms: async (otp: string): Promise<{ message: string }> => {
-    return fetchWithAuth('/api/users/phone-change/verify-sms/', {
+  verifyPhoneChange: async (otp: string): Promise<{ message: string }> => {
+    return fetchWithAuth('/api/users/phone-change/verify/', {
       method: 'POST',
       body: JSON.stringify({ otp }),
     });

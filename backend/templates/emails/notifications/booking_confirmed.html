@@ -1,29 +1,14 @@
-{% extends "emails/base_email.html" %}
-
-{% block subject %}Booking Confirmed — {{ data.listing_title }}{% endblock %}
-
+﻿{% extends "emails/notifications/base_email.html" %}
 {% block content %}
-  <h2 style="color:#27ae60;">Your Booking is Confirmed!</h2>
-  <p>Hi {{ user.get_full_name|default:user.username }},</p>
-  <p>Great news! Your booking has been confirmed by the property owner.</p>
-
-  <div class="info-box">
-    <p><strong>Property:</strong> {{ data.listing_title }}</p>
-    <p><strong>Owner:</strong> {{ data.owner_name }}</p>
-    <p><strong>Check-in:</strong> {{ data.start_date }}</p>
-    <p><strong>Check-out:</strong> {{ data.end_date }}</p>
-    <p><strong>Total Amount:</strong> {{ data.total_amount }}</p>
-    {% if data.owner_notes %}
-    <p><strong>Owner Notes:</strong> {{ data.owner_notes }}</p>
-    {% endif %}
-  </div>
-
-  <a class="cta-btn" href="http://{{ site_url }}/bookings/{{ data.booking_id }}">
-    View Booking Details
-  </a>
-
-  <hr class="divider"/>
-  <p style="font-size:13px; color:#888;">
-    Booking #{{ data.booking_id }} &mdash; {{ site_name }}
-  </p>
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Booking Confirmed!</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">Your reservation is all set</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0faf0;border-radius:6px;padding:20px;margin:0 0 24px;border-left:4px solid #22c55e;">
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Property:</strong> {{ data.listing_title }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Host:</strong> {{ data.owner_name }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Check-in:</strong> {{ data.start_date }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Check-out:</strong> {{ data.end_date }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Total:</strong> ${{ data.total_amount }}</td></tr>
+  {% if data.owner_notes %}<tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Note from host:</strong> {{ data.owner_notes }}</td></tr>{% endif %}
+</table>
+<a href="{{ site_url }}/trips" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">View Booking</a>
 {% endblock %}

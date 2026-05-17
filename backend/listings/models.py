@@ -42,6 +42,11 @@ class Listing(models.Model):
         ('super_strict', 'Super Strict'),
     ]
 
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('published', 'Published'),
+    ]
+
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -49,11 +54,19 @@ class Listing(models.Model):
     beds = models.IntegerField(default=0)
     bathrooms = models.IntegerField(default=0)
     max_guests = models.IntegerField(default=1)
-    property_type = models.CharField(max_length=50, default='homes')
+    property_type = models.CharField(max_length=50, default='apartment')
     privacy_type = models.CharField(max_length=20, choices=PRIVACY_TYPES, default='entire_place')
     booking_mode = models.CharField(max_length=20, choices=BOOKING_MODES, default='instant')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='listings')
     address = models.CharField(max_length=200, blank=False)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_in_time = models.CharField(max_length=10, default='15:00')
+    check_out_time = models.CharField(max_length=10, default='11:00')
+    self_checkin = models.BooleanField(default=False)
     square_footage = models.IntegerField(default=0)
     amenities = models.JSONField(default=list, blank=True)
     highlights = models.JSONField(default=list, blank=True)
@@ -70,6 +83,7 @@ class Listing(models.Model):
     weapons_on_property = models.BooleanField(default=False)
     cancellation_policy = models.CharField(max_length=20, choices=CANCELLATION_POLICIES, default='flexible')
     is_available = models.BooleanField(default=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='published')
     main_image = models.ImageField(upload_to='listings/main/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -181,3 +195,48 @@ class PropertyStats(models.Model):
 
     def __str__(self):
         return f'Stats for {self.listing.title} on {self.date}'
+
+
+class HotelRoom(models.Model):
+    BED_TYPE_CHOICES = [
+        ('king', 'King'), ('queen', 'Queen'), ('twin', 'Twin'),
+        ('double', 'Double'), ('single', 'Single'), ('bunk', 'Bunk'),
+    ]
+    ROOM_TYPE_CHOICES = [
+        ('standard', 'Standard'), ('deluxe', 'Deluxe'), ('suite', 'Suite'),
+        ('family', 'Family'), ('studio', 'Studio'), ('penthouse', 'Penthouse'),
+    ]
+
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='hotel_rooms')
+    name = models.CharField(max_length=120)
+    room_type = models.CharField(max_length=20, choices=ROOM_TYPE_CHOICES, default='standard')
+    description = models.TextField(blank=True)
+    price_per_night = models.DecimalField(max_digits=12, decimal_places=2)
+    max_occupancy = models.PositiveIntegerField(default=2)
+    beds = models.PositiveIntegerField(default=1)
+    bed_type = models.CharField(max_length=20, choices=BED_TYPE_CHOICES, default='queen')
+    bathrooms = models.PositiveIntegerField(default=1)
+    amenities = models.JSONField(default=list, blank=True)
+    total_count = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['room_type', 'price_per_night']
+
+    def __str__(self):
+        return f"{self.listing.title} — {self.name}"
+
+
+class HotelRoomImage(models.Model):
+    room = models.ForeignKey(HotelRoom, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='listings/rooms/')
+    caption = models.CharField(max_length=255, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f'{self.room.name} - Image {self.order + 1}'

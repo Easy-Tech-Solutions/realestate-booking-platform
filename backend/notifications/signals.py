@@ -159,3 +159,36 @@ def listing_post_save(sender, instance, created, **kwargs):
 
     if old_is_available is False and instance.is_available is True:
         notify_listing_available(instance)
+
+
+# ---- Report signals ----------------------------------------------------------
+
+@receiver(pre_save, sender='reports.Report')
+def report_pre_save(sender, instance, **kwargs):
+    """Cache the report status before the save so post_save can detect changes."""
+    if instance.pk:
+        try:
+            old = sender.objects.get(pk=instance.pk)
+            instance._pre_save_status = old.status
+        except sender.DoesNotExist:
+            instance._pre_save_status = None
+    else:
+        instance._pre_save_status = None
+
+
+@receiver(post_save, sender='reports.Report')
+def report_post_save(sender, instance, created, **kwargs):
+    """Notify the reporter whenever an admin changes the report's status."""
+    if created:
+        # Creation is handled separately — notify_report_submitted is called
+        # from the report-creation endpoint to notify admins, not the reporter.
+        return
+
+    old_status = getattr(instance, '_pre_save_status', None)
+    new_status = instance.status
+
+    if old_status == new_status:
+        return
+
+    from .services import notify_report_updated
+    notify_report_updated(instance)

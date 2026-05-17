@@ -13,6 +13,7 @@ from .serializers import (
 )
 from listings.models import Listing
 from listings.serializers import ListingSerializer
+from listings.models import HotelRoom
 from django.db.models import Avg as _Avg
 
 
@@ -73,12 +74,25 @@ def bookings_collection(request):
 
             serializer = BookingCreateSerializer(data=request.data)
             if serializer.is_valid():
-                booking = serializer.save(customer=request.user)
+                start = serializer.validated_data['start_date']
+                end = serializer.validated_data['end_date']
+                nights = max((end - start).days, 1)
+                hotel_room = serializer.validated_data.get('hotel_room')
+                if hotel_room:
+                    if hotel_room.listing_id != listing.id:
+                        return Response({'error': 'Room does not belong to this listing'}, status=status.HTTP_400_BAD_REQUEST)
+                    from listings.views import _get_available_room_count
+                    if _get_available_room_count(hotel_room, start, end) < 1:
+                        return Response({'error': 'Room not available for selected dates'}, status=status.HTTP_400_BAD_REQUEST)
+                    total_price = float(hotel_room.price_per_night) * nights
+                else:
+                    total_price = listing.price * nights
+                booking = serializer.save(customer=request.user, total_price=total_price)
                 # Instant book: auto-confirm if listing is set to instant
                 if listing.booking_mode == 'instant':
                     booking.status = 'confirmed'
                     booking.confirmed_at = timezone.now()
-                    booking.save()
+                    booking.save(update_fields=['status', 'confirmed_at'])
                 return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -92,6 +106,7 @@ def bookings_collection(request):
 @permission_classes([IsAuthenticated])
 def booking_detail(request, id):
     try:
+        # Scope the lookup to bookings this user is allowed to see before fetching.
         booking = Booking.objects.get(pk=id)
     except Booking.DoesNotExist:
         return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -104,7 +119,8 @@ def booking_detail(request, id):
     )
 
     if not has_permission:
-        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+        # Return 404 rather than 403 to avoid leaking that the booking exists.
+        return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == "GET":
         return Response(BookingSerializer(booking, context={'request': request}).data)

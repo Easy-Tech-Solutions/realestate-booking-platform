@@ -22,7 +22,7 @@ send_phone_change_sms_otp(phone_number, otp, network_provider)
                swap in their SDK if preferred.
 """
 
-import random
+import secrets
 import string
 
 from django.core.mail import send_mail
@@ -30,35 +30,26 @@ from django.conf import settings
 
 
 def generate_otp(length=6):
-    #Return a random numeric OTP string of `length` digits
-    return ''.join(random.choices(string.digits, k=length))
+    return ''.join(secrets.choice(string.digits) for _ in range(length))
 
 
 # ── Email OTP ──────────────────────────────────────────────────────────────────
 
 def send_phone_change_email_otp(user, otp):
     """
-    Send the Step-2 email OTP to the user's registered email address.
+    Send the verification OTP to the user's registered email address.
     The OTP expires in 10 minutes (enforced in the view/model).
     """
-    # Development: print to console for Postman / manual testing
-    print(f"\n=== PHONE CHANGE EMAIL OTP FOR {user.username} ===")
-    print(f"OTP: {otp}  (valid 10 minutes)")
-    print(f"Submit at: POST /api/users/phone-change/verify-email/")
-    print("=" * 52)
-
-    # ── Production email ───────────────────────────────────────────────────────
-    # Switch EMAIL_BACKEND to smtp.EmailBackend in settings.py, then uncomment:
-    """
-    subject = f"[{settings.SITE_NAME}] Verify your phone number change"
+    site_name = getattr(settings, 'SITE_NAME', 'Real Estate Platform')
+    subject = f"[{site_name}] Verify your Mobile Money number change"
     message = (
         f"Hi {user.get_short_name() or user.username},\n\n"
-        f"We received a request to change the mobile wallet number on your account.\n\n"
+        f"We received a request to change the Mobile Money number on your account.\n\n"
         f"Your verification code is:  {otp}\n\n"
         f"This code expires in 10 minutes.\n\n"
-        f"If you did not request this change, please secure your account immediately "
-        f"by resetting your password.\n\n"
-        f"— The {settings.SITE_NAME} Team"
+        f"If you did not request this change, please secure your account "
+        f"immediately by resetting your password.\n\n"
+        f"— The {site_name} Team"
     )
     send_mail(
         subject,
@@ -66,7 +57,6 @@ def send_phone_change_email_otp(user, otp):
         settings.DEFAULT_FROM_EMAIL,
         [user.email],
     )
-    """
 
 
 # ── SMS OTP ────────────────────────────────────────────────────────────────────

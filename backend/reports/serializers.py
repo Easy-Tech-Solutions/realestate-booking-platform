@@ -6,8 +6,9 @@ class ReportCreateSerializer(serializers.ModelSerializer):
     """
     Used by authenticated users to file a new report.
 
-    Exactly one of reported_user / reported_listing / reported_review /
-    reported_message must be supplied, matching the declared content_type.
+    The FK fields (reported_user etc.) are all optional — the reporter
+    can instead supply owner_name + screenshot when they don't know the ID.
+    At least one of the FK fields OR owner_name must be present.
     """
 
     class Meta:
@@ -20,35 +21,45 @@ class ReportCreateSerializer(serializers.ModelSerializer):
             'reported_message',
             'report_type',
             'description',
+            'owner_name',
+            'screenshot',
         ]
+        extra_kwargs = {
+            'reported_user':    {'required': False, 'allow_null': True},
+            'reported_listing': {'required': False, 'allow_null': True},
+            'reported_review':  {'required': False, 'allow_null': True},
+            'reported_message': {'required': False, 'allow_null': True},
+            'owner_name':       {'required': False},
+            'screenshot':       {'required': False},
+        }
 
     def validate(self, attrs):
         content_type = attrs.get('content_type')
 
-        # Map each content_type to its expected FK field
-        expected_field = {
+        fk_map = {
             Report.ContentType.USER:    'reported_user',
             Report.ContentType.LISTING: 'reported_listing',
             Report.ContentType.REVIEW:  'reported_review',
             Report.ContentType.MESSAGE: 'reported_message',
         }
 
-        required = expected_field.get(content_type)
-        if not required:
+        required_fk = fk_map.get(content_type)
+        if not required_fk:
             raise serializers.ValidationError({'content_type': 'Invalid content type.'})
 
-        # The expected FK must be present
-        if not attrs.get(required):
+        has_fk = bool(attrs.get(required_fk))
+        has_context = bool(attrs.get('owner_name', '').strip() or attrs.get('screenshot'))
+
+        if not has_fk and not has_context:
             raise serializers.ValidationError(
-                {required: f'This field is required when content_type is "{content_type}".'}
+                'Please provide either the listing owner name / screenshot, '
+                'or a direct reference to the reported content.'
             )
 
-        # All other FK fields must be absent
-        for field, fk_field in expected_field.items():
-            if fk_field != required and attrs.get(fk_field):
-                raise serializers.ValidationError(
-                    {fk_field: f'Do not supply this field when content_type is "{content_type}".'}
-                )
+        # Clear unrelated FK fields
+        for ct, fk_field in fk_map.items():
+            if fk_field != required_fk:
+                attrs.pop(fk_field, None)
 
         return attrs
 
@@ -62,15 +73,15 @@ class ReportCreateSerializer(serializers.ModelSerializer):
 class ReportSerializer(serializers.ModelSerializer):
     """
     Read serializer — returned to the reporter or an admin.
-    Exposes human-readable labels alongside raw choice values.
     """
-    reporter_username     = serializers.CharField(source='reporter.username', read_only=True)
-    reported_user_name    = serializers.SerializerMethodField()
+    reporter_username      = serializers.CharField(source='reporter.username', read_only=True)
+    reported_user_name     = serializers.SerializerMethodField()
     reported_listing_title = serializers.SerializerMethodField()
-    status_display        = serializers.CharField(source='get_status_display', read_only=True)
-    report_type_display   = serializers.CharField(source='get_report_type_display', read_only=True)
-    content_type_display  = serializers.CharField(source='get_content_type_display', read_only=True)
-    resolved_by_username  = serializers.SerializerMethodField()
+    status_display         = serializers.CharField(source='get_status_display', read_only=True)
+    report_type_display    = serializers.CharField(source='get_report_type_display', read_only=True)
+    content_type_display   = serializers.CharField(source='get_content_type_display', read_only=True)
+    resolved_by_username   = serializers.SerializerMethodField()
+    screenshot_url         = serializers.SerializerMethodField()
 
     class Meta:
         model = Report
@@ -88,6 +99,8 @@ class ReportSerializer(serializers.ModelSerializer):
             'report_type',
             'report_type_display',
             'description',
+            'owner_name',
+            'screenshot_url',
             'status',
             'status_display',
             'admin_notes',
@@ -112,6 +125,14 @@ class ReportSerializer(serializers.ModelSerializer):
         if obj.resolved_by:
             return obj.resolved_by.username
         return None
+
+    def get_screenshot_url(self, obj):
+        if not obj.screenshot:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.screenshot.url)
+        return obj.screenshot.url
 
 
 class ReportAdminUpdateSerializer(serializers.ModelSerializer):

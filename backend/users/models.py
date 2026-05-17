@@ -10,8 +10,10 @@ class User(AbstractUser):
         ('admin', 'Admin')
     ]
     email_verified = models.BooleanField(default=False)
-    email_verification_token = models.CharField(max_length=100, blank=True, null=True)
-    password_reset_token = models.CharField(max_length=100, blank=True, null=True)
+    email_verification_token = models.CharField(max_length=200, blank=True, null=True)
+    email_verification_token_expires_at = models.DateTimeField(null=True, blank=True)
+    password_reset_token = models.CharField(max_length=200, blank=True, null=True)
+    password_reset_token_expires_at = models.DateTimeField(null=True, blank=True)
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='user')
 
     def save(self, *args, **kwargs):
@@ -31,6 +33,7 @@ class Profile(models.Model):
     image = models.ImageField(upload_to='uploads/', null=True, blank=True)
     bio = models.TextField(blank=True)
     is_superhost = models.BooleanField(default=False)
+    last_seen = models.DateTimeField(null=True, blank=True)
     momo_number = models.CharField(
         max_length=20, blank=True,
         help_text='MTN Mobile Money number for receiving payouts (Liberian format, e.g. 0880123456)'
@@ -42,13 +45,15 @@ class Profile(models.Model):
 
 class PhoneChangeRequest(models.Model):
     """
-    Tracks a pending phone number change through the 3-step verification flow:
-      Step 1 — Password re-entry    (password_verified = True)
-      Step 2 — Email OTP            (email_otp_verified = True  → SMS sent to new number)
-      Step 3 — SMS OTP on new number (sms_otp_verified = True   → phone updated)
+    Tracks a pending phone number change through the 2-step verification flow:
+      Step 1 — (optional password re-entry for accounts with a usable password)
+               → both email and SMS OTPs are generated and sent at once.
+      Step 2 — User submits both OTPs together; on success the phone is updated.
 
     One active request per user at a time (OneToOneField).  The row is deleted
-    after the change is committed or if the user cancels.
+    after the change is committed or if the user cancels. The *_verified flags
+    are retained for schema compatibility but are no longer used as
+    intermediate gates.
     """
     NETWORK_MTN    = 'mtn'
     NETWORK_ORANGE = 'orange'

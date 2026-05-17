@@ -1,14 +1,14 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from .views import NotificationViewSet, NotificationPreferenceView
+from .views import NotificationViewSet, NotificationPreferenceView, device_token, vapid_public_key
 
 router = DefaultRouter()
 router.register(r'', NotificationViewSet, basename='notification')
 
 urlpatterns = [
-    # Preferences endpoint (not a viewset action, lives at a fixed path)
     path('preferences/', NotificationPreferenceView.as_view(), name='notification-preferences'),
-    # All other notification endpoints via router
+    path('device-token/', device_token, name='device-token'),
+    path('vapid-public-key/', vapid_public_key, name='vapid-public-key'),
     path('', include(router.urls)),
 ]

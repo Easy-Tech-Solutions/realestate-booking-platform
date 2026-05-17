@@ -14,6 +14,10 @@ class Booking(models.Model):
     ]
 
     listing = models.ForeignKey('listings.Listing', on_delete=models.CASCADE, related_name='bookings')
+    hotel_room = models.ForeignKey(
+        'listings.HotelRoom', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='bookings'
+    )
     customer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bookings')
     start_date = models.DateField()
     end_date = models.DateField()
@@ -24,6 +28,7 @@ class Booking(models.Model):
     declined_at = models.DateTimeField(null=True, blank=True)
     owner_notes = models.TextField(blank=True)
     decline_reason = models.TextField(blank=True)
+    total_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     class Meta:
         unique_together = ['customer', 'listing', 'start_date', 'end_date']

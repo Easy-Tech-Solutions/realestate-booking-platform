@@ -11,7 +11,8 @@ export function BookingConfirmed() {
   const location = useLocation();
   const navigate = useNavigate();
   const stateBooking = (location.state as { booking?: Booking } | null)?.booking;
-  const bookingId = new URLSearchParams(location.search).get('bookingId') || stateBooking?.id;
+  // ID comes only from router state — never from the URL to avoid leaking booking IDs in logs/history.
+  const bookingId = stateBooking?.id;
   const { booking, isLoading, isError } = useBookingConfirmedData(bookingId || undefined, stateBooking);
 
   if (isLoading) {
@@ -150,7 +151,7 @@ export function BookingConfirmed() {
             Message your host
           </Button>
           <Button variant="outline" className="flex-1" onClick={() => navigate('/trips')}>
-            View my trips
+            View my bookings
           </Button>
           <Button variant="outline" size="icon" title="Download receipt">
             <Download className="w-4 h-4" />

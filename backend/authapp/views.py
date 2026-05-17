@@ -1,3 +1,4 @@
+import logging
 import re
 import secrets
 
@@ -24,8 +25,11 @@ from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.http import HttpResponse
+from django.template.loader import render_to_string
 from django.db import transaction
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 
 def _get_active_suspension(user):
@@ -51,7 +55,6 @@ def _suspension_response(suspension):
 @permission_classes([AllowAny])
 @throttle_classes([RegisterRateThrottle])
 def register(request):
-    username = request.data.get("username")
     email = request.data.get("email")
     password = request.data.get("password")
     password2 = request.data.get("password2")
@@ -59,8 +62,8 @@ def register(request):
     last_name = request.data.get("last_name")
 
     # Input validation
-    if not all([username, password, email, password2]):
-        return Response({"error": "username, email, password, and password2 required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not all([password, email, password2]):
+        return Response({"error": "email, password, and password2 required"}, status=status.HTTP_400_BAD_REQUEST)
 
     # Password confirmation check
     if password != password2:
@@ -76,12 +79,10 @@ def register(request):
     if len(password) < 8:
         return Response({"error": "password must be at least 8 characters long"}, status=status.HTTP_400_BAD_REQUEST)
 
-    #Username and email availability check
-    if User.objects.filter(username=username).exists():
-        return Response({"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
-
     if User.objects.filter(email=email).exists():
         return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+
+    username = _unique_username_from_email(email)
 
     try:
         with transaction.atomic():
@@ -101,10 +102,12 @@ def register(request):
             message = "User registered successfully. You can now log in."
         return Response({"message": message}, status=status.HTTP_201_CREATED)
     except Exception:
+        logger.exception("register: failed during user creation or email send")
         return Response(
             {"error": "Registration could not be completed because the verification email could not be sent. Please try again in a moment."},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
+
 
 @api_view(["GET", "POST"])
 @permission_classes([AllowAny])
@@ -114,37 +117,61 @@ def verify_email(request):
     if not token:
         return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
 
+    login_url = getattr(settings, "FRONTEND_ORIGIN", "") or f"https://{settings.LOCAL_DOMAIN}"
+
     try:
         user = User.objects.get(email_verification_token=token)
-        user.email_verified = True
-        user.is_active = True
-        user.email_verification_token = None
-        user.save()
-        if request.method == "GET":
-            login_url = getattr(settings, "FRONTEND_ORIGIN", "") or f"https://{settings.LOCAL_DOMAIN}"
-            return HttpResponse(
-                f"<html><body style='font-family: sans-serif; padding: 2rem;'><h1>Email verified</h1><p>Your account is now active. You can return to the app and log in.</p><p><a href='{login_url}'>Open app</a></p></body></html>"
-            )
-        return Response({"message": "Email verified successfully"}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         if request.method == "GET":
-            return HttpResponse(
-                "<html><body style='font-family: sans-serif; padding: 2rem;'><h1>Invalid verification link</h1><p>This verification link is invalid or has already been used.</p></body></html>",
-                status=400,
-            )
+            html = render_to_string("auth/verification_failure.html", {
+                "heading": "Invalid verification link",
+                "message": "This verification link is invalid or has already been used.",
+                "login_url": login_url,
+                "site_name": settings.SITE_NAME,
+            })
+            return HttpResponse(html, status=400)
         return Response({"error": "Invalid verification token"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if user.email_verification_token_expires_at and timezone.now() > user.email_verification_token_expires_at:
+        if request.method == "GET":
+            html = render_to_string("auth/verification_failure.html", {
+                "heading": "Link expired",
+                "message": "This verification link has expired. Please request a new one.",
+                "login_url": login_url,
+                "site_name": settings.SITE_NAME,
+            })
+            return HttpResponse(html, status=400)
+        return Response({"error": "Verification link has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.email_verified = True
+    user.is_active = True
+    user.email_verification_token = None
+    user.email_verification_token_expires_at = None
+    user.save(update_fields=['email_verified', 'is_active', 'email_verification_token', 'email_verification_token_expires_at'])
+    if request.method == "GET":
+        html = render_to_string("auth/verification_success.html", {
+            "login_url": login_url,
+            "site_name": settings.SITE_NAME,
+        })
+        return HttpResponse(html)
+    return Response({"message": "Email verified successfully"}, status=status.HTTP_200_OK)
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([LoginRateThrottle])
 def login_view(request):
-    username = request.data.get("username")
+    email = request.data.get("email")
     password = request.data.get("password")
 
-    if not username or not password:
-        return Response({"error": "username and password required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not email or not password:
+        return Response({"error": "email and password required"}, status=status.HTTP_400_BAD_REQUEST)
 
-    user = authenticate(request, username=username, password=password)
+    try:
+        user_obj = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user = authenticate(request, username=user_obj.username, password=password)
     if user is None:
         return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -161,28 +188,44 @@ def login_view(request):
 
     #Geneate JWT tokens
     refresh = RefreshToken.for_user(user)
-    return Response({
-        "refresh": str(refresh),
-        "access": str(refresh.access_token),
-        "user": UserSerializer(user).data
+    access_token = str(refresh.access_token)
+    refresh_token = str(refresh)
+
+    # The refresh token is returned in the JSON body so the SPA can persist it
+    # in localStorage. The cookie is kept for now as a soft fallback for
+    # already-issued sessions but the SPA no longer reads it; it can be removed
+    # in a later cleanup once nobody is relying on it.
+    response = Response({
+        "access": access_token,
+        "refresh": refresh_token,
+        "user": UserSerializer(user).data,
     })
+    response.set_cookie(
+        'refresh_token',
+        refresh_token,
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite='None' if not settings.DEBUG else 'Lax',
+        max_age=60 * 60 * 24 * 7,  # 7 days — matches SimpleJWT REFRESH_TOKEN_LIFETIME
+        path='/api/auth/',
+    )
+    return response
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
     try:
-        refresh_token = request.data.get("refresh")
-        if not refresh_token:
-            return Response({"error":"Refresh token is required"}, status=status.HTTP_400_BAD_REQUEST)
+        refresh_token = request.COOKIES.get("refresh_token") or request.data.get("refresh")
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except TokenError:
+                pass
 
-        # Blacklist the refresh token
-        token = RefreshToken(refresh_token)
-        token.blacklist()
-
-        return Response({"message": "Logged out successfully"}, status=status.HTTP_205_RESET_CONTENT)
-
-    except TokenError as e:
-        return Response({"error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
+        response = Response({"message": "Logged out successfully"}, status=status.HTTP_205_RESET_CONTENT)
+        response.delete_cookie('refresh_token', path='/api/auth/')
+        return response
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -190,7 +233,7 @@ def logout_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def refresh_token_view(request):
-    refresh_token = request.data.get("refresh")
+    refresh_token = request.COOKIES.get("refresh_token") or request.data.get("refresh")
     if not refresh_token:
         return Response({"error": "Refresh token is required"}, status=status.HTTP_400_BAD_REQUEST)
     try:
@@ -208,7 +251,22 @@ def refresh_token_view(request):
                 pass
 
         access_token = str(refresh.access_token)
-        return Response({"access": access_token, "access_token": access_token})
+        response = Response({"access": access_token, "access_token": access_token})
+
+        # Rotate refresh cookie if SimpleJWT issues a new one
+        new_refresh = refresh.get("new_refresh", None)
+        if new_refresh:
+            response.set_cookie(
+                'refresh_token',
+                str(new_refresh),
+                httponly=True,
+                secure=not settings.DEBUG,
+                samesite='None' if not settings.DEBUG else 'Lax',
+                max_age=60 * 60 * 24 * 7,
+                path='/api/auth/',
+            )
+
+        return response
     except Exception:
         return Response({"error": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
 @api_view(["GET"])
@@ -258,9 +316,13 @@ def password_reset_confirm(request):
     except User.DoesNotExist:
         return Response({"error": "Invalid or expired reset token"}, status=status.HTTP_400_BAD_REQUEST)
 
+    if user.password_reset_token_expires_at and timezone.now() > user.password_reset_token_expires_at:
+        return Response({"error": "Invalid or expired reset token"}, status=status.HTTP_400_BAD_REQUEST)
+
     user.set_password(password)
     user.password_reset_token = None
-    user.save()
+    user.password_reset_token_expires_at = None
+    user.save(update_fields=['password', 'password_reset_token', 'password_reset_token_expires_at'])
     return Response({"message": "Password reset successfully. You can now log in with your new password."}, status=status.HTTP_200_OK)
 
 
@@ -272,30 +334,52 @@ def _verify_google_id_token(token):
     """Return the decoded Google ID-token payload, or None if invalid.
 
     Validates signature, expiry, audience, and issuer. Returns None on any
-    failure so the caller can respond with a generic 401 (no detail leaked).
+    failure so the caller can respond with a generic 401 (no detail leaked
+    to the client). The actual reason is logged server-side so operators
+    can distinguish misconfiguration from bad input.
     """
     client_id = getattr(settings, "GOOGLE_OAUTH_CLIENT_ID", "")
     if not client_id:
+        logger.error(
+            "google_login: GOOGLE_OAUTH_CLIENT_ID is not configured; "
+            "every Google sign-in will fail until it is set."
+        )
         return None
 
     try:
         from google.oauth2 import id_token as google_id_token
         from google.auth.transport import requests as google_requests
     except ImportError:
+        logger.error(
+            "google_login: 'google-auth' package is not installed. "
+            "Run `pip install -r requirements.txt`."
+        )
         return None
 
     try:
         payload = google_id_token.verify_oauth2_token(
             token, google_requests.Request(), client_id
         )
+    except ValueError as exc:
+        # google-auth raises ValueError for signature / expiry / audience
+        # mismatches. The message is safe to log but not to return.
+        logger.warning("google_login: token verification failed: %s", exc)
+        return None
     except Exception:
+        logger.exception("google_login: unexpected error verifying token")
         return None
 
     if payload.get("iss") not in GOOGLE_ALLOWED_ISSUERS:
+        logger.warning("google_login: rejected token with iss=%r", payload.get("iss"))
         return None
     if not payload.get("email") or not payload.get("sub"):
+        logger.warning("google_login: token missing email or sub claim")
         return None
     if not payload.get("email_verified"):
+        logger.warning(
+            "google_login: rejected token for unverified email %r",
+            payload.get("email"),
+        )
         return None
 
     return payload
@@ -309,13 +393,27 @@ def _unique_username_from_email(email):
     return candidate
 
 
-def _issue_tokens_for_user(user):
+def _issue_tokens_for_user(user, http_status=200):
     refresh = RefreshToken.for_user(user)
-    return {
-        "refresh": str(refresh),
-        "access": str(refresh.access_token),
-        "user": UserSerializer(user).data,
-    }
+    refresh_token = str(refresh)
+    response = Response(
+        {
+            "access": str(refresh.access_token),
+            "refresh": refresh_token,
+            "user": UserSerializer(user).data,
+        },
+        status=http_status,
+    )
+    response.set_cookie(
+        'refresh_token',
+        refresh_token,
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite='None' if not settings.DEBUG else 'Lax',
+        max_age=60 * 60 * 24 * 7,
+        path='/api/auth/',
+    )
+    return response
 
 
 @api_view(["POST"])
@@ -381,7 +479,7 @@ def google_login(request):
 
         social.last_login_at = timezone.now()
         social.save(update_fields=["last_login_at"])
-        return Response(_issue_tokens_for_user(user), status=status.HTTP_200_OK)
+        return _issue_tokens_for_user(user, http_status=status.HTTP_200_OK)
 
     # Case 2: email already owned by a local (password) account — no auto-link.
     if User.objects.filter(email__iexact=email).exists():
@@ -452,4 +550,4 @@ def google_login(request):
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
-    return Response(_issue_tokens_for_user(user), status=status.HTTP_201_CREATED)
+    return _issue_tokens_for_user(user, http_status=status.HTTP_201_CREATED)
