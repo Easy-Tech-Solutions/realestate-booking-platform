@@ -116,7 +116,9 @@ export function normalizeHotelRoomAvailability(r: any): HotelRoomAvailability {
 export function normalizeBooking(b: any): Booking {
   const statusMap: Record<string, Booking['status']> = {
     requested: 'pending',
+    pending: 'pending',
     confirmed: 'confirmed',
+    declined: 'declined',
     cancelled: 'cancelled',
     completed: 'completed',
   };

@@ -98,12 +98,22 @@ export function useUserDashboardData(userId?: string, enabled = true) {
 
   const upcomingTrips = trips.filter(({ booking }) => {
     const checkOut = new Date(booking.checkOut);
-    return booking.status !== 'cancelled' && booking.status !== 'completed' && checkOut >= today;
+    return (
+      booking.status !== 'cancelled' &&
+      booking.status !== 'declined' &&
+      booking.status !== 'completed' &&
+      checkOut >= today
+    );
   });
 
   const pastTrips = trips.filter(({ booking }) => {
     const checkOut = new Date(booking.checkOut);
-    return booking.status === 'cancelled' || booking.status === 'completed' || checkOut < today;
+    return (
+      booking.status === 'cancelled' ||
+      booking.status === 'declined' ||
+      booking.status === 'completed' ||
+      checkOut < today
+    );
   });
 
   const reviewPool = reviewsQueries.flatMap((query) => query.data || []) as Review[];
