@@ -171,8 +171,8 @@ export function normalizeBooking(b: any): Booking {
   const fallbackUser: User = {
     id: String(b.customer || ''),
     email: '',
-    firstName: b.customer_username || 'Guest',
-    lastName: '',
+    firstName: b.customer_first_name || b.customer_username || 'Guest',
+    lastName: b.customer_last_name || '',
     isHost: false,
     verified: true,
     createdAt: b.requested_at || new Date().toISOString(),
