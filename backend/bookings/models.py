@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.conf import settings
 from listings.models import Listing
 import uuid
@@ -31,7 +32,16 @@ class Booking(models.Model):
     total_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     class Meta:
-        unique_together = ['customer', 'listing', 'start_date', 'end_date']
+        # Only enforce uniqueness while the booking is "alive". A declined,
+        # cancelled, or completed booking should not block the same guest from
+        # re-booking the same property/dates.
+        constraints = [
+            models.UniqueConstraint(
+                fields=['customer', 'listing', 'start_date', 'end_date'],
+                condition=Q(status__in=['requested', 'pending', 'confirmed']),
+                name='unique_active_booking_per_guest_listing_dates',
+            ),
+        ]
         ordering = ['-requested_at']
 
     def __str__(self):
