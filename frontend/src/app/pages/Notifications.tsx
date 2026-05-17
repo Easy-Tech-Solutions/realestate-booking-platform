@@ -28,7 +28,7 @@ function targetHref(n: ApiNotification): string | null {
     return `/messages?conversation=${d.conversation_id}`;
   }
   if (t === 'booking_requested') {
-    return '/host';
+    return '/host?section=bookings';
   }
   if (t.startsWith('booking_') || t.startsWith('payment_')) {
     return '/trips';

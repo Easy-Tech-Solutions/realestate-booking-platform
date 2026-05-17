@@ -17,7 +17,10 @@ import {
   TrendingUp,
   Hotel,
 } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { bookingsAPI } from '../../services/api/bookings';
+import { queryKeys } from '../../hooks/queries/keys';
 import {
   Sidebar,
   SidebarContent,
@@ -574,9 +577,54 @@ function getMonthKey(dateString?: string) {
   return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString('en-US', { month: 'short' });
 }
 
+const VALID_SECTIONS: Section[] = ['overview', 'properties', 'bookings', 'messages', 'pricing', 'reviews'];
+
 export function HostDashboard() {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<Section>('overview');
+  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const initialSection = (searchParams.get('section') as Section | null);
+  const [activeSection, setActiveSection] = useState<Section>(
+    initialSection && VALID_SECTIONS.includes(initialSection) ? initialSection : 'overview'
+  );
+  const [bookingActionId, setBookingActionId] = useState<string | null>(null);
+
+  // Keep activeSection in sync when the URL search param changes (e.g. user
+  // clicks a "/host?section=bookings" notification while already on /host).
+  React.useEffect(() => {
+    const next = searchParams.get('section') as Section | null;
+    if (next && VALID_SECTIONS.includes(next) && next !== activeSection) {
+      setActiveSection(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const handleConfirmBooking = async (id: string) => {
+    setBookingActionId(id);
+    try {
+      await bookingsAPI.confirm(id);
+      toast.success('Booking confirmed');
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.me });
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to confirm booking'));
+    } finally {
+      setBookingActionId(null);
+    }
+  };
+
+  const handleDeclineBooking = async (id: string) => {
+    const reason = window.prompt('Reason for declining (optional):') ?? undefined;
+    setBookingActionId(id);
+    try {
+      await bookingsAPI.decline(id, reason);
+      toast.success('Booking declined');
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.me });
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to decline booking'));
+    } finally {
+      setBookingActionId(null);
+    }
+  };
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<DashboardMessage | null>(null);
   const [messageReply, setMessageReply] = useState('');
@@ -916,8 +964,10 @@ export function HostDashboard() {
           {bookings.map((booking) => {
             const property = properties.find((item) => item.id === booking.propertyId);
             const guestName = booking.user?.firstName || booking.userId || 'Guest';
+            const isPending = booking.status === 'pending';
+            const isBusy = bookingActionId === booking.id;
             return (
-              <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-border rounded-lg">
+              <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-border rounded-lg">
                 <div className="flex-1">
                   <h3 className="font-semibold mb-1">{guestName}</h3>
                   <p className="text-sm text-muted-foreground">
@@ -926,7 +976,30 @@ export function HostDashboard() {
                   <p className="text-xs text-muted-foreground mt-0.5">{property?.title || booking.propertyId}</p>
                   <p className="text-sm font-semibold mt-1 capitalize">{booking.status}</p>
                 </div>
-                <Button variant="outline" size="sm" className="flex-shrink-0" onClick={() => setActiveSection('messages')}>Contact guest</Button>
+                <div className="flex flex-wrap gap-2 sm:flex-nowrap flex-shrink-0">
+                  {isPending && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => handleConfirmBooking(booking.id)}
+                        disabled={isBusy}
+                      >
+                        {isBusy ? 'Please wait…' : 'Accept'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeclineBooking(booking.id)}
+                        disabled={isBusy}
+                      >
+                        Decline
+                      </Button>
+                    </>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setActiveSection('messages')}>
+                    Contact guest
+                  </Button>
+                </div>
               </div>
             );
           })}
