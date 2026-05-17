@@ -579,7 +579,7 @@ def listing_pricing(request, listing_id):
 
     discounted_subtotal = subtotal - discount
     cleaning_fee = min(50.0, base_price * 0.08)
-    service_fee = discounted_subtotal * 0.14
+    service_fee = discounted_subtotal * 0.04
     taxes = (discounted_subtotal + service_fee) * 0.05
     total = discounted_subtotal + cleaning_fee + service_fee + taxes
 
