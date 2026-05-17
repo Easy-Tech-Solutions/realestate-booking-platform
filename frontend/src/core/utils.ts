@@ -7,11 +7,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number, currency: string = 'USD'): string {
+  // Show cents only when they're non-zero so round figures stay clean
+  // ($30, $120) but fee breakdowns stay accurate ($4.80, $6.34).
+  const hasCents = Math.abs(amount - Math.trunc(amount)) > 0.005;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: hasCents ? 2 : 0,
   }).format(amount);
 }
 
