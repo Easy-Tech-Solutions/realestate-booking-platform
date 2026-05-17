@@ -3,9 +3,11 @@ import {
   BarChart3,
   Calendar,
   Camera,
+  CheckCircle2,
   DollarSign,
   Edit,
   Eye,
+  History,
   Home,
   Mail,
   MessageSquare,
@@ -16,6 +18,7 @@ import {
   Trash2,
   TrendingUp,
   Hotel,
+  XCircle,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
@@ -56,14 +59,14 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line,
 } from 'recharts';
-import type { Booking, Conversation, Property } from '../../core/types';
+import type { Booking, BookingStatus, Conversation, Property } from '../../core/types';
 import { toast } from 'sonner';
 import { getErrorMessage } from '../../services/api/shared/errors';
 import { useSendMessage } from '../../hooks/queries/useMessages';
 import { useQuery } from '@tanstack/react-query';
 import { useDeleteHostProperty, useHostDashboardData, useRespondToHostReview, useUpdateHostProperty } from '../../hooks/queries/useHostDashboard';
 
-type Section = 'overview' | 'properties' | 'bookings' | 'messages' | 'pricing' | 'reviews';
+type Section = 'overview' | 'properties' | 'bookings' | 'accepted' | 'declined' | 'past' | 'messages' | 'pricing' | 'reviews';
 
 type DashboardMessage = {
   id: string;
@@ -78,6 +81,9 @@ const navItems: { id: Section; label: string; icon: React.ElementType; badge?: n
   { id: 'overview', label: 'Overview', icon: BarChart3 },
   { id: 'properties', label: 'Properties', icon: Home },
   { id: 'bookings', label: 'Upcoming Bookings', icon: Calendar },
+  { id: 'accepted', label: 'Accepted Bookings', icon: CheckCircle2 },
+  { id: 'declined', label: 'Declined Bookings', icon: XCircle },
+  { id: 'past', label: 'Past Bookings', icon: History },
   { id: 'messages', label: 'Messages', icon: MessageSquare },
   { id: 'pricing', label: 'Pricing', icon: DollarSign },
   { id: 'reviews', label: 'Recent Reviews', icon: Star },
@@ -577,7 +583,7 @@ function getMonthKey(dateString?: string) {
   return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString('en-US', { month: 'short' });
 }
 
-const VALID_SECTIONS: Section[] = ['overview', 'properties', 'bookings', 'messages', 'pricing', 'reviews'];
+const VALID_SECTIONS: Section[] = ['overview', 'properties', 'bookings', 'accepted', 'declined', 'past', 'messages', 'pricing', 'reviews'];
 
 export function HostDashboard() {
   const navigate = useNavigate();
@@ -968,12 +974,12 @@ export function HostDashboard() {
     </div>
   );
 
-  const renderBookings = () => (
+  const renderBookings = (statuses: BookingStatus[], title: string, emptyMessage: string) => (
     <Card>
-      <CardHeader><CardTitle>Upcoming Bookings</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {bookings.map((booking) => {
+          {bookings.filter((b) => statuses.includes(b.status)).map((booking) => {
             const property = properties.find((item) => item.id === booking.propertyId);
             const guestName =
               [booking.user?.firstName, booking.user?.lastName].filter(Boolean).join(' ').trim() ||
@@ -1031,7 +1037,9 @@ export function HostDashboard() {
               </div>
             );
           })}
-          {bookings.length === 0 && <p className="text-sm text-muted-foreground">No bookings yet.</p>}
+          {bookings.filter((b) => statuses.includes(b.status)).length === 0 && (
+            <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+          )}
         </div>
       </CardContent>
 
@@ -1237,7 +1245,13 @@ export function HostDashboard() {
       case 'properties':
         return renderProperties();
       case 'bookings':
-        return renderBookings();
+        return renderBookings(['pending'], 'Upcoming Bookings', 'No pending bookings.');
+      case 'accepted':
+        return renderBookings(['confirmed'], 'Accepted Bookings', "You haven't accepted any bookings yet.");
+      case 'declined':
+        return renderBookings(['declined'], 'Declined Bookings', "You haven't declined any bookings yet.");
+      case 'past':
+        return renderBookings(['cancelled', 'completed'], 'Past Bookings', 'No past bookings yet.');
       case 'messages':
         return renderMessages();
       case 'pricing':
