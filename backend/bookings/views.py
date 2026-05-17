@@ -59,12 +59,14 @@ def bookings_collection(request):
         try:
             listing = Listing.objects.get(pk=request.data.get('listing'))
 
+            # Declined and cancelled bookings should not block the guest from
+            # re-booking the same property/dates — they're effectively dead.
             existing_booking = Booking.objects.filter(
                 customer=request.user,
                 listing=listing,
                 start_date=request.data.get('start_date'),
-                end_date=request.data.get('end_date')
-            ).first()
+                end_date=request.data.get('end_date'),
+            ).exclude(status__in=['declined', 'cancelled']).first()
 
             if existing_booking:
                 return Response({
