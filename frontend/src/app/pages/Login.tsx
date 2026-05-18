@@ -8,13 +8,6 @@ import { Label } from '../components/ui/label';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 
-interface PendingGoogleSignup {
-  idToken: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-}
-
 export function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -25,7 +18,6 @@ export function Login() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
   const [emailError, setEmailError] = React.useState('');
-  const [pendingGoogleSignup, setPendingGoogleSignup] = React.useState<PendingGoogleSignup | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -55,19 +47,9 @@ export function Login() {
     }
     setIsLoading(true);
     try {
-      const result = await loginWithGoogle(idToken);
-      if (result.status === 'success') {
-        toast.success('Welcome!');
-        navigate(next, { replace: true });
-        return;
-      }
-      // First-time Google sign-up — collect a role.
-      setPendingGoogleSignup({
-        idToken: result.idToken,
-        email: result.email,
-        firstName: result.firstName,
-        lastName: result.lastName,
-      });
+      await loginWithGoogle(idToken);
+      toast.success('Welcome!');
+      navigate(next, { replace: true });
     } catch (error: any) {
       toast.error(error?.message || 'Google sign-in failed. Please try again.');
     } finally {
@@ -78,76 +60,6 @@ export function Login() {
   const handleGoogleError = () => {
     toast.error('Google sign-in failed. Please try again.');
   };
-
-  const handleRoleChoice = async (role: 'user' | 'agent') => {
-    if (!pendingGoogleSignup) return;
-    setIsLoading(true);
-    try {
-      const result = await loginWithGoogle(pendingGoogleSignup.idToken, role);
-      if (result.status === 'success') {
-        toast.success('Welcome to the platform!');
-        navigate(next, { replace: true });
-      } else {
-        toast.error('Could not complete sign-up. Please try again.');
-      }
-    } catch (error: any) {
-      toast.error(error?.message || 'Could not complete sign-up.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (pendingGoogleSignup) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
-          <h1 className="text-3xl font-semibold mb-2">
-            Welcome{pendingGoogleSignup.firstName ? `, ${pendingGoogleSignup.firstName}` : ''}!
-          </h1>
-          <p className="text-muted-foreground mb-8">
-            How do you plan to use the platform? You can change this later in settings.
-          </p>
-
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => handleRoleChoice('user')}
-              disabled={isLoading}
-              className="w-full text-left border rounded-lg p-4 hover:bg-muted transition disabled:opacity-50"
-            >
-              <div className="font-semibold">I'm here to book</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Find and book properties listed by agents.
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleRoleChoice('agent')}
-              disabled={isLoading}
-              className="w-full text-left border rounded-lg p-4 hover:bg-muted transition disabled:opacity-50"
-            >
-              <div className="font-semibold">I'm an agent</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                List and manage properties for booking.
-              </div>
-            </button>
-
-            <div className="text-center pt-2">
-              <button
-                type="button"
-                onClick={() => setPendingGoogleSignup(null)}
-                disabled={isLoading}
-                className="text-sm text-muted-foreground hover:underline"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
