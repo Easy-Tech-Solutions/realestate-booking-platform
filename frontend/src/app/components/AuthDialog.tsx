@@ -16,14 +16,7 @@ interface AuthDialogProps {
   onModeChange: (mode: 'login' | 'register') => void;
 }
 
-type AuthView = 'login' | 'register' | 'forgot-password' | 'choose-role';
-
-interface PendingGoogleSignup {
-  idToken: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-}
+type AuthView = 'login' | 'register' | 'forgot-password';
 
 interface FormErrors {
   first_name?: string;
@@ -55,14 +48,11 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     last_name: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
-  const [pendingGoogleSignup, setPendingGoogleSignup] = useState<PendingGoogleSignup | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
 
   useEffect(() => {
-    if (view !== 'choose-role') {
-      setView(mode);
-    }
+    setView(mode);
   }, [mode, open]);
 
   const resetForm = () => {
@@ -72,7 +62,6 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
 
   const handleClose = () => {
     setView(mode);
-    setPendingGoogleSignup(null);
     resetForm();
     onClose();
   };
@@ -154,19 +143,9 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
 
     setIsLoading(true);
     try {
-      const result = await loginWithGoogle(idToken);
-      if (result.status === 'success') {
-        toast.success('Welcome!');
-        handleClose();
-        return;
-      }
-      setPendingGoogleSignup({
-        idToken: result.idToken,
-        email: result.email,
-        firstName: result.firstName,
-        lastName: result.lastName,
-      });
-      setView('choose-role');
+      await loginWithGoogle(idToken);
+      toast.success('Welcome!');
+      handleClose();
     } catch (error: any) {
       toast.error(error.message || 'Google sign-in failed. Please try again.');
     } finally {
@@ -176,29 +155,6 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
 
   const handleGoogleError = () => {
     toast.error('Google sign-in failed. Please try again.');
-  };
-
-  const handleRoleChoice = async (role: 'user' | 'agent') => {
-    if (!pendingGoogleSignup) return;
-    setIsLoading(true);
-    try {
-      const result = await loginWithGoogle(pendingGoogleSignup.idToken, role);
-      if (result.status === 'success') {
-        toast.success('Welcome to the platform!');
-        handleClose();
-      } else {
-        toast.error('Could not complete sign-up. Please try again.');
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Could not complete sign-up.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const cancelRoleChoice = () => {
-    setPendingGoogleSignup(null);
-    setView(mode);
   };
 
   const field = (id: keyof typeof formData) => ({
@@ -217,37 +173,21 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
             <X className="w-4 h-4" />
           </button>
           <h2 className="text-center font-semibold">
-            {view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : view === 'forgot-password' ? 'Forgot password' : 'Choose your role'}
+            {view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Forgot password'}
           </h2>
         </div>
 
         <div className="p-6 space-y-4">
           <div>
             <h3 className="text-lg font-semibold mb-2">
-              {view === 'login' ? 'Welcome back' : view === 'register' ? 'Create your account' : view === 'forgot-password' ? 'Reset your password' : `Welcome${pendingGoogleSignup?.firstName ? `, ${pendingGoogleSignup.firstName}` : ''}!`}
+              {view === 'login' ? 'Welcome back' : view === 'register' ? 'Create your account' : 'Reset your password'}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {view === 'login' ? 'Log in to continue your journey' : view === 'register' ? 'Create an account to get started' : view === 'forgot-password' ? 'Enter your email and we will send you a password reset link' : 'How do you plan to use the platform? You can change this later in settings.'}
+              {view === 'login' ? 'Log in to continue your journey' : view === 'register' ? 'Create an account to get started' : 'Enter your email and we will send you a password reset link'}
             </p>
           </div>
 
-          {view === 'choose-role' && (
-            <div className="space-y-3">
-              <button type="button" onClick={() => handleRoleChoice('user')} disabled={isLoading} className="w-full text-left border rounded-lg p-4 hover:bg-muted transition disabled:opacity-50">
-                <div className="font-semibold">I'm here to book</div>
-                <div className="text-xs text-muted-foreground mt-1">Find and book properties listed by agents.</div>
-              </button>
-              <button type="button" onClick={() => handleRoleChoice('agent')} disabled={isLoading} className="w-full text-left border rounded-lg p-4 hover:bg-muted transition disabled:opacity-50">
-                <div className="font-semibold">I'm an agent</div>
-                <div className="text-xs text-muted-foreground mt-1">List and manage properties for booking.</div>
-              </button>
-              <div className="text-center">
-                <button type="button" onClick={cancelRoleChoice} disabled={isLoading} className="text-sm text-muted-foreground hover:underline">Cancel</button>
-              </div>
-            </div>
-          )}
-
-          {view !== 'forgot-password' && view !== 'choose-role' && (
+          {view !== 'forgot-password' && (
             <div className="space-y-3">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
@@ -261,8 +201,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
             </div>
           )}
 
-          {view !== 'choose-role' && (
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               {view === 'register' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -331,19 +270,16 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                 {isLoading ? 'Please wait...' : view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Send reset link'}
               </Button>
             </form>
-          )}
 
-          {view !== 'choose-role' && (
-            <div className="text-center text-sm">
-              {view === 'login' ? (
-                <span>Don't have an account?{' '}<button type="button" onClick={() => { onModeChange('register'); setView('register'); }} className="text-primary font-semibold hover:underline">Sign up</button></span>
-              ) : view === 'register' ? (
-                <span>Already have an account?{' '}<button type="button" onClick={() => { onModeChange('login'); setView('login'); }} className="text-primary font-semibold hover:underline">Log in</button></span>
-              ) : (
-                <span>Remembered your password?{' '}<button type="button" onClick={() => setView('login')} className="text-primary font-semibold hover:underline">Back to log in</button></span>
-              )}
-            </div>
-          )}
+          <div className="text-center text-sm">
+            {view === 'login' ? (
+              <span>Don't have an account?{' '}<button type="button" onClick={() => { onModeChange('register'); setView('register'); }} className="text-primary font-semibold hover:underline">Sign up</button></span>
+            ) : view === 'register' ? (
+              <span>Already have an account?{' '}<button type="button" onClick={() => { onModeChange('login'); setView('login'); }} className="text-primary font-semibold hover:underline">Log in</button></span>
+            ) : (
+              <span>Remembered your password?{' '}<button type="button" onClick={() => setView('login')} className="text-primary font-semibold hover:underline">Back to log in</button></span>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

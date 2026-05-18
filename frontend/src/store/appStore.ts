@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { toast } from 'sonner';
 import type { User, SearchFilters } from '../core/types';
 import { authAPI, propertiesAPI, clearTokens, attemptTokenRefresh } from '../services/api.service';
-import type { GoogleLoginResult, GoogleSignupRole } from '../services/api/auth';
+import type { GoogleLoginResult } from '../services/api/auth';
 import { queryClient } from '../providers/QueryProvider';
 import { queryKeys } from '../hooks/queries/keys';
 
@@ -12,7 +12,7 @@ export interface AppStoreState {
   setUser: (user: User | null) => void;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
-  loginWithGoogle: (idToken: string, role?: GoogleSignupRole) => Promise<GoogleLoginResult>;
+  loginWithGoogle: (idToken: string) => Promise<GoogleLoginResult>;
   register: (data: {
     username: string;
     email: string;
@@ -47,12 +47,10 @@ export const useAppStore = create<AppStoreState>()(
         loadFavoritesIntoStore();
       },
 
-      loginWithGoogle: async (idToken, role) => {
-        const result = await authAPI.loginWithGoogle(idToken, role);
-        if (result.status === 'success') {
-          set({ user: result.user, isAuthenticated: true });
-          loadFavoritesIntoStore();
-        }
+      loginWithGoogle: async (idToken) => {
+        const result = await authAPI.loginWithGoogle(idToken);
+        set({ user: result.user, isAuthenticated: true });
+        loadFavoritesIntoStore();
         return result;
       },
 
