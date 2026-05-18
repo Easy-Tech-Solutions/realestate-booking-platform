@@ -48,11 +48,11 @@ def _check_superhost(owner):
 @permission_classes([IsAuthenticated])
 def bookings_collection(request):
     if request.method == "GET":
-        if request.user.role in ['agent', 'admin']:
-            bookings = Booking.objects.filter(listing__owner=request.user)
-        else:
-            bookings = Booking.objects.filter(customer=request.user)
-        bookings = bookings.order_by("-requested_at")
+        # Always return the requester's bookings as a guest (what /trips shows).
+        # Agents access bookings on their *listings* via the host dashboard
+        # endpoint (/api/users/me/dashboard/), which is a separate, role-aware
+        # surface — so this endpoint doesn't need to branch on role.
+        bookings = Booking.objects.filter(customer=request.user).order_by("-requested_at")
         return Response(BookingSerializer(bookings, many=True, context={'request': request}).data)
 
     elif request.method == "POST":
