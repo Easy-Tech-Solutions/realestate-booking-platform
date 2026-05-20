@@ -51,6 +51,7 @@ def booking_pre_save(sender, instance, **kwargs):
 def booking_post_save(sender, instance, created, **kwargs):
     from .services import (
         notify_booking_requested,
+        notify_booking_submitted,
         notify_booking_confirmed,
         notify_booking_declined,
         notify_booking_cancelled,
@@ -58,7 +59,8 @@ def booking_post_save(sender, instance, created, **kwargs):
     )
 
     if created:
-        notify_booking_requested(instance)
+        notify_booking_requested(instance)   # → host
+        notify_booking_submitted(instance)   # → guest
         return
 
     old_status = getattr(instance, '_pre_save_status', None)

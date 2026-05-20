@@ -5,7 +5,8 @@ from django.utils import timezone
 
 class NotificationType(models.TextChoices):
     # Booking lifecycle
-    BOOKING_REQUESTED  = 'booking_requested',  'Booking Requested'
+    BOOKING_REQUESTED  = 'booking_requested',  'Booking Requested'   # → host
+    BOOKING_SUBMITTED  = 'booking_submitted',  'Booking Submitted'   # → guest
     BOOKING_CONFIRMED  = 'booking_confirmed',  'Booking Confirmed'
     BOOKING_DECLINED   = 'booking_declined',   'Booking Declined'
     BOOKING_CANCELLED  = 'booking_cancelled',  'Booking Cancelled'
