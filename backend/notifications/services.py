@@ -165,6 +165,29 @@ def notify_booking_requested(booking):
     )
 
 
+def notify_booking_submitted(booking):
+    """Confirm to the guest that their booking request was submitted."""
+    create_notification(
+        user=booking.customer,
+        notification_type='booking_submitted',
+        title='Booking Requested',
+        message=(
+            f'Your request to book "{booking.listing.title}" from '
+            f'{booking.start_date} to {booking.end_date} has been sent to the host. '
+            f"You'll be notified once they accept or decline."
+        ),
+        data={
+            'booking_id':    booking.id,
+            'listing_id':    booking.listing.id,
+            'listing_title': booking.listing.title,
+            'owner_name':    booking.listing.owner.get_full_name() or booking.listing.owner.username,
+            'start_date':    str(booking.start_date),
+            'end_date':      str(booking.end_date),
+            'total_amount':  f'{Decimal(booking.total_amount):.2f}',
+        },
+    )
+
+
 def notify_booking_confirmed(booking):
     """Notify the customer their booking was confirmed."""
     create_notification(
