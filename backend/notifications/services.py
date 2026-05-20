@@ -93,9 +93,10 @@ def create_notification(
 
     prefs = _get_or_create_preferences(user)
 
-    if not prefs.in_app_enabled:
-        return None
-
+    # Always persist the Notification row so the email task has something to
+    # render from and the audit history is preserved. In-app *delivery*
+    # (live WebSocket push + Web Push) is gated by prefs.in_app_enabled
+    # separately, and the email goes through its own per-type preference.
     notification = Notification.objects.create(
         user=user,
         notification_type=notification_type,
@@ -104,24 +105,25 @@ def create_notification(
         data=data or {},
     )
 
-    # Push to WebSocket immediately (best-effort)
-    _push_realtime(user.id, {
-        'id':         notification.id,
-        'type':       notification_type,
-        'title':      title,
-        'message':    message,
-        'data':       data or {},
-        'is_read':    False,
-        'created_at': notification.created_at.isoformat(),
-    })
+    if prefs.in_app_enabled:
+        # Push to WebSocket immediately (best-effort)
+        _push_realtime(user.id, {
+            'id':         notification.id,
+            'type':       notification_type,
+            'title':      title,
+            'message':    message,
+            'data':       data or {},
+            'is_read':    False,
+            'created_at': notification.created_at.isoformat(),
+        })
 
-    # Queue email via Celery
+        # Queue Web Push via Celery
+        from .tasks import send_push_notification_task
+        send_push_notification_task.delay(notification.id)
+
+    # Email is independent of the in-app toggle — its own per-type pref decides.
     if send_email and user.email and prefs.email_enabled_for(notification_type):
         send_notification_email.delay(notification.id)
-
-    # Queue Web Push via Celery
-    from .tasks import send_push_notification_task
-    send_push_notification_task.delay(notification.id)
 
     return notification
 
