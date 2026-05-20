@@ -23,6 +23,14 @@ class NotificationViewSet(
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # If the user has turned off in-app notifications, the bell and
+        # /notifications page should show nothing. The rows still exist in
+        # the DB so emails still render and history reappears if they
+        # re-enable later.
+        prefs = NotificationPreference.objects.filter(user=self.request.user).first()
+        if prefs and not prefs.in_app_enabled:
+            return Notification.objects.none()
+
         qs = Notification.objects.filter(user=self.request.user)
 
         # Optional filter: ?is_read=true / false
@@ -65,6 +73,10 @@ class NotificationViewSet(
     @action(detail=False, methods=['get'], url_path='unread-count')
     def unread_count(self, request):
         #Return the count of unread notifications (for badge display)
+        # Bell badge must reflect what /notifications would actually show.
+        prefs = NotificationPreference.objects.filter(user=request.user).first()
+        if prefs and not prefs.in_app_enabled:
+            return Response({'unread_count': 0})
         count = Notification.objects.filter(user=request.user, is_read=False).count()
         return Response({'unread_count': count})
 
