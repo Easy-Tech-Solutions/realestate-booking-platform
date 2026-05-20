@@ -15,9 +15,15 @@ Flow for every notification
 """
 
 import logging
+from decimal import Decimal
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+
+# Platform commission on host payouts. Distinct from the guest-side service
+# fee (which is added on top of the booking subtotal); this one is subtracted
+# from what the host receives.
+HOST_SERVICE_FEE_RATE = Decimal('0.04')
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +132,11 @@ def notify_booking_requested(booking):
     """Notify the property owner of a new booking request."""
     owner         = booking.listing.owner
     customer_name = booking.customer.get_full_name() or booking.customer.username
+
+    booking_amount = Decimal(booking.total_amount)
+    host_service_fee = (booking_amount * HOST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
+    amount_received = (booking_amount - host_service_fee).quantize(Decimal('0.01'))
+
     create_notification(
         user=owner,
         notification_type='booking_requested',
@@ -135,13 +146,19 @@ def notify_booking_requested(booking):
             f'from {booking.start_date} to {booking.end_date}.'
         ),
         data={
-            'booking_id':    booking.id,
-            'listing_id':    booking.listing.id,
-            'listing_title': booking.listing.title,
-            'customer_name': customer_name,
-            'start_date':    str(booking.start_date),
-            'end_date':      str(booking.end_date),
-            'total_amount':  str(booking.total_amount),
+            'booking_id':       booking.id,
+            'listing_id':       booking.listing.id,
+            'listing_title':    booking.listing.title,
+            'customer_name':    customer_name,
+            'start_date':       str(booking.start_date),
+            'end_date':         str(booking.end_date),
+            'booking_amount':   f'{booking_amount:.2f}',
+            'host_service_fee': f'{host_service_fee:.2f}',
+            'amount_received':  f'{amount_received:.2f}',
+            # Kept for backwards compatibility with any existing UI that
+            # reads `total_amount`; new templates should use the three fields
+            # above instead.
+            'total_amount':     f'{booking_amount:.2f}',
         },
     )
 
