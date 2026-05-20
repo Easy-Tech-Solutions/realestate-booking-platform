@@ -116,7 +116,7 @@ function BookingForm() {
         paymentMethod,
       };
 
-      toast.success('Booking confirmed!');
+      toast.success('Booking requested!');
       navigate('/booking/confirmed', {
         state: { booking: confirmedBooking },
       });
