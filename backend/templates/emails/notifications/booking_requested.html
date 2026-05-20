@@ -10,7 +10,9 @@
   <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Guest:</strong> {{ data.customer_name }}</p>
   <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Check-in:</strong> {{ data.start_date }}</p>
   <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Check-out:</strong> {{ data.end_date }}</p>
-  <p style="margin:0;font-size:14px;color:#333333;line-height:1.6;"><strong>Total:</strong> {{ data.total_amount }}</p>
+  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Booking amount:</strong> ${{ data.booking_amount }}</p>
+  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Service fee:</strong> ${{ data.host_service_fee }}</p>
+  <p style="margin:0;font-size:14px;color:#333333;line-height:1.6;"><strong>Amount received:</strong> ${{ data.amount_received }}</p>
 </div>
 
 <a href="{{ site_url }}/host" style="display:inline-block;background:#004406;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">Review Request</a>
