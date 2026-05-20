@@ -78,7 +78,6 @@ def bookings_collection(request):
             if serializer.is_valid():
                 start = serializer.validated_data['start_date']
                 end = serializer.validated_data['end_date']
-                nights = max((end - start).days, 1)
                 hotel_room = serializer.validated_data.get('hotel_room')
                 if hotel_room:
                     if hotel_room.listing_id != listing.id:
@@ -86,9 +85,13 @@ def bookings_collection(request):
                     from listings.views import _get_available_room_count
                     if _get_available_room_count(hotel_room, start, end) < 1:
                         return Response({'error': 'Room not available for selected dates'}, status=status.HTTP_400_BAD_REQUEST)
-                    total_price = float(hotel_room.price_per_night) * nights
-                else:
-                    total_price = listing.price * nights
+
+                # Compute the full grand total (subtotal + cleaning + service + taxes,
+                # with weekend premiums and discounts) so it matches what the guest
+                # saw at checkout and what they're charged.
+                from listings.views import compute_listing_pricing
+                pricing = compute_listing_pricing(listing, start, end, room=hotel_room)
+                total_price = round(pricing["total"], 2)
                 booking = serializer.save(customer=request.user, total_price=total_price)
                 # Instant book: auto-confirm if listing is set to instant
                 if listing.booking_mode == 'instant':

@@ -183,7 +183,7 @@ def notify_booking_submitted(booking):
             'owner_name':    booking.listing.owner.get_full_name() or booking.listing.owner.username,
             'start_date':    str(booking.start_date),
             'end_date':      str(booking.end_date),
-            'total_amount':  f'{Decimal(booking.total_amount):.2f}',
+            'total_amount':  f'{Decimal(booking.total_price or booking.total_amount):.2f}',
         },
     )
 
