@@ -730,9 +730,9 @@ export function Account() {
             <h2 className="text-xl font-semibold mb-6">Notifications</h2>
             <div className="space-y-1">
               {[
-                { label: 'In-app notifications', description: 'Receive booking updates in the app', value: emailNotif, setter: setEmailNotif },
-                { label: 'Message emails', description: 'Get emails when you receive new messages', value: smsNotif, setter: setSmsNotif },
-                { label: 'Marketing emails', description: 'Receive promotional offers and tips', value: marketingNotif, setter: setMarketingNotif },
+                { label: 'In-app notifications', description: 'Receive booking updates in the app', value: emailNotif, setter: setEmailNotif, field: 'in_app_enabled' },
+                { label: 'Message emails', description: 'Get emails when you receive new messages', value: smsNotif, setter: setSmsNotif, field: 'new_message_email' },
+                { label: 'Marketing emails', description: 'Receive promotional offers and tips', value: marketingNotif, setter: setMarketingNotif, field: 'search_alert_email' },
               ].map((item, i, arr) => (
                 <div key={i}>
                   <div className="flex items-center justify-between py-3">
@@ -740,7 +740,19 @@ export function Account() {
                       <p className="font-medium">{item.label}</p>
                       <p className="text-sm text-muted-foreground">{item.description}</p>
                     </div>
-                    <Switch checked={item.value} onCheckedChange={v => { item.setter(v); toast.success(`${item.label} ${v ? 'enabled' : 'disabled'}`); }} />
+                    <Switch
+                      checked={item.value}
+                      onCheckedChange={async (v) => {
+                        item.setter(v);
+                        try {
+                          await notificationsAPI.updatePreferences({ [item.field]: v });
+                          toast.success(`${item.label} ${v ? 'enabled' : 'disabled'}`);
+                        } catch {
+                          item.setter(!v);
+                          toast.error(`Failed to update ${item.label.toLowerCase()}`);
+                        }
+                      }}
+                    />
                   </div>
                   {i < arr.length - 1 && <Separator />}
                 </div>
