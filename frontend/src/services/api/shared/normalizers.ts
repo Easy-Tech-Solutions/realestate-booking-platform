@@ -331,6 +331,8 @@ export function buildSearchParams(filters: SearchFilters): string {
   if (filters.priceMax) params.set('max_price', String(filters.priceMax));
   if (filters.bedrooms) params.set('min_bedrooms', String(filters.bedrooms));
   if (filters.guests) params.set('min_guests', String(filters.guests));
+  if (filters.checkIn) params.set('check_in', filters.checkIn.toISOString().slice(0, 10));
+  if (filters.checkOut) params.set('check_out', filters.checkOut.toISOString().slice(0, 10));
   if (filters.propertyType?.length === 1) {
     params.set('property_type', filters.propertyType[0]);
   } else if (filters.propertyType && filters.propertyType.length > 1) {

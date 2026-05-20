@@ -70,8 +70,25 @@ def category_detail(request, id):
 def listings_collection(request):
     if request.method == "GET":
         items = ListingFilter(request.GET, queryset=Listing.objects.filter(status='published'))
+        qs = items.qs
+
+        # When the search includes check-in/check-out, hide listings that
+        # already have a confirmed booking overlapping those dates. A booking
+        # overlaps if it starts before our check-out and ends after our
+        # check-in (standard half-open interval test).
+        check_in = request.GET.get('check_in')
+        check_out = request.GET.get('check_out')
+        if check_in and check_out:
+            from bookings.models import Booking
+            conflicting_listing_ids = Booking.objects.filter(
+                status='confirmed',
+                start_date__lt=check_out,
+                end_date__gt=check_in,
+            ).values_list('listing_id', flat=True)
+            qs = qs.exclude(id__in=conflicting_listing_ids)
+
         paginator = _ListingPagination()
-        page = paginator.paginate_queryset(items.qs, request)
+        page = paginator.paginate_queryset(qs, request)
         serialized = ListingSerializer(page, many=True, context={"request": request}).data
         return paginator.get_paginated_response(serialized)
 
