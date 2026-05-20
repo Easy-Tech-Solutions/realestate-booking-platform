@@ -621,6 +621,7 @@ def listing_pricing(request, listing_id):
 
     pricing = compute_listing_pricing(listing, start, end, room=room)
     nights = pricing["nights"]
+    base_price = pricing["base_price"]
     subtotal = pricing["subtotal"]
     discount = pricing["discount"]
     discount_label = pricing["discount_label"]
