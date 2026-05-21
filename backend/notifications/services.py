@@ -25,6 +25,11 @@ from channels.layers import get_channel_layer
 # from what the host receives.
 HOST_SERVICE_FEE_RATE = Decimal('0.04')
 
+# Service fee added on top of the booking subtotal that the guest pays. Must
+# stay in sync with the rate used by compute_listing_pricing in listings/views.py
+# so the guest's receipt email matches what they were charged at checkout.
+GUEST_SERVICE_FEE_RATE = Decimal('0.04')
+
 logger = logging.getLogger(__name__)
 
 
@@ -167,6 +172,10 @@ def notify_booking_requested(booking):
 
 def notify_booking_submitted(booking):
     """Confirm to the guest that their booking request was submitted."""
+    booking_amount = Decimal(booking.total_amount)
+    service_fee = (booking_amount * GUEST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
+    total = (booking_amount + service_fee).quantize(Decimal('0.01'))
+
     create_notification(
         user=booking.customer,
         notification_type='booking_submitted',
@@ -177,13 +186,15 @@ def notify_booking_submitted(booking):
             f"You'll be notified once they accept or decline."
         ),
         data={
-            'booking_id':    booking.id,
-            'listing_id':    booking.listing.id,
-            'listing_title': booking.listing.title,
-            'owner_name':    booking.listing.owner.get_full_name() or booking.listing.owner.username,
-            'start_date':    str(booking.start_date),
-            'end_date':      str(booking.end_date),
-            'total_amount':  f'{Decimal(booking.total_price or booking.total_amount):.2f}',
+            'booking_id':     booking.id,
+            'listing_id':     booking.listing.id,
+            'listing_title':  booking.listing.title,
+            'owner_name':     booking.listing.owner.get_full_name() or booking.listing.owner.username,
+            'start_date':     str(booking.start_date),
+            'end_date':       str(booking.end_date),
+            'booking_amount': f'{booking_amount:.2f}',
+            'service_fee':    f'{service_fee:.2f}',
+            'total_amount':   f'{total:.2f}',
         },
     )
 
