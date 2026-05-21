@@ -381,16 +381,8 @@ function BookingForm() {
                       <span>{formatCurrency(currentPricing.subtotal)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Cleaning fee</span>
-                      <span>{formatCurrency(currentPricing.cleaningFee)}</span>
-                    </div>
-                    <div className="flex justify-between">
                       <span>Service fee</span>
                       <span>{formatCurrency(currentPricing.serviceFee)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Taxes</span>
-                      <span>{formatCurrency(currentPricing.taxes)}</span>
                     </div>
                   </div>
 
