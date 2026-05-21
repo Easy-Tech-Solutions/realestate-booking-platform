@@ -106,16 +106,8 @@ export function BookingConfirmed() {
               <span>{formatCurrency(booking.basePrice)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Cleaning fee</span>
-              <span>{formatCurrency(booking.cleaningFee)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Service fee</span>
               <span>{formatCurrency(booking.serviceFee)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Taxes</span>
-              <span>{formatCurrency(booking.taxes)}</span>
             </div>
             <Separator className="my-3" />
             <div className="flex justify-between font-semibold">

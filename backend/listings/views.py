@@ -572,10 +572,13 @@ def compute_listing_pricing(listing, start, end, room=None):
             discount_label = f"{listing.last_minute_discount_percent}% last-minute discount"
 
     discounted_subtotal = subtotal - discount
-    cleaning_fee = min(50.0, base_price * 0.08)
+    # Cleaning fee and taxes are disabled for now — the guest is only charged
+    # the nightly subtotal plus the platform service fee. Kept as 0.0 in the
+    # response so any consumer that still reads these keys keeps working.
+    cleaning_fee = 0.0
     service_fee = discounted_subtotal * 0.04
-    taxes = (discounted_subtotal + service_fee) * 0.05
-    total = discounted_subtotal + cleaning_fee + service_fee + taxes
+    taxes = 0.0
+    total = discounted_subtotal + service_fee
 
     return {
         "nights": nights,
