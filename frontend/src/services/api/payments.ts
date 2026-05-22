@@ -15,7 +15,7 @@ const initiatePayment = async (payload: {
       phone_number: payload.phone_number,
       gateway: payload.gateway || 'mtn_momo',
       payment_method: payload.payment_method || 'mobile_money',
-      currency: payload.currency || 'LRD',
+      currency: payload.currency || 'USD',
     }),
   });
   return data.payment || data;
@@ -30,7 +30,7 @@ export const paymentAPI = {
       phone_number: phoneNumber,
       gateway: 'mtn_momo',
       payment_method: 'mobile_money',
-      currency: 'LRD',
+      currency: 'USD',
     });
   },
 
