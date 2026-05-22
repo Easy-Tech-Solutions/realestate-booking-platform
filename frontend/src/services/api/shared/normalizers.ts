@@ -273,6 +273,7 @@ export function normalizeConversation(conversation: any): Conversation {
       : undefined,
     unreadCount: Number(conversation.unread_count || 0),
     propertyId: conversation.listing ? String(conversation.listing) : undefined,
+    attachmentsAllowed: Boolean(conversation.attachments_allowed),
     createdAt: conversation.created_at,
     updatedAt: conversation.updated_at,
   };
