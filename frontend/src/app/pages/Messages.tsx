@@ -575,6 +575,12 @@ function ChatPane({
         : await messagesAPI.sendMessage(conversation.id, text, replyToMsg?.id);
       setMessages(prev => prev.map(m => m.id === optimistic.id ? sent : m));
       queryClient.invalidateQueries({ queryKey: queryKeys.messages.conversations });
+      if (sent.wasRedacted) {
+        toast.warning(
+          'We removed contact details from your message. Sharing them outside Home Konet means you lose refund and dispute protection.',
+          { duration: 8000 },
+        );
+      }
     } catch {
       setMessages(prev => prev.filter(m => m.id !== optimistic.id));
       setInput(text);

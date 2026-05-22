@@ -320,6 +320,7 @@ export function normalizeMessage(message: any): Message {
     editedAt: message.edited_at || undefined,
     attachments,
     replyTo,
+    wasRedacted: Boolean(message.was_redacted),
     createdAt: message.created_at,
   };
 }

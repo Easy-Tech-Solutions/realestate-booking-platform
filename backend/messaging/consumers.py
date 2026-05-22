@@ -105,6 +105,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send_error("Message content cannot be empty.")
             return
 
+        # Strip phone/email before persisting so the WS path can't bypass the
+        # redaction the HTTP path enforces.
+        from .redaction import redact_contact_info
+        content, _ = redact_contact_info(content)
+
         message = await self.save_message(self.conversation_id, self.user, content)
 
         await self.channel_layer.group_send(
