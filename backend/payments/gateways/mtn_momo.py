@@ -123,6 +123,13 @@ class MTNMoMoGateway(PaymentGatewayBase):
             currency = payment_data.get('currency', 'LRD')
             payment_id = payment_data.get('payment_id')  # our internal Payment UUID
 
+            # MTN sandbox only accepts EUR — every other currency 400s with
+            # NOT_ENOUGH_FUNDS / WRONG_CURRENCY. The local Payment row still
+            # stores the user-facing currency (LRD); this override is purely
+            # the wire format for sandbox testing.
+            if self.is_sandbox:
+                currency = 'EUR'
+
             if not self.is_sandbox and not self._validate_liberian_phone(phone_number):
                 return {
                     'success': False,

@@ -12,8 +12,16 @@ import { Textarea } from '../components/ui/textarea';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import { PaymentMethod } from '../../core/types';
-import { bookingsAPI } from '../../services/api.service';
+import { bookingsAPI, paymentAPI } from '../../services/api.service';
 import { fetchWithAuth } from '../../services/api/shared/client';
+
+// MTN MoMo is async — after we kick off the request-to-pay, the user has to
+// approve the prompt on their phone. We poll the verify endpoint until the
+// payment either completes or the user declines / it times out. Numbers
+// chosen so a real-world approval (3-15s) feels responsive, while a stuck
+// request gives up gracefully instead of hanging the UI forever.
+const MOMO_POLL_INTERVAL_MS = 3000;
+const MOMO_POLL_TIMEOUT_MS = 3 * 60 * 1000;  // 3 minutes
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -30,6 +38,9 @@ function BookingForm() {
   const [specialRequests, setSpecialRequests] = useState('');
   const [agreedToRules, setAgreedToRules] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  // MoMo-specific async state. 'awaiting' is shown while we poll for the
+  // user to approve the prompt on their phone.
+  const [momoStatus, setMomoStatus] = useState<'idle' | 'awaiting'>('idle');
 
   const currentProperty = property;
   const currentCheckIn = checkIn;
@@ -102,6 +113,48 @@ function BookingForm() {
         ...(selectedRoom ? { hotel_room: selectedRoom.id } : {}),
       });
 
+      // MTN MoMo: send a request-to-pay push, then poll for the user's
+      // approval. Until this completes we don't let them onto the
+      // confirmation page — no payment, no confirmation.
+      if (paymentMethod === 'mtn_momo') {
+        const payment = await paymentAPI.initiateMomoPayment(booking.id, phoneNumber);
+        const paymentId = payment?.id || payment?.payment?.id;
+        if (!paymentId) {
+          toast.error('Could not start MoMo payment. Please try again.');
+          return;
+        }
+
+        setMomoStatus('awaiting');
+        toast.info('Check your phone — approve the MoMo prompt to complete the booking.', {
+          duration: 8000,
+        });
+
+        const started = Date.now();
+        let confirmed = false;
+        while (Date.now() - started < MOMO_POLL_TIMEOUT_MS) {
+          await new Promise((r) => setTimeout(r, MOMO_POLL_INTERVAL_MS));
+          try {
+            const result = await paymentAPI.verifyPayment(paymentId);
+            const status = result?.payment?.status || result?.status;
+            if (status === 'completed') {
+              confirmed = true;
+              break;
+            }
+            if (status === 'failed') {
+              toast.error('Payment was declined or failed. Please try again.');
+              return;
+            }
+          } catch {
+            // Transient verify error — keep polling until the overall timeout.
+          }
+        }
+
+        if (!confirmed) {
+          toast.error('Payment timed out. You can retry from this page.');
+          return;
+        }
+      }
+
       const confirmedBooking = {
         ...booking,
         property: currentProperty,
@@ -116,7 +169,7 @@ function BookingForm() {
         paymentMethod,
       };
 
-      toast.success('Booking requested!');
+      toast.success(paymentMethod === 'mtn_momo' ? 'Payment received!' : 'Booking requested!');
       navigate('/booking/confirmed', {
         state: { booking: confirmedBooking },
       });
@@ -124,6 +177,7 @@ function BookingForm() {
       toast.error(err.message || 'Booking failed. Please try again.');
     } finally {
       setIsProcessing(false);
+      setMomoStatus('idle');
     }
   };
 
@@ -275,6 +329,16 @@ function BookingForm() {
                 </label>
               </div>
 
+              {momoStatus === 'awaiting' && (
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
+                  <p className="font-medium text-foreground">Check your phone to approve the payment</p>
+                  <p className="text-muted-foreground mt-1">
+                    We sent a MoMo prompt to {phoneNumber}. Approve it on your MTN Mobile Money app to
+                    complete the booking. This page will update automatically.
+                  </p>
+                </div>
+              )}
+
               <Button
                 type="button"
                 onClick={handlePayment}
@@ -282,7 +346,11 @@ function BookingForm() {
                 className="w-full"
                 size="lg"
               >
-                {isProcessing ? 'Processing...' : `Confirm and pay ${formatCurrency(currentPricing.total)}`}
+                {momoStatus === 'awaiting'
+                  ? 'Waiting for MoMo approval…'
+                  : isProcessing
+                    ? 'Processing...'
+                    : `Confirm and pay ${formatCurrency(currentPricing.total)}`}
               </Button>
             </div>
 
