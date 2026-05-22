@@ -12,6 +12,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from .models import Conversation, Message, MessageAttachment
+from .redaction import redact_contact_info
 from .serializers import (
     ConversationSerializer,
     MessageSerializer,
@@ -178,6 +179,10 @@ class SendMessageView(APIView):
         content = serializer.validated_data.get('content', '').strip()
         uploaded_files = request.FILES.getlist('files')
 
+        # Strip phone numbers / emails before persisting; the frontend uses
+        # `was_redacted` to show the sender a one-time educational nudge.
+        content, was_redacted = redact_contact_info(content)
+
         if content and uploaded_files:
             msg_type = 'text_file'
         elif uploaded_files:
@@ -234,7 +239,9 @@ class SendMessageView(APIView):
         })
 
         out = MessageSerializer(message, context={'request': request})
-        return Response(out.data, status=status.HTTP_201_CREATED)
+        payload = dict(out.data)
+        payload['was_redacted'] = was_redacted
+        return Response(payload, status=status.HTTP_201_CREATED)
 
 
 class EditMessageView(APIView):

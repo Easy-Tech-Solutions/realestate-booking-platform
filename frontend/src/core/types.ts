@@ -172,6 +172,9 @@ export interface Message {
   editedAt?: string;
   attachments: MessageAttachment[];
   replyTo?: MessageReplySnippet;
+  // True when the server stripped a phone number / email out of the content
+  // before persisting. Only set on the response from sendMessage.
+  wasRedacted?: boolean;
   createdAt: string;
 }
 
