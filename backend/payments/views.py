@@ -30,19 +30,11 @@ def initiate_payment(request):
             phone_number = serializer.validated_data['phone_number']
             currency_code = serializer.validated_data['currency']
 
-            # Convert booking amount (stored in listing's native currency, LRD)
-            # into the currency the user wants to pay in
-            from payments.models import Currency as _Currency
+            # Listings are priced in USD; booking.total_price already
+            # includes the guest-side service fee (set at booking creation
+            # by compute_listing_pricing). Use it directly — no FX needed.
             from decimal import Decimal as _D
-            lrd_amount = booking.total_amount  # always in LRD (listing price × days)
-            pay_currency = _Currency.objects.get(code=currency_code)
-            lrd_currency = _Currency.objects.filter(code='LRD').first()
-            if lrd_currency and pay_currency.code != 'LRD':
-                # Convert: LRD → USD → target currency
-                amount_usd = lrd_amount * lrd_currency.exchange_rate_to_usd
-                amount_in_pay_currency = amount_usd / pay_currency.exchange_rate_to_usd
-            else:
-                amount_in_pay_currency = _D(str(lrd_amount))
+            amount_in_pay_currency = _D(str(booking.total_price or booking.total_amount))
 
             payment = PaymentService.create_payment(
                 booking=booking,

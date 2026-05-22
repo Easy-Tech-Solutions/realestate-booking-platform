@@ -201,6 +201,10 @@ def notify_booking_submitted(booking):
 
 def notify_booking_confirmed(booking):
     """Notify the customer their booking was confirmed."""
+    booking_amount = Decimal(booking.total_amount)
+    service_fee = (booking_amount * GUEST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
+    total = (booking_amount + service_fee).quantize(Decimal('0.01'))
+
     create_notification(
         user=booking.customer,
         notification_type='booking_confirmed',
@@ -210,14 +214,16 @@ def notify_booking_confirmed(booking):
             f'from {booking.start_date} to {booking.end_date} has been confirmed.'
         ),
         data={
-            'booking_id':    booking.id,
-            'listing_id':    booking.listing.id,
-            'listing_title': booking.listing.title,
-            'owner_name':    booking.listing.owner.get_full_name() or booking.listing.owner.username,
-            'start_date':    str(booking.start_date),
-            'end_date':      str(booking.end_date),
-            'total_amount':  str(booking.total_amount),
-            'owner_notes':   booking.owner_notes,
+            'booking_id':     booking.id,
+            'listing_id':     booking.listing.id,
+            'listing_title':  booking.listing.title,
+            'owner_name':     booking.listing.owner.get_full_name() or booking.listing.owner.username,
+            'start_date':     str(booking.start_date),
+            'end_date':       str(booking.end_date),
+            'booking_amount': f'{booking_amount:.2f}',
+            'service_fee':    f'{service_fee:.2f}',
+            'total_amount':   f'{total:.2f}',
+            'owner_notes':    booking.owner_notes,
         },
     )
 
