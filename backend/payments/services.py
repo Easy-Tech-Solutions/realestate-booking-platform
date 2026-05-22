@@ -135,18 +135,18 @@ class PaymentService:
     @classmethod
     def _on_payment_confirmed(cls, payment: Payment) -> None:
         """
-        Centralised post-payment logic:
-          1. Confirm the booking.
-          2. Disburse funds to the property owner.
+        Centralised post-payment logic — confirm the booking only.
+
+        Funds are held in the platform's MoMo account (escrow) until the
+        guest has actually checked in; payout to the host is then triggered
+        manually via the admin dashboard. Do NOT call ``transfer_to_owner``
+        here — that would auto-forward the money on payment and defeat the
+        escrow guarantee.
         """
-        # 1. Confirm booking
         booking = payment.booking
         booking.status = 'confirmed'
         booking.confirmed_at = timezone.now()
         booking.save(update_fields=['status', 'confirmed_at'])
-
-        # 2. Disburse to owner
-        cls.transfer_to_owner(payment)
 
     @classmethod
     def transfer_to_owner(cls, payment: Payment) -> Dict[str, Any]:
