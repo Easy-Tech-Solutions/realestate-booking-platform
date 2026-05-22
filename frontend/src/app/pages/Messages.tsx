@@ -810,9 +810,28 @@ function ChatPane({
         <div className="flex items-end gap-2 rounded-2xl border border-border bg-background px-3 py-2 focus-within:ring-2 focus-within:ring-ring/50 focus-within:border-ring transition-[box-shadow]">
           <button
             type="button"
-            aria-label="Attach file"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-shrink-0 p-1 text-muted-foreground hover:text-primary transition-colors self-end mb-0.5"
+            aria-label={conversation.attachmentsAllowed
+              ? 'Attach file'
+              : 'Attachments unlock after a booking is confirmed'}
+            title={conversation.attachmentsAllowed
+              ? undefined
+              : 'Attachments unlock after a booking is confirmed'}
+            onClick={() => {
+              if (!conversation.attachmentsAllowed) {
+                toast.info(
+                  'Attachments unlock once you have a confirmed booking with this person. Sharing contact info in images can get your account suspended.',
+                  { duration: 8000 },
+                );
+                return;
+              }
+              fileInputRef.current?.click();
+            }}
+            className={cn(
+              'flex-shrink-0 p-1 transition-colors self-end mb-0.5',
+              conversation.attachmentsAllowed
+                ? 'text-muted-foreground hover:text-primary cursor-pointer'
+                : 'text-muted-foreground/40 cursor-not-allowed',
+            )}
           >
             <Paperclip className="w-4 h-4" />
           </button>

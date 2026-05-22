@@ -185,6 +185,9 @@ export interface Conversation {
   unreadCount: number;
   propertyId?: string;
   property?: Property;
+  // True only when the two participants share a confirmed/completed booking
+  // for this listing. Used to gate the file-upload button in chat.
+  attachmentsAllowed: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -79,13 +79,25 @@ class ConversationSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
     listing_title = serializers.SerializerMethodField()
+    attachments_allowed = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
         fields = [
             'id', 'participants', 'listing', 'listing_title',
-            'last_message', 'unread_count', 'created_at', 'updated_at'
+            'last_message', 'unread_count', 'attachments_allowed',
+            'created_at', 'updated_at',
         ]
+
+    def get_attachments_allowed(self, obj):
+        if not obj.listing_id:
+            return False
+        from bookings.models import Booking
+        return Booking.objects.filter(
+            listing_id=obj.listing_id,
+            status__in=['confirmed', 'completed'],
+            customer__in=obj.participants.all(),
+        ).exists()
 
     def get_last_message(self, obj):
         last = obj.messages.last()
