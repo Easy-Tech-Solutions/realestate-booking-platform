@@ -318,32 +318,53 @@ def notify_booking_completed(booking):
 def notify_payment_received(payment):
     """Notify the payer (success confirmation) and the property owner (income alert)."""
     listing_title = payment.booking.listing.title
-    amount_str    = f'{payment.amount} {payment.currency.code}'
-    common_data   = {
-        'payment_id':    str(payment.id),
-        'booking_id':    payment.booking.id,
-        'listing_id':    payment.booking.listing.id,
-        'listing_title': listing_title,
-        'amount':        str(payment.amount),
-        'currency':      payment.currency.code,
-    }
+    currency_code = payment.currency.code
 
+    # Host-side numbers: the "booking amount" the guest paid for the stay
+    # (excluding the guest's service fee, which stays with the platform),
+    # minus our 4% commission from the host.
+    booking_amount = Decimal(payment.booking.total_amount)
+    host_service_fee = (booking_amount * HOST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
+    amount_received = (booking_amount - host_service_fee).quantize(Decimal('0.01'))
+
+    # Guest sees what they actually paid (includes their 4% service fee).
     create_notification(
         user=payment.user,
         notification_type='payment_received',
         title='Payment Successful',
-        message=f'Your payment of {amount_str} for "{listing_title}" was successful.',
-        data=common_data,
+        message=f'Your payment of {payment.amount} {currency_code} for "{listing_title}" was successful.',
+        data={
+            'payment_id':    str(payment.id),
+            'booking_id':    payment.booking.id,
+            'listing_id':    payment.booking.listing.id,
+            'listing_title': listing_title,
+            'amount':        str(payment.amount),
+            'currency':      currency_code,
+        },
     )
 
+    # Host sees the booking-level breakdown — what the guest paid for the
+    # stay, our commission, and what the host nets.
     owner = payment.booking.listing.owner
     if owner != payment.user:
         create_notification(
             user=owner,
-            notification_type='payment_received',
+            notification_type='payment_received_host',
             title='Payment Received',
-            message=f'You received a payment of {amount_str} for "{listing_title}".',
-            data=common_data,
+            message=(
+                f'A guest has paid for "{listing_title}". You will receive '
+                f'{amount_received} {currency_code} after our {HOST_SERVICE_FEE_RATE * 100:.0f}% commission.'
+            ),
+            data={
+                'payment_id':       str(payment.id),
+                'booking_id':       payment.booking.id,
+                'listing_id':       payment.booking.listing.id,
+                'listing_title':    listing_title,
+                'currency':         currency_code,
+                'booking_amount':   f'{booking_amount:.2f}',
+                'host_service_fee': f'{host_service_fee:.2f}',
+                'amount_received':  f'{amount_received:.2f}',
+            },
         )
 
 
