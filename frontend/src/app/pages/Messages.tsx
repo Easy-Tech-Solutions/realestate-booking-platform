@@ -90,7 +90,7 @@ function AttachmentView({ att }: { att: MessageAttachment }) {
         <img
           src={att.fileUrl}
           alt={att.fileName}
-          className="max-w-[220px] rounded-xl mt-1 cursor-pointer hover:opacity-90 transition-opacity"
+          className="max-w-full sm:max-w-[220px] rounded-xl mt-1 cursor-pointer hover:opacity-90 transition-opacity"
         />
       </a>
     );
@@ -960,7 +960,7 @@ export function Messages() {
   const showList = !selectedId;
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex bg-background overflow-hidden">
+    <div className="h-[calc(100vh-9rem)] md:h-[calc(100vh-5rem)] flex bg-background overflow-hidden">
       {/* Sidebar */}
       <div className={cn(
         'w-full lg:w-80 xl:w-96 flex-shrink-0 flex flex-col border-r border-border bg-card/30',
