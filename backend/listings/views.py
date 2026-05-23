@@ -747,3 +747,82 @@ def my_drafts(request):
         return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
     drafts = Listing.objects.filter(owner=request.user, status='draft').order_by('-updated_at')
     return Response(ListingSerializer(drafts, many=True, context={"request": request}).data)
+
+
+@api_view(["GET"])
+def my_listings(request):
+    """Authenticated host: see all own listings (all statuses)."""
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    items = Listing.objects.filter(owner=request.user).exclude(status='draft').order_by('-created_at')
+    return Response(ListingSerializer(items, many=True, context={"request": request}).data)
+
+
+@api_view(["GET"])
+def pending_review_listings(request):
+    """Admin-only: listings waiting for review."""
+    if not request.user.is_authenticated or not (request.user.is_staff or getattr(request.user, 'role', '') == 'admin'):
+        return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
+    items = Listing.objects.filter(status='pending_review').order_by('-created_at')
+    return Response(ListingSerializer(items, many=True, context={"request": request}).data)
+
+
+@api_view(["POST"])
+def approve_listing(request, id):
+    """Admin approves a pending listing — sets status to published."""
+    if not request.user.is_authenticated or not (request.user.is_staff or getattr(request.user, 'role', '') == 'admin'):
+        return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
+    try:
+        listing = Listing.objects.get(pk=id)
+    except Listing.DoesNotExist:
+        return Response({"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND)
+    if listing.status not in ('pending_review', 'rejected'):
+        return Response({"error": "Listing is not pending review"}, status=status.HTTP_400_BAD_REQUEST)
+    listing.status = 'published'
+    listing.save(update_fields=['status'])
+    # Send email notification to host
+    try:
+        from django.core.mail import send_mail
+        from django.conf import settings as django_settings
+        send_mail(
+            subject='Your listing has been approved — HomeKonet',
+            message=f'Hi {listing.owner.first_name},\n\nGreat news! Your listing "{listing.title}" has been reviewed and approved. It is now live on HomeKonet.\n\nThank you for being part of our community!\n\nThe HomeKonet Team',
+            from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@homekonet.com'),
+            recipient_list=[listing.owner.email],
+            fail_silently=True,
+        )
+    except Exception:
+        pass
+    return Response(ListingSerializer(listing, context={"request": request}).data)
+
+
+@api_view(["POST"])
+def reject_listing(request, id):
+    """Admin rejects a pending listing."""
+    if not request.user.is_authenticated or not (request.user.is_staff or getattr(request.user, 'role', '') == 'admin'):
+        return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
+    try:
+        listing = Listing.objects.get(pk=id)
+    except Listing.DoesNotExist:
+        return Response({"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND)
+    listing.status = 'rejected'
+    listing.save(update_fields=['status'])
+    reason = request.data.get('reason', '')
+    # Notify host
+    try:
+        from django.core.mail import send_mail
+        from django.conf import settings as django_settings
+        msg = f'Hi {listing.owner.first_name},\n\nUnfortunately, your listing "{listing.title}" was not approved at this time.'
+        if reason:
+            msg += f'\n\nReason: {reason}'
+        msg += '\n\nYou may update your listing and resubmit, or contact us at homekonnet@gmail.com for help.\n\nThe HomeKonet Team'
+        send_mail(
+            subject='Update on your listing submission — HomeKonet',
+            message=msg,
+            from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@homekonet.com'),
+            recipient_list=[listing.owner.email],
+            fail_silently=True,
+        )
+    except Exception:
+        pass
+    return Response({"status": "rejected", "reason": reason})

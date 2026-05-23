@@ -44,7 +44,9 @@ class Listing(models.Model):
 
     STATUS_CHOICES = [
         ('draft', 'Draft'),
+        ('pending_review', 'Pending Review'),
         ('published', 'Published'),
+        ('rejected', 'Rejected'),
     ]
 
     title = models.CharField(max_length=200)
@@ -83,7 +85,7 @@ class Listing(models.Model):
     weapons_on_property = models.BooleanField(default=False)
     cancellation_policy = models.CharField(max_length=20, choices=CANCELLATION_POLICIES, default='flexible')
     is_available = models.BooleanField(default=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='published')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending_review')
     main_image = models.ImageField(upload_to='listings/main/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

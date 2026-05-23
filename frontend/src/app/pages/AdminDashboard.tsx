@@ -74,6 +74,8 @@ export function AdminDashboard() {
   const [loading, setLoading]       = useState(true);
   const [userSearch, setUserSearch] = useState('');
   const [propSearch, setPropSearch] = useState('');
+  const [pendingListings, setPendingListings] = useState<any[]>([]);
+  const [propTab, setPropTab] = useState<'published' | 'pending'>('published');
 
   // Support state
   const [supportTickets, setSupportTickets]     = useState<SupportTicket[]>([]);
@@ -88,14 +90,16 @@ export function AdminDashboard() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, usersRes, propsRes] = await Promise.all([
+      const [statsRes, usersRes, propsRes, pendingRes] = await Promise.all([
         usersAPI.adminStats(),
         usersAPI.listAll(),
         propertiesAPI.getAll(),
+        propertiesAPI.getPendingReview().catch(() => []),
       ]);
       setStats(statsRes);
       setUsers(usersRes);
       setProperties(propsRes);
+      setPendingListings(pendingRes);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to load admin data');
     } finally {
@@ -126,6 +130,29 @@ export function AdminDashboard() {
       setProperties(prev => prev.filter(p => String(p.id) !== String(listingId)));
     } catch (err: any) {
       toast.error(err?.message || 'Failed to remove listing');
+    }
+  };
+
+  const handleApproveListing = async (listingId: string, title: string) => {
+    try {
+      await propertiesAPI.approveListing(listingId);
+      toast.success(`"${title}" approved and now live!`);
+      setPendingListings(prev => prev.filter(p => String(p.id) !== String(listingId)));
+      await loadData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to approve listing');
+    }
+  };
+
+  const handleRejectListing = async (listingId: string, title: string) => {
+    const reason = window.prompt(`Rejection reason for "${title}" (optional):`);
+    if (reason === null) return; // user cancelled prompt
+    try {
+      await propertiesAPI.rejectListing(listingId, reason);
+      toast.success(`"${title}" rejected.`);
+      setPendingListings(prev => prev.filter(p => String(p.id) !== String(listingId)));
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to reject listing');
     }
   };
 
@@ -317,61 +344,158 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Property</TableHead>
-                  <TableHead>Host</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading
-                  ? [...Array(5)].map((_, i) => (
-                      <TableRow key={i}>
-                        {[...Array(4)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
-                      </TableRow>
-                    ))
-                  : filteredProperties.map((p: any) => (
-                      <TableRow key={p.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            {p.images?.[0] && (
-                              <img src={p.images[0]} alt={p.title} className="w-12 h-8 rounded object-cover" />
-                            )}
-                            <div>
-                              <p className="font-medium truncate max-w-[200px]">{p.title}</p>
-                              <p className="text-sm text-muted-foreground">{p.location?.city}</p>
+      {/* Pending review banner */}
+      {pendingListings.length > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-xl">
+          <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse flex-shrink-0" />
+          <p className="text-sm font-medium text-yellow-800">
+            {pendingListings.length} listing{pendingListings.length > 1 ? 's' : ''} pending your review
+          </p>
+          <button type="button" onClick={() => setPropTab('pending')} className="ml-auto text-sm text-primary font-semibold hover:underline">
+            Review now →
+          </button>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setPropTab('published')}
+          className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${propTab === 'published' ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary'}`}
+        >
+          Published ({filteredProperties.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setPropTab('pending')}
+          className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${propTab === 'pending' ? 'bg-yellow-500 text-white border-yellow-500' : 'border-border text-muted-foreground hover:border-yellow-400'}`}
+        >
+          Pending Review ({pendingListings.length})
+        </button>
+      </div>
+
+      {propTab === 'published' ? (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Property</TableHead>
+                    <TableHead>Host</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading
+                    ? [...Array(5)].map((_, i) => (
+                        <TableRow key={i}>
+                          {[...Array(4)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                        </TableRow>
+                      ))
+                    : filteredProperties.map((p: any) => (
+                        <TableRow key={p.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              {p.images?.[0] && (
+                                <img src={p.images[0]} alt={p.title} className="w-12 h-8 rounded object-cover" />
+                              )}
+                              <div>
+                                <p className="font-medium truncate max-w-[200px]">{p.title}</p>
+                                <p className="text-sm text-muted-foreground">{p.location?.city}</p>
+                              </div>
                             </div>
+                          </TableCell>
+                          <TableCell>{p.host?.firstName} {p.host?.lastName}</TableCell>
+                          <TableCell>{formatCurrency(p.price)}/night</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="sm" onClick={() => navigate(`/rooms/${p.id}`)}>
+                                <Eye className="h-3 w-3 mr-1" /> View
+                              </Button>
+                              <Button
+                                variant="outline" size="sm" className="text-red-600"
+                                onClick={() => handleRemoveListing(String(p.id), p.title)}
+                              >
+                                <X className="h-3 w-3 mr-1" /> Remove
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  }
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Property</TableHead>
+                    <TableHead>Host</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingListings.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        No listings pending review.
+                      </TableCell>
+                    </TableRow>
+                  ) : pendingListings.map((p: any) => (
+                    <TableRow key={p.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          {p.images?.[0] && (
+                            <img src={p.images[0]} alt={p.title} className="w-12 h-8 rounded object-cover" />
+                          )}
+                          <div>
+                            <p className="font-medium truncate max-w-[200px]">{p.title}</p>
+                            <p className="text-sm text-muted-foreground">{p.location?.city}</p>
                           </div>
-                        </TableCell>
-                        <TableCell>{p.host?.firstName} {p.host?.lastName}</TableCell>
-                        <TableCell>{formatCurrency(p.price)}/night</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => navigate(`/rooms/${p.id}`)}>
-                              <Eye className="h-3 w-3 mr-1" /> View
-                            </Button>
-                            <Button
-                              variant="outline" size="sm" className="text-red-600"
-                              onClick={() => handleRemoveListing(String(p.id), p.title)}
-                            >
-                              <X className="h-3 w-3 mr-1" /> Remove
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                }
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                        </div>
+                      </TableCell>
+                      <TableCell>{p.host?.firstName} {p.host?.lastName}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/rooms/${p.id}`)}>
+                            <Eye className="h-3 w-3 mr-1" /> Preview
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-primary text-white"
+                            onClick={() => handleApproveListing(String(p.id), p.title)}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant="outline" size="sm" className="text-red-600 border-red-200"
+                            onClick={() => handleRejectListing(String(p.id), p.title)}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 

@@ -7,6 +7,8 @@ import { formatCurrency, formatDate } from '../../core/utils';
 import type { Booking } from '../../core/types';
 import { useBookingConfirmedData } from '../../hooks/queries/useBookingConfirmed';
 
+const BOOKING_FEE = 3;
+
 export function BookingConfirmed() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -14,6 +16,48 @@ export function BookingConfirmed() {
   // ID comes only from router state — never from the URL to avoid leaking booking IDs in logs/history.
   const bookingId = stateBooking?.id;
   const { booking, isLoading, isError } = useBookingConfirmedData(bookingId || undefined, stateBooking);
+
+  const handleDownloadReceipt = () => {
+    if (!booking) return;
+    const checkIn = formatDate(booking.checkIn, 'MMM dd, yyyy');
+    const checkOut = formatDate(booking.checkOut, 'MMM dd, yyyy');
+    const bookingFee = (booking as any).bookingFee ?? BOOKING_FEE;
+    const total = (booking.basePrice || 0) + (booking.serviceFee || 0) + bookingFee;
+    const lines = [
+      '==============================',
+      '     HOMEKONET BOOKING RECEIPT',
+      '==============================',
+      '',
+      `Booking ID  : ${booking.id}`,
+      `Property    : ${booking.property?.title ?? '—'}`,
+      `Location    : ${booking.property?.location?.city ?? ''}, ${booking.property?.location?.state ?? ''}`,
+      `Hosted by   : ${booking.property?.host?.firstName ?? '—'}`,
+      '',
+      `Check-in    : ${checkIn}`,
+      `Check-out   : ${checkOut}`,
+      `Guests      : ${booking.guests}`,
+      '',
+      '--- Price Breakdown -----------',
+      `Subtotal    : ${formatCurrency(booking.basePrice)}`,
+      `Service fee : ${formatCurrency(booking.serviceFee)}`,
+      `Booking fee : ${formatCurrency(bookingFee)}`,
+      '------------------------------',
+      `Total       : ${formatCurrency(total)}`,
+      '',
+      'Thank you for booking with HomeKonet!',
+      'homekonnet@gmail.com',
+    ];
+    const content = lines.join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `homekonet-receipt-${booking.id}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   if (isLoading) {
     return (
@@ -106,16 +150,12 @@ export function BookingConfirmed() {
               <span>{formatCurrency(booking.basePrice)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Cleaning fee</span>
-              <span>{formatCurrency(booking.cleaningFee)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Service fee</span>
               <span>{formatCurrency(booking.serviceFee)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Taxes</span>
-              <span>{formatCurrency(booking.taxes)}</span>
+              <span className="text-muted-foreground">Booking fee</span>
+              <span>{formatCurrency((booking as any).bookingFee ?? BOOKING_FEE)}</span>
             </div>
             <Separator className="my-3" />
             <div className="flex justify-between font-semibold">
@@ -153,7 +193,7 @@ export function BookingConfirmed() {
           <Button variant="outline" className="flex-1" onClick={() => navigate('/trips')}>
             View my bookings
           </Button>
-          <Button variant="outline" size="icon" title="Download receipt">
+          <Button variant="outline" size="icon" title="Download receipt" type="button" onClick={handleDownloadReceipt}>
             <Download className="w-4 h-4" />
           </Button>
         </div>

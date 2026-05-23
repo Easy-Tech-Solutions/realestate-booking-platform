@@ -94,6 +94,7 @@ export function PropertyDetails() {
     communication: 0, location_rating: 0, value: 0,
   });
   const [selectedRoom, setSelectedRoom] = useState<HotelRoom | null>(null);
+  const [roomQuantity, setRoomQuantity] = useState(1);
   const pricingQuery = usePropertyPricing(
     id,
     dateRange?.from?.toISOString().split('T')[0],
@@ -195,7 +196,7 @@ export function PropertyDetails() {
       return;
     }
     navigate('/book', {
-      state: { property, checkIn: dateRange.from, checkOut: dateRange.to, guests, pricing, selectedRoom },
+      state: { property, checkIn: dateRange.from, checkOut: dateRange.to, guests, pricing, selectedRoom, roomQuantity },
     });
   };
 
@@ -220,7 +221,25 @@ export function PropertyDetails() {
                 </button>
               </div>
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={async () => {
+                    const url = window.location.href;
+                    const title = property.title;
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({ title, url });
+                      } catch {
+                        // user cancelled — no action needed
+                      }
+                    } else {
+                      await navigator.clipboard.writeText(url);
+                      import('sonner').then(({ toast }) => toast.success('Link copied to clipboard'));
+                    }
+                  }}
+                >
                   <Share className="w-4 h-4 mr-2" />
                   Share
                 </Button>
@@ -255,13 +274,16 @@ export function PropertyDetails() {
               }}
               onClick={() => { setSelectedImageIndex(mobileSlideIndex); setShowImageGallery(true); }}
             >
-              {/* Sliding strip */}
+              {/* Sliding strip — each slide is exactly 1/N of the total strip width */}
               <div
                 className="flex h-full transition-transform duration-300 ease-in-out will-change-transform"
-                style={{ transform: `translateX(-${mobileSlideIndex * 100}%)` }}
+                style={{
+                  width: `${property.images.length * 100}%`,
+                  transform: `translateX(-${(mobileSlideIndex / property.images.length) * 100}%)`,
+                }}
               >
                 {property.images.map((img, i) => (
-                  <div key={i} className="min-w-full h-full flex-shrink-0">
+                  <div key={i} className="h-full flex-shrink-0" style={{ width: `${100 / property.images.length}%` }}>
                     <img src={img} alt={`${property.title} ${i + 1}`} className="w-full h-full object-cover" draggable={false} />
                   </div>
                 ))}
@@ -468,7 +490,12 @@ export function PropertyDetails() {
                         return (
                           <div
                             key={room.id}
-                            onClick={() => !isUnavailable && setSelectedRoom(isSelected ? null : room)}
+                            onClick={() => {
+                            if (!isUnavailable) {
+                              setSelectedRoom(isSelected ? null : room);
+                              setRoomQuantity(1);
+                            }
+                          }}
                             className={`border rounded-xl overflow-hidden transition-all cursor-pointer ${
                               isUnavailable
                                 ? 'opacity-50 cursor-not-allowed border-border'
@@ -541,6 +568,23 @@ export function PropertyDetails() {
                                       : <p className="text-xs text-green-700 mt-1">{available} of {room.totalCount} available</p>
                                   ) : (
                                     <p className="text-xs text-muted-foreground mt-1">{room.totalCount} room{room.totalCount !== 1 ? 's' : ''}</p>
+                                  )}
+                                  {/* Quantity selector - only when this room is selected */}
+                                  {isSelected && (
+                                    <div className="flex items-center gap-2 mt-2" onClick={e => e.stopPropagation()}>
+                                      <span className="text-xs text-muted-foreground">Rooms:</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setRoomQuantity(q => Math.max(1, q - 1))}
+                                        className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:bg-muted text-sm"
+                                      >−</button>
+                                      <span className="text-sm font-semibold w-4 text-center">{roomQuantity}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setRoomQuantity(q => Math.min(available, q + 1))}
+                                        className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:bg-muted text-sm"
+                                      >+</button>
+                                    </div>
                                   )}
                                 </div>
                               </div>

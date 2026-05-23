@@ -262,4 +262,27 @@ export const propertiesAPI = {
     );
     return data.map(normalizeHotelRoomAvailability);
   },
+
+  // Admin: listing verification
+  getPendingReview: async (): Promise<Property[]> => {
+    const data = await fetchWithAuth<any[]>('/api/listings/pending-review/');
+    return data.map(normalizeListing);
+  },
+
+  approveListing: async (id: string): Promise<Property> => {
+    const data = await fetchWithAuth<any>(`/api/listings/${id}/approve/`, { method: 'POST' });
+    return normalizeListing(data);
+  },
+
+  rejectListing: async (id: string, reason?: string): Promise<void> => {
+    await fetchWithAuth(`/api/listings/${id}/reject/`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || '' }),
+    });
+  },
+
+  getMyListings: async (): Promise<Property[]> => {
+    const data = await fetchWithAuth<any[]>('/api/listings/my-listings/');
+    return data.map(normalizeListing);
+  },
 };
