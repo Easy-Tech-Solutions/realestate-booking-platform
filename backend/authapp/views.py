@@ -327,7 +327,6 @@ def password_reset_confirm(request):
 
 
 GOOGLE_ALLOWED_ISSUERS = {"accounts.google.com", "https://accounts.google.com"}
-GOOGLE_SIGNUP_ALLOWED_ROLES = {"user", "agent"}
 
 
 def _verify_google_id_token(token):
@@ -423,13 +422,15 @@ def google_login(request):
     """Sign in or register via a Google ID token.
 
     Request body:
-      { "id_token": "<JWT from Google>", "role": "user" | "agent" (optional) }
+      { "id_token": "<JWT from Google>" }
+
+    Every new account starts with role='user'. Users upgrade themselves to
+    'agent' by clicking "Become a host" / "List Your Property", which hits
+    /api/users/me/profile/. There is no role picker on signup.
 
     Responses:
       200 { refresh, access, user }                   — existing user signed in
-      200 { needs_role: true, email, suggested_username }
-                                                       — new user, frontend must
-                                                         resubmit with `role`
+      201 { refresh, access, user }                   — new user created
       409 { error: "...", code: "email_already_registered" }
                                                        — local account owns this
                                                          email (no auto-linking)
@@ -491,30 +492,11 @@ def google_login(request):
             status=status.HTTP_409_CONFLICT,
         )
 
-    # Case 3: new user. Require a role choice on this second call.
-    role = request.data.get("role")
-    if role is None:
-        return Response(
-            {
-                "needs_role": True,
-                "email": email,
-                "suggested_username": _unique_username_from_email(email),
-                "first_name": first_name,
-                "last_name": last_name,
-            },
-            status=status.HTTP_200_OK,
-        )
-
-    if role not in GOOGLE_SIGNUP_ALLOWED_ROLES:
-        return Response(
-            {"error": "Invalid role. Choose 'user' or 'agent'."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
+    # Case 3: new user. Create with the default role ('user') — they can
+    # upgrade to 'agent' later via the "Become a host" button.
     try:
         with transaction.atomic():
-            # Re-check inside the transaction to close the race window between
-            # the needs_role response and this call.
+            # Re-check inside the transaction to close any race window.
             if User.objects.filter(email__iexact=email).exists():
                 return Response(
                     {
@@ -530,7 +512,7 @@ def google_login(request):
                 email=email,
                 first_name=first_name,
                 last_name=last_name,
-                role=role,
+                role='user',
                 email_verified=True,
                 is_active=True,
             )

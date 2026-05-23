@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router';
 import { Calendar, Heart, MapPin, Star, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -10,10 +11,13 @@ import { useUserDashboardData } from '../../hooks/queries/useUserDashboard';
 const statusColor: Record<string, string> = {
   confirmed: 'bg-primary/10 text-primary',
   pending: 'bg-yellow-100 text-yellow-700',
+  declined: 'bg-destructive/10 text-destructive',
+  cancelled: 'bg-gray-100 text-gray-600',
   completed: 'bg-gray-100 text-gray-600',
 };
 
 export function UserDashboard() {
+  const navigate = useNavigate();
   const { user, isAuthenticated } = useApp();
   const {
     dashboardQuery,
@@ -116,7 +120,7 @@ export function UserDashboard() {
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[trip.booking.status]}`}>
                         {trip.booking.status}
                       </span>
-                      <Button variant="outline" size="sm">View</Button>
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/rooms/${trip.property.id}`)}>View</Button>
                     </div>
                   </div>
                 ))}

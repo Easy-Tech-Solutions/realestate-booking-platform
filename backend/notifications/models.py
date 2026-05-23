@@ -5,15 +5,17 @@ from django.utils import timezone
 
 class NotificationType(models.TextChoices):
     # Booking lifecycle
-    BOOKING_REQUESTED  = 'booking_requested',  'Booking Requested'
+    BOOKING_REQUESTED  = 'booking_requested',  'Booking Requested'   # → host
+    BOOKING_SUBMITTED  = 'booking_submitted',  'Booking Submitted'   # → guest
     BOOKING_CONFIRMED  = 'booking_confirmed',  'Booking Confirmed'
     BOOKING_DECLINED   = 'booking_declined',   'Booking Declined'
     BOOKING_CANCELLED  = 'booking_cancelled',  'Booking Cancelled'
     BOOKING_COMPLETED  = 'booking_completed',  'Booking Completed'
     # Payments
-    PAYMENT_RECEIVED   = 'payment_received',   'Payment Received'
-    PAYMENT_FAILED     = 'payment_failed',     'Payment Failed'
-    PAYMENT_REFUNDED   = 'payment_refunded',   'Payment Refunded'
+    PAYMENT_RECEIVED      = 'payment_received',      'Payment Received'         # → guest (paid)
+    PAYMENT_RECEIVED_HOST = 'payment_received_host', 'Payment Received (Host)'  # → host (earned)
+    PAYMENT_FAILED        = 'payment_failed',        'Payment Failed'
+    PAYMENT_REFUNDED      = 'payment_refunded',      'Payment Refunded'
     # Messaging
     NEW_MESSAGE        = 'new_message',        'New Message'
     # Listings

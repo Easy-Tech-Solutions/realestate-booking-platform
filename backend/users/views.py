@@ -310,6 +310,14 @@ def update_profile(request):
             setattr(user, field, data[field])
         user.save(update_fields=changed)
 
+    # Role changes — only allow self-promotion between 'user' and 'agent'.
+    # Admin role is intentionally NOT writable here to prevent privilege
+    # escalation; admins are provisioned through Django admin / shell only.
+    if 'role' in data and data['role'] in ('user', 'agent') and user.role != 'admin':
+        if user.role != data['role']:
+            user.role = data['role']
+            user.save(update_fields=['role'])
+
     # Update profile fields (image + bio)
     profile, _ = Profile.objects.get_or_create(user=user)
     profile_changed = False

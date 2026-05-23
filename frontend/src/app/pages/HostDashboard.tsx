@@ -3,9 +3,11 @@ import {
   BarChart3,
   Calendar,
   Camera,
+  CheckCircle2,
   DollarSign,
   Edit,
   Eye,
+  History,
   Home,
   Mail,
   MessageSquare,
@@ -16,8 +18,12 @@ import {
   Trash2,
   TrendingUp,
   Hotel,
+  XCircle,
 } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { bookingsAPI } from '../../services/api/bookings';
+import { queryKeys } from '../../hooks/queries/keys';
 import {
   Sidebar,
   SidebarContent,
@@ -54,14 +60,14 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line,
 } from 'recharts';
-import type { Booking, Conversation, Property } from '../../core/types';
+import type { Booking, BookingStatus, Conversation, Property } from '../../core/types';
 import { toast } from 'sonner';
 import { getErrorMessage } from '../../services/api/shared/errors';
 import { useSendMessage } from '../../hooks/queries/useMessages';
 import { useQuery } from '@tanstack/react-query';
 import { useDeleteHostProperty, useHostDashboardData, useRespondToHostReview, useUpdateHostProperty } from '../../hooks/queries/useHostDashboard';
 
-type Section = 'overview' | 'properties' | 'bookings' | 'messages' | 'pricing' | 'reviews';
+type Section = 'overview' | 'properties' | 'bookings' | 'accepted' | 'declined' | 'past' | 'messages' | 'pricing' | 'reviews';
 
 type DashboardMessage = {
   id: string;
@@ -76,6 +82,9 @@ const navItems: { id: Section; label: string; icon: React.ElementType; badge?: n
   { id: 'overview', label: 'Overview', icon: BarChart3 },
   { id: 'properties', label: 'Properties', icon: Home },
   { id: 'bookings', label: 'Upcoming Bookings', icon: Calendar },
+  { id: 'accepted', label: 'Accepted Bookings', icon: CheckCircle2 },
+  { id: 'declined', label: 'Declined Bookings', icon: XCircle },
+  { id: 'past', label: 'Past Bookings', icon: History },
   { id: 'messages', label: 'Messages', icon: MessageSquare },
   { id: 'pricing', label: 'Pricing', icon: DollarSign },
   { id: 'reviews', label: 'Recent Reviews', icon: Star },
@@ -575,9 +584,66 @@ function getMonthKey(dateString?: string) {
   return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString('en-US', { month: 'short' });
 }
 
+const VALID_SECTIONS: Section[] = ['overview', 'properties', 'bookings', 'accepted', 'declined', 'past', 'messages', 'pricing', 'reviews'];
+
 export function HostDashboard() {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<Section>('overview');
+  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const initialSection = (searchParams.get('section') as Section | null);
+  const [activeSection, setActiveSection] = useState<Section>(
+    initialSection && VALID_SECTIONS.includes(initialSection) ? initialSection : 'overview'
+  );
+  const [bookingActionId, setBookingActionId] = useState<string | null>(null);
+
+  // Keep activeSection in sync when the URL search param changes (e.g. user
+  // clicks a "/host?section=bookings" notification while already on /host).
+  React.useEffect(() => {
+    const next = searchParams.get('section') as Section | null;
+    if (next && VALID_SECTIONS.includes(next) && next !== activeSection) {
+      setActiveSection(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const handleConfirmBooking = async (id: string) => {
+    setBookingActionId(id);
+    try {
+      await bookingsAPI.confirm(id);
+      toast.success('Booking confirmed');
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.me });
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to confirm booking'));
+    } finally {
+      setBookingActionId(null);
+    }
+  };
+
+  const [declineDialogBookingId, setDeclineDialogBookingId] = useState<string | null>(null);
+  const [declineReason, setDeclineReason] = useState('');
+
+  const openDeclineDialog = (id: string) => {
+    setDeclineReason('');
+    setDeclineDialogBookingId(id);
+  };
+
+  const submitDecline = async () => {
+    if (!declineDialogBookingId) return;
+    const id = declineDialogBookingId;
+    const reason = declineReason.trim() || undefined;
+    setBookingActionId(id);
+    setDeclineDialogBookingId(null);
+    try {
+      await bookingsAPI.decline(id, reason);
+      toast.success('Booking declined');
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.me });
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to decline booking'));
+    } finally {
+      setBookingActionId(null);
+      setDeclineReason('');
+    }
+  };
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<DashboardMessage | null>(null);
   const [messageReply, setMessageReply] = useState('');
@@ -1040,6 +1106,102 @@ export function HostDashboard() {
       </div>
     );
   };
+  const renderBookings = (statuses: BookingStatus[], title: string, emptyMessage: string) => (
+    <Card>
+      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {bookings.filter((b) => statuses.includes(b.status)).map((booking) => {
+            const property = properties.find((item) => item.id === booking.propertyId);
+            const guestName =
+              [booking.user?.firstName, booking.user?.lastName].filter(Boolean).join(' ').trim() ||
+              booking.user?.firstName ||
+              booking.userId ||
+              'Guest';
+            const isPending = booking.status === 'pending';
+            const isBusy = bookingActionId === booking.id;
+            return (
+              <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-border rounded-lg">
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-1">{guestName}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {booking.checkIn} - {booking.checkOut} · {booking.guests} guests
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{property?.title || booking.propertyId}</p>
+                  <p className="text-sm font-semibold mt-1 capitalize">{booking.status}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap flex-shrink-0">
+                  {isPending ? (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => handleConfirmBooking(booking.id)}
+                        disabled={isBusy}
+                      >
+                        {isBusy ? 'Please wait…' : 'Accept'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => openDeclineDialog(booking.id)}
+                        disabled={isBusy}
+                      >
+                        Decline
+                      </Button>
+                    </>
+                  ) : (
+                    <span
+                      className={cn(
+                        'inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold capitalize select-none',
+                        booking.status === 'confirmed' && 'bg-primary/10 text-primary',
+                        booking.status === 'declined' && 'bg-destructive/10 text-destructive',
+                        booking.status === 'cancelled' && 'bg-muted text-muted-foreground',
+                        booking.status === 'completed' && 'bg-muted text-foreground',
+                      )}
+                    >
+                      {booking.status === 'confirmed' ? 'Accepted' : booking.status}
+                    </span>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setActiveSection('messages')}>
+                    Contact guest
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {bookings.filter((b) => statuses.includes(b.status)).length === 0 && (
+            <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+          )}
+        </div>
+      </CardContent>
+
+      <Dialog open={declineDialogBookingId !== null} onOpenChange={(open) => !open && setDeclineDialogBookingId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Decline booking</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Add a reason (optional). The guest will see this message.
+          </p>
+          <Textarea
+            value={declineReason}
+            onChange={(e) => setDeclineReason(e.target.value)}
+            placeholder="e.g. The property is no longer available for these dates."
+            rows={3}
+            className="bg-card border-border"
+          />
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="outline" onClick={() => setDeclineDialogBookingId(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={submitDecline}>
+              Decline booking
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
 
   const renderMessages = () => (
     <Card>
@@ -1215,7 +1377,13 @@ export function HostDashboard() {
       case 'properties':
         return renderProperties();
       case 'bookings':
-        return renderBookings();
+        return renderBookings(['pending'], 'Upcoming Bookings', 'No pending bookings.');
+      case 'accepted':
+        return renderBookings(['confirmed'], 'Accepted Bookings', "You haven't accepted any bookings yet.");
+      case 'declined':
+        return renderBookings(['declined'], 'Declined Bookings', "You haven't declined any bookings yet.");
+      case 'past':
+        return renderBookings(['cancelled', 'completed'], 'Past Bookings', 'No past bookings yet.');
       case 'messages':
         return renderMessages();
       case 'pricing':

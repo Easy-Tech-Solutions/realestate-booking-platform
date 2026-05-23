@@ -70,8 +70,25 @@ def category_detail(request, id):
 def listings_collection(request):
     if request.method == "GET":
         items = ListingFilter(request.GET, queryset=Listing.objects.filter(status='published'))
+        qs = items.qs
+
+        # When the search includes check-in/check-out, hide listings that
+        # already have a confirmed booking overlapping those dates. A booking
+        # overlaps if it starts before our check-out and ends after our
+        # check-in (standard half-open interval test).
+        check_in = request.GET.get('check_in')
+        check_out = request.GET.get('check_out')
+        if check_in and check_out:
+            from bookings.models import Booking
+            conflicting_listing_ids = Booking.objects.filter(
+                status='confirmed',
+                start_date__lt=check_out,
+                end_date__gt=check_in,
+            ).values_list('listing_id', flat=True)
+            qs = qs.exclude(id__in=conflicting_listing_ids)
+
         paginator = _ListingPagination()
-        page = paginator.paginate_queryset(items.qs, request)
+        page = paginator.paginate_queryset(qs, request)
         serialized = ListingSerializer(page, many=True, context={"request": request}).data
         return paginator.get_paginated_response(serialized)
 
@@ -523,37 +540,14 @@ def listing_availability(request, listing_id):
     return Response({"booked_dates": booked_dates})
 
 
-@api_view(["GET"])
-def listing_pricing(request, listing_id):
+def compute_listing_pricing(listing, start, end, room=None):
+    """Compute the full pricing breakdown for a stay. Shared by the pricing
+    endpoint and booking creation so the email/receipt total matches what the
+    guest saw at checkout."""
     from datetime import date as _date, timedelta as _td
 
-    listing = get_object_or_404(Listing, pk=listing_id)
-    start_str = request.GET.get("start_date")
-    end_str = request.GET.get("end_date")
-
-    if not start_str or not end_str:
-        return Response({"error": "start_date and end_date are required"}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        start = _date.fromisoformat(start_str)
-        end = _date.fromisoformat(end_str)
-    except ValueError:
-        return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=status.HTTP_400_BAD_REQUEST)
-
-    if end <= start:
-        return Response({"error": "end_date must be after start_date"}, status=status.HTTP_400_BAD_REQUEST)
-
     nights = (end - start).days
-    base_price = float(listing.price)
-
-    room_id = request.GET.get("room_id")
-    if room_id:
-        try:
-            room = HotelRoom.objects.get(pk=room_id, listing=listing, is_active=True)
-            base_price = float(room.price_per_night)
-        except HotelRoom.DoesNotExist:
-            pass
-
+    base_price = float(room.price_per_night) if room else float(listing.price)
     weekend_premium = listing.weekend_premium_percent / 100.0
 
     subtotal = 0.0
@@ -578,10 +572,67 @@ def listing_pricing(request, listing_id):
             discount_label = f"{listing.last_minute_discount_percent}% last-minute discount"
 
     discounted_subtotal = subtotal - discount
-    cleaning_fee = min(50.0, base_price * 0.08)
-    service_fee = discounted_subtotal * 0.14
-    taxes = (discounted_subtotal + service_fee) * 0.05
-    total = discounted_subtotal + cleaning_fee + service_fee + taxes
+    # Cleaning fee and taxes are disabled for now — the guest is only charged
+    # the nightly subtotal plus the platform service fee. Kept as 0.0 in the
+    # response so any consumer that still reads these keys keeps working.
+    cleaning_fee = 0.0
+    service_fee = discounted_subtotal * 0.04
+    taxes = 0.0
+    total = discounted_subtotal + service_fee
+
+    return {
+        "nights": nights,
+        "base_price": base_price,
+        "subtotal": subtotal,
+        "discount": discount,
+        "discount_label": discount_label,
+        "discounted_subtotal": discounted_subtotal,
+        "cleaning_fee": cleaning_fee,
+        "service_fee": service_fee,
+        "taxes": taxes,
+        "total": total,
+    }
+
+
+@api_view(["GET"])
+def listing_pricing(request, listing_id):
+    from datetime import date as _date
+
+    listing = get_object_or_404(Listing, pk=listing_id)
+    start_str = request.GET.get("start_date")
+    end_str = request.GET.get("end_date")
+
+    if not start_str or not end_str:
+        return Response({"error": "start_date and end_date are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        start = _date.fromisoformat(start_str)
+        end = _date.fromisoformat(end_str)
+    except ValueError:
+        return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if end <= start:
+        return Response({"error": "end_date must be after start_date"}, status=status.HTTP_400_BAD_REQUEST)
+
+    room = None
+    room_id = request.GET.get("room_id")
+    if room_id:
+        try:
+            room = HotelRoom.objects.get(pk=room_id, listing=listing, is_active=True)
+        except HotelRoom.DoesNotExist:
+            pass
+
+    pricing = compute_listing_pricing(listing, start, end, room=room)
+    nights = pricing["nights"]
+    base_price = pricing["base_price"]
+    subtotal = pricing["subtotal"]
+    discount = pricing["discount"]
+    discount_label = pricing["discount_label"]
+    discounted_subtotal = pricing["discounted_subtotal"]
+    cleaning_fee = pricing["cleaning_fee"]
+    service_fee = pricing["service_fee"]
+    taxes = pricing["taxes"]
+    total = pricing["total"]
 
     return Response({
         "nights": nights,

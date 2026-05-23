@@ -172,6 +172,9 @@ export interface Message {
   editedAt?: string;
   attachments: MessageAttachment[];
   replyTo?: MessageReplySnippet;
+  // True when the server stripped a phone number / email out of the content
+  // before persisting. Only set on the response from sendMessage.
+  wasRedacted?: boolean;
   createdAt: string;
 }
 
@@ -182,6 +185,9 @@ export interface Conversation {
   unreadCount: number;
   propertyId?: string;
   property?: Property;
+  // True only when the two participants share a confirmed/completed booking
+  // for this listing. Used to gate the file-upload button in chat.
+  attachmentsAllowed: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -240,10 +246,11 @@ export type PropertyType =
   | 'lighthouse'
   | 'yurt';
 
-export type BookingStatus = 
-  | 'pending' 
-  | 'confirmed' 
-  | 'cancelled' 
+export type BookingStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'declined'
+  | 'cancelled'
   | 'completed';
 
 export type PaymentStatus = 

@@ -12,6 +12,28 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from .models import Conversation, Message, MessageAttachment
+from .redaction import redact_contact_info
+
+
+def _attachments_allowed(conversation, user):
+    """Attachments are only allowed inside a conversation tied to a listing
+    where the two participants already have a confirmed (or completed)
+    booking together.
+
+    Rationale: the bypass incentive is highest *before* a booking exists.
+    Once the booking is locked in we've earned our commission, so the
+    trust-and-safety risk of contact-card screenshots drops sharply.
+    """
+    if not conversation.listing_id:
+        return False
+
+    from bookings.models import Booking
+    participant_ids = list(conversation.participants.values_list('id', flat=True))
+    return Booking.objects.filter(
+        listing_id=conversation.listing_id,
+        status__in=['confirmed', 'completed'],
+        customer_id__in=participant_ids,
+    ).exists()
 from .serializers import (
     ConversationSerializer,
     MessageSerializer,
@@ -178,6 +200,20 @@ class SendMessageView(APIView):
         content = serializer.validated_data.get('content', '').strip()
         uploaded_files = request.FILES.getlist('files')
 
+        # Block attachments until the two participants have a confirmed booking.
+        if uploaded_files and not _attachments_allowed(conversation, request.user):
+            return Response(
+                {
+                    'detail': 'Attachments are only available after a booking is confirmed.',
+                    'code': 'attachments_not_allowed',
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Strip phone numbers / emails before persisting; the frontend uses
+        # `was_redacted` to show the sender a one-time educational nudge.
+        content, was_redacted = redact_contact_info(content)
+
         if content and uploaded_files:
             msg_type = 'text_file'
         elif uploaded_files:
@@ -234,7 +270,9 @@ class SendMessageView(APIView):
         })
 
         out = MessageSerializer(message, context={'request': request})
-        return Response(out.data, status=status.HTTP_201_CREATED)
+        payload = dict(out.data)
+        payload['was_redacted'] = was_redacted
+        return Response(payload, status=status.HTTP_201_CREATED)
 
 
 class EditMessageView(APIView):

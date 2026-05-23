@@ -959,16 +959,8 @@ export function PropertyDetails() {
                           </div>
                         )}
                         <div className="flex justify-between text-sm">
-                          <span className="underline">Cleaning fee</span>
-                          <span>{formatCurrency(pricing.cleaningFee)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
                           <span className="underline">Service fee</span>
                           <span>{formatCurrency(pricing.serviceFee)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="underline">Taxes</span>
-                          <span>{formatCurrency(pricing.taxes)}</span>
                         </div>
                       </div>
                       <Separator className="my-4" />

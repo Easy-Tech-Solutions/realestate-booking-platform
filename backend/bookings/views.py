@@ -48,23 +48,25 @@ def _check_superhost(owner):
 @permission_classes([IsAuthenticated])
 def bookings_collection(request):
     if request.method == "GET":
-        if request.user.role in ['agent', 'admin']:
-            bookings = Booking.objects.filter(listing__owner=request.user)
-        else:
-            bookings = Booking.objects.filter(customer=request.user)
-        bookings = bookings.order_by("-requested_at")
+        # Always return the requester's bookings as a guest (what /trips shows).
+        # Agents access bookings on their *listings* via the host dashboard
+        # endpoint (/api/users/me/dashboard/), which is a separate, role-aware
+        # surface — so this endpoint doesn't need to branch on role.
+        bookings = Booking.objects.filter(customer=request.user).order_by("-requested_at")
         return Response(BookingSerializer(bookings, many=True, context={'request': request}).data)
 
     elif request.method == "POST":
         try:
             listing = Listing.objects.get(pk=request.data.get('listing'))
 
+            # Declined and cancelled bookings should not block the guest from
+            # re-booking the same property/dates — they're effectively dead.
             existing_booking = Booking.objects.filter(
                 customer=request.user,
                 listing=listing,
                 start_date=request.data.get('start_date'),
-                end_date=request.data.get('end_date')
-            ).first()
+                end_date=request.data.get('end_date'),
+            ).exclude(status__in=['declined', 'cancelled']).first()
 
             if existing_booking:
                 return Response({
@@ -76,7 +78,6 @@ def bookings_collection(request):
             if serializer.is_valid():
                 start = serializer.validated_data['start_date']
                 end = serializer.validated_data['end_date']
-                nights = max((end - start).days, 1)
                 hotel_room = serializer.validated_data.get('hotel_room')
                 if hotel_room:
                     if hotel_room.listing_id != listing.id:
@@ -84,9 +85,13 @@ def bookings_collection(request):
                     from listings.views import _get_available_room_count
                     if _get_available_room_count(hotel_room, start, end) < 1:
                         return Response({'error': 'Room not available for selected dates'}, status=status.HTTP_400_BAD_REQUEST)
-                    total_price = float(hotel_room.price_per_night) * nights
-                else:
-                    total_price = listing.price * nights
+
+                # Compute the full grand total (subtotal + cleaning + service + taxes,
+                # with weekend premiums and discounts) so it matches what the guest
+                # saw at checkout and what they're charged.
+                from listings.views import compute_listing_pricing
+                pricing = compute_listing_pricing(listing, start, end, room=hotel_room)
+                total_price = round(pricing["total"], 2)
                 booking = serializer.save(customer=request.user, total_price=total_price)
                 # Instant book: auto-confirm if listing is set to instant
                 if listing.booking_mode == 'instant':
@@ -159,7 +164,10 @@ def confirm_booking(request, id):
     if booking.listing.owner != request.user:
         return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
 
-    if booking.status != 'requested':
+    # 'pending' is legacy data from the original migration (before the model
+    # default was changed to 'requested'); accept both so old bookings can
+    # still be actioned.
+    if booking.status not in ('requested', 'pending'):
         return Response({'error': 'Booking cannot be confirmed'}, status=status.HTTP_400_BAD_REQUEST)
 
     booking.status = 'confirmed'
@@ -183,7 +191,7 @@ def decline_booking(request, id):
     if booking.listing.owner != request.user:
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-    if booking.status != 'requested':
+    if booking.status not in ('requested', 'pending'):
         return Response({"error": "Booking cannot be declined"}, status=status.HTTP_400_BAD_REQUEST)
 
     serializer = BookingConfrimationSerializer(data=request.data)

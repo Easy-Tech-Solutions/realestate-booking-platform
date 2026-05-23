@@ -688,7 +688,7 @@ export function CreateListing() {
     }
   };
 
-  const guestPriceBeforeTaxes = Math.round(form.weekdayBasePrice * 1.14);
+  const guestPriceBeforeTaxes = Math.round(form.weekdayBasePrice * 1.04);
   const weekendPrice = Math.round(form.weekdayBasePrice * (1 + form.weekendPremiumPercent / 100));
 
   // Basics step rows — differ by property group
@@ -1379,6 +1379,10 @@ export function CreateListing() {
 
         {currentStep === 'weekend_price' && (
           <section className="max-w-3xl mx-auto py-8 text-center">
+            <h2 className="text-6xl font-semibold mb-3">Set a weekend price</h2>
+            <p className="text-2xl text-muted-foreground mb-8">Add a premium for Fridays and Saturdays.</p>
+            <div className="text-[120px] font-semibold leading-none">${weekendPrice}</div>
+            <p className="text-3xl text-muted-foreground mt-3">Guest price before taxes ${Math.round(weekendPrice * 1.04)} <ChevronDown className="inline w-5 h-5" /></p>
             <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Set a weekend price</h2>
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">Add a premium for Fridays and Saturdays.</p>
             <div className="text-[60px] sm:text-[90px] lg:text-[120px] font-semibold leading-none">${weekendPrice}</div>

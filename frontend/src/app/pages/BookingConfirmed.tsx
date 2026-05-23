@@ -86,9 +86,9 @@ export function BookingConfirmed() {
           <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-10 h-10 text-primary" />
           </div>
-          <h1 className="text-3xl font-semibold mb-2">Booking confirmed!</h1>
+          <h1 className="text-3xl font-semibold mb-2">Booking requested!</h1>
           <p className="text-muted-foreground">
-            Check your email for a confirmation receipt.
+            We've emailed you a copy of your request. The host will review it shortly.
           </p>
           <p className="text-sm font-mono text-muted-foreground mt-2">
             Booking ID: <span className="font-semibold text-foreground">{booking.id}</span>
@@ -159,7 +159,7 @@ export function BookingConfirmed() {
             </div>
             <Separator className="my-3" />
             <div className="flex justify-between font-semibold">
-              <span>Total charged</span>
+              <span>Total</span>
               <span>{formatCurrency(booking.totalPrice)}</span>
             </div>
           </div>

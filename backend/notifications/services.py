@@ -15,9 +15,20 @@ Flow for every notification
 """
 
 import logging
+from decimal import Decimal
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+
+# Platform commission on host payouts. Distinct from the guest-side service
+# fee (which is added on top of the booking subtotal); this one is subtracted
+# from what the host receives.
+HOST_SERVICE_FEE_RATE = Decimal('0.04')
+
+# Service fee added on top of the booking subtotal that the guest pays. Must
+# stay in sync with the rate used by compute_listing_pricing in listings/views.py
+# so the guest's receipt email matches what they were charged at checkout.
+GUEST_SERVICE_FEE_RATE = Decimal('0.04')
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +98,10 @@ def create_notification(
 
     prefs = _get_or_create_preferences(user)
 
-    if not prefs.in_app_enabled:
-        return None
-
+    # Always persist the Notification row so the email task has something to
+    # render from and the audit history is preserved. In-app *delivery*
+    # (live WebSocket push + Web Push) is gated by prefs.in_app_enabled
+    # separately, and the email goes through its own per-type preference.
     notification = Notification.objects.create(
         user=user,
         notification_type=notification_type,
@@ -98,24 +110,25 @@ def create_notification(
         data=data or {},
     )
 
-    # Push to WebSocket immediately (best-effort)
-    _push_realtime(user.id, {
-        'id':         notification.id,
-        'type':       notification_type,
-        'title':      title,
-        'message':    message,
-        'data':       data or {},
-        'is_read':    False,
-        'created_at': notification.created_at.isoformat(),
-    })
+    if prefs.in_app_enabled:
+        # Push to WebSocket immediately (best-effort)
+        _push_realtime(user.id, {
+            'id':         notification.id,
+            'type':       notification_type,
+            'title':      title,
+            'message':    message,
+            'data':       data or {},
+            'is_read':    False,
+            'created_at': notification.created_at.isoformat(),
+        })
 
-    # Queue email via Celery
+        # Queue Web Push via Celery
+        from .tasks import send_push_notification_task
+        send_push_notification_task.delay(notification.id)
+
+    # Email is independent of the in-app toggle — its own per-type pref decides.
     if send_email and user.email and prefs.email_enabled_for(notification_type):
         send_notification_email.delay(notification.id)
-
-    # Queue Web Push via Celery
-    from .tasks import send_push_notification_task
-    send_push_notification_task.delay(notification.id)
 
     return notification
 
@@ -126,6 +139,11 @@ def notify_booking_requested(booking):
     """Notify the property owner of a new booking request."""
     owner         = booking.listing.owner
     customer_name = booking.customer.get_full_name() or booking.customer.username
+
+    booking_amount = Decimal(booking.total_amount)
+    host_service_fee = (booking_amount * HOST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
+    amount_received = (booking_amount - host_service_fee).quantize(Decimal('0.01'))
+
     create_notification(
         user=owner,
         notification_type='booking_requested',
@@ -135,19 +153,58 @@ def notify_booking_requested(booking):
             f'from {booking.start_date} to {booking.end_date}.'
         ),
         data={
-            'booking_id':    booking.id,
-            'listing_id':    booking.listing.id,
-            'listing_title': booking.listing.title,
-            'customer_name': customer_name,
-            'start_date':    str(booking.start_date),
-            'end_date':      str(booking.end_date),
-            'total_amount':  str(booking.total_amount),
+            'booking_id':       booking.id,
+            'listing_id':       booking.listing.id,
+            'listing_title':    booking.listing.title,
+            'customer_name':    customer_name,
+            'start_date':       str(booking.start_date),
+            'end_date':         str(booking.end_date),
+            'booking_amount':   f'{booking_amount:.2f}',
+            'host_service_fee': f'{host_service_fee:.2f}',
+            'amount_received':  f'{amount_received:.2f}',
+            # Kept for backwards compatibility with any existing UI that
+            # reads `total_amount`; new templates should use the three fields
+            # above instead.
+            'total_amount':     f'{booking_amount:.2f}',
+        },
+    )
+
+
+def notify_booking_submitted(booking):
+    """Confirm to the guest that their booking request was submitted."""
+    booking_amount = Decimal(booking.total_amount)
+    service_fee = (booking_amount * GUEST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
+    total = (booking_amount + service_fee).quantize(Decimal('0.01'))
+
+    create_notification(
+        user=booking.customer,
+        notification_type='booking_submitted',
+        title='Booking Requested',
+        message=(
+            f'Your request to book "{booking.listing.title}" from '
+            f'{booking.start_date} to {booking.end_date} has been sent to the host. '
+            f"You'll be notified once they accept or decline."
+        ),
+        data={
+            'booking_id':     booking.id,
+            'listing_id':     booking.listing.id,
+            'listing_title':  booking.listing.title,
+            'owner_name':     booking.listing.owner.get_full_name() or booking.listing.owner.username,
+            'start_date':     str(booking.start_date),
+            'end_date':       str(booking.end_date),
+            'booking_amount': f'{booking_amount:.2f}',
+            'service_fee':    f'{service_fee:.2f}',
+            'total_amount':   f'{total:.2f}',
         },
     )
 
 
 def notify_booking_confirmed(booking):
     """Notify the customer their booking was confirmed."""
+    booking_amount = Decimal(booking.total_amount)
+    service_fee = (booking_amount * GUEST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
+    total = (booking_amount + service_fee).quantize(Decimal('0.01'))
+
     create_notification(
         user=booking.customer,
         notification_type='booking_confirmed',
@@ -157,14 +214,16 @@ def notify_booking_confirmed(booking):
             f'from {booking.start_date} to {booking.end_date} has been confirmed.'
         ),
         data={
-            'booking_id':    booking.id,
-            'listing_id':    booking.listing.id,
-            'listing_title': booking.listing.title,
-            'owner_name':    booking.listing.owner.get_full_name() or booking.listing.owner.username,
-            'start_date':    str(booking.start_date),
-            'end_date':      str(booking.end_date),
-            'total_amount':  str(booking.total_amount),
-            'owner_notes':   booking.owner_notes,
+            'booking_id':     booking.id,
+            'listing_id':     booking.listing.id,
+            'listing_title':  booking.listing.title,
+            'owner_name':     booking.listing.owner.get_full_name() or booking.listing.owner.username,
+            'start_date':     str(booking.start_date),
+            'end_date':       str(booking.end_date),
+            'booking_amount': f'{booking_amount:.2f}',
+            'service_fee':    f'{service_fee:.2f}',
+            'total_amount':   f'{total:.2f}',
+            'owner_notes':    booking.owner_notes,
         },
     )
 
@@ -259,32 +318,53 @@ def notify_booking_completed(booking):
 def notify_payment_received(payment):
     """Notify the payer (success confirmation) and the property owner (income alert)."""
     listing_title = payment.booking.listing.title
-    amount_str    = f'{payment.amount} {payment.currency.code}'
-    common_data   = {
-        'payment_id':    str(payment.id),
-        'booking_id':    payment.booking.id,
-        'listing_id':    payment.booking.listing.id,
-        'listing_title': listing_title,
-        'amount':        str(payment.amount),
-        'currency':      payment.currency.code,
-    }
+    currency_code = payment.currency.code
 
+    # Host-side numbers: the "booking amount" the guest paid for the stay
+    # (excluding the guest's service fee, which stays with the platform),
+    # minus our 4% commission from the host.
+    booking_amount = Decimal(payment.booking.total_amount)
+    host_service_fee = (booking_amount * HOST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
+    amount_received = (booking_amount - host_service_fee).quantize(Decimal('0.01'))
+
+    # Guest sees what they actually paid (includes their 4% service fee).
     create_notification(
         user=payment.user,
         notification_type='payment_received',
         title='Payment Successful',
-        message=f'Your payment of {amount_str} for "{listing_title}" was successful.',
-        data=common_data,
+        message=f'Your payment of {payment.amount} {currency_code} for "{listing_title}" was successful.',
+        data={
+            'payment_id':    str(payment.id),
+            'booking_id':    payment.booking.id,
+            'listing_id':    payment.booking.listing.id,
+            'listing_title': listing_title,
+            'amount':        str(payment.amount),
+            'currency':      currency_code,
+        },
     )
 
+    # Host sees the booking-level breakdown — what the guest paid for the
+    # stay, our commission, and what the host nets.
     owner = payment.booking.listing.owner
     if owner != payment.user:
         create_notification(
             user=owner,
-            notification_type='payment_received',
+            notification_type='payment_received_host',
             title='Payment Received',
-            message=f'You received a payment of {amount_str} for "{listing_title}".',
-            data=common_data,
+            message=(
+                f'A guest has paid for "{listing_title}". You will receive '
+                f'{amount_received} {currency_code} after our {HOST_SERVICE_FEE_RATE * 100:.0f}% commission.'
+            ),
+            data={
+                'payment_id':       str(payment.id),
+                'booking_id':       payment.booking.id,
+                'listing_id':       payment.booking.listing.id,
+                'listing_title':    listing_title,
+                'currency':         currency_code,
+                'booking_amount':   f'{booking_amount:.2f}',
+                'host_service_fee': f'{host_service_fee:.2f}',
+                'amount_received':  f'{amount_received:.2f}',
+            },
         )
 
 

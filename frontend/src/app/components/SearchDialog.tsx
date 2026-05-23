@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { format } from 'date-fns';
 import { useApp } from '../../hooks/useApp';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { propertiesAPI } from '../../services/api.service';
 import { PROPERTY_CATEGORIES } from '../../core/constants';
@@ -109,6 +110,11 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const totalGuests = guests.adults + guests.children;
 
   const handleSearch = () => {
+    if (priceMin && priceMax && Number(priceMin) > Number(priceMax)) {
+      toast.error('Minimum price cannot be greater than maximum price.');
+      return;
+    }
+
     setSearchFilters({
       location: location.trim() || undefined,
       checkIn,

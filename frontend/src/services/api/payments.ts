@@ -14,8 +14,8 @@ const initiatePayment = async (payload: {
       booking_id: payload.booking_id,
       phone_number: payload.phone_number,
       gateway: payload.gateway || 'mtn_momo',
-      payment_method: payload.payment_method || 'momo',
-      currency: payload.currency || 'LRD',
+      payment_method: payload.payment_method || 'mobile_money',
+      currency: payload.currency || 'USD',
     }),
   });
   return data.payment || data;
@@ -29,8 +29,8 @@ export const paymentAPI = {
       booking_id: bookingId,
       phone_number: phoneNumber,
       gateway: 'mtn_momo',
-      payment_method: 'momo',
-      currency: 'LRD',
+      payment_method: 'mobile_money',
+      currency: 'USD',
     });
   },
 

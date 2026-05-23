@@ -116,7 +116,9 @@ export function normalizeHotelRoomAvailability(r: any): HotelRoomAvailability {
 export function normalizeBooking(b: any): Booking {
   const statusMap: Record<string, Booking['status']> = {
     requested: 'pending',
+    pending: 'pending',
     confirmed: 'confirmed',
+    declined: 'declined',
     cancelled: 'cancelled',
     completed: 'completed',
   };
@@ -171,8 +173,8 @@ export function normalizeBooking(b: any): Booking {
   const fallbackUser: User = {
     id: String(b.customer || ''),
     email: '',
-    firstName: b.customer_username || 'Guest',
-    lastName: '',
+    firstName: b.customer_first_name || b.customer_username || 'Guest',
+    lastName: b.customer_last_name || '',
     isHost: false,
     verified: true,
     createdAt: b.requested_at || new Date().toISOString(),
@@ -271,6 +273,7 @@ export function normalizeConversation(conversation: any): Conversation {
       : undefined,
     unreadCount: Number(conversation.unread_count || 0),
     propertyId: conversation.listing ? String(conversation.listing) : undefined,
+    attachmentsAllowed: Boolean(conversation.attachments_allowed),
     createdAt: conversation.created_at,
     updatedAt: conversation.updated_at,
   };
@@ -318,6 +321,7 @@ export function normalizeMessage(message: any): Message {
     editedAt: message.edited_at || undefined,
     attachments,
     replyTo,
+    wasRedacted: Boolean(message.was_redacted),
     createdAt: message.created_at,
   };
 }
@@ -329,6 +333,8 @@ export function buildSearchParams(filters: SearchFilters): string {
   if (filters.priceMax) params.set('max_price', String(filters.priceMax));
   if (filters.bedrooms) params.set('min_bedrooms', String(filters.bedrooms));
   if (filters.guests) params.set('min_guests', String(filters.guests));
+  if (filters.checkIn) params.set('check_in', filters.checkIn.toISOString().slice(0, 10));
+  if (filters.checkOut) params.set('check_out', filters.checkOut.toISOString().slice(0, 10));
   if (filters.propertyType?.length === 1) {
     params.set('property_type', filters.propertyType[0]);
   } else if (filters.propertyType && filters.propertyType.length > 1) {

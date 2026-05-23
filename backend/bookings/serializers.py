@@ -12,6 +12,8 @@ class BookingConfrimationSerializer(serializers.ModelSerializer):
 
 class BookingSerializer(serializers.ModelSerializer):
     customer_username = serializers.CharField(source='customer.username', read_only=True)
+    customer_first_name = serializers.CharField(source='customer.first_name', read_only=True)
+    customer_last_name = serializers.CharField(source='customer.last_name', read_only=True)
     listing_title = serializers.CharField(source='listing.title', read_only=True)
     listing_owner = serializers.CharField(source='listing.owner.username', read_only=True)
     days_until_expiry = serializers.SerializerMethodField()
@@ -19,9 +21,9 @@ class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = [
-            'id', 'customer', 'customer_username', 'listing', 'listing_title',
-            'listing_owner', 'hotel_room', 'start_date', 'end_date', 'status', 'notes',
-            'requested_at', 'confirmed_at', 'declined_at', 'owner_notes',
+            'id', 'customer', 'customer_username', 'customer_first_name', 'customer_last_name',
+            'listing', 'listing_title', 'listing_owner', 'hotel_room', 'start_date', 'end_date',
+            'status', 'notes', 'requested_at', 'confirmed_at', 'declined_at', 'owner_notes',
             'decline_reason', 'total_price', 'days_until_expiry'
         ]
         read_only_fields = ['customer', 'requested_at', 'confirmed_at', 'declined_at', 'total_price']
