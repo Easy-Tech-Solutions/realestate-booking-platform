@@ -7,13 +7,17 @@ from .views import (
     platform_stats, nearby_listings, listing_availability, listing_pricing, review_response,
     hotel_rooms_collection, hotel_room_detail, hotel_room_availability,
     hotel_room_images, hotel_room_image_detail,
-    my_drafts,
+    my_drafts, pending_review_listings, approve_listing, reject_listing, my_listings,
 )
 
 urlpatterns = [
     path('categories/', categories_collection, name='categories_collection'),
     path('categories/<int:id>/', category_detail, name='category_detail'),
     path('my-drafts/', my_drafts, name='my_drafts'),
+    path('my-listings/', my_listings, name='my_listings'),
+    path('pending-review/', pending_review_listings, name='pending_review_listings'),
+    path('<int:id>/approve/', approve_listing, name='approve_listing'),
+    path('<int:id>/reject/', reject_listing, name='reject_listing'),
     path('reviews/', all_reviews, name='all_reviews'),
     path('', listings_collection, name='listings_collection'),
     path('<int:id>/', listing_detail, name='listing_detail'),

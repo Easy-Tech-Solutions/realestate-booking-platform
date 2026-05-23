@@ -71,7 +71,7 @@ const STEPS_BY_GROUP: Record<PropertyGroup, WizardStep[]> = {
     'welcome', 'step1_intro', 'property_type', 'location',
     'hotel_room_count', 'hotel_rooms',
     'check_in_out', 'amenities', 'photos', 'title', 'description',
-    'step3_intro', 'booking_settings', 'discounts', 'weekday_price', 'weekend_price',
+    'step3_intro', 'booking_settings', 'discounts',
     'final_details',
   ],
   land: [
@@ -400,7 +400,32 @@ export function CreateListing() {
         setDraftListingId(savedId);
         localStorage.setItem(DRAFT_KEY, JSON.stringify({ form: serializableForm, stepIndex, draftListingId: savedId }));
       }
-      toast.success('Draft saved — continue anytime from your dashboard.');
+
+      // Upload any selected photos to the server so they survive the draft
+      if (images.length > 0) {
+        const uploadedUrls: string[] = [];
+        try {
+          if (images[0]) {
+            const coverPayload = new FormData();
+            coverPayload.append('main_image', images[0]);
+            const updated2 = await propertiesAPI.update(savedId, coverPayload);
+            if (updated2.images?.[0]) uploadedUrls.push(updated2.images[0]);
+          }
+          for (let i = 1; i < Math.min(images.length, 11); i++) {
+            const res = await propertiesAPI.addGalleryImage(savedId, images[i], '', i - 1);
+            if (res?.image_url || res?.imageUrl) uploadedUrls.push(res.image_url || res.imageUrl);
+          }
+        } catch { /* silent — photos will re-upload on publish */ }
+        if (uploadedUrls.length > 0) {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify({
+            form: { ...serializableForm, hotelRooms: serializableRooms, savedImageUrls: uploadedUrls },
+            stepIndex,
+            draftListingId: savedId,
+          }));
+        }
+      }
+
+      toast.success('Draft saved — photos and all details preserved.');
     } catch {
       toast.success('Draft saved locally.');
     } finally {
@@ -600,7 +625,7 @@ export function CreateListing() {
       payload.append('check_in_time', form.checkInTime);
       payload.append('check_out_time', form.checkOutTime);
       payload.append('is_available', 'true');
-      payload.append('status', 'published');
+      payload.append('status', 'pending_review');
 
       if (form.images[0]) {
         payload.append('main_image', form.images[0]);
@@ -641,7 +666,7 @@ export function CreateListing() {
       }
 
       localStorage.removeItem(DRAFT_KEY);
-      toast.success('Listing created successfully');
+      toast.success('Listing submitted for review! Our team will approve it shortly.');
       navigate('/host');
     } catch (error: any) {
       if (error?.status === 401) {
@@ -1461,6 +1486,15 @@ export function CreateListing() {
               <Button onClick={publish} disabled={!canContinue || isSubmitting}>
                 {isSubmitting ? 'Publishing...' : 'Create listing'}
               </Button>
+            ) : currentStep === 'weekend_price' ? (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={next}>
+                  Skip <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+                <Button onClick={next} disabled={!canContinue}>
+                  Next <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
             ) : (
               <Button onClick={next} disabled={!canContinue}>
                 Next <ArrowRight className="w-4 h-4 ml-2" />

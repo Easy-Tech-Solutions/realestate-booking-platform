@@ -28,7 +28,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 
 function BookingForm() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { property, checkIn, checkOut, guests, pricing, selectedRoom } = location.state || {};
+  const { property, checkIn, checkOut, guests, pricing, selectedRoom, roomQuantity: stateRoomQuantity } = location.state || {};
 
   const stripe = useStripe();
   const elements = useElements();
@@ -42,11 +42,21 @@ function BookingForm() {
   // user to approve the prompt on their phone.
   const [momoStatus, setMomoStatus] = useState<'idle' | 'awaiting'>('idle');
 
+  const BOOKING_FEE = 3;
+
   const currentProperty = property;
   const currentCheckIn = checkIn;
   const currentCheckOut = checkOut;
   const currentGuests = guests || 1;
+  const currentRoomQuantity = stateRoomQuantity || 1;
   const currentPricing = pricing || { subtotal: 0, cleaningFee: 0, serviceFee: 0, taxes: 0, total: 0 };
+
+  // For hotels with multiple rooms, multiply subtotal by room quantity
+  const baseSubtotal = (currentPricing.subtotal || 0) * currentRoomQuantity;
+  const baseServiceFee = (currentPricing.serviceFee || 0) * currentRoomQuantity;
+
+  // Remove cleaning fee & taxes; add flat $3 booking fee
+  const displayTotal = baseSubtotal + baseServiceFee + BOOKING_FEE;
 
   if (!currentProperty) {
     return (
@@ -83,7 +93,7 @@ function BookingForm() {
         : currentCheckOut;
 
       if (paymentMethod === 'stripe') {
-        const amountCents = Math.round(currentPricing.total * 100);
+        const amountCents = Math.round(displayTotal * 100);
         const { client_secret } = await fetchWithAuth<{ client_secret: string }>(
           '/api/payments/stripe/payment-intent/',
           { method: 'POST', body: JSON.stringify({ amount_cents: amountCents, currency: 'usd' }) }
@@ -161,11 +171,13 @@ function BookingForm() {
         checkIn: startDate,
         checkOut: endDate,
         guests: currentGuests,
-        totalPrice: currentPricing.total,
-        basePrice: currentPricing.subtotal,
-        cleaningFee: currentPricing.cleaningFee,
-        serviceFee: currentPricing.serviceFee,
-        taxes: currentPricing.taxes,
+        roomQuantity: currentRoomQuantity,
+        totalPrice: displayTotal,
+        basePrice: baseSubtotal,
+        cleaningFee: 0,
+        serviceFee: baseServiceFee,
+        bookingFee: BOOKING_FEE,
+        taxes: 0,
         paymentMethod,
       };
 
@@ -346,6 +358,7 @@ function BookingForm() {
                 className="w-full"
                 size="lg"
               >
+                {isProcessing ? 'Processing...' : `Confirm and pay ${formatCurrency(displayTotal)}`}
                 {momoStatus === 'awaiting'
                   ? 'Waiting for MoMo approval…'
                   : isProcessing
@@ -444,13 +457,18 @@ function BookingForm() {
                         {currentPricing.nights || (currentPricing.subtotal && (selectedRoom?.pricePerNight || currentProperty.price)
                           ? Math.round(currentPricing.subtotal / (selectedRoom?.pricePerNight || currentProperty.price))
                           : 0)}{' '}
-                        nights
+                        nights{currentRoomQuantity > 1 ? ` × ${currentRoomQuantity} rooms` : ''}
                       </span>
+                      <span>{formatCurrency(baseSubtotal)}</span>
                       <span>{formatCurrency(currentPricing.subtotal)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Service fee</span>
-                      <span>{formatCurrency(currentPricing.serviceFee)}</span>
+                      <span>{formatCurrency(baseServiceFee)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Booking fee</span>
+                      <span>{formatCurrency(BOOKING_FEE)}</span>
                     </div>
                   </div>
 
@@ -458,7 +476,7 @@ function BookingForm() {
 
                   <div className="flex justify-between font-semibold text-base">
                     <span>Total (USD)</span>
-                    <span>{formatCurrency(currentPricing.total)}</span>
+                    <span>{formatCurrency(displayTotal)}</span>
                   </div>
                 </div>
 

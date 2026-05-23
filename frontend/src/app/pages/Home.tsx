@@ -251,7 +251,7 @@ export function Home() {
           <img
             src={bannerImage}
             alt="HomeKonet — Find Your Perfect Stay"
-            className="block w-full max-h-[520px] object-cover object-center"
+            className="block w-full h-[220px] sm:h-[320px] md:h-[420px] lg:h-[500px] xl:h-[560px] object-cover object-center"
           />
         </div>
       )}
