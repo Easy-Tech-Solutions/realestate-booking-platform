@@ -663,7 +663,6 @@ export function HostDashboard() {
   const properties = useMemo(() => ((dashboardQuery.data?.listings || []) as Property[]), [dashboardQuery.data?.listings]);
   const bookings = useMemo(() => ((dashboardQuery.data?.bookings_on_my_listings || []) as Booking[]), [dashboardQuery.data?.bookings_on_my_listings]);
   const conversations = useMemo(() => ((conversationsQuery.data || []) as Conversation[]), [conversationsQuery.data]);
-  const [approvingBookingId, setApprovingBookingId] = useState<string | null>(null);
   const [pricingSettings, setPricingSettings] = useState({
     basePrice: properties[0]?.price || 0,
     weekendMultiplier: 1.2,
@@ -992,120 +991,6 @@ export function HostDashboard() {
     </div>
   );
 
-  const handleConfirmBooking = async (bookingId: string) => {
-    setApprovingBookingId(bookingId);
-    try {
-      await bookingsAPI.confirm(bookingId);
-      toast.success('Booking confirmed!');
-      dashboardQuery.refetch();
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to confirm booking');
-    } finally {
-      setApprovingBookingId(null);
-    }
-  };
-
-  const handleDeclineBooking = async (bookingId: string) => {
-    setApprovingBookingId(bookingId);
-    try {
-      await bookingsAPI.decline(bookingId, 'Declined by host');
-      toast.success('Booking declined.');
-      dashboardQuery.refetch();
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to decline booking');
-    } finally {
-      setApprovingBookingId(null);
-    }
-  };
-
-  const renderBookings = () => {
-    const pendingBookings = bookings.filter(b => b.status === 'requested');
-    const activeBookings = bookings.filter(b => b.status !== 'requested');
-
-    const statusColor: Record<string, string> = {
-      requested: 'bg-yellow-100 text-yellow-700',
-      confirmed: 'bg-primary/10 text-primary',
-      completed: 'bg-gray-100 text-gray-600',
-      declined: 'bg-red-100 text-red-600',
-      cancelled: 'bg-gray-100 text-gray-500',
-    };
-
-    const BookingRow = ({ booking }: { booking: any }) => {
-      const property = properties.find((item) => item.id === booking.propertyId);
-      const guestName = booking.user?.firstName || booking.userId || 'Guest';
-      const isPending = booking.status === 'requested';
-      const isProcessing = approvingBookingId === booking.id;
-      return (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-border rounded-lg">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold">{guestName}</h3>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[booking.status] || 'bg-gray-100 text-gray-600'}`}>
-                {booking.status}
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {booking.checkIn} – {booking.checkOut} · {booking.guests} guests
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">{property?.title || booking.propertyId}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {isPending ? (
-              <>
-                <Button
-                  size="sm"
-                  disabled={isProcessing}
-                  onClick={() => handleConfirmBooking(booking.id)}
-                >
-                  {isProcessing ? 'Processing…' : 'Confirm'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive border-destructive hover:bg-destructive/10"
-                  disabled={isProcessing}
-                  onClick={() => handleDeclineBooking(booking.id)}
-                >
-                  Decline
-                </Button>
-              </>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setActiveSection('messages')}>
-                Contact guest
-              </Button>
-            )}
-          </div>
-        </div>
-      );
-    };
-
-    return (
-      <div className="space-y-6">
-        {pendingBookings.length > 0 && (
-          <Card className="border-yellow-200 bg-yellow-50/50">
-            <CardHeader>
-              <CardTitle className="text-yellow-800 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-                Booking Requests ({pendingBookings.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {pendingBookings.map(b => <BookingRow key={b.id} booking={b} />)}
-            </CardContent>
-          </Card>
-        )}
-        <Card>
-          <CardHeader><CardTitle>All Bookings</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {activeBookings.length === 0 && pendingBookings.length === 0 && (
-              <p className="text-sm text-muted-foreground">No bookings yet.</p>
-            )}
-            {activeBookings.map(b => <BookingRow key={b.id} booking={b} />)}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  };
   const renderBookings = (statuses: BookingStatus[], title: string, emptyMessage: string) => (
     <Card>
       <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
