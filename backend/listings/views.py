@@ -252,7 +252,20 @@ def create_review(request):
 
     listing = get_object_or_404(Listing, pk=request.data.get("listing"))
 
-    if not Booking.objects.filter(listing=listing, customer=request.user, status='completed').exists():
+    # A stay counts as "complete" if either:
+    #   - the booking has explicit status='completed', or
+    #   - it's still 'confirmed' but the checkout date has passed (nothing
+    #     in the system auto-flips the status today, so without this branch
+    #     past stays could never leave a review).
+    today = timezone.now().date()
+    has_completed_stay = Booking.objects.filter(
+        listing=listing,
+        customer=request.user,
+    ).filter(
+        Q(status='completed') | Q(status='confirmed', end_date__lt=today)
+    ).exists()
+
+    if not has_completed_stay:
         return Response({"error": "You must complete a stay before leaving a review"}, status=status.HTTP_400_BAD_REQUEST)
 
     if Review.objects.filter(listing=listing, reviewer=request.user).exists():
