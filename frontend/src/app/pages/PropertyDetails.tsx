@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useSearchParams } from 'react-router';
 import {
   Star, Share, Heart, MapPin, Award, Shield,
   ChevronLeft, ChevronRight, X, Minus, Plus, MessageCircle, BedDouble, Users, Check,
@@ -55,6 +55,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
 export function PropertyDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated, wishlistIds, toggleWishlist, user } = useApp();
   const queryClient = useQueryClient();
   const [messagingHost, setMessagingHost] = useState(false);
@@ -87,6 +88,15 @@ export function PropertyDetails() {
   const [guests, setGuests] = useState(2);
 
   const [showReviewForm, setShowReviewForm] = useState(false);
+
+  // Deep-link from the user dashboard's "Review" button:
+  // /rooms/<id>?review=open auto-opens the review form on load.
+  useEffect(() => {
+    if (searchParams.get('review') === 'open') {
+      setShowReviewForm(true);
+    }
+  }, [searchParams]);
+
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewForm, setReviewForm] = useState({
     rating: 0, title: '', content: '',
