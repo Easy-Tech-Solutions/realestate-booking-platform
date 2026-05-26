@@ -208,7 +208,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                     <Label htmlFor="first_name">First name</Label>
                     <div className="relative">
                       <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input id="first_name" type="text" placeholder="John" className="pl-10" {...field('first_name')} />
+                      <Input id="first_name" type="text" placeholder="John" className="pl-10" required {...field('first_name')} />
                     </div>
                     {errors.first_name && <p className="text-xs text-destructive">{errors.first_name}</p>}
                   </div>
@@ -216,7 +216,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                     <Label htmlFor="last_name">Last name</Label>
                     <div className="relative">
                       <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input id="last_name" type="text" placeholder="Doe" className="pl-10" {...field('last_name')} />
+                      <Input id="last_name" type="text" placeholder="Doe" className="pl-10" required {...field('last_name')} />
                     </div>
                     {errors.last_name && <p className="text-xs text-destructive">{errors.last_name}</p>}
                   </div>
