@@ -71,6 +71,9 @@ if not os.environ.get("DJANGO_ALLOWED_HOSTS"):
     ALLOWED_HOSTS += [".onrender.com"]
 
 INSTALLED_APPS = [
+    "unfold",
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -333,6 +336,30 @@ GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
 
 CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '')
 
+UNFOLD = {
+    "SITE_TITLE": "Home Konet Admin",
+    "SITE_HEADER": "Home Konet Admin",
+    "SITE_URL": "/",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": True,
+    "THEME": None,  #None = follow OS / user toggle. "light" or "dark" forces it.
+
+    "COLORS": {
+        "primary": {
+            "50": "240 250 241",
+            "100": "214 241 216",
+            "200": "173 228 179",
+            "300": "121 207 131",
+            "400": "74 178 89",
+            "500": "42 146 57",
+            "600": "29 113 41",
+            "700": "20 89 31",
+            "800": "0 68 6",  #brand color #004406
+            "900": "0 51 10",
+            "950": "0 37 7",
+        },
+    },
+}
 if CLOUDINARY_URL:
     import cloudinary
     cloudinary.config(cloudinary_url=CLOUDINARY_URL)
