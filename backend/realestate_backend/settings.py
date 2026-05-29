@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import timedelta
 #from dotenv import load_dotenv
 from urllib.parse import urlparse, parse_qsl
-
+from django.templatetags.static import static
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -339,7 +339,8 @@ CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '')
 UNFOLD = {
     "SITE_TITLE": "Home Konet Admin",
     "SITE_HEADER": "Home Konet Admin",
-    "SITE_URL": "/",
+    "SITE_URL": "https://realestate-booking-platform.vercel.app",
+    "SITE_ICON": lambda request: static("admin/Home-Konet-Logo2.jpeg"),
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,
     "THEME": None,  #None = follow OS / user toggle. "light" or "dark" forces it.
