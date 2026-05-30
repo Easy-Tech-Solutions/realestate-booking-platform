@@ -37,7 +37,10 @@ export function Header() {
 
   const handleBecomeHost = async () => {
     if (!isAuthenticated) {
-      handleAuthClick('login');
+      // Match the "List Your Property" CTA: first-time clickers most likely
+      // don't have an account, so default to signup. The dialog has a built-in
+      // "Already have an account? Log in" link for returning users.
+      handleAuthClick('register');
       return;
     }
 

@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { bookingsAPI } from '../../services/api/bookings';
 import { queryKeys } from '../../hooks/queries/keys';
 import {
   Sidebar,
