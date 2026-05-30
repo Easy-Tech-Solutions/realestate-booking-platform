@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Search, Star, Quote, Navigation, Loader2, PenLine, X, ArrowRight, Car, Leaf, Landmark } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Star, Quote, Navigation, Loader2, PenLine, X, ArrowRight, Car, Leaf, Landmark, Building2, Mail } from 'lucide-react';
 import bannerImage from '../../assets/banner.jpeg';
 import { useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import { propertiesAPI } from '../../services/api.service';
 import { testimonialsAPI } from '../../services/api/testimonials';
 import { useApp } from '../../hooks/useApp';
 import { Link } from 'react-router';
+import { AuthDialog } from '../components/AuthDialog';
 
 function CategorySvgIcon({ id, className = 'w-8 h-8' }: { id: string; className?: string }) {
   const s = {
@@ -153,6 +154,8 @@ export function Home() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [showBecomeHostDialog, setShowBecomeHostDialog] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
   const categoryScrollRef = React.useRef<HTMLDivElement>(null);
   const categoriesQuery = useQuery({
@@ -251,7 +254,7 @@ export function Home() {
           <img
             src={bannerImage}
             alt="HomeKonet — Find Your Perfect Stay"
-            className="block w-full h-[220px] sm:h-[320px] md:h-[420px] lg:h-[500px] xl:h-[560px] object-cover object-center"
+            className="block w-full object-cover object-center aspect-[16/9] sm:aspect-[2.5/1] lg:aspect-[3/1]"
           />
         </div>
       )}
@@ -654,11 +657,79 @@ export function Home() {
               </p>
             </div>
             <button
-              onClick={() => navigate('/host/new')}
+              onClick={() => {
+                if (!isAuthenticated) { setShowAuthDialog(true); return; }
+                if (user?.isHost) { navigate('/host/new'); return; }
+                setShowBecomeHostDialog(true);
+              }}
               className="flex-shrink-0 px-8 py-4 bg-white text-primary font-semibold rounded-xl hover:bg-white/90 transition-colors"
             >
               Try hosting
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Auth dialog (sign-in prompt) ── */}
+      <AuthDialog open={showAuthDialog} onClose={() => setShowAuthDialog(false)} />
+
+      {/* ── Become a Host dialog ── */}
+      {showBecomeHostDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowBecomeHostDialog(false)}
+        >
+          <div
+            className="relative bg-background rounded-2xl shadow-2xl w-full max-w-md p-8 border border-border"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setShowBecomeHostDialog(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Building2 className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-semibold mb-2">Want to become a host?</h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  To list your property on HomeKonet you need host access. Our team reviews each
+                  application to ensure every listing is legitimate and properly documented.
+                </p>
+              </div>
+
+              <div className="w-full bg-muted/40 rounded-xl p-4 text-left space-y-2 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">How to apply</p>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Send us your property ownership documents (title deed, lease agreement, or authorization letter).</li>
+                  <li>Our team reviews your submission — usually within 24–48 hours.</li>
+                  <li>Once approved, host access is granted and you can list your property.</li>
+                </ol>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 w-full pt-2">
+                <Link
+                  to="/contact"
+                  onClick={() => setShowBecomeHostDialog(false)}
+                  className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-primary text-primary-foreground font-semibold rounded-xl hover:bg-primary/90 transition-colors text-sm"
+                >
+                  <Mail className="w-4 h-4" /> Apply via Contact Us
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowBecomeHostDialog(false)}
+                  className="flex-1 px-5 py-3 border border-border rounded-xl font-semibold text-sm hover:border-primary hover:text-primary transition-colors"
+                >
+                  Maybe later
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
