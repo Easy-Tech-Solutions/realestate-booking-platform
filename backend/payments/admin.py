@@ -36,12 +36,27 @@ class CurrencyAdmin(admin.ModelAdmin):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ['id', 'user', 'booking', 'amount', 'currency', 'status', 'payment_method', 'created_at']
+    list_display = ['id', 'user', 'customer_full_name', 'booking', 'amount', 'currency', 'status', 'payment_method', 'created_at']
     list_filter = ['status', 'payment_method', 'gateway', 'currency']
-    search_fields = ['id', 'user__username', 'phone_number', 'gateway_transaction_id']
+    # Searching by full name works via the ORM's double-underscore traversal:
+    # `user__first_name` resolves to the User row's first_name column at query
+    # time, so we never duplicate the name onto the Payment row.
+    search_fields = [
+        'id',
+        'user__username',
+        'user__first_name',
+        'user__last_name',
+        'user__email',
+        'phone_number',
+        'gateway_transaction_id',
+    ]
     readonly_fields = ['id', 'created_at', 'processed_at', 'completed_at', 'amount_in_usd', 'gateway_response']
     raw_id_fields = ['booking', 'user']
     date_hierarchy = 'created_at'
+
+    @admin.display(description='Full name', ordering='user__last_name')
+    def customer_full_name(self, obj):
+        return obj.user.get_full_name() or '—'
 
 
 @admin.register(Refund)
