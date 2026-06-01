@@ -445,11 +445,25 @@ function ChatPane({
     return () => clearInterval(t);
   }, [other?.id]);
 
-  // Auto-scroll to bottom only when new messages arrive (not on edits)
+  // Auto-scroll to bottom only when new messages arrive (not on edits).
+  // We deliberately scroll the ScrollArea viewport's scrollTop instead of
+  // calling `scrollIntoView` — the latter also scrolls every ancestor that
+  // can scroll (including the window), which would push the whole page past
+  // the chat input and into the footer on mobile and on shorter screens.
   const prevLengthRef = useRef(0);
   useEffect(() => {
     if (messages.length > prevLengthRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const viewport = bottomRef.current?.closest(
+        '[data-radix-scroll-area-viewport]',
+      ) as HTMLElement | null;
+      if (viewport) {
+        // Instant on initial load (no jarring animation), smooth for new messages.
+        const isInitialLoad = prevLengthRef.current === 0;
+        viewport.scrollTo({
+          top: viewport.scrollHeight,
+          behavior: isInitialLoad ? 'auto' : 'smooth',
+        });
+      }
     }
     prevLengthRef.current = messages.length;
   }, [messages.length]);
