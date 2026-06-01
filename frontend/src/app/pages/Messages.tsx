@@ -450,6 +450,11 @@ function ChatPane({
   // calling `scrollIntoView` — the latter also scrolls every ancestor that
   // can scroll (including the window), which would push the whole page past
   // the chat input and into the footer on mobile and on shorter screens.
+  //
+  // We wrap the scroll in requestAnimationFrame so the browser finishes
+  // laying out the newly-mounted messages first. Without the rAF, the
+  // effect reads a stale `scrollHeight` on initial load and the viewport
+  // never actually reaches the bottom — the user sees the oldest message.
   const prevLengthRef = useRef(0);
   useEffect(() => {
     if (messages.length > prevLengthRef.current) {
@@ -457,11 +462,12 @@ function ChatPane({
         '[data-radix-scroll-area-viewport]',
       ) as HTMLElement | null;
       if (viewport) {
-        // Instant on initial load (no jarring animation), smooth for new messages.
         const isInitialLoad = prevLengthRef.current === 0;
-        viewport.scrollTo({
-          top: viewport.scrollHeight,
-          behavior: isInitialLoad ? 'auto' : 'smooth',
+        requestAnimationFrame(() => {
+          viewport.scrollTo({
+            top: viewport.scrollHeight,
+            behavior: isInitialLoad ? 'auto' : 'smooth',
+          });
         });
       }
     }
