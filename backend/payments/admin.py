@@ -61,9 +61,23 @@ class PaymentAdmin(admin.ModelAdmin):
 
 @admin.register(Refund)
 class RefundAdmin(admin.ModelAdmin):
-    list_display = ['id', 'payment', 'amount', 'status', 'created_at']
+    list_display = ['id', 'payment', 'customer_full_name', 'amount', 'status', 'created_at']
     list_filter = ['status']
+    # The Refund row links to a Payment, which links to a User — so we traverse
+    # two FKs (payment__user__...) to display and search by the underlying
+    # customer name without storing it on the Refund row itself.
+    search_fields = [
+        'id',
+        'payment__user__username',
+        'payment__user__first_name',
+        'payment__user__last_name',
+        'payment__user__email',
+    ]
     readonly_fields = ['created_at', 'processed_at']
+
+    @admin.display(description='Customer (Full name)', ordering='payment__user__last_name')
+    def customer_full_name(self, obj):
+        return obj.payment.user.get_full_name() or obj.payment.user.username
 
 
 @admin.register(WebhookLog)

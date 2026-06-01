@@ -4,10 +4,21 @@ from .models import Booking
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ['listing', 'customer', 'start_date', 'end_date', 'status', 'requested_at']
+    list_display = ['listing', 'customer_full_name', 'start_date', 'end_date', 'status', 'requested_at']
     list_filter = ['status', 'requested_at', 'start_date', 'listing', 'customer']
-    search_fields = ['listing__title', 'customer__username', 'notes']
+    search_fields = [
+        'listing__title',
+        'customer__username',
+        'customer__first_name',
+        'customer__last_name',
+        'customer__email',
+        'notes',
+    ]
     readonly_fields = ['requested_at', 'confirmed_at']
+
+    @admin.display(description='Customer', ordering='customer__last_name')
+    def customer_full_name(self, obj):
+        return obj.customer.get_full_name() or obj.customer.username
     
     fieldsets = (
         ('Booking Details', {

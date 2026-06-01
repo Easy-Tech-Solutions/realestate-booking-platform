@@ -17,11 +17,23 @@ class ListingImageInline(admin.TabularInline):
 
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
-    list_display = ['title', 'price', 'property_type', 'bedrooms', 'owner', 'is_available', 'created_at']
+    list_display = ['title', 'price', 'property_type', 'bedrooms', 'owner_full_name', 'is_available', 'created_at']
     list_filter = ['property_type', 'is_available', 'created_at', 'owner']
-    search_fields = ['title', 'description', 'address']
+    search_fields = [
+        'title',
+        'description',
+        'address',
+        'owner__username',
+        'owner__first_name',
+        'owner__last_name',
+        'owner__email',
+    ]
     readonly_fields = ['created_at', 'updated_at']
     inlines = [ListingImageInline]
+
+    @admin.display(description='Owner', ordering='owner__last_name')
+    def owner_full_name(self, obj):
+        return obj.owner.get_full_name() or obj.owner.username
     
     fieldsets = (
         ('Basic Information', {
