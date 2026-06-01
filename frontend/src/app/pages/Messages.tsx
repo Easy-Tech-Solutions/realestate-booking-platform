@@ -446,26 +446,23 @@ function ChatPane({
   }, [other?.id]);
 
   // Auto-scroll to bottom only when new messages arrive (not on edits).
-  // We deliberately scroll the ScrollArea viewport's scrollTop instead of
-  // calling `scrollIntoView` — the latter also scrolls every ancestor that
+  // We scroll the chat container's scrollTop directly (via scrollRef) instead
+  // of calling `scrollIntoView` — the latter also scrolls every ancestor that
   // can scroll (including the window), which would push the whole page past
   // the chat input and into the footer on mobile and on shorter screens.
   //
-  // We wrap the scroll in requestAnimationFrame so the browser finishes
-  // laying out the newly-mounted messages first. Without the rAF, the
-  // effect reads a stale `scrollHeight` on initial load and the viewport
-  // never actually reaches the bottom — the user sees the oldest message.
+  // We wrap in requestAnimationFrame so the browser finishes laying out the
+  // newly-mounted messages first. Without it, the effect reads a stale
+  // `scrollHeight` on initial load and never actually reaches the bottom.
   const prevLengthRef = useRef(0);
   useEffect(() => {
     if (messages.length > prevLengthRef.current) {
-      const viewport = bottomRef.current?.closest(
-        '[data-radix-scroll-area-viewport]',
-      ) as HTMLElement | null;
-      if (viewport) {
+      const container = scrollRef.current;
+      if (container) {
         const isInitialLoad = prevLengthRef.current === 0;
         requestAnimationFrame(() => {
-          viewport.scrollTo({
-            top: viewport.scrollHeight,
+          container.scrollTo({
+            top: container.scrollHeight,
             behavior: isInitialLoad ? 'auto' : 'smooth',
           });
         });
