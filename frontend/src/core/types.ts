@@ -223,11 +223,11 @@ export interface SearchFilters {
   categories?: string[];
 }
 
-export type PropertyType = 
-  | 'house' 
-  | 'apartment' 
-  | 'villa' 
-  | 'cabin' 
+export type PropertyType =
+  | 'house'
+  | 'apartment'
+  | 'villa'
+  | 'cabin'
   | 'cottage'
   | 'bungalow'
   | 'chalet'
@@ -239,6 +239,14 @@ export type PropertyType =
   | 'room'
   | 'suite'
   | 'hall'
+  // Categories from PROPERTY_CATEGORIES that the backend stores as property_type.
+  | 'hotels'
+  | 'lodge'
+  | 'beaches'
+  | 'roadside'
+  | 'highway'
+  | 'land'
+  | 'office-space'
   | 'resort'
   | 'land'
   | 'hotel'

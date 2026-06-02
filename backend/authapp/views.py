@@ -58,12 +58,15 @@ def register(request):
     email = request.data.get("email")
     password = request.data.get("password")
     password2 = request.data.get("password2")
-    first_name = request.data.get("first_name")
-    last_name = request.data.get("last_name")
+    first_name = (request.data.get("first_name") or "").strip()
+    last_name = (request.data.get("last_name") or "").strip()
 
     # Input validation
-    if not all([password, email, password2]):
-        return Response({"error": "email, password, and password2 required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not all([password, email, password2, first_name, last_name]):
+        return Response(
+            {"error": "first_name, last_name, email, password, and password2 are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     # Password confirmation check
     if password != password2:
@@ -90,8 +93,8 @@ def register(request):
                 username=username,
                 email=email,
                 password=password,
-                first_name=first_name or "",
-                last_name=last_name or "",
+                first_name=first_name,
+                last_name=last_name,
                 is_active=not settings.AUTH_REQUIRE_EMAIL_VERIFICATION,
             )
             if settings.AUTH_REQUIRE_EMAIL_VERIFICATION:

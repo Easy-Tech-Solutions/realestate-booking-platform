@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useSearchParams } from 'react-router';
 import {
   Star, Share, Heart, MapPin, Award, Shield,
   ChevronLeft, ChevronRight, X, Minus, Plus, MessageCircle, BedDouble, Users, Check,
@@ -55,6 +55,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
 export function PropertyDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated, wishlistIds, toggleWishlist, user } = useApp();
   const queryClient = useQueryClient();
   const [messagingHost, setMessagingHost] = useState(false);
@@ -87,6 +88,15 @@ export function PropertyDetails() {
   const [guests, setGuests] = useState(2);
 
   const [showReviewForm, setShowReviewForm] = useState(false);
+
+  // Deep-link from the user dashboard's "Review" button:
+  // /rooms/<id>?review=open auto-opens the review form on load.
+  useEffect(() => {
+    if (searchParams.get('review') === 'open') {
+      setShowReviewForm(true);
+    }
+  }, [searchParams]);
+
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewForm, setReviewForm] = useState({
     rating: 0, title: '', content: '',
@@ -175,10 +185,35 @@ export function PropertyDetails() {
   const cancellationPolicy = CANCELLATION_POLICIES[property.cancellationPolicy];
 
   const bookedDateSet = new Set(property.bookedDates ?? []);
-  const isDateBlocked = (date: Date) => {
-    if (date < new Date()) return true;
-    const iso = date.toISOString().split('T')[0];
-    return bookedDateSet.has(iso);
+  const isPastDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date < today;
+  };
+  const isBookedDate = (date: Date) =>
+    bookedDateSet.has(date.toISOString().split('T')[0]);
+
+  const handleDateRangeSelect = (range: typeof dateRange) => {
+    // Reject any range that overlaps a confirmed booking. The check uses
+    // `cursor < to` because the check-out morning is available for the next
+    // guest — only the nights in [from, to) are actually occupied.
+    if (range?.from && range?.to) {
+      const cursor = new Date(range.from);
+      while (cursor < range.to) {
+        if (bookedDateSet.has(cursor.toISOString().split('T')[0])) {
+          toast.error('Your selection overlaps with dates that are already booked.');
+          return;
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+    setDateRange(range);
+  };
+
+  const handleDayClick = (day: Date, modifiers: Record<string, boolean>) => {
+    if (modifiers.booked) {
+      toast.info('This date is already booked. Please choose a different date.');
+    }
   };
 
   const handleReserve = () => {
@@ -626,9 +661,14 @@ export function PropertyDetails() {
                   <Calendar
                     mode="range"
                     selected={dateRange}
-                    onSelect={setDateRange}
+                    onSelect={handleDateRangeSelect}
+                    onDayClick={handleDayClick}
+                    modifiers={{ booked: isBookedDate }}
+                    modifiersClassNames={{
+                      booked: 'line-through opacity-50 text-muted-foreground',
+                    }}
                     numberOfMonths={2}
-                    disabled={isDateBlocked}
+                    disabled={isPastDate}
                     className="border rounded-xl p-4"
                   />
                 </div>
