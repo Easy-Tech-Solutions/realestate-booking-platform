@@ -35,8 +35,21 @@ export async function fetchPublicJson<T>(url: string, options: RequestInit = {})
   const response = await fetch(`${API_BASE_URL}${url}`, { ...options, headers, credentials: 'include' });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: response.statusText }));
-    throw new ApiError(error.error || response.statusText, response.status, error);
+    const body = await response.json().catch(() => ({}));
+    // Different endpoints in our codebase use different keys for error
+    // messages: home-grown views use `error`, DRF's built-in validation and
+    // permission denials use `detail`. Fall through both so the caller
+    // always gets a readable message. `response.statusText` is the last
+    // resort because HTTP/2 (which Render uses) drops the reason phrase,
+    // leaving it as an empty string — which would otherwise show a toast
+    // with no text at all.
+    const message =
+      body.error ||
+      body.detail ||
+      body.message ||
+      response.statusText ||
+      `Request failed (${response.status})`;
+    throw new ApiError(message, response.status, body);
   }
 
   if (response.status === 204) {
@@ -97,8 +110,21 @@ export async function fetchWithAuth<T>(url: string, options: RequestInit = {}): 
   }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: response.statusText }));
-    throw new ApiError(error.error || response.statusText, response.status, error);
+    const body = await response.json().catch(() => ({}));
+    // Different endpoints in our codebase use different keys for error
+    // messages: home-grown views use `error`, DRF's built-in validation and
+    // permission denials use `detail`. Fall through both so the caller
+    // always gets a readable message. `response.statusText` is the last
+    // resort because HTTP/2 (which Render uses) drops the reason phrase,
+    // leaving it as an empty string — which would otherwise show a toast
+    // with no text at all.
+    const message =
+      body.error ||
+      body.detail ||
+      body.message ||
+      response.statusText ||
+      `Request failed (${response.status})`;
+    throw new ApiError(message, response.status, body);
   }
 
   if (response.status === 204) {
