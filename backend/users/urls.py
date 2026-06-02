@@ -4,6 +4,7 @@ from .views import (
     user_detail,
     me_dashboard,
     update_profile,
+    delete_my_account,
     initiate_phone_change,
     verify_phone_change,
     cancel_phone_change,
@@ -16,6 +17,7 @@ urlpatterns = [
     path('<int:id>/', user_detail, name='user_detail'),
     path('me/dashboard/', me_dashboard, name='me_dashboard'),
     path('me/profile/', update_profile, name='update_profile'),
+    path('me/delete/',  delete_my_account, name='delete_my_account'),
 
     # Phone number change — 2-step verification
     path('phone-change/initiate/', initiate_phone_change, name='phone_change_initiate'),

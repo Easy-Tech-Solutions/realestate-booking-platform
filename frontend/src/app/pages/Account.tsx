@@ -6,6 +6,18 @@ import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { Switch } from '../components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '../components/ui/alert-dialog';
+import { useNavigate } from 'react-router';
 import { useApp } from '../../hooks/useApp';
 import { getInitials } from '../../core/utils';
 import { toast } from 'sonner';
@@ -323,7 +335,25 @@ function CardTile({ card, onEdit, onDelete, onSetDefault }: CardTileProps) {
 // ── Main Account page ─────────────────────────────────────────────────────────
 
 export function Account() {
-  const { user, setUser } = useApp();
+  const { user, setUser, logout } = useApp();
+  const navigate = useNavigate();
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      await usersAPI.deleteAccount();
+      // The backend has already invalidated our tokens; flush local auth
+      // state and bounce to the home page.
+      await logout();
+      toast.success('Your account has been deleted.');
+      navigate('/', { replace: true });
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not delete account. Please try again.');
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -758,6 +788,41 @@ export function Account() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Danger zone — account deletion */}
+          <div className="border border-destructive/30 rounded-xl p-6">
+            <h2 className="text-xl font-semibold mb-2 text-destructive">Danger zone</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Deleting your account is permanent. Your listings will be unpublished
+              and your name will be replaced with "Deleted User" on any past bookings
+              or reviews. You'll need any active bookings resolved first.
+            </p>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">Delete my account</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This cannot be undone. You'll be logged out immediately and
+                    your account will be closed. Active bookings must be resolved
+                    before this can proceed.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deletingAccount}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAccount}
+                    disabled={deletingAccount}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deletingAccount ? 'Deleting…' : 'Yes, delete'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
         </div>
