@@ -69,7 +69,10 @@ def category_detail(request, id):
 @parser_classes([MultiPartParser, FormParser])
 def listings_collection(request):
     if request.method == "GET":
-        items = ListingFilter(request.GET, queryset=Listing.objects.filter(status='published'))
+        items = ListingFilter(
+            request.GET,
+            queryset=Listing.objects.filter(status='published', deleted_at__isnull=True),
+        )
         qs = items.qs
 
         # When the search includes check-in/check-out, hide listings that
@@ -110,6 +113,12 @@ def listing_detail(request, id):
         return Response({"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == "GET":
+        # Soft-deleted listings 404 for everyone except the owner / admin so
+        # that direct-URL access doesn't bypass the search-page filter.
+        if item.deleted_at is not None and not (
+            request.user.is_authenticated and (item.owner == request.user or request.user.is_superuser)
+        ):
+            return Response({"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(ListingSerializer(item, context={"request": request}).data)
 
     elif request.method == "PUT":
@@ -128,8 +137,11 @@ def listing_detail(request, id):
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         if item.owner != request.user and not request.user.is_superuser:
             return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
-        item.delete()
-        return Response({"message": "Listing deleted"}, status=status.HTTP_204_NO_CONTENT)
+        from .deletion import delete_listing
+        ok, error = delete_listing(item)
+        if not ok:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["GET", "POST"])

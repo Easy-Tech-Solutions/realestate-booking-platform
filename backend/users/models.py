@@ -16,6 +16,13 @@ class User(AbstractUser):
     password_reset_token_expires_at = models.DateTimeField(null=True, blank=True)
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='user')
 
+    # Soft-delete marker. When set, the account is considered closed: the user
+    # cannot log in, their listings are unpublished, and their public-facing
+    # name is replaced with "Deleted User". Historical bookings, payments and
+    # reviews keep their FK to this row so financial / audit history stays
+    # intact.
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
     def save(self, *args, **kwargs):
         # Keep Django admin flags and app role aligned.
         if self.is_superuser or self.is_staff or self.role == 'admin':
