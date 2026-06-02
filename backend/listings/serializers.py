@@ -212,6 +212,8 @@ class ReviewImageSerializer(serializers.ModelSerializer):
 
 class ReviewSerializer(serializers.ModelSerializer):
     reviewer_username = serializers.CharField(source='reviewer.username', read_only=True)
+    reviewer_first_name = serializers.CharField(source='reviewer.first_name', read_only=True)
+    reviewer_last_name = serializers.CharField(source='reviewer.last_name', read_only=True)
     reviewer_avatar = serializers.SerializerMethodField()
     listing_title = serializers.CharField(source='listing.title', read_only=True)
     images = ReviewImageSerializer(many=True, read_only=True)
@@ -219,7 +221,8 @@ class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = [
-            'id', 'listing', 'listing_title', 'reviewer', 'reviewer_username', 'reviewer_avatar',
+            'id', 'listing', 'listing_title', 'reviewer',
+            'reviewer_username', 'reviewer_first_name', 'reviewer_last_name', 'reviewer_avatar',
             'rating', 'cleanliness', 'accuracy', 'check_in_rating',
             'communication', 'location_rating', 'value',
             'title', 'content', 'host_response', 'host_response_at',

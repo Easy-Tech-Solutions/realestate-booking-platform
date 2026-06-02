@@ -7,11 +7,18 @@ from .models import Report
 @admin.register(Report)
 class ReportAdmin(admin.ModelAdmin):
     list_display  = [
-        'id', 'reporter_link', 'content_type', 'report_type',
+        'id', 'reporter_link', 'reporter_full_name', 'content_type', 'report_type',
         'colored_status', 'created_at', 'resolved_by',
     ]
     list_filter   = ['status', 'report_type', 'content_type', 'created_at']
-    search_fields = ['reporter__username', 'description', 'admin_notes']
+    search_fields = [
+        'reporter__username',
+        'reporter__first_name',
+        'reporter__last_name',
+        'reporter__email',
+        'description',
+        'admin_notes',
+    ]
     readonly_fields = [
         'reporter', 'content_type',
         'reported_user', 'reported_listing', 'reported_review', 'reported_message',
@@ -60,6 +67,10 @@ class ReportAdmin(admin.ModelAdmin):
     def reporter_link(self, obj):
         return format_html('<a href="/admin/users/user/{}/change/">{}</a>', obj.reporter_id, obj.reporter.username)
     reporter_link.short_description = 'Reporter'
+
+    @admin.display(description='Reporter (Full name)', ordering='reporter__last_name')
+    def reporter_full_name(self, obj):
+        return obj.reporter.get_full_name() or '—'
 
     def colored_status(self, obj):
         colors = {

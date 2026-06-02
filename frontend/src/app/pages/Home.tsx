@@ -383,9 +383,15 @@ export function Home() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (!isAuthenticated) { setShowAuthDialog(true); return; }
-                      if (user?.isHost) { navigate('/host/new'); return; }
-                      setShowBecomeHostDialog(true);
+                      // Logged-in users go straight to the create-listing flow.
+                      // Logged-out clickers are sent to signup — most people
+                      // hitting this CTA for the first time don't have an
+                      // account yet, so defaulting to login adds friction.
+                      if (isAuthenticated) {
+                        navigate('/host/new');
+                      } else {
+                        navigate('/login?mode=signup&next=' + encodeURIComponent('/host/new'));
+                      }
                     }}
                     className="flex items-center gap-2 px-6 py-3 border border-border rounded-xl font-semibold text-foreground hover:border-primary hover:text-primary transition-colors"
                   >

@@ -149,7 +149,13 @@ export function UserDashboard() {
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[trip.booking.status]}`}>
                         {trip.booking.status}
                       </span>
-                      <Button variant="outline" size="sm">Review</Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/rooms/${trip.property.id}?review=open`)}
+                      >
+                        Review
+                      </Button>
                     </div>
                   </div>
                 ))}

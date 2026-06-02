@@ -445,11 +445,28 @@ function ChatPane({
     return () => clearInterval(t);
   }, [other?.id]);
 
-  // Auto-scroll to bottom only when new messages arrive (not on edits)
+  // Auto-scroll to bottom only when new messages arrive (not on edits).
+  // We scroll the chat container's scrollTop directly (via scrollRef) instead
+  // of calling `scrollIntoView` — the latter also scrolls every ancestor that
+  // can scroll (including the window), which would push the whole page past
+  // the chat input and into the footer on mobile and on shorter screens.
+  //
+  // We wrap in requestAnimationFrame so the browser finishes laying out the
+  // newly-mounted messages first. Without it, the effect reads a stale
+  // `scrollHeight` on initial load and never actually reaches the bottom.
   const prevLengthRef = useRef(0);
   useEffect(() => {
     if (messages.length > prevLengthRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const container = scrollRef.current;
+      if (container) {
+        const isInitialLoad = prevLengthRef.current === 0;
+        requestAnimationFrame(() => {
+          container.scrollTo({
+            top: container.scrollHeight,
+            behavior: isInitialLoad ? 'auto' : 'smooth',
+          });
+        });
+      }
     }
     prevLengthRef.current = messages.length;
   }, [messages.length]);
@@ -915,7 +932,14 @@ export function Messages() {
     const paramId = searchParams.get('conversation');
     if (paramId) {
       setSelectedId(paramId);
-    } else if (!selectedId && conversations.length > 0) {
+      return;
+    }
+    // Auto-open the first conversation only on the desktop two-pane layout
+    // (lg+ matches the `lg:w-80` sidebar breakpoint). On mobile the same
+    // action would jump the user past the list into the last chat, which is
+    // confusing — keep them on the inbox view instead.
+    const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+    if (!selectedId && conversations.length > 0 && isDesktop) {
       setSelectedId(conversations[0].id);
     }
   }, [conversations, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps

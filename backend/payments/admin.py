@@ -36,19 +36,48 @@ class CurrencyAdmin(admin.ModelAdmin):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ['id', 'user', 'booking', 'amount', 'currency', 'status', 'payment_method', 'created_at']
+    list_display = ['id', 'user', 'customer_full_name', 'booking', 'amount', 'currency', 'status', 'payment_method', 'created_at']
     list_filter = ['status', 'payment_method', 'gateway', 'currency']
-    search_fields = ['id', 'user__username', 'phone_number', 'gateway_transaction_id']
+    # Searching by full name works via the ORM's double-underscore traversal:
+    # `user__first_name` resolves to the User row's first_name column at query
+    # time, so we never duplicate the name onto the Payment row.
+    search_fields = [
+        'id',
+        'user__username',
+        'user__first_name',
+        'user__last_name',
+        'user__email',
+        'phone_number',
+        'gateway_transaction_id',
+    ]
     readonly_fields = ['id', 'created_at', 'processed_at', 'completed_at', 'amount_in_usd', 'gateway_response']
     raw_id_fields = ['booking', 'user']
     date_hierarchy = 'created_at'
 
+    @admin.display(description='Full name', ordering='user__last_name')
+    def customer_full_name(self, obj):
+        return obj.user.get_full_name() or '—'
+
 
 @admin.register(Refund)
 class RefundAdmin(admin.ModelAdmin):
-    list_display = ['id', 'payment', 'amount', 'status', 'created_at']
+    list_display = ['id', 'payment', 'customer_full_name', 'amount', 'status', 'created_at']
     list_filter = ['status']
+    # The Refund row links to a Payment, which links to a User — so we traverse
+    # two FKs (payment__user__...) to display and search by the underlying
+    # customer name without storing it on the Refund row itself.
+    search_fields = [
+        'id',
+        'payment__user__username',
+        'payment__user__first_name',
+        'payment__user__last_name',
+        'payment__user__email',
+    ]
     readonly_fields = ['created_at', 'processed_at']
+
+    @admin.display(description='Customer (Full name)', ordering='payment__user__last_name')
+    def customer_full_name(self, obj):
+        return obj.payment.user.get_full_name() or obj.payment.user.username
 
 
 @admin.register(WebhookLog)

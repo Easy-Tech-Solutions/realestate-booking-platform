@@ -216,8 +216,8 @@ export function normalizeReview(r: any): Review {
     user: {
       id: String(r.reviewer),
       email: '',
-      firstName: r.reviewer_username || '',
-      lastName: '',
+      firstName: r.reviewer_first_name || r.reviewer_username || '',
+      lastName: r.reviewer_last_name || '',
       avatar: r.reviewer_avatar,
       isHost: false,
       verified: true,
