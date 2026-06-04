@@ -23,7 +23,8 @@ import { fetchWithAuth } from '../../services/api/shared/client';
 const MOMO_POLL_INTERVAL_MS = 3000;
 const MOMO_POLL_TIMEOUT_MS = 3 * 60 * 1000;  // 3 minutes
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
+const stripePromise = STRIPE_KEY ? loadStripe(STRIPE_KEY) : null;
 
 function BookingForm() {
   const location = useLocation();
@@ -264,19 +265,34 @@ function BookingForm() {
               {paymentMethod === 'stripe' && (
                 <div className="space-y-4">
                   <Label>Card details</Label>
-                  <div className="border border-border rounded-lg p-4">
-                    <CardElement
-                      options={{
-                        style: {
-                          base: {
-                            fontSize: '16px',
-                            color: 'hsl(var(--foreground))',
-                            '::placeholder': { color: 'hsl(var(--muted-foreground))' },
-                          },
-                        },
-                      }}
-                    />
-                  </div>
+                  {!STRIPE_KEY ? (
+                    <div className="border border-destructive/40 bg-destructive/5 rounded-lg p-4 text-sm text-destructive">
+                      Stripe is not configured. Please add <code className="font-mono">VITE_STRIPE_PUBLISHABLE_KEY</code> to your environment variables.
+                    </div>
+                  ) : (
+                    <div className="border border-border rounded-lg px-4 py-3 min-h-[52px] flex items-center">
+                      <div className="w-full">
+                        <CardElement
+                          options={{
+                            style: {
+                              base: {
+                                fontSize: '16px',
+                                fontFamily: 'system-ui, -apple-system, sans-serif',
+                                color: '#111827',
+                                '::placeholder': { color: '#9ca3af' },
+                                iconColor: '#6b7280',
+                              },
+                              invalid: {
+                                color: '#ef4444',
+                                iconColor: '#ef4444',
+                              },
+                            },
+                            hidePostalCode: true,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     Powered by Stripe — your card number never touches our servers.
                   </p>
@@ -354,16 +370,15 @@ function BookingForm() {
               <Button
                 type="button"
                 onClick={handlePayment}
-                disabled={isProcessing || !agreedToRules}
+                disabled={isProcessing || !agreedToRules || momoStatus === 'awaiting'}
                 className="w-full"
                 size="lg"
               >
-                {isProcessing ? 'Processing...' : `Confirm and pay ${formatCurrency(displayTotal)}`}
                 {momoStatus === 'awaiting'
                   ? 'Waiting for MoMo approval…'
                   : isProcessing
-                    ? 'Processing...'
-                    : `Confirm and pay ${formatCurrency(currentPricing.total)}`}
+                    ? 'Processing…'
+                    : `Confirm and pay ${formatCurrency(displayTotal)}`}
               </Button>
             </div>
 
