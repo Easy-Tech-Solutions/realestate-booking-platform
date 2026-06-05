@@ -93,6 +93,7 @@ function BookingForm() {
     }
 
     setIsProcessing(true);
+    let stripePaymentIntentId: string | undefined;
     try {
       const startDate = currentCheckIn instanceof Date
         ? currentCheckIn.toISOString().split('T')[0]
@@ -130,11 +131,13 @@ function BookingForm() {
         }
 
         let confirmError: { message?: string } | undefined;
+        let confirmedPaymentIntentId: string | undefined;
         try {
           const result = await stripe!.confirmCardPayment(clientSecret, {
             payment_method: { card: cardElement },
           });
           confirmError = result.error;
+          confirmedPaymentIntentId = result.paymentIntent?.id;
         } catch {
           toast.error('Card payment failed — please check your card details and try again.');
           return;
@@ -144,6 +147,13 @@ function BookingForm() {
           toast.error(confirmError.message || 'Card payment failed');
           return;
         }
+
+        if (!confirmedPaymentIntentId) {
+          toast.error('Payment completed but could not retrieve payment ID. Please contact support.');
+          return;
+        }
+
+        stripePaymentIntentId = confirmedPaymentIntentId;
       }
 
       const booking = await bookingsAPI.create({
@@ -152,6 +162,7 @@ function BookingForm() {
         end_date: endDate,
         notes: specialRequests,
         ...(selectedRoom ? { hotel_room: selectedRoom.id } : {}),
+        ...(stripePaymentIntentId ? { stripe_payment_intent_id: stripePaymentIntentId } : {}),
       });
 
       // MTN MoMo: send a request-to-pay push, then poll for the user's

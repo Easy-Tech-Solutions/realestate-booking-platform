@@ -30,6 +30,7 @@ class Booking(models.Model):
     owner_notes = models.TextField(blank=True)
     decline_reason = models.TextField(blank=True)
     total_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    stripe_payment_intent_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
 
     class Meta:
         # Only enforce uniqueness while the booking is "alive". A declined,
