@@ -102,13 +102,20 @@ function BookingForm() {
         : currentCheckOut;
 
       if (paymentMethod === 'stripe') {
-        const amountCents = Math.round(displayTotal * 100);
-
         let clientSecret: string;
         try {
-          const result = await fetchWithAuth<{ client_secret: string }>(
+          const result = await fetchWithAuth<{ client_secret: string; amount_cents: number }>(
             '/api/payments/stripe/payment-intent/',
-            { method: 'POST', body: JSON.stringify({ amount_cents: amountCents, currency: 'usd' }) }
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                listing_id: currentProperty.id,
+                check_in:   startDate,
+                check_out:  endDate,
+                ...(selectedRoom ? { room_id: selectedRoom.id } : {}),
+                currency: 'usd',
+              }),
+            }
           );
           clientSecret = result.client_secret;
         } catch (piErr: any) {
