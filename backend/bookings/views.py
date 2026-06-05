@@ -76,10 +76,11 @@ def bookings_collection(request):
 
             serializer = BookingCreateSerializer(data=request.data)
             if serializer.is_valid():
-                start     = serializer.validated_data['start_date']
-                end       = serializer.validated_data['end_date']
-                hotel_room = serializer.validated_data.get('hotel_room')
-                stripe_pi_id = serializer.validated_data.get('stripe_payment_intent_id')
+                start          = serializer.validated_data['start_date']
+                end            = serializer.validated_data['end_date']
+                hotel_room     = serializer.validated_data.get('hotel_room')
+                stripe_pi_id   = serializer.validated_data.get('stripe_payment_intent_id')
+                payment_method = serializer.validated_data.get('payment_method', 'mtn_momo')
 
                 if hotel_room:
                     if hotel_room.listing_id != listing.id:
@@ -88,10 +89,15 @@ def bookings_collection(request):
                     if _get_available_room_count(hotel_room, start, end) < 1:
                         return Response({'error': 'Room not available for selected dates'}, status=status.HTTP_400_BAD_REQUEST)
 
-                # Stripe payments: verify the PaymentIntent server-side before
-                # creating the booking.  This prevents booking without payment and
-                # replay attacks (reusing a completed PI for a second booking).
+                # Stripe payments: require and verify PI before creating booking.
+                # MoMo: booking is created first, payment initiated after.
                 from django.conf import settings as _settings
+                if payment_method == 'stripe' and not stripe_pi_id:
+                    return Response(
+                        {'error': 'stripe_payment_intent_id is required for Stripe payments'},
+                        status=status.HTTP_402_PAYMENT_REQUIRED,
+                    )
+
                 if stripe_pi_id:
                     try:
                         import stripe as _stripe
@@ -117,11 +123,6 @@ def bookings_collection(request):
                             {'error': f'Payment amount mismatch (expected {expected_cents} cents)'},
                             status=status.HTTP_400_BAD_REQUEST,
                         )
-                elif getattr(_settings, 'STRIPE_SECRET_KEY', ''):
-                    # Stripe is configured but no PI supplied — require payment proof
-                    # unless the listing uses MoMo (payment happens after booking).
-                    # For now we allow omission to keep MoMo flow intact; flag it.
-                    pass  # MoMo bookings go through initiate_payment after creation
 
                 # Compute the full grand total so it matches what the guest saw.
                 from listings.views import compute_listing_pricing

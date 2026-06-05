@@ -161,6 +161,7 @@ function BookingForm() {
         start_date: startDate,
         end_date: endDate,
         notes: specialRequests,
+        payment_method: paymentMethod === 'mtn_momo' ? 'mtn_momo' : 'stripe',
         ...(selectedRoom ? { hotel_room: selectedRoom.id } : {}),
         ...(stripePaymentIntentId ? { stripe_payment_intent_id: stripePaymentIntentId } : {}),
       });
