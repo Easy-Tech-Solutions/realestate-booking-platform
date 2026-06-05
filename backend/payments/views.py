@@ -268,27 +268,67 @@ def mtn_momo_webhook(request):
 
 # ── Stripe PaymentIntent ───────────────────────────────────────────────────────
 
+# Flat booking fee (USD) that is added to every stay — must match the
+# BOOKING_FEE constant in frontend/src/app/pages/Booking.tsx.
+_BOOKING_FEE_USD = 3.00
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_stripe_payment_intent(request):
     """
-    Creates a Stripe PaymentIntent for the given amount and returns the client_secret.
-    The frontend uses this to confirm payment without raw card data touching our server.
+    Creates a Stripe PaymentIntent whose amount is computed server-side from
+    the listing and dates.  The client MUST NOT send amount_cents — accepting
+    a client-controlled amount would allow price-manipulation attacks.
     """
+    from datetime import date as _date
     from django.conf import settings as django_settings
+    from listings.models import Listing, HotelRoom
+    from listings.views import compute_listing_pricing
 
     stripe_secret = getattr(django_settings, 'STRIPE_SECRET_KEY', '') or ''
     if not stripe_secret:
         return Response({'error': 'Stripe is not configured on the server'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-    currency = request.data.get('currency', 'usd').lower()
-    try:
-        amount_cents = int(request.data.get('amount_cents', 0))
-    except (TypeError, ValueError):
-        return Response({'error': 'amount_cents must be a positive integer'}, status=status.HTTP_400_BAD_REQUEST)
+    listing_id  = request.data.get('listing_id')
+    check_in_s  = request.data.get('check_in')
+    check_out_s = request.data.get('check_out')
+    room_id     = request.data.get('room_id')
+    currency    = request.data.get('currency', 'usd').lower()
 
-    if amount_cents <= 0:
-        return Response({'error': 'amount_cents must be a positive integer'}, status=status.HTTP_400_BAD_REQUEST)
+    if not listing_id or not check_in_s or not check_out_s:
+        return Response(
+            {'error': 'listing_id, check_in, and check_out are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        listing = Listing.objects.get(pk=listing_id, is_available=True)
+    except Listing.DoesNotExist:
+        return Response({'error': 'Listing not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    room = None
+    if room_id:
+        try:
+            room = HotelRoom.objects.get(pk=room_id, listing=listing, is_active=True)
+        except HotelRoom.DoesNotExist:
+            return Response({'error': 'Room not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        check_in  = _date.fromisoformat(check_in_s)
+        check_out = _date.fromisoformat(check_out_s)
+    except ValueError:
+        return Response({'error': 'Invalid date format — use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if check_in >= check_out:
+        return Response({'error': 'check_out must be after check_in'}, status=status.HTTP_400_BAD_REQUEST)
+    if check_in < _date.today():
+        return Response({'error': 'check_in cannot be in the past'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Compute canonical total — never trust the client-supplied amount.
+    pricing     = compute_listing_pricing(listing, check_in, check_out, room=room)
+    total_usd   = pricing['discounted_subtotal'] + pricing['service_fee'] + _BOOKING_FEE_USD
+    amount_cents = round(total_usd * 100)
 
     try:
         import stripe
@@ -296,9 +336,15 @@ def create_stripe_payment_intent(request):
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
             currency=currency,
-            metadata={'user_id': str(request.user.id)},
+            metadata={
+                'user_id':    str(request.user.id),
+                'listing_id': str(listing_id),
+                'check_in':   check_in_s,
+                'check_out':  check_out_s,
+                'room_id':    str(room_id) if room_id else '',
+            },
         )
-        return Response({'client_secret': intent.client_secret})
+        return Response({'client_secret': intent.client_secret, 'amount_cents': amount_cents})
     except ImportError:
         return Response({'error': 'Stripe library is not installed on the server'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     except stripe.error.StripeError as e:
