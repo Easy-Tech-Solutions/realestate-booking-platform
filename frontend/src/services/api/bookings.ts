@@ -3,7 +3,7 @@ import { fetchWithAuth } from './shared/client';
 import { normalizeBooking } from './shared/normalizers';
 
 export const bookingsAPI = {
-  create: async (bookingData: { listing: string; start_date: string; end_date: string; notes?: string; hotel_room?: string; stripe_payment_intent_id?: string }): Promise<Booking> => {
+  create: async (bookingData: { listing: string; start_date: string; end_date: string; notes?: string; hotel_room?: string; stripe_payment_intent_id?: string; payment_method?: 'stripe' | 'mtn_momo' }): Promise<Booking> => {
     const data = await fetchWithAuth('/api/bookings/', {
       method: 'POST',
       body: JSON.stringify(bookingData),
