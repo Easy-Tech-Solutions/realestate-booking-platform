@@ -24,7 +24,7 @@ class BookingSerializer(serializers.ModelSerializer):
             'id', 'customer', 'customer_username', 'customer_first_name', 'customer_last_name',
             'listing', 'listing_title', 'listing_owner', 'hotel_room', 'start_date', 'end_date',
             'status', 'notes', 'requested_at', 'confirmed_at', 'declined_at', 'owner_notes',
-            'decline_reason', 'total_price', 'days_until_expiry'
+            'decline_reason', 'total_price', 'stripe_payment_intent_id', 'days_until_expiry'
         ]
         read_only_fields = ['customer', 'requested_at', 'confirmed_at', 'declined_at', 'total_price']
 
@@ -40,7 +40,7 @@ class BookingSerializer(serializers.ModelSerializer):
 class BookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
-        fields = ['listing', 'hotel_room', 'start_date', 'end_date', 'notes']
+        fields = ['listing', 'hotel_room', 'start_date', 'end_date', 'notes', 'stripe_payment_intent_id']
 
     def validate(self, data):
         if data['start_date'] >= data['end_date']:
