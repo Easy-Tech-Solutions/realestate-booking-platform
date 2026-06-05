@@ -108,6 +108,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "realestate_backend.security_headers.SecurityHeadersMiddleware",
     "django.middleware.security.SecurityMiddleware",
     # WhiteNoise serves /static/* directly from STATIC_ROOT in production so
     # Django admin's CSS/JS/icons load without a separate web server.
@@ -233,10 +234,14 @@ elif USE_DB_CACHE:
         }
     }
 else:
+    # DatabaseCache is shared across all gunicorn workers (unlike LocMemCache which
+    # is per-process), so rate limits actually accumulate correctly in production.
+    # Run `python manage.py createcachetable` once after deploying, or add it to
+    # your Render build command. Set REDIS_URL in production for best performance.
     CACHES = {
         'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'realestate-booking-platform',
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'cache_table',
         }
     }
 
@@ -258,6 +263,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.UserRateThrottle",
     ],
+    "NUM_PROXIES": 1,
     "DEFAULT_THROTTLE_RATES": {
         "user": "1000/day",
         "login": "10/min" if DEBUG else "5/min",
