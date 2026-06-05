@@ -24,7 +24,11 @@ const MOMO_POLL_INTERVAL_MS = 3000;
 const MOMO_POLL_TIMEOUT_MS = 3 * 60 * 1000;  // 3 minutes
 
 const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
-const stripePromise = STRIPE_KEY ? loadStripe(STRIPE_KEY) : null;
+// Stripe keys must start with pk_test_ or pk_live_ followed by at least 20 chars.
+// Guard against placeholder values like "pk_test_your_stripe_publishable_key_here".
+const isValidStripeKey = (key?: string): key is string =>
+  !!key && /^pk_(test|live)_[a-zA-Z0-9]{20,}$/.test(key);
+const stripePromise = isValidStripeKey(STRIPE_KEY) ? loadStripe(STRIPE_KEY) : null;
 
 function BookingForm() {
   const location = useLocation();
@@ -79,8 +83,12 @@ function BookingForm() {
       toast.error('Please enter your phone number');
       return;
     }
+    if (paymentMethod === 'stripe' && !stripePromise) {
+      toast.error('Stripe is not configured. Please contact support.');
+      return;
+    }
     if (paymentMethod === 'stripe' && (!stripe || !elements)) {
-      toast.error('Stripe has not loaded yet. Please try again.');
+      toast.error('Stripe has not finished loading. Please wait a moment and try again.');
       return;
     }
 
@@ -95,23 +103,38 @@ function BookingForm() {
 
       if (paymentMethod === 'stripe') {
         const amountCents = Math.round(displayTotal * 100);
-        const { client_secret } = await fetchWithAuth<{ client_secret: string }>(
-          '/api/payments/stripe/payment-intent/',
-          { method: 'POST', body: JSON.stringify({ amount_cents: amountCents, currency: 'usd' }) }
-        );
 
-        const cardElement = elements!.getElement(CardElement);
-        if (!cardElement) {
-          toast.error('Card element not found');
+        let clientSecret: string;
+        try {
+          const result = await fetchWithAuth<{ client_secret: string }>(
+            '/api/payments/stripe/payment-intent/',
+            { method: 'POST', body: JSON.stringify({ amount_cents: amountCents, currency: 'usd' }) }
+          );
+          clientSecret = result.client_secret;
+        } catch (piErr: any) {
+          toast.error(piErr.message || 'Could not initialise payment. Please try again.');
           return;
         }
 
-        const { error: stripeError } = await stripe!.confirmCardPayment(client_secret, {
-          payment_method: { card: cardElement },
-        });
+        const cardElement = elements!.getElement(CardElement);
+        if (!cardElement) {
+          toast.error('Card element not found. Please refresh and try again.');
+          return;
+        }
 
-        if (stripeError) {
-          toast.error(stripeError.message || 'Card payment failed');
+        let confirmError: { message?: string } | undefined;
+        try {
+          const result = await stripe!.confirmCardPayment(clientSecret, {
+            payment_method: { card: cardElement },
+          });
+          confirmError = result.error;
+        } catch {
+          toast.error('Card payment failed — please check your card details and try again.');
+          return;
+        }
+
+        if (confirmError) {
+          toast.error(confirmError.message || 'Card payment failed');
           return;
         }
       }
@@ -265,9 +288,10 @@ function BookingForm() {
               {paymentMethod === 'stripe' && (
                 <div className="space-y-4">
                   <Label>Card details</Label>
-                  {!STRIPE_KEY ? (
+                  {!stripePromise ? (
                     <div className="border border-destructive/40 bg-destructive/5 rounded-lg p-4 text-sm text-destructive">
-                      Stripe is not configured. Please add <code className="font-mono">VITE_STRIPE_PUBLISHABLE_KEY</code> to your environment variables.
+                      Stripe is not configured. Please set a valid <code className="font-mono">VITE_STRIPE_PUBLISHABLE_KEY</code>{' '}
+                      (format: <code className="font-mono">pk_test_…</code> or <code className="font-mono">pk_live_…</code>) in your environment variables.
                     </div>
                   ) : (
                     <div className="border border-border rounded-lg px-4 py-3 min-h-[52px] flex items-center">

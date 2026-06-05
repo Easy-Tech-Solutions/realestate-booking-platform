@@ -388,6 +388,9 @@ else:
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+
 PAYMENT_GATEWAYS = {
     'mtn_momo': {
         'api_key': os.environ.get('MTN_MOMO_API_KEY'),
