@@ -26,7 +26,7 @@ class ViewTrackingMiddleware:
                             user_agent=request.META.get('HTTP_USER_AGENT', '')[:255],
                         )
 
-            except (ValueError, IndexError):
+            except Exception:
                 pass
 
         return response

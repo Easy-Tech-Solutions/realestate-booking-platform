@@ -9,8 +9,15 @@ class ProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['user']
 
 
+class PublicProfileSerializer(serializers.ModelSerializer):
+    """Profile fields safe to expose to any unauthenticated caller — no PII."""
+    class Meta:
+        model = Profile
+        fields = ['image', 'bio', 'is_superhost']
+
+
 class PublicUserSerializer(serializers.ModelSerializer):
-    profile = ProfileSerializer(read_only=True)
+    profile = PublicProfileSerializer(read_only=True)
     is_superhost = serializers.SerializerMethodField()
     member_since = serializers.DateTimeField(source='date_joined', read_only=True)
 
