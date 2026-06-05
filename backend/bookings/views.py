@@ -80,7 +80,8 @@ def bookings_collection(request):
                 end            = serializer.validated_data['end_date']
                 hotel_room     = serializer.validated_data.get('hotel_room')
                 stripe_pi_id   = serializer.validated_data.get('stripe_payment_intent_id')
-                payment_method = serializer.validated_data.get('payment_method', 'mtn_momo')
+                # Pop payment_method — it's validation-only and not a model field.
+                payment_method = serializer.validated_data.pop('payment_method', 'mtn_momo')
 
                 if hotel_room:
                     if hotel_room.listing_id != listing.id:
