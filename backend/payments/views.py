@@ -353,6 +353,56 @@ def create_stripe_payment_intent(request):
         return Response({'error': 'Could not create payment intent'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# ── Stripe Webhook ────────────────────────────────────────────────────────────
+
+@csrf_exempt
+def stripe_webhook(request):
+    """
+    Receive Stripe event callbacks and verify the Stripe-Signature HMAC before
+    processing anything.  An attacker POSTing a fake payment_intent.succeeded
+    event without a valid signature must get HTTP 400 — not a booking upgrade.
+    """
+    from django.conf import settings as django_settings
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    webhook_secret = getattr(django_settings, 'STRIPE_WEBHOOK_SECRET', '') or ''
+    if not webhook_secret:
+        return JsonResponse({'error': 'Webhook secret not configured'}, status=500)
+
+    sig_header = request.headers.get('Stripe-Signature', '')
+    if not sig_header:
+        return JsonResponse({'error': 'Missing Stripe-Signature header'}, status=400)
+
+    raw_body = request.body
+    try:
+        import stripe
+        stripe.api_key = getattr(django_settings, 'STRIPE_SECRET_KEY', '')
+        event = stripe.Webhook.construct_event(raw_body, sig_header, webhook_secret)
+    except ImportError:
+        return JsonResponse({'error': 'Stripe library not installed'}, status=500)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid payload'}, status=400)
+    except stripe.error.SignatureVerificationError:
+        return JsonResponse({'error': 'Invalid signature'}, status=400)
+
+    event_type = event['type']
+
+    if event_type == 'payment_intent.succeeded':
+        import logging
+        pi   = event['data']['object']
+        meta = pi.get('metadata', {})
+        logging.getLogger(__name__).info(
+            'stripe payment_intent.succeeded pi=%s listing=%s user=%s amount=%s',
+            pi.get('id'), meta.get('listing_id'), meta.get('user_id'), pi.get('amount'),
+        )
+        # Future: look up the related Payment record by stripe_payment_intent_id,
+        # mark it completed, and notify the host.
+
+    return JsonResponse({'status': 'ok'})
+
+
 # ── Saved Cards ───────────────────────────────────────────────────────────────
 
 @api_view(['GET', 'POST'])
