@@ -38,9 +38,16 @@ class BookingSerializer(serializers.ModelSerializer):
 
 
 class BookingCreateSerializer(serializers.ModelSerializer):
+    payment_method = serializers.ChoiceField(
+        choices=['stripe', 'mtn_momo'],
+        write_only=True,
+        required=False,
+        default='mtn_momo',
+    )
+
     class Meta:
         model = Booking
-        fields = ['listing', 'hotel_room', 'start_date', 'end_date', 'notes', 'stripe_payment_intent_id']
+        fields = ['listing', 'hotel_room', 'start_date', 'end_date', 'notes', 'stripe_payment_intent_id', 'payment_method']
 
     def validate(self, data):
         if data['start_date'] >= data['end_date']:
