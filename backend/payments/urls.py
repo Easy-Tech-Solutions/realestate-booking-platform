@@ -8,6 +8,7 @@ urlpatterns = [
     path('user/', views.user_payments, name='user_payments'),
     path('<uuid:payment_id>/', views.payment_detail, name='payment_detail'),
     path('webhooks/mtn_momo/', views.mtn_momo_webhook, name='mtn_momo_webhook'),
+    path('webhooks/stripe/', views.stripe_webhook, name='stripe_webhook'),
     path('stripe/payment-intent/', views.create_stripe_payment_intent, name='stripe_payment_intent'),
     path('cards/', views.saved_cards, name='saved_cards'),
     path('cards/<int:card_id>/', views.saved_card_detail, name='saved_card_detail'),
