@@ -275,20 +275,23 @@ def create_stripe_payment_intent(request):
     Creates a Stripe PaymentIntent for the given amount and returns the client_secret.
     The frontend uses this to confirm payment without raw card data touching our server.
     """
-    import stripe
     from django.conf import settings as django_settings
 
     stripe_secret = getattr(django_settings, 'STRIPE_SECRET_KEY', '') or ''
     if not stripe_secret:
-        return Response({'error': 'Stripe is not configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({'error': 'Stripe is not configured on the server'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-    amount_cents = request.data.get('amount_cents')
     currency = request.data.get('currency', 'usd').lower()
+    try:
+        amount_cents = int(request.data.get('amount_cents', 0))
+    except (TypeError, ValueError):
+        return Response({'error': 'amount_cents must be a positive integer'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if not amount_cents or not isinstance(amount_cents, int) or amount_cents <= 0:
+    if amount_cents <= 0:
         return Response({'error': 'amount_cents must be a positive integer'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        import stripe
         stripe.api_key = stripe_secret
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
@@ -296,6 +299,8 @@ def create_stripe_payment_intent(request):
             metadata={'user_id': str(request.user.id)},
         )
         return Response({'client_secret': intent.client_secret})
+    except ImportError:
+        return Response({'error': 'Stripe library is not installed on the server'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     except stripe.error.StripeError as e:
         return Response({'error': str(e.user_message or e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception:
