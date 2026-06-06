@@ -441,6 +441,15 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = env_bool('CELERY_ALWAYS_EAGER', DEBUG)
 CELERY_TASK_EAGER_PROPAGATES = True
 
+# ── Security settings applied in all environments ──────────────────────────
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+# 'Lax' (not 'Strict') so Google OAuth redirects still send the session cookie.
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = True
