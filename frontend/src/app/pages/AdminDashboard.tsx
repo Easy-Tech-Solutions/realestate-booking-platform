@@ -711,11 +711,7 @@ export function AdminDashboard() {
 
   const handleMarkContactRead = async (id: number) => {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/support/admin/contact/${id}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('access_token')}` },
-        body: JSON.stringify({ is_read: true }),
-      });
+      await supportAPI.adminMarkContactRead(id);
       setContactInquiries(prev => prev.map(c => c.id === id ? { ...c, isRead: true } : c));
     } catch {
       toast.error('Failed to mark as read');
