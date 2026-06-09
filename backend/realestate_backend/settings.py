@@ -298,10 +298,31 @@ FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    # 14-day sliding session: every refresh rotates the token and resets this
+    # window (see authapp.views.refresh_token_view), so users stay logged in
+    # through normal use and are only signed out after ~14 days of inactivity.
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
 }
+
+# --- Refresh token cookie ---------------------------------------------------
+# The refresh token is delivered ONLY as an httpOnly, first-party cookie so it
+# is never readable by JavaScript (mitigates XSS token theft — TEST-AUTH-02).
+#
+# IMPORTANT: this REQUIRES the SPA and API to be served same-site (same
+# registrable domain) — e.g. app.example.com + api.example.com, or the SPA
+# origin reverse-proxying /api/* to the backend. With SameSite=Lax a
+# cross-site request does NOT carry the cookie, so a cross-domain deployment
+# must either move same-site or override AUTH_REFRESH_COOKIE_SAMESITE=None
+# (which Safari/Brave/Firefox increasingly block). See the deployment note in
+# docs/backend/infrastructure-production.md.
+AUTH_REFRESH_COOKIE_NAME = "refresh_token"
+AUTH_REFRESH_COOKIE_PATH = "/api/auth/"
+AUTH_REFRESH_COOKIE_SAMESITE = os.environ.get("AUTH_REFRESH_COOKIE_SAMESITE", "Lax")
+AUTH_REFRESH_COOKIE_DOMAIN = os.environ.get("AUTH_REFRESH_COOKIE_DOMAIN") or None
+AUTH_REFRESH_COOKIE_SECURE = not DEBUG
+AUTH_REFRESH_COOKIE_MAX_AGE = int(SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
 
 EMAIL_BACKEND = os.environ.get(
     "EMAIL_BACKEND",
