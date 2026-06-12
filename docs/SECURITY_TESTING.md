@@ -2058,3 +2058,5 @@ pre-commit run --all-files                # validate entire codebase once
 | **LOW** | TEST-FILE-02 | File size limits | Denial-of-service via large upload | ✅ FIXED — view-level check returns 413 for images >10 MB before Cloudinary upload |
 | **LOW** | TEST-FILE-03 | Filename path traversal in upload | Directory traversal via malicious filename | ✅ PASS — Cloudinary ignores client-supplied filenames; underlying storage is safe |
 | **LOW** | TEST-DATA-01 | PII exposure (public user profile) | Mobile money number leaked to any caller | ✅ FIXED — `PublicProfileSerializer` strips momo_number and last_seen |
+| **LOW** | TEST-TRANS-03 | HTTPS enforcement | Credentials sent in cleartext over HTTP | ✅ PASS — Render terminates TLS; HTTP redirected to HTTPS; `SECURE_SSL_REDIRECT=True` in production |
+| **LOW** | TEST-INFRA-04 | Database not publicly exposed | Direct DB access bypasses app-layer auth | ✅ PASS — no credentials in code (env-only); Neon is cloud-managed and secured by SSL + password authentication (public port 5432 is by design for Neon, not a misconfiguration) |
