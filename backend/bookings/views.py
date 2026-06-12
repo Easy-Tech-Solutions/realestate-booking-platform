@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from .models import Booking, SavedSearch, SearchAlert, PropertyComparison, ComparisonItem
@@ -57,31 +58,36 @@ def bookings_collection(request):
 
     elif request.method == "POST":
         try:
-            listing = Listing.objects.get(pk=request.data.get('listing'))
-
-            # Declined and cancelled bookings should not block the guest from
-            # re-booking the same property/dates — they're effectively dead.
-            existing_booking = Booking.objects.filter(
-                customer=request.user,
-                listing=listing,
-                start_date=request.data.get('start_date'),
-                end_date=request.data.get('end_date'),
-            ).exclude(status__in=['declined', 'cancelled']).first()
-
-            if existing_booking:
-                return Response({
-                    'error': 'You already have a booking for this property on these dates',
-                    'existing_booking_id': existing_booking.id
-                }, status=status.HTTP_400_BAD_REQUEST)
-
             serializer = BookingCreateSerializer(data=request.data)
-            if serializer.is_valid():
-                start          = serializer.validated_data['start_date']
-                end            = serializer.validated_data['end_date']
-                hotel_room     = serializer.validated_data.get('hotel_room')
-                stripe_pi_id   = serializer.validated_data.get('stripe_payment_intent_id')
-                # Pop payment_method — it's validation-only and not a model field.
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            with transaction.atomic():
+                # Lock the listing row so concurrent booking requests queue up
+                # rather than racing through the availability check simultaneously.
+                listing = Listing.objects.select_for_update().get(
+                    pk=request.data.get('listing')
+                )
+
+                start        = serializer.validated_data['start_date']
+                end          = serializer.validated_data['end_date']
+                hotel_room   = serializer.validated_data.get('hotel_room')
+                stripe_pi_id = serializer.validated_data.get('stripe_payment_intent_id')
                 payment_method = serializer.validated_data.pop('payment_method', 'mtn_momo')
+
+                # Declined and cancelled bookings do not block re-booking.
+                existing_booking = Booking.objects.filter(
+                    customer=request.user,
+                    listing=listing,
+                    start_date=start,
+                    end_date=end,
+                ).exclude(status__in=['declined', 'cancelled']).first()
+
+                if existing_booking:
+                    return Response({
+                        'error': 'You already have a booking for this property on these dates',
+                        'existing_booking_id': existing_booking.id
+                    }, status=status.HTTP_400_BAD_REQUEST)
 
                 if hotel_room:
                     if hotel_room.listing_id != listing.id:
@@ -89,6 +95,20 @@ def bookings_collection(request):
                     from listings.views import _get_available_room_count
                     if _get_available_room_count(hotel_room, start, end) < 1:
                         return Response({'error': 'Room not available for selected dates'}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    # For non-hotel listings, reject if another confirmed booking
+                    # already overlaps the requested dates (half-open interval).
+                    conflict = Booking.objects.filter(
+                        listing=listing,
+                        status='confirmed',
+                        start_date__lt=end,
+                        end_date__gt=start,
+                    ).exists()
+                    if conflict:
+                        return Response(
+                            {'error': 'This property is already booked for the selected dates'},
+                            status=status.HTTP_409_CONFLICT,
+                        )
 
                 # Stripe payments: require and verify PI before creating booking.
                 # MoMo: booking is created first, payment initiated after.
@@ -136,7 +156,6 @@ def bookings_collection(request):
                     booking.confirmed_at = timezone.now()
                     booking.save(update_fields=['status', 'confirmed_at'])
                 return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         except Listing.DoesNotExist:
             return Response({'error': 'Listing not found'}, status=status.HTTP_404_NOT_FOUND)
