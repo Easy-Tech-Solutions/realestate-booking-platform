@@ -4,5 +4,6 @@
       "Bash(git checkout *)",
       "Bash(git pull *)"
     ]
-  }
+  },
+  "includeCoAuthoredBy": false
 }

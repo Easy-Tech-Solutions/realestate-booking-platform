@@ -7,6 +7,9 @@ node_modules/
 package-lock.json
 yarn.lock
 npm-debug.log*
+.github/
+.clause/
+.agents/
 
 # Python virtual environments and cache
 python-backend/.venv/
