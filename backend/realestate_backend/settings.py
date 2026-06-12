@@ -57,6 +57,12 @@ if not _secret_key:
     )
 SECRET_KEY = _secret_key
 
+# Django admin URL path (must end with '/').
+# Override DJANGO_ADMIN_URL in production to an obscure slug so automated
+# scanners cannot discover the admin panel at the default /admin/ path.
+# Example: DJANGO_ADMIN_URL=hk-secure-panel-8f2a/
+ADMIN_URL = os.environ.get("DJANGO_ADMIN_URL", "admin/")
+
 DEBUG = env_bool("DJANGO_DEBUG", False)
 
 # If DJANGO_ALLOWED_HOSTS is explicitly set, use it.

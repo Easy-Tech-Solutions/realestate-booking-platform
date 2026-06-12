@@ -296,11 +296,20 @@ def me_dashboard(request):
     })
 
 
+_MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
 @api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     user = request.user
     data = request.data
+
+    if 'image' in request.FILES and request.FILES['image'].size > _MAX_IMAGE_BYTES:
+        return Response(
+            {"error": "Image file is too large. Maximum allowed is 10 MB."},
+            status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        )
 
     # Update user-level fields
     updatable_fields = ['first_name', 'last_name', 'email']
