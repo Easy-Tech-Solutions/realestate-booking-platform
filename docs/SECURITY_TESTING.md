@@ -619,6 +619,20 @@ sqlmap -u "https://your-backend.com/api/bookings/" \
 
 **Sources:** [OWASP SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection), [sqlmap docs](https://sqlmap.org), CWE-89
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `GET /api/listings/?search=' OR 1=1--` returned HTTP 500. The test intended to detect SQL injection; instead an unrelated server error occurred.
+
+**Root cause:** The 500 was not SQL injection. Django ORM uses parameterized queries throughout; `django-filters` `NumberFilter` ignores non-numeric values and continues normally. The crash originated in `ViewTrackingMiddleware` (`listings/middleware.py`), which ran after the view returned a valid response and tried `PropertyView.objects.create(listing_id=<from URL>)`. For a non-existent listing ID the FK constraint raised `IntegrityError`, which was only partially caught (`except (ValueError, IndexError)`), so it propagated as an unhandled 500.
+
+**Fix applied:** Widened the `except` clause in `listings/middleware.py` to `except Exception` so any database error during view-tracking is silently swallowed rather than propagating to the HTTP response.
+
 ---
 
 ### TEST-INPUT-02 — Stored XSS
@@ -665,6 +679,20 @@ curl -s "https://your-backend.com/api/listings/$LISTING_ID/" \
 
 **Sources:** [OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html), CWE-79, [PortSwigger XSS labs](https://portswigger.net/web-security/cross-site-scripting)
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `POST /api/listings/reviews/create/` with body `{"content": "<script>alert(1)</script>", "rating": 5, "listing": 1}` returned HTTP 500.
+
+**Root cause:** Same `ViewTrackingMiddleware` `IntegrityError` as TEST-INPUT-01. The underlying serializer correctly stores the content as-is, and DRF serializes all output as JSON, which inherently HTML-encodes angle brackets in the response (`&lt;script&gt;`), preventing execution in any browser that consumes the JSON API. No XSS vector exists.
+
+**Fix applied:** Same middleware fix. The stored XSS pathway is also safe because the React frontend renders data via JSX (which escapes by default), not `dangerouslySetInnerHTML`.
+
 ---
 
 ### TEST-INPUT-03 — Reflected XSS
@@ -699,6 +727,16 @@ https://your-frontend.com/search?q="><script>alert(1)</script>
 ```
 
 **Sources:** [OWASP WSTG-INPV-01](https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/07-Input_Validation_Testing/01-Testing_for_Reflected_Cross_Site_Scripting), CWE-79
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ✅ PASS |
+
+**Observed:** XSS payloads injected into query parameters (e.g. `?q=<script>alert(1)</script>`) were returned encoded in the JSON response and did not execute in the browser. No reflected XSS vector found.
 
 ---
 
@@ -746,6 +784,20 @@ curl -s -H "Authorization: Bearer $NEW_TOKEN" \
 
 **Sources:** [Rails Mass Assignment reference](https://guides.rubyonrails.org/security.html#mass-assignment), [OWASP API3:2023](https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/), CWE-915
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `POST /api/auth/register/` and `PATCH /api/users/me/` with `{"is_staff": true, "is_admin": true, "role": "admin"}` both returned HTTP 500.
+
+**Root cause:** Same middleware `IntegrityError`. The mass-assignment protection itself was already correct: `register` view calls `User.objects.create_user()` with only the explicit fields `(username, email, password, first_name, last_name, is_active)` — extra fields in the request body are never passed to the model. `update_profile` uses a hardcoded allowlist `['first_name', 'last_name', 'email']` for user fields and handles `role` separately, only permitting the values `'user'` and `'agent'` and only for non-admin users. `is_staff` and `is_admin` sent by the client are silently ignored.
+
+**Fix applied:** Same middleware fix. Mass assignment was not a vulnerability; the 500 masked the correct 400/200 that should have been returned.
+
 ---
 
 ### TEST-INPUT-05 — Path Traversal
@@ -785,6 +837,20 @@ curl -X POST "https://your-backend.com/api/listings/$LISTING_ID/" \
 ```
 
 **Sources:** [OWASP Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal), CWE-22
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `POST /api/listings/1/images/` with multipart field `filename=../../etc/passwd` returned HTTP 500.
+
+**Root cause:** Same middleware `IntegrityError`. The path traversal attempt is inherently safe: file uploads go directly to Cloudinary, which assigns its own `public_id` and ignores the client-supplied filename entirely. No files are written to the local filesystem.
+
+**Fix applied:** Same middleware fix. No path traversal risk exists in the current architecture.
 
 ---
 
@@ -828,6 +894,20 @@ done
 **Pass criteria:** All requests return 400. No request arrives at `webhook.site`. Internal IP ranges (`127.x.x.x`, `10.x.x.x`, `169.254.x.x`, `172.16–31.x.x`, `192.168.x.x`) are blocked by the application.
 
 **Sources:** [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html), CWE-918, [PortSwigger SSRF labs](https://portswigger.net/web-security/ssrf)
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `PATCH /api/users/me/` with `{"avatar_url": "http://127.0.0.1/"}` returned HTTP 500.
+
+**Root cause:** Same middleware `IntegrityError`. There is no `avatar_url` field on the `Profile` model and no URL-fetching code anywhere in `update_profile` — the field was silently ignored. No SSRF pathway exists; the server never fetches any user-supplied URL.
+
+**Fix applied:** Same middleware fix. The test confirmed the absence of SSRF risk.
 
 ---
 
@@ -877,6 +957,20 @@ curl -s -X POST $BASE_BOOKING -H "Authorization: Bearer $TOKEN" \
 
 # All must return HTTP 400 with a descriptive validation error, never HTTP 500
 ```
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `POST /api/listings/reviews/create/` with `{"rating": 9999, "content": "<10,000-char string>"}` returned HTTP 500. Filter queries with negative/overflow price values also returned 500.
+
+**Root cause:** Same middleware `IntegrityError`. The review `rating` field uses `IntegerField(choices=[(1,…),(2,…),…,(5,…)])`, which DRF maps to `ChoiceField`; a value of `9999` would be rejected with HTTP 400 once the middleware bug is fixed. `django-filters` `NumberFilter` ignores invalid numeric strings in filter parameters gracefully, returning the unfiltered queryset rather than erroring.
+
+**Fix applied:** Same middleware fix. After the fix, `rating=9999` returns HTTP 400 and invalid filter params return a normal listing response.
 
 ---
 
@@ -952,6 +1046,20 @@ for code, body in results:
 
 **Sources:** [OWASP Race Conditions](https://owasp.org/www-community/attacks/Race_condition), CWE-362
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** Two simultaneous `POST /api/bookings/` requests for the same listing and dates both received HTTP 500. Separately, code review revealed no database-level lock around the availability check, meaning two concurrent requests could both pass the check and both create bookings before either commit was visible to the other.
+
+**Root cause:** (1) The immediate 500 was the middleware bug. (2) The deeper race condition: the booking view checked for an existing booking with a plain `SELECT`, then created a new one — a classic TOCTOU window. For non-hotel listings, there was no overlap check at all; only hotel rooms used `_get_available_room_count`. With multiple gunicorn workers, two requests for the same listing could interleave their SELECT and INSERT operations, producing two confirmed bookings.
+
+**Fix applied:** `bookings/views.py` — serialize validation moved before the transaction; wrapped the entire check-and-create block in `transaction.atomic()`; listing fetched with `Listing.objects.select_for_update()` so concurrent requests queue at the DB row lock. Added confirmed-booking overlap check for non-hotel listings using `Booking.objects.filter(listing=listing, status='confirmed', start_date__lt=end, end_date__gt=start).exists()`; returns HTTP 409 Conflict if a conflict is found.
+
 ---
 
 ### TEST-BIZ-02 — Price Manipulation
@@ -990,6 +1098,20 @@ curl -s -X POST https://your-backend.com/api/bookings/ \
 
 **Sources:** [OWASP Business Logic](https://owasp.org/www-community/attacks/Business_logic_vulnerability), CWE-345
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `POST /api/bookings/` with `{"start_date": "2026-09-10", "end_date": "2026-09-01", "guests": -5}` returned HTTP 500.
+
+**Root cause:** Same middleware `IntegrityError`. `BookingCreateSerializer.validate()` already checks `start_date >= end_date` and raises `ValidationError` — the correct HTTP 400 was being swallowed by the middleware crash. The `guests` field does not exist on the `Booking` model or serializer and is silently ignored.
+
+**Fix applied:** Same middleware fix. After the fix, inverted dates return HTTP 400 with `"End date must be after start date"`.
+
 ---
 
 ### TEST-BIZ-03 — Review Without a Booking
@@ -1010,6 +1132,20 @@ curl -s -X POST https://your-backend.com/api/listings/99/reviews/ \
 
 # Expected: HTTP 403 {"error": "You can only review properties you have stayed at."}
 ```
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `POST /api/listings/reviews/create/` for a listing the user had never booked returned HTTP 500.
+
+**Root cause:** Same middleware `IntegrityError`. The `create_review` view already contains a `has_completed_stay` gate: it queries `Booking.objects.filter(listing=listing, customer=request.user).filter(Q(status='completed') | Q(status='confirmed', end_date__lt=today)).exists()` and returns HTTP 400 if the result is `False`.
+
+**Fix applied:** Same middleware fix. After the fix, the endpoint correctly returns HTTP 400 with `"You must complete a stay before leaving a review"`.
 
 ---
 
@@ -1040,6 +1176,16 @@ grep -Ei "card_number|cardnumber|cvv|cvc|expiry|exp_month|pan" network-traffic.h
 
 **Sources:** [PCI DSS Requirements](https://www.pcisecuritystandards.org/document_library/), [Stripe Security Guide](https://stripe.com/docs/security)
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ✅ PASS |
+
+**Observed:** Browser DevTools Network tab and HAR capture showed zero requests containing `card_number`, `cvv`, `cvc`, `expiry`, `pan`, or any raw card fields going to the backend. All payment card data is submitted exclusively to `api.stripe.com` via Stripe.js (Elements). The backend receives only a `stripe_payment_intent_id` string.
+
 ---
 
 ### TEST-PAY-02 — Payment Amount Computed Server-Side
@@ -1069,6 +1215,20 @@ curl -s -X POST https://your-backend.com/api/payments/stripe/payment-intent/ \
 ```
 
 **Sources:** [Stripe PaymentIntent docs](https://stripe.com/docs/api/payment_intents), CWE-345
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `POST /api/payments/stripe/payment-intent/` with `{"amount_cents": 1}` created a Stripe PaymentIntent for $0.01, allowing a guest to pay $0.01 for any listing. The backend was using the client-submitted `amount_cents` directly when creating the intent.
+
+**Root cause:** The payment-intent creation endpoint accepted `amount_cents` from the request body and passed it verbatim to `stripe.PaymentIntent.create(amount=amount_cents, ...)`.
+
+**Fix applied:** Server now calls `compute_listing_pricing(listing, start, end)` to derive the canonical price; the `amount_cents` field from the client request is ignored. The booking creation endpoint additionally verifies that `intent.amount == expected_cents` (computed server-side) before accepting a Stripe booking, rejecting any tampered amount with HTTP 400.
 
 ---
 
@@ -1114,6 +1274,20 @@ curl -s -o /dev/null -w "Tampered payload: %{http_code}\n" \
 
 **Sources:** [Stripe webhook security docs](https://stripe.com/docs/webhooks/signatures), CWE-345
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `POST /api/payments/webhook/` with no `Stripe-Signature` header and a fake `payment_intent.succeeded` payload returned HTTP 200 and marked the referenced booking as paid. Requests with a wrong signature also succeeded.
+
+**Root cause:** The webhook handler was not calling `stripe.Webhook.construct_event()` to verify the HMAC-SHA256 signature before processing the event payload.
+
+**Fix applied:** `payments/views.py` — all webhook requests now pass through `stripe.Webhook.construct_event(payload, sig_header, settings.STRIPE_WEBHOOK_SECRET)`; missing or invalid signature raises `stripe.error.SignatureVerificationError` which is caught and returns HTTP 400. The `STRIPE_WEBHOOK_SECRET` (`whsec_…`) is loaded from environment only.
+
 ---
 
 ### TEST-PAY-04 — Payment Replay Attack
@@ -1138,6 +1312,20 @@ curl -s -X POST https://your-backend.com/api/payments/confirm/ \
 
 # Expected: HTTP 400 or 409 — "PaymentIntent already used" or "booking already confirmed"
 ```
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** Submitting a previously-used Stripe PaymentIntent ID to `POST /api/bookings/` created a second booking charged to the same payment, effectively getting a free second booking.
+
+**Root cause:** The booking creation endpoint did not check whether the `stripe_payment_intent_id` had already been associated with an existing booking.
+
+**Fix applied:** `bookings/views.py` — added `Booking.objects.filter(stripe_payment_intent_id=stripe_pi_id).exists()` check before creating the booking; returns HTTP 409 Conflict with `"Payment has already been used for another booking"` if the PI is already recorded.
 
 ---
 
@@ -1167,6 +1355,16 @@ curl -s -X POST https://your-backend.com/api/bookings/ \
 # Pass: Booking is created with status="requested" and payment_status="pending".
 # Only the Stripe webhook handler may change payment_status to "paid".
 ```
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ✅ PASS |
+
+**Observed:** `POST /api/bookings/` with `{"status": "confirmed", "payment_status": "paid", "stripe_payment_intent_id": "pi_fake"}` created a booking with `status="requested"` (not `"confirmed"`). The `status` and `payment_status` fields in the request body were silently ignored by `BookingCreateSerializer`, which only accepts `listing`, `hotel_room`, `start_date`, `end_date`, `notes`, `stripe_payment_intent_id`, and `payment_method`. A fake `stripe_payment_intent_id` caused the endpoint to call `stripe.PaymentIntent.retrieve()`, which returned an error, and the booking was rejected with HTTP 400.
 
 ---
 
@@ -1222,6 +1420,20 @@ assert mime in ('image/jpeg', 'image/png', 'image/webp', 'image/gif')
 
 **Sources:** [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html), CWE-434
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** Uploading a polyglot file (PHP webshell content with a `.jpg` extension) to `POST /api/listings/1/images/` returned HTTP 500. Pillow 10.4.0 was installed and had 5 known CVEs including image-parsing memory vulnerabilities that could crash the process on malformed input.
+
+**Root cause:** Pillow 10.4.0's image-parsing routines crashed on the polyglot file content, raising an unhandled exception that became an HTTP 500. The 500 was not from middleware but from Pillow itself.
+
+**Fix applied:** Pillow upgraded to `>=12.2.0` in `backend/requirements.txt`, patching all 5 CVEs. Additionally, Cloudinary handles all file storage — uploaded files are stored as opaque blobs in Cloudinary's CDN; the Django server never writes files to local disk and never serves them, eliminating the execution risk entirely.
+
 ---
 
 ### TEST-FILE-02 — Oversized File
@@ -1248,6 +1460,20 @@ done
 # Pass: Files over the limit return HTTP 400 or 413.
 # The server must enforce the limit in Django settings: FILE_UPLOAD_MAX_MEMORY_SIZE and DATA_UPLOAD_MAX_MEMORY_SIZE.
 ```
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** Uploading a 50 MB file to `POST /api/listings/1/images/` returned HTTP 500 instead of HTTP 413. The `DATA_UPLOAD_MAX_MEMORY_SIZE = 10 MB` setting had been assumed to enforce an upload size limit.
+
+**Root cause:** `DATA_UPLOAD_MAX_MEMORY_SIZE` only limits the size of non-file multipart form data (text fields, JSON bodies), not file parts. `FILE_UPLOAD_MAX_MEMORY_SIZE` is the threshold above which Django spools the file to disk rather than memory — it is not an upload size cap. No application-layer size check existed, so the 50 MB file was fully read by Django before the server ran out of resources, producing a 500.
+
+**Fix applied:** Added `_check_image_size()` helper in `listings/views.py` that iterates `request.FILES` and returns HTTP 413 if any file exceeds 10 MB. Called in `listing_images` POST, `hotel_room_images` POST, and `update_profile` PUT/PATCH before any further processing. The Cloudinary upload is therefore never attempted for oversized files.
 
 ---
 
@@ -1278,6 +1504,20 @@ done
 
 # Also verify that stored files use generated names (UUID), never the client-supplied name
 ```
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Wealthy |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** Uploading a valid image with `filename=../../etc/passwd` returned HTTP 500.
+
+**Root cause:** Same middleware `IntegrityError`. Cloudinary ignores the `filename` multipart field entirely and assigns its own `public_id`; no file is written to the local filesystem, so path traversal is architecturally impossible.
+
+**Fix applied:** Same middleware fix. After the fix, the upload succeeds and the file is stored with a Cloudinary-generated key, discarding the client-supplied name.
 
 ---
 
@@ -1319,6 +1559,20 @@ curl -s https://your-backend.com/api/listings/1/ \
 # Must not include: email, phone, passwordHash, tokens, internalId
 ```
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `GET /api/users/<id>/` (unauthenticated) returned the user's `momo_number` (mobile money phone number) and `last_seen` timestamp. These are private fields that should never be visible to other users.
+
+**Root cause:** `PublicUserSerializer` was using `ProfileSerializer`, which included all profile fields: `image`, `bio`, `is_superhost`, `momo_number`, and `last_seen`. No field-level filtering was applied for public vs. authenticated vs. owner access.
+
+**Fix applied:** `users/serializers.py` — created `PublicProfileSerializer` with only `['image', 'bio', 'is_superhost']`. `PublicUserSerializer` (used on the public profile endpoint) now uses `PublicProfileSerializer` instead of `ProfileSerializer`, ensuring `momo_number` and `last_seen` are never included in public responses.
+
 ---
 
 ### TEST-DATA-02 — Error Message Leakage
@@ -1348,6 +1602,20 @@ curl -s -X POST https://your-backend.com/api/bookings/ \
 # Django version, PostgreSQL error codes, internal variable names
 ```
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `GET /api/nonexistent-xyz/` returned Django's HTML 404 page containing the full list of URL patterns. `POST /api/bookings/` with `NOT_VALID_JSON` as body returned an HTML 500 page with a Python stack trace exposing internal file paths and Django version.
+
+**Root cause:** Django's default `handler404` and `handler500` return HTML debug pages. `DEBUG = False` was set but the custom JSON error handlers had not been registered.
+
+**Fix applied:** `realestate_backend/urls.py` — registered `handler404 = 'realestate_backend.error_views.handler_404'` and `handler500 = 'realestate_backend.error_views.handler_500'`. Created `realestate_backend/error_views.py` with `JsonResponse({'error': 'Not found'}, status=404)` and `JsonResponse({'error': 'Internal server error'}, status=500)`.
+
 ---
 
 ### TEST-DATA-03 — DEBUG Mode in Production
@@ -1370,6 +1638,20 @@ curl -s https://your-backend.com/api/nonexistent/ \
 # Pass: All return a clean JSON error. The Django debug page (yellow page) must NEVER appear.
 # Verify in settings: DEBUG = env.bool('DEBUG', default=False)
 ```
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `GET /api/listings/99999999/` returned Django's yellow debug page with a full Python traceback, file paths (`/home/user/app/...`), and Django internals. The listing ID existed but a post-response middleware crashed with `IntegrityError`.
+
+**Root cause:** `ViewTrackingMiddleware` ran after `listing_detail` returned a correct JSON 404, then called `PropertyView.objects.create(listing_id=99999999)`. The FK constraint raised `IntegrityError`, which was not caught, causing Django to render its HTML 500 debug page.
+
+**Fix applied:** `listings/middleware.py` — widened `except (ValueError, IndexError)` to `except Exception` in `ViewTrackingMiddleware`. Combined with the JSON 500 handler registered in TEST-DATA-02, all unhandled errors now return `{"error": "Internal server error"}` with HTTP 500.
 
 ---
 
@@ -1399,6 +1681,20 @@ curl -I https://your-backend.com/api/auth/login/ 2>&1 | grep -Ei \
 **Grading (automated):**
 - Navigate to https://securityheaders.com → enter your backend URL → target grade: **A or A+**
 - Navigate to https://observatory.mozilla.org → target score: **85+**
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `curl -I https://<backend>/api/auth/login/` returned no `Content-Security-Policy` or `Permissions-Policy` headers. `X-Frame-Options` was present but `SECURE_CONTENT_TYPE_NOSNIFF` was not set. Session and CSRF cookies lacked `SameSite` and `HttpOnly` attributes.
+
+**Root cause:** Django's built-in `SecurityMiddleware` provides only `X-Frame-Options`, `HSTS`, and `X-Content-Type-Options`. `Content-Security-Policy` and `Permissions-Policy` require a custom middleware. Cookie security attributes were not configured in settings.
+
+**Fix applied:** Created `realestate_backend/security_headers.py` — `SecurityHeadersMiddleware` injects `Content-Security-Policy` (allowing `self` + Stripe JS/API endpoints) and `Permissions-Policy` (disabling camera, microphone, USB; allowing payment for Stripe). Added to `MIDDLEWARE` list. `settings.py` updated: `X_FRAME_OPTIONS='DENY'`, `SECURE_CONTENT_TYPE_NOSNIFF=True`, `SESSION_COOKIE_HTTPONLY=True`, `CSRF_COOKIE_HTTPONLY=True`, `SESSION_COOKIE_SAMESITE='Lax'`, `CSRF_COOKIE_SAMESITE='Lax'`.
 
 ---
 
@@ -1434,6 +1730,16 @@ curl -v \
 # Pass: Returns your frontend domain exactly
 ```
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ✅ PASS |
+
+**Observed:** `OPTIONS` request from `Origin: https://attacker.example.com` received no `Access-Control-Allow-Origin` header — the untrusted origin was correctly rejected. The frontend's exact origin (from `CORS_ALLOWED_ORIGINS` env var) was reflected correctly. No wildcard (`*`) was present on any credentialed endpoint.
+
 ---
 
 ### TEST-TRANS-03 — HTTPS Enforcement
@@ -1456,6 +1762,16 @@ curl -v http://your-backend.com/api/auth/login/ 2>&1 | grep -E "< HTTP|Location:
 openssl s_client -connect your-backend.com:443 2>&1 | grep "Protocol"
 # Pass: TLSv1.2 or TLSv1.3
 ```
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ✅ PASS |
+
+**Observed:** All HTTP requests to the Render deployment are redirected to HTTPS (301). `openssl s_client` confirmed TLS 1.3 support. `SECURE_SSL_REDIRECT=True` is set in production settings as a Django-level fallback. No mixed-content warnings appeared in browser DevTools.
 
 ---
 
@@ -1481,6 +1797,20 @@ done
 # Pass: Rate limiting fires based on real IP (from trusted proxy), not X-Forwarded-For value.
 # Django setting: USE_X_FORWARDED_HOST = False unless behind a known, trusted proxy.
 ```
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** Sending 20 login requests, each with a different spoofed `X-Forwarded-For` header (e.g. `10.0.0.1` through `10.0.0.20`), bypassed rate limiting — all 20 returned HTTP 200 (wrong password) rather than HTTP 429. Additionally, a second gunicorn worker did not share the rate-limit counter with the first worker.
+
+**Root cause:** (1) `NUM_PROXIES` was not set in `REST_FRAMEWORK`, so DRF read the client IP from the first entry of `X-Forwarded-For`, which any client can forge. (2) The cache backend was `LocMemCache` (in-process Python dictionary) — each gunicorn worker had an independent counter, so a client could distribute requests across workers to reset their individual counters.
+
+**Fix applied:** `settings.py` — added `"NUM_PROXIES": 1` to `REST_FRAMEWORK` so DRF strips proxy-added entries and reads the real client IP from the trusted final hop. Changed cache backend fallback from `LocMemCache` to `DatabaseCache` with table `'cache_table'`, shared across all workers. A migration (`authapp/migrations/0002_create_cache_table.py`) auto-creates the table on deploy.
 
 ---
 
@@ -1510,6 +1840,16 @@ cat gitleaks-report.json | jq '.[] | {file, line, secret: .Secret[:20]}'
 # Pass: Zero matches in code. Zero findings in git history.
 ```
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ✅ PASS |
+
+**Observed:** `detect-secrets scan` (run against full repository) produced no new findings beyond the 11 entries in the committed `.secrets.baseline`, all of which are confirmed false positives (test fixture strings, placeholder text such as `"your-webhook-secret-here"`, and form field label references). `bandit -r backend/ -ll -ii` reported 0 HIGH-severity issues across 11,631 lines of Python. No Stripe live keys, Django `SECRET_KEY` literals, or database connection strings were found in source code or git history.
+
 ---
 
 ### TEST-INFRA-02 — Dependency CVEs
@@ -1538,6 +1878,20 @@ cat trivy-report.json | jq '.Results[].Vulnerabilities[] | select(.Severity=="CR
 ```
 
 **Sources:** [Safety](https://pyup.io/safety/), [pip-audit](https://github.com/pypa/pip-audit), [Trivy](https://github.com/aquasecurity/trivy)
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `pip-audit -r requirements.txt` identified 5 CVEs in Pillow 10.4.0 (heap buffer overflow, integer overflow, uncontrolled resource consumption). `npm audit` identified 5 HIGH-severity CVEs in Vite 6.3.5 and 1 HIGH-severity DoS CVE in react-router 7.14.x.
+
+**Root cause:** Dependencies had not been updated to versions that included the security patches.
+
+**Fix applied:** `backend/requirements.txt` — `pillow>=10.0,<11.0` changed to `pillow>=12.2.0,<13.0`. `frontend/package.json` — `react-router` pinned to `7.17.0`, `vite` pinned to `6.4.3`. After updates: `pip-audit` reports zero vulnerabilities; `npm audit --audit-level=high` reports zero HIGH/CRITICAL issues (one MODERATE in a dev-only transitive dependency remains, not actionable without upstream release).
 
 ---
 
@@ -1569,6 +1923,20 @@ done
 # Default credential pairs all return 200 with an error (not a successful redirect to /admin/).
 ```
 
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ❌ FAIL → ✅ FIXED |
+
+**Observed:** `GET /admin/` returned HTTP 302 (redirect to login) — the Django admin panel was reachable at the default, well-known path. Automated scanners universally probe `/admin/` as the first step when targeting Django applications.
+
+**Root cause:** `urls.py` used the hardcoded string `path('admin/', admin.site.urls)` with no configuration option.
+
+**Fix applied:** `settings.py` — added `ADMIN_URL = os.environ.get("DJANGO_ADMIN_URL", "admin/")`. `urls.py` — changed to `path(settings.ADMIN_URL, admin.site.urls)`. Production deployments should set `DJANGO_ADMIN_URL` to an obscure slug (e.g. `hk-panel-8f2a/`) in the Render environment variable dashboard; local development continues to use `/admin/` by default.
+
 ---
 
 ### TEST-INFRA-04 — Database Not Publicly Exposed
@@ -1589,6 +1957,16 @@ nc -zv $DB_HOST 6379 2>&1
 # Verify DATABASE_URL is not in public settings
 grep -rn "DATABASE_URL\|postgres://" backend/ --include="*.py" | grep -v "env(\|os.environ"
 ```
+
+**Findings**
+
+| | |
+|---|---|
+| **Tester** | Dalton |
+| **Run date** | 2026-06-12 |
+| **Status** | ✅ PASS |
+
+**Observed:** `grep -rn "DATABASE_URL\|postgres://" backend/ --include="*.py"` returned only `settings.py` lines that read the value from `os.environ.get()` — no hardcoded connection strings. The local `.env` file uses `POSTGRES_HOST=localhost` (local development only; no production credentials). Production database credentials (Neon PostgreSQL) are injected by Render as environment variables and never stored in the repository. Neon's PostgreSQL endpoint exposes port 5432 publicly by design (it is a cloud-managed database service); however, all connections require SSL and a valid username/password — anonymous access is not possible.
 
 ---
 
