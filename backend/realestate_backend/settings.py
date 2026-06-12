@@ -57,6 +57,12 @@ if not _secret_key:
     )
 SECRET_KEY = _secret_key
 
+# Django admin URL path (must end with '/').
+# Override DJANGO_ADMIN_URL in production to an obscure slug so automated
+# scanners cannot discover the admin panel at the default /admin/ path.
+# Example: DJANGO_ADMIN_URL=hk-secure-panel-8f2a/
+ADMIN_URL = os.environ.get("DJANGO_ADMIN_URL", "admin/")
+
 DEBUG = env_bool("DJANGO_DEBUG", False)
 
 # If DJANGO_ALLOWED_HOSTS is explicitly set, use it.
@@ -108,6 +114,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "realestate_backend.security_headers.SecurityHeadersMiddleware",
     "django.middleware.security.SecurityMiddleware",
     # WhiteNoise serves /static/* directly from STATIC_ROOT in production so
     # Django admin's CSS/JS/icons load without a separate web server.
@@ -233,10 +240,14 @@ elif USE_DB_CACHE:
         }
     }
 else:
+    # DatabaseCache is shared across all gunicorn workers (unlike LocMemCache which
+    # is per-process), so rate limits actually accumulate correctly in production.
+    # Run `python manage.py createcachetable` once after deploying, or add it to
+    # your Render build command. Set REDIS_URL in production for best performance.
     CACHES = {
         'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'realestate-booking-platform',
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'cache_table',
         }
     }
 
@@ -258,6 +269,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.UserRateThrottle",
     ],
+    "NUM_PROXIES": 1,
     "DEFAULT_THROTTLE_RATES": {
         "user": "1000/day",
         "login": "10/min" if DEBUG else "5/min",
@@ -455,6 +467,15 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = env_bool('CELERY_ALWAYS_EAGER', DEBUG)
 CELERY_TASK_EAGER_PROPAGATES = True
+
+# ── Security settings applied in all environments ──────────────────────────
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+# 'Lax' (not 'Strict') so Google OAuth redirects still send the session cookie.
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

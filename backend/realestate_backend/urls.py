@@ -4,8 +4,11 @@ from django.conf.urls.static import static
 from django.urls import path, include, re_path
 from django.views.static import serve
 
+handler404 = 'realestate_backend.error_views.handler_404'
+handler500 = 'realestate_backend.error_views.handler_500'
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
     path('api/auth/', include('authapp.urls')),
     path('api/listings/', include('listings.urls')),
     path('api/bookings/', include('bookings.urls')),

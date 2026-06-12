@@ -9,6 +9,22 @@ from datetime import timedelta
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import IntegrityError
 import math
+
+# Maximum file size accepted at the application layer (10 MB).
+# Server-level limits (nginx client_max_body_size) are the first line of
+# defence; this is the backend guard.
+_MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def _check_image_size(request):
+    """Return a 413 Response if any uploaded image exceeds the limit, else None."""
+    for _key, f in request.FILES.items():
+        if f.size > _MAX_IMAGE_BYTES:
+            return Response(
+                {"error": f"File '{f.name}' is too large. Maximum allowed is 10 MB."},
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            )
+    return None
 from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory, HotelRoom, HotelRoomImage
 from bookings.models import Booking
 from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer, HotelRoomImageSerializer
@@ -160,6 +176,9 @@ def listing_images(request, listing_id):
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         if listing.owner != request.user:
             return Response({"error": "Only the owner can add images"}, status=status.HTTP_403_FORBIDDEN)
+        size_error = _check_image_size(request)
+        if size_error:
+            return size_error
         serializer = ListingImageCreateSerializer(data=request.data)
         if serializer.is_valid():
             if serializer.validated_data.get("order") is None:
@@ -792,6 +811,10 @@ def hotel_room_images(request, listing_id, room_id):
         return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
     if listing.owner != request.user and not request.user.is_superuser:
         return Response({"error": "Only the owner can add room images"}, status=status.HTTP_403_FORBIDDEN)
+
+    size_error = _check_image_size(request)
+    if size_error:
+        return size_error
 
     serializer = HotelRoomImageSerializer(data=request.data)
     if serializer.is_valid():
