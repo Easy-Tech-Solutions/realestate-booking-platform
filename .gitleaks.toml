@@ -1,0 +1,41 @@
+title = "HomeKonet Gitleaks Config"
+
+[extend]
+# Inherit all default detection rules
+useDefault = true
+
+[allowlist]
+description = "Known false positives and reviewed historical findings"
+
+# ── Path-based allowlist ──────────────────────────────────────────────────────
+# These files intentionally contain placeholder values or security-tooling
+# metadata (hashes), not real credentials.
+paths = [
+  # detect-secrets baseline: stores SHA1 *hashes* of secret candidates, not
+  # plaintext secrets. Gitleaks incorrectly treats these 40-char hex strings
+  # as generic API keys.
+  '''(^|/)\.secrets\.baseline$''',
+
+  # .env.example is documentation — every value is a placeholder/template.
+  '''(^|/)\.env\.example$''',
+
+  # Security testing guide uses example URLs and payloads as documentation.
+  # The "curl-auth-user" rule fires on a bare example URL with no credentials.
+  '''(^|/)docs/SECURITY_TESTING\.md$''',
+]
+
+# ── Commit-based allowlist ────────────────────────────────────────────────────
+# Findings in these commits have been individually reviewed and are either
+# placeholder values or belong to files that predate the current codebase.
+# IMPORTANT: the Google Maps API key (AIzaSy...) in the public/ prototype HTML
+# files should be rotated or restricted to specific referrer domains in the
+# Google Cloud Console.
+commits = [
+  # Old prototype static HTML files (public/) committed 2025-02-15.
+  # Contains a Google Maps API key that should be rotated/restricted in GCP.
+  "f4e2f109608220307b667746c9777a29ec2a65f1",
+
+  # Apple Sign-In private key *placeholder* ("\n...\n") in backend/.env and
+  # backend/.env.example. The value is a template, not a real private key.
+  "96d474653986c82a7fb7cd6b1381995059818146",
+]
