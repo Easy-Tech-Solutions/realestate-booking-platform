@@ -296,6 +296,21 @@ CORS_ALLOWED_ORIGIN_REGEXES: list[str] = []  # no regex patterns — exact origi
 CORS_ALLOW_CREDENTIALS = True
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 
+# CSRF trusted origins (required by Django 4+ for cross-origin POSTs to the
+# admin). DRF endpoints use JWT/header auth and are not CSRF-protected, but the
+# Django admin (session auth) is — so it must trust the API's own public origin.
+# Default to an https origin for every non-local, non-wildcard allowed host,
+# plus the frontend origin; extend with the CSRF_TRUSTED_ORIGINS env var.
+CSRF_TRUSTED_ORIGINS = [
+    f"https://{_host}" for _host in ALLOWED_HOSTS
+    if _host and _host not in ("localhost", "127.0.0.1") and not _host.startswith((".", "*"))
+]
+for _origin in env_origins("CSRF_TRUSTED_ORIGINS", ""):
+    if _origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_origin)
+if _fe_origin and _fe_origin not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(_fe_origin)
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     # 14-day sliding session: every refresh rotates the token and resets this
