@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('listings', '0015_listing_pending_review_status'),
+        ('listings', '0016_listing_deleted_at'),
     ]
 
     operations = [

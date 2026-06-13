@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0012_profile_last_seen'),
+        ('users', '0013_user_deleted_at'),
     ]
 
     operations = [

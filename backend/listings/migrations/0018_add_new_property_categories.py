@@ -29,7 +29,7 @@ def remove_new_categories(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('listings', '0016_listing_pricing_type_payment_schedule'),
+        ('listings', '0017_listing_pricing_type_payment_schedule'),
     ]
 
     operations = [
