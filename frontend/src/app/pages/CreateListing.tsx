@@ -53,14 +53,15 @@ type WizardStep =
   | 'safety'
   | 'final_details';
 
-type PropertyGroup = 'residential' | 'hotel' | 'land' | 'commercial' | 'long_term_rental';
+type PropertyGroup = 'residential' | 'hotel' | 'land' | 'commercial' | 'long_term_rental' | 'airbnb';
 
 function getPropertyGroup(type: string): PropertyGroup {
   if (type === 'hotels') return 'hotel';
   if (type === 'land') return 'land';
   if (['apartment', 'room', 'house'].includes(type)) return 'long_term_rental';
+  if (type === 'airbnb') return 'airbnb';
   if (['office-space', 'hall', 'roadside', 'highway'].includes(type)) return 'commercial';
-  // airbnb, lodge, beaches and any other short-term rental → nightly pricing with guests/beds
+  // lodge, beaches and any other short-term rental → nightly pricing, no guests field
   return 'residential';
 }
 
@@ -68,20 +69,26 @@ const STEPS_BY_GROUP: Record<PropertyGroup, WizardStep[]> = {
   long_term_rental: [
     'welcome', 'step1_intro', 'property_type', 'privacy_type', 'location',
     'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
-    'step3_intro', 'booking_settings', 'monthly_price', 'payment_schedule',
+    'step3_intro', 'monthly_price', 'payment_schedule',
+    'safety', 'final_details',
+  ],
+  airbnb: [
+    'welcome', 'step1_intro', 'property_type', 'privacy_type', 'location',
+    'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
+    'step3_intro', 'discounts', 'weekday_price', 'weekend_price',
     'safety', 'final_details',
   ],
   residential: [
     'welcome', 'step1_intro', 'property_type', 'privacy_type', 'location',
     'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
-    'step3_intro', 'booking_settings', 'discounts', 'weekday_price', 'weekend_price',
+    'step3_intro', 'discounts', 'weekday_price', 'weekend_price',
     'safety', 'final_details',
   ],
   hotel: [
     'welcome', 'step1_intro', 'property_type', 'location',
     'hotel_room_count', 'hotel_rooms',
     'check_in_out', 'amenities', 'photos', 'title', 'description',
-    'step3_intro', 'booking_settings', 'discounts',
+    'step3_intro', 'discounts',
     'final_details',
   ],
   land: [
@@ -91,7 +98,7 @@ const STEPS_BY_GROUP: Record<PropertyGroup, WizardStep[]> = {
   commercial: [
     'welcome', 'step1_intro', 'property_type', 'location', 'basics',
     'amenities', 'photos', 'title', 'description',
-    'step3_intro', 'booking_settings', 'discounts', 'weekday_price', 'final_details',
+    'step3_intro', 'discounts', 'weekday_price', 'final_details',
   ],
 };
 
@@ -243,6 +250,11 @@ const GROUP_LABELS: Record<PropertyGroup, { place: string; title: string; descri
     title: 'Now, let\'s give your place a title',
     description: 'Create your description',
   },
+  airbnb: {
+    place: 'place',
+    title: 'Now, let\'s give your place a title',
+    description: 'Create your description',
+  },
   residential: {
     place: 'place',
     title: 'Now, let\'s give your place a title',
@@ -304,12 +316,12 @@ export function CreateListing() {
 
     bookingMode: 'approve_first_3',
 
-    newListingPromo: true,
-    lastMinuteDiscountEnabled: true,
+    newListingPromo: false,
+    lastMinuteDiscountEnabled: false,
     lastMinuteDiscountPercent: 7,
-    weeklyDiscountEnabled: true,
+    weeklyDiscountEnabled: false,
     weeklyDiscountPercent: 10,
-    monthlyDiscountEnabled: true,
+    monthlyDiscountEnabled: false,
     monthlyDiscountPercent: 15,
 
     weekdayBasePrice: 42,
@@ -321,6 +333,7 @@ export function CreateListing() {
     exteriorCamera: false,
     noiseMonitor: false,
     weaponsOnProperty: false,
+    safetyNotes: '',
 
     hotelRoomCount: 1,
     hotelRooms: [{ ...defaultRoom }] as HotelRoomDraft[],
@@ -628,9 +641,9 @@ export function CreateListing() {
       payload.append('max_guests', String(
         propertyGroup === 'hotel'
           ? Math.max(...form.hotelRooms.map((r) => r.maxOccupancy), 1)
-          : propertyGroup === 'long_term_rental'
+          : propertyGroup === 'long_term_rental' || propertyGroup === 'residential'
             ? 0
-            : form.guests
+            : form.guests  // airbnb, commercial
       ));
       payload.append('amenities', JSON.stringify(form.amenities));
       payload.append('highlights', JSON.stringify(form.highlights));
@@ -643,9 +656,11 @@ export function CreateListing() {
       payload.append('weekly_discount_percent', String(form.weeklyDiscountPercent));
       payload.append('monthly_discount_enabled', String(form.monthlyDiscountEnabled));
       payload.append('monthly_discount_percent', String(form.monthlyDiscountPercent));
-      payload.append('exterior_camera', String(propertyGroup === 'residential' ? form.exteriorCamera : false));
-      payload.append('noise_monitor', String(propertyGroup === 'residential' ? form.noiseMonitor : false));
-      payload.append('weapons_on_property', String(propertyGroup === 'residential' ? form.weaponsOnProperty : false));
+      const hasSafety = propertyGroup === 'residential' || propertyGroup === 'airbnb' || propertyGroup === 'long_term_rental';
+      payload.append('exterior_camera', String(hasSafety ? form.exteriorCamera : false));
+      payload.append('noise_monitor', String(hasSafety ? form.noiseMonitor : false));
+      payload.append('weapons_on_property', String(hasSafety ? form.weaponsOnProperty : false));
+      if (form.safetyNotes) payload.append('safety_notes', form.safetyNotes);
       payload.append('square_footage', String(form.squareFootage));
       payload.append('check_in_time', form.checkInTime);
       payload.append('check_out_time', form.checkOutTime);
@@ -734,8 +749,16 @@ export function CreateListing() {
         { label: 'Bathrooms', key: 'bathrooms' as const },
       ];
     }
+    if (propertyGroup === 'airbnb') {
+      return [
+        { label: 'Guests', key: 'guests' as const },
+        { label: 'Bedrooms', key: 'bedrooms' as const },
+        { label: 'Beds', key: 'beds' as const },
+        { label: 'Bathrooms', key: 'bathrooms' as const },
+      ];
+    }
+    // residential (lodge, beaches, etc.) — no guests field
     return [
-      { label: 'Guests', key: 'guests' as const },
       { label: 'Bedrooms', key: 'bedrooms' as const },
       { label: 'Beds', key: 'beds' as const },
       { label: 'Bathrooms', key: 'bathrooms' as const },
@@ -1285,23 +1308,37 @@ export function CreateListing() {
         )}
 
         {currentStep === 'highlights' && (
-          <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Next, let's describe your place</h2>
-            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Choose up to 2 highlights.</p>
-            <div className="flex flex-wrap gap-3">
-              {HIGHLIGHTS.map((h) => (
-                <button
-                  type="button"
-                  key={h}
-                  onClick={() => toggleHighlight(h)}
-                  className={cn(
-                    'px-5 py-3 rounded-full border text-base sm:text-xl',
-                    form.highlights.includes(h) ? 'border-foreground bg-muted' : 'hover:border-foreground'
-                  )}
-                >
-                  {h}
-                </button>
-              ))}
+          <section className="max-w-3xl mx-auto py-8 space-y-8">
+            <div>
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Next, let's describe your place</h2>
+              <p className="text-base sm:text-2xl text-muted-foreground mb-6">Choose up to 2 highlights.</p>
+              <div className="flex flex-wrap gap-3">
+                {HIGHLIGHTS.map((h) => (
+                  <button
+                    type="button"
+                    key={h}
+                    onClick={() => toggleHighlight(h)}
+                    className={cn(
+                      'px-5 py-3 rounded-full border text-base sm:text-xl',
+                      form.highlights.includes(h) ? 'border-foreground bg-muted' : 'hover:border-foreground'
+                    )}
+                  >
+                    {h}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-xl sm:text-2xl font-semibold mb-2 block">Write a description</Label>
+              <p className="text-base text-muted-foreground mb-3">Tell guests what makes your {groupLabels.place} special.</p>
+              <Textarea
+                rows={6}
+                maxLength={500}
+                value={form.description}
+                onChange={(e) => update({ description: e.target.value })}
+                placeholder={`Describe your ${groupLabels.place}…`}
+              />
+              <p className="text-sm text-muted-foreground mt-1">{form.description.length}/500</p>
             </div>
           </section>
         )}
@@ -1360,8 +1397,8 @@ export function CreateListing() {
 
         {currentStep === 'discounts' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Add discounts</h2>
-            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Help your place stand out and get booked faster.</p>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Add discounts <span className="text-2xl sm:text-3xl font-normal text-muted-foreground">(optional)</span></h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">All discounts are optional. Enable only the ones you'd like to offer — you can change them any time.</p>
             <div className="space-y-4">
               {[
                 { key: 'newListingPromo', title: 'New listing promotion', description: 'Offer 20% off your first 3 bookings', value: true },
@@ -1400,15 +1437,28 @@ export function CreateListing() {
                 : 'Now, set a weekday base price'}
             </h2>
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">
-              {propertyGroup === 'land' ? 'Price per day for the land.' : 'Tip: $42. You\'ll set a weekend price next.'}
+              {propertyGroup === 'land' ? 'Price per day for the land.' : 'You\'ll set a weekend premium on the next step.'}
             </p>
             <div className="text-[60px] sm:text-[90px] lg:text-[120px] font-semibold leading-none">${form.weekdayBasePrice}</div>
             <p className="text-xl sm:text-3xl text-muted-foreground mt-3">
               Guest price before taxes ${guestPriceBeforeTaxes} <ChevronDown className="inline w-5 h-5" />
             </p>
-            <div className="mt-8 flex justify-center gap-3">
-              <Button variant="outline" size="sm" onClick={() => update({ weekdayBasePrice: Math.max(10, form.weekdayBasePrice - 1) })}>-</Button>
-              <Button variant="outline" size="sm" onClick={() => update({ weekdayBasePrice: form.weekdayBasePrice + 1 })}>+</Button>
+            <div className="mt-6 flex justify-center gap-3">
+              <Button type="button" variant="outline" size="sm" onClick={() => update({ weekdayBasePrice: Math.max(10, form.weekdayBasePrice - 10) })}>-10</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => update({ weekdayBasePrice: Math.max(10, form.weekdayBasePrice - 1) })}>-1</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => update({ weekdayBasePrice: form.weekdayBasePrice + 1 })}>+1</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => update({ weekdayBasePrice: form.weekdayBasePrice + 10 })}>+10</Button>
+            </div>
+            <div className="max-w-sm mx-auto mt-6">
+              <Label htmlFor="weekday-price-input" className="text-base">Or type a price</Label>
+              <Input
+                id="weekday-price-input"
+                type="number"
+                min={10}
+                value={form.weekdayBasePrice}
+                onChange={(e) => update({ weekdayBasePrice: Math.max(10, Number(e.target.value) || 10) })}
+                className="mt-2 text-center text-lg"
+              />
             </div>
           </section>
         )}
@@ -1416,7 +1466,9 @@ export function CreateListing() {
         {currentStep === 'weekend_price' && (
           <section className="max-w-3xl mx-auto py-8 text-center">
             <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Set a weekend price</h2>
-            <p className="text-base sm:text-2xl text-muted-foreground mb-8">Add a premium for Fridays and Saturdays.</p>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">
+              Optional — add a premium for Fridays and Saturdays, or leave at 0% to keep the same price.
+            </p>
             <div className="text-[60px] sm:text-[90px] lg:text-[120px] font-semibold leading-none">${weekendPrice}</div>
             <p className="text-xl sm:text-3xl text-muted-foreground mt-3">
               Guest price before taxes ${Math.round(weekendPrice * 1.04)} <ChevronDown className="inline w-5 h-5" />
@@ -1433,9 +1485,14 @@ export function CreateListing() {
                   onChange={(e) => update({ weekendPremiumPercent: Number(e.target.value) })}
                   className="w-full"
                 />
-                <div className="w-20 h-14 border rounded-2xl flex items-center justify-center text-2xl sm:text-4xl font-semibold">
-                  {form.weekendPremiumPercent}%
-                </div>
+                <Input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={form.weekendPremiumPercent}
+                  onChange={(e) => update({ weekendPremiumPercent: Math.min(99, Math.max(0, Number(e.target.value) || 0)) })}
+                  className="w-20 text-center text-xl font-semibold"
+                />
               </div>
             </div>
           </section>
@@ -1528,6 +1585,21 @@ export function CreateListing() {
                   />
                 </div>
               ))}
+              <div className="pt-4 border-t">
+                <Label htmlFor="safety-notes" className="text-xl sm:text-2xl font-medium block mb-2">
+                  Additional safety information <span className="text-base font-normal text-muted-foreground">(optional)</span>
+                </Label>
+                <p className="text-sm text-muted-foreground mb-3">Describe any other safety features, rules, or hazards guests should know about.</p>
+                <Textarea
+                  id="safety-notes"
+                  rows={4}
+                  maxLength={300}
+                  value={form.safetyNotes}
+                  onChange={(e) => update({ safetyNotes: e.target.value })}
+                  placeholder="e.g. Pool is unfenced, steep stairs, smoke-free property…"
+                />
+                <p className="text-sm text-muted-foreground mt-1">{form.safetyNotes.length}/300</p>
+              </div>
             </div>
           </section>
         )}

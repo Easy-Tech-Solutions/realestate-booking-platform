@@ -216,14 +216,24 @@ function BookingForm() {
     <div className="min-h-screen bg-background py-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-20">
         <div className="max-w-6xl mx-auto">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm mb-6 hover:text-primary"
-          >
-            <ChevronRight className="w-4 h-4 rotate-180" />
-            Back
-          </button>
+          <div className="flex items-center justify-between mb-6">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 text-sm hover:text-primary"
+            >
+              <ChevronRight className="w-4 h-4 rotate-180" />
+              Back to property
+            </button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/trips')}
+            >
+              Cancel — go to dashboard
+            </Button>
+          </div>
 
           <h1 className="text-3xl font-semibold mb-2">Review and book</h1>
           <p className="text-muted-foreground mb-8 text-sm">
