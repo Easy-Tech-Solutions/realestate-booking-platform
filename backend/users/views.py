@@ -296,6 +296,50 @@ def me_dashboard(request):
     })
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+    """
+    Soft-deletes the authenticated user's account.
+    The account is deactivated and archived for 30 days; after that period
+    a scheduled task permanently deletes it. The admin can reactivate within
+    the 30-day window.
+    """
+    from bookings.models import Booking as _Booking
+    user = request.user
+
+    if user.is_archived:
+        return Response(
+            {'error': 'Account deletion is already pending.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    active_bookings = _Booking.objects.filter(
+        customer=user,
+        status__in=['requested', 'payment_requested', 'payment_received', 'confirmed'],
+    )
+    if active_bookings.exists():
+        return Response(
+            {'error': 'You have active bookings. Please resolve them before deleting your account.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    now = timezone.now()
+    user.is_active = False
+    user.is_archived = True
+    user.archived_at = now
+    user.scheduled_deletion_at = now + timedelta(days=30)
+    user.save(update_fields=['is_active', 'is_archived', 'archived_at', 'scheduled_deletion_at'])
+
+    return Response({
+        'message': (
+            'Your account has been deactivated. It will be permanently deleted in 30 days. '
+            'Contact support within this period if you change your mind.'
+        ),
+        'scheduled_deletion_at': user.scheduled_deletion_at.isoformat(),
+    })
+
+
 _MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 

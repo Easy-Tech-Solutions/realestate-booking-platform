@@ -243,15 +243,15 @@ export function PropertyDetails() {
           <div className="mb-6">
             <h1 className="text-3xl font-semibold mb-2">{property.title}</h1>
             <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2 text-sm flex-wrap">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <Star className="w-4 h-4 fill-current" />
                   <span className="font-semibold">{property.rating.toFixed(2)}</span>
                   <span className="text-muted-foreground">·</span>
                   <button className="underline font-semibold">{property.reviewCount} reviews</button>
                 </div>
-                <span className="text-muted-foreground">·</span>
-                <button className="underline font-semibold">
+                <span className="text-muted-foreground flex-shrink-0">·</span>
+                <button className="underline font-semibold text-left">
                   {property.location.city}, {property.location.state}, {property.location.country}
                 </button>
               </div>
@@ -404,12 +404,12 @@ export function PropertyDetails() {
             <div className="lg:col-span-2 lg:order-1 space-y-8">
               {/* Host Info */}
               <div>
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h2 className="text-2xl font-semibold mb-2">
-                      Entire {property.propertyType} hosted by {property.host.firstName}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-xl sm:text-2xl font-semibold mb-2">
+                      Entire {property.propertyType} hosted by {property.host.firstName} {property.host.lastName}
                     </h2>
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="flex items-center gap-2 text-muted-foreground flex-wrap text-sm">
                       <span>{property.guests} guests</span>
                       <span>·</span>
                       <span>{property.bedrooms} bedrooms</span>

@@ -7,8 +7,10 @@ import uuid
 
 class Booking(models.Model):
     STATUS_CHOICES = [
-        ('requested', 'Requested'),
-        ('confirmed', 'Confirmed'),
+        ('requested', 'Requested'),           # Booking fee paid; awaiting owner review
+        ('payment_requested', 'Payment Requested'),  # Owner sent payment request to guest
+        ('payment_received', 'Payment Received'),    # Guest paid; awaiting admin confirmation
+        ('confirmed', 'Confirmed'),           # Admin confirmed
         ('declined', 'Declined'),
         ('cancelled', 'Cancelled'),
         ('completed', 'Completed'),
@@ -52,6 +54,34 @@ class Booking(models.Model):
     def total_amount(self):
         days = (self.end_date - self.start_date).days
         return self.listing.price * max(days, 1)
+
+
+class PaymentRequest(models.Model):
+    """
+    Created by the property owner once they've agreed terms with the guest.
+    The guest sees a 'Make payment' prompt and is redirected to pay the
+    property amount.  Admin must then confirm to move the booking to 'confirmed'.
+    """
+    booking = models.OneToOneField(
+        Booking, on_delete=models.CASCADE, related_name='payment_request',
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, default='USD')
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='payment_requests_sent',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_paid = models.BooleanField(default=False)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    stripe_payment_intent_id = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'PaymentRequest for Booking #{self.booking_id} — ${self.amount}'
 
 
 class SavedSearch(models.Model):

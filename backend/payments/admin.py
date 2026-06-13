@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PaymentGateway, Currency, Payment, Refund, WebhookLog
+from .models import PaymentGateway, Currency, Payment, Refund, WebhookLog, PlatformFee
 
 
 @admin.register(PaymentGateway)
@@ -78,6 +78,36 @@ class RefundAdmin(admin.ModelAdmin):
     @admin.display(description='Customer (Full name)', ordering='payment__user__last_name')
     def customer_full_name(self, obj):
         return obj.payment.user.get_full_name() or obj.payment.user.username
+
+
+@admin.register(PlatformFee)
+class PlatformFeeAdmin(admin.ModelAdmin):
+    list_display = ['booking_fee', 'transaction_fee_type', 'transaction_fee_value', 'updated_at']
+    readonly_fields = ['updated_at']
+    fieldsets = (
+        ('Booking Fee', {
+            'fields': ('booking_fee',),
+            'description': 'Flat fee charged to the guest at booking time (in USD). This is independent of the property rental price.',
+        }),
+        ('Transaction Fee (added to guest total at payment)', {
+            'fields': ('transaction_fee_type', 'transaction_fee_value', 'transaction_fee_min', 'transaction_fee_max'),
+            'description': (
+                'Fixed: add a flat USD amount. '
+                'Percentage: e.g. enter 2.9 for 2.9%. '
+                'Range: percentage bounded by min/max USD values.'
+            ),
+        }),
+        ('Last Updated', {
+            'fields': ('updated_at',),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def has_add_permission(self, request):
+        return not PlatformFee.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(WebhookLog)

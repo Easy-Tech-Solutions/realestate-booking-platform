@@ -15,6 +15,9 @@ class User(AbstractUser):
     password_reset_token = models.CharField(max_length=200, blank=True, null=True)
     password_reset_token_expires_at = models.DateTimeField(null=True, blank=True)
     role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='user')
+    is_archived = models.BooleanField(default=False)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    scheduled_deletion_at = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         # Keep Django admin flags and app role aligned.

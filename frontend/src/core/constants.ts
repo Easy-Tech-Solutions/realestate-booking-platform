@@ -12,6 +12,9 @@ export const WS_BASE_URL = _wsEnv
 
 export const PROPERTY_CATEGORIES = [
   { id: 'apartment', name: 'Apartment', icon: '🏠' },
+  { id: 'room', name: 'Single Room', icon: '🚪' },
+  { id: 'house', name: 'Whole House', icon: '🏡' },
+  { id: 'airbnb', name: 'Air BnB', icon: '🛋️' },
   { id: 'hotels', name: 'Hotels', icon: '🏨' },
   { id: 'lodge', name: 'Lodge', icon: '🛖' },
   { id: 'beaches', name: 'Beaches', icon: '🏖️' },
