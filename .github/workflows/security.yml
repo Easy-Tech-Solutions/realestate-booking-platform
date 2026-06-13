@@ -72,7 +72,8 @@ jobs:
         with:
           node-version: '20'
 
-      - run: npm ci
+      - name: Install dependencies
+        run: npm install --prefer-offline
 
       - name: npm audit (HIGH+)
         run: npm audit --audit-level=high
@@ -99,4 +100,4 @@ jobs:
           sudo mv gitleaks /usr/local/bin/gitleaks
 
       - name: Run gitleaks
-        run: gitleaks detect --source . --log-opts="--all" --verbose
+        run: gitleaks detect --source . --log-opts="--all" --config .gitleaks.toml --verbose
