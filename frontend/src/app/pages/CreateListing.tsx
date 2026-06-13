@@ -67,7 +67,7 @@ function getPropertyGroup(type: string): PropertyGroup {
 
 const STEPS_BY_GROUP: Record<PropertyGroup, WizardStep[]> = {
   long_term_rental: [
-    'welcome', 'step1_intro', 'property_type', 'privacy_type', 'location',
+    'welcome', 'step1_intro', 'property_type', 'location',
     'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
     'step3_intro', 'monthly_price', 'payment_schedule',
     'safety', 'final_details',
@@ -244,36 +244,42 @@ const COUNTRIES = [
 
 const DRAFT_KEY = 'create_listing_draft';
 
-const GROUP_LABELS: Record<PropertyGroup, { place: string; title: string; description: string }> = {
+const GROUP_LABELS: Record<PropertyGroup, { place: string; title: string; description: string; occupant: string }> = {
   long_term_rental: {
     place: 'place',
     title: 'Now, let\'s give your place a title',
     description: 'Create your description',
+    occupant: 'tenant',
   },
   airbnb: {
     place: 'place',
     title: 'Now, let\'s give your place a title',
     description: 'Create your description',
+    occupant: 'guest',
   },
   residential: {
     place: 'place',
     title: 'Now, let\'s give your place a title',
     description: 'Create your description',
+    occupant: 'guest',
   },
   hotel: {
     place: 'hotel / room',
     title: 'Give your hotel listing a name',
     description: 'Describe what guests can expect',
+    occupant: 'guest',
   },
   land: {
     place: 'land',
     title: 'Give your land listing a title',
     description: 'Describe the land and its potential',
+    occupant: 'guest',
   },
   commercial: {
     place: 'space',
     title: 'Give your space a name',
     description: 'Describe what makes your space ideal',
+    occupant: 'tenant',
   },
 };
 
@@ -404,7 +410,12 @@ export function CreateListing() {
       payload.append('title', form.title.trim() || 'Untitled Draft');
       payload.append('description', form.description || '');
       payload.append('property_type', form.propertyType);
-      payload.append('privacy_type', propertyGroup === 'hotel' ? 'private_room' : (form.privacyType || 'entire_place'));
+      payload.append('privacy_type',
+        propertyGroup === 'hotel' ? 'private_room' :
+        propertyGroup === 'long_term_rental' ? (form.propertyType === 'room' ? 'private_room' : 'entire_place') :
+        propertyGroup === 'commercial' ? 'entire_place' :
+        (form.privacyType || 'entire_place')
+      );
       payload.append('address', composedAddress || form.address1 || '');
       payload.append('city', form.city || '');
       payload.append('state', form.state || '');
@@ -625,7 +636,12 @@ export function CreateListing() {
       payload.append('title', form.title);
       payload.append('description', form.description);
       payload.append('property_type', form.propertyType);
-      payload.append('privacy_type', propertyGroup === 'hotel' ? 'private_room' : form.privacyType);
+      payload.append('privacy_type',
+        propertyGroup === 'hotel' ? 'private_room' :
+        propertyGroup === 'long_term_rental' ? (form.propertyType === 'room' ? 'private_room' : 'entire_place') :
+        propertyGroup === 'commercial' ? 'entire_place' :
+        (form.privacyType || 'entire_place')
+      );
       payload.append('address', composedAddress);
       payload.append('city', form.city);
       payload.append('state', form.state);
@@ -790,7 +806,7 @@ export function CreateListing() {
                 <div>
                   <p className="text-xl sm:text-3xl font-semibold">1</p>
                   <p className="text-xl sm:text-3xl font-semibold">Tell us about your place</p>
-                  <p className="text-muted-foreground text-base sm:text-2xl">Share basic info, like where it is and how many guests can stay.</p>
+                  <p className="text-muted-foreground text-base sm:text-2xl">Share basic info, like where it is and how many {groupLabels.occupant}s can stay.</p>
                 </div>
               </div>
               <div className="flex items-start justify-between border-b pb-4">
@@ -816,7 +832,7 @@ export function CreateListing() {
             <div>
               <p className="text-lg sm:text-2xl text-muted-foreground mb-2">Step 1</p>
               <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-4">Tell us about your place</h2>
-              <p className="text-lg sm:text-2xl text-muted-foreground">We'll ask what type of property you have and where guests can stay.</p>
+              <p className="text-lg sm:text-2xl text-muted-foreground">We'll ask what type of property you have and where {groupLabels.occupant}s can stay.</p>
             </div>
             <div className="rounded-3xl border p-8 text-center text-muted-foreground">Property setup</div>
           </div>
@@ -845,12 +861,12 @@ export function CreateListing() {
 
         {currentStep === 'privacy_type' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-8">What type of place will guests have?</h2>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-8">What type of place will {groupLabels.occupant}s have?</h2>
             <div className="space-y-4">
               {[
-                { id: 'entire_place', title: 'An entire place', subtitle: 'Guests have the whole place to themselves.' },
-                { id: 'private_room', title: 'A private room', subtitle: 'Guests have their own room and shared spaces.' },
-                { id: 'shared_room', title: 'A shared room in a hostel', subtitle: 'Guests sleep in a shared room.' },
+                { id: 'entire_place', title: 'An entire place', subtitle: `${groupLabels.occupant === 'tenant' ? 'Tenants have' : 'Guests have'} the whole place to themselves.` },
+                { id: 'private_room', title: 'A private room', subtitle: `${groupLabels.occupant === 'tenant' ? 'Tenants have' : 'Guests have'} their own room and shared spaces.` },
+                { id: 'shared_room', title: 'A shared room in a hostel', subtitle: `${groupLabels.occupant === 'tenant' ? 'Tenants sleep' : 'Guests sleep'} in a shared room.` },
               ].map((option) => (
                 <button
                   type="button"
@@ -872,7 +888,7 @@ export function CreateListing() {
         {currentStep === 'location' && (
           <section className="max-w-3xl mx-auto py-8 space-y-6">
             <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold">Where's your {groupLabels.place} located?</h2>
-            <p className="text-base sm:text-2xl text-muted-foreground">We only share your address with guests after booking.</p>
+            <p className="text-base sm:text-2xl text-muted-foreground">We only share your address with {groupLabels.occupant}s after booking.</p>
             <div className="space-y-4">
               <div>
                 <Label>Country / region</Label>
@@ -1227,7 +1243,7 @@ export function CreateListing() {
                 ? 'What does your hotel offer?'
                 : propertyGroup === 'commercial'
                 ? 'What does your space have?'
-                : 'Tell guests what your place has to offer'}
+                : `Tell ${groupLabels.occupant}s what your place has to offer`}
             </h2>
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">You can add more after publishing.</p>
             <div className="grid sm:grid-cols-3 gap-4">
@@ -1330,7 +1346,7 @@ export function CreateListing() {
             </div>
             <div>
               <Label className="text-xl sm:text-2xl font-semibold mb-2 block">Write a description</Label>
-              <p className="text-base text-muted-foreground mb-3">Tell guests what makes your {groupLabels.place} special.</p>
+              <p className="text-base text-muted-foreground mb-3">Tell {groupLabels.occupant}s what makes your {groupLabels.place} special.</p>
               <Textarea
                 rows={6}
                 maxLength={500}
@@ -1589,7 +1605,7 @@ export function CreateListing() {
                 <Label htmlFor="safety-notes" className="text-xl sm:text-2xl font-medium block mb-2">
                   Additional safety information <span className="text-base font-normal text-muted-foreground">(optional)</span>
                 </Label>
-                <p className="text-sm text-muted-foreground mb-3">Describe any other safety features, rules, or hazards guests should know about.</p>
+                <p className="text-sm text-muted-foreground mb-3">Describe any other safety features, rules, or hazards {groupLabels.occupant}s should know about.</p>
                 <Textarea
                   id="safety-notes"
                   rows={4}
