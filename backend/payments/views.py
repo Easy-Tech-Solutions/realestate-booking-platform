@@ -268,9 +268,49 @@ def mtn_momo_webhook(request):
 
 # ── Stripe PaymentIntent ───────────────────────────────────────────────────────
 
-# Flat booking fee (USD) that is added to every stay — must match the
-# BOOKING_FEE constant in frontend/src/app/pages/Booking.tsx.
-_BOOKING_FEE_USD = 3.00
+def _get_booking_fee():
+    """Return the current booking fee from PlatformFee config."""
+    from .models import PlatformFee
+    return float(PlatformFee.get_current().booking_fee)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_booking_fee_intent(request):
+    """
+    Creates a Stripe PaymentIntent for the booking fee only.
+    Called at initial booking time — the property rental amount is collected
+    separately via a PaymentRequest after owner-guest agreement.
+    """
+    from django.conf import settings as django_settings
+
+    stripe_secret = getattr(django_settings, 'STRIPE_SECRET_KEY', '') or ''
+    if not stripe_secret:
+        return Response({'error': 'Stripe is not configured on the server'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    listing_id = request.data.get('listing_id')
+    currency = request.data.get('currency', 'usd').lower()
+
+    booking_fee_usd = _get_booking_fee()
+    amount_cents = round(booking_fee_usd * 100)
+
+    try:
+        import stripe
+        stripe.api_key = stripe_secret
+        intent = stripe.PaymentIntent.create(
+            amount=amount_cents,
+            currency=currency,
+            metadata={
+                'user_id': str(request.user.id),
+                'listing_id': str(listing_id) if listing_id else '',
+                'type': 'booking_fee',
+            },
+        )
+        return Response({'client_secret': intent.client_secret, 'amount_cents': amount_cents})
+    except ImportError:
+        return Response({'error': 'Stripe library is not installed on the server'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
@@ -391,14 +431,61 @@ def stripe_webhook(request):
 
     if event_type == 'payment_intent.succeeded':
         import logging
+        from django.utils import timezone as _tz
+        from bookings.models import Booking, PaymentRequest
+
         pi   = event['data']['object']
         meta = pi.get('metadata', {})
-        logging.getLogger(__name__).info(
-            'stripe payment_intent.succeeded pi=%s listing=%s user=%s amount=%s',
-            pi.get('id'), meta.get('listing_id'), meta.get('user_id'), pi.get('amount'),
+        pi_id = pi.get('id', '')
+        pi_type = meta.get('type', '')
+        logger = logging.getLogger(__name__)
+        logger.info(
+            'stripe payment_intent.succeeded pi=%s type=%s listing=%s user=%s amount=%s',
+            pi_id, pi_type, meta.get('listing_id'), meta.get('user_id'), pi.get('amount'),
         )
-        # Future: look up the related Payment record by stripe_payment_intent_id,
-        # mark it completed, and notify the host.
+
+        if pi_type == 'booking_fee':
+            # Booking fee paid — update status to 'requested' (booking confirmed pending owner review)
+            booking_id = meta.get('booking_id')
+            if booking_id:
+                try:
+                    booking = Booking.objects.get(pk=booking_id, status='requested')
+                    booking.stripe_payment_intent_id = pi_id
+                    booking.save(update_fields=['stripe_payment_intent_id'])
+                except Booking.DoesNotExist:
+                    pass
+        elif pi_type == 'property_payment':
+            # Full property payment — mark booking as payment_received; awaiting admin confirmation
+            booking_id = meta.get('booking_id')
+            if not booking_id:
+                # Fall back: look up via PaymentRequest
+                try:
+                    pr = PaymentRequest.objects.get(stripe_payment_intent_id=pi_id)
+                    pr.is_paid = True
+                    pr.paid_at = _tz.now()
+                    pr.save(update_fields=['is_paid', 'paid_at'])
+                    booking = pr.booking
+                    if booking.status == 'payment_requested':
+                        booking.status = 'payment_received'
+                        booking.save(update_fields=['status'])
+                except PaymentRequest.DoesNotExist:
+                    pass
+            else:
+                try:
+                    booking = Booking.objects.get(pk=booking_id, status='payment_requested')
+                    booking.status = 'payment_received'
+                    booking.stripe_payment_intent_id = pi_id
+                    booking.save(update_fields=['status', 'stripe_payment_intent_id'])
+                    try:
+                        pr = booking.payment_request
+                        pr.is_paid = True
+                        pr.paid_at = _tz.now()
+                        pr.stripe_payment_intent_id = pi_id
+                        pr.save(update_fields=['is_paid', 'paid_at', 'stripe_payment_intent_id'])
+                    except PaymentRequest.DoesNotExist:
+                        pass
+                except Booking.DoesNotExist:
+                    pass
 
     return JsonResponse({'status': 'ok'})
 

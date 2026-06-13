@@ -932,17 +932,8 @@ export function Messages() {
     const paramId = searchParams.get('conversation');
     if (paramId) {
       setSelectedId(paramId);
-      return;
     }
-    // Auto-open the first conversation only on the desktop two-pane layout
-    // (lg+ matches the `lg:w-80` sidebar breakpoint). On mobile the same
-    // action would jump the user past the list into the last chat, which is
-    // confusing — keep them on the inbox view instead.
-    const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
-    if (!selectedId && conversations.length > 0 && isDesktop) {
-      setSelectedId(conversations[0].id);
-    }
-  }, [conversations, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return conversations;

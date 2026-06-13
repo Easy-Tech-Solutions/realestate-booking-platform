@@ -48,19 +48,29 @@ type WizardStep =
   | 'discounts'
   | 'weekday_price'
   | 'weekend_price'
+  | 'monthly_price'
+  | 'payment_schedule'
   | 'safety'
   | 'final_details';
 
-type PropertyGroup = 'residential' | 'hotel' | 'land' | 'commercial';
+type PropertyGroup = 'residential' | 'hotel' | 'land' | 'commercial' | 'long_term_rental';
 
 function getPropertyGroup(type: string): PropertyGroup {
   if (type === 'hotels') return 'hotel';
   if (type === 'land') return 'land';
+  if (['apartment', 'room', 'house'].includes(type)) return 'long_term_rental';
   if (['office-space', 'hall', 'roadside', 'highway'].includes(type)) return 'commercial';
+  // airbnb, lodge, beaches and any other short-term rental → nightly pricing with guests/beds
   return 'residential';
 }
 
 const STEPS_BY_GROUP: Record<PropertyGroup, WizardStep[]> = {
+  long_term_rental: [
+    'welcome', 'step1_intro', 'property_type', 'privacy_type', 'location',
+    'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
+    'step3_intro', 'booking_settings', 'monthly_price', 'payment_schedule',
+    'safety', 'final_details',
+  ],
   residential: [
     'welcome', 'step1_intro', 'property_type', 'privacy_type', 'location',
     'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
@@ -228,6 +238,11 @@ const COUNTRIES = [
 const DRAFT_KEY = 'create_listing_draft';
 
 const GROUP_LABELS: Record<PropertyGroup, { place: string; title: string; description: string }> = {
+  long_term_rental: {
+    place: 'place',
+    title: 'Now, let\'s give your place a title',
+    description: 'Create your description',
+  },
   residential: {
     place: 'place',
     title: 'Now, let\'s give your place a title',
@@ -299,6 +314,9 @@ export function CreateListing() {
 
     weekdayBasePrice: 42,
     weekendPremiumPercent: 1,
+
+    monthlyPrice: 500,
+    paymentSchedule: 'monthly' as 'monthly' | 'quarterly' | 'biannual' | 'annual',
 
     exteriorCamera: false,
     noiseMonitor: false,
@@ -559,6 +577,7 @@ export function CreateListing() {
       case 'title': return form.title.trim().length > 0;
       case 'description': return form.description.trim().length > 0;
       case 'land_details': return form.squareFootage > 0;
+      case 'monthly_price': return form.monthlyPrice >= 50;
       case 'final_details': return Boolean(form.address1 && form.city && form.country);
       default: return true;
     }
@@ -598,14 +617,20 @@ export function CreateListing() {
       payload.append('city', form.city);
       payload.append('state', form.state);
       payload.append('country', form.country);
-      payload.append('price', String(form.weekdayBasePrice));
+      payload.append('price', String(propertyGroup === 'long_term_rental' ? form.monthlyPrice : form.weekdayBasePrice));
+      payload.append('pricing_type', propertyGroup === 'long_term_rental' ? 'monthly' : 'nightly');
+      if (propertyGroup === 'long_term_rental') {
+        payload.append('payment_schedule', form.paymentSchedule);
+      }
       payload.append('bedrooms', String(propertyGroup === 'hotel' || propertyGroup === 'commercial' ? 0 : form.bedrooms));
-      payload.append('beds', String(propertyGroup === 'land' || propertyGroup === 'commercial' ? 0 : propertyGroup === 'hotel' ? 0 : form.beds));
+      payload.append('beds', String(propertyGroup === 'land' || propertyGroup === 'commercial' || propertyGroup === 'long_term_rental' ? 0 : propertyGroup === 'hotel' ? 0 : form.beds));
       payload.append('bathrooms', String(propertyGroup === 'land' ? 0 : propertyGroup === 'hotel' ? 0 : form.bathrooms));
       payload.append('max_guests', String(
         propertyGroup === 'hotel'
           ? Math.max(...form.hotelRooms.map((r) => r.maxOccupancy), 1)
-          : form.guests
+          : propertyGroup === 'long_term_rental'
+            ? 0
+            : form.guests
       ));
       payload.append('amenities', JSON.stringify(form.amenities));
       payload.append('highlights', JSON.stringify(form.highlights));
@@ -703,6 +728,12 @@ export function CreateListing() {
         { label: 'Bathrooms', key: 'bathrooms' as const },
       ];
     }
+    if (propertyGroup === 'long_term_rental') {
+      return [
+        { label: 'Bedrooms', key: 'bedrooms' as const },
+        { label: 'Bathrooms', key: 'bathrooms' as const },
+      ];
+    }
     return [
       { label: 'Guests', key: 'guests' as const },
       { label: 'Bedrooms', key: 'bedrooms' as const },
@@ -774,6 +805,7 @@ export function CreateListing() {
             <div className="grid sm:grid-cols-3 gap-4">
               {listingCategories.map((type) => (
                 <button
+                  type="button"
                   key={type.id}
                   onClick={() => update({ propertyType: type.id })}
                   className={cn(
@@ -798,6 +830,7 @@ export function CreateListing() {
                 { id: 'shared_room', title: 'A shared room in a hostel', subtitle: 'Guests sleep in a shared room.' },
               ].map((option) => (
                 <button
+                  type="button"
                   key={option.id}
                   onClick={() => update({ privacyType: option.id as 'entire_place' | 'private_room' | 'shared_room' })}
                   className={cn(
@@ -1177,6 +1210,7 @@ export function CreateListing() {
             <div className="grid sm:grid-cols-3 gap-4">
               {currentAmenities.map((amenity) => (
                 <button
+                  type="button"
                   key={amenity.id}
                   onClick={() => toggleAmenity(amenity.id)}
                   className={cn(
@@ -1257,6 +1291,7 @@ export function CreateListing() {
             <div className="flex flex-wrap gap-3">
               {HIGHLIGHTS.map((h) => (
                 <button
+                  type="button"
                   key={h}
                   onClick={() => toggleHighlight(h)}
                   className={cn(
@@ -1307,6 +1342,7 @@ export function CreateListing() {
                 { id: 'instant_book', title: 'Use Instant Book', subtitle: 'Let guests book automatically.' },
               ].map((opt) => (
                 <button
+                  type="button"
                   key={opt.id}
                   onClick={() => update({ bookingMode: opt.id })}
                   className={cn(
@@ -1379,15 +1415,11 @@ export function CreateListing() {
 
         {currentStep === 'weekend_price' && (
           <section className="max-w-3xl mx-auto py-8 text-center">
-            <h2 className="text-6xl font-semibold mb-3">Set a weekend price</h2>
-            <p className="text-2xl text-muted-foreground mb-8">Add a premium for Fridays and Saturdays.</p>
-            <div className="text-[120px] font-semibold leading-none">${weekendPrice}</div>
-            <p className="text-3xl text-muted-foreground mt-3">Guest price before taxes ${Math.round(weekendPrice * 1.04)} <ChevronDown className="inline w-5 h-5" /></p>
             <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Set a weekend price</h2>
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">Add a premium for Fridays and Saturdays.</p>
             <div className="text-[60px] sm:text-[90px] lg:text-[120px] font-semibold leading-none">${weekendPrice}</div>
             <p className="text-xl sm:text-3xl text-muted-foreground mt-3">
-              Guest price before taxes ${Math.round(weekendPrice * 1.14)} <ChevronDown className="inline w-5 h-5" />
+              Guest price before taxes ${Math.round(weekendPrice * 1.04)} <ChevronDown className="inline w-5 h-5" />
             </p>
             <div className="max-w-xl mx-auto mt-10 text-left">
               <p className="text-xl sm:text-3xl font-medium mb-2">Weekend premium</p>
@@ -1405,6 +1437,75 @@ export function CreateListing() {
                   {form.weekendPremiumPercent}%
                 </div>
               </div>
+            </div>
+          </section>
+        )}
+
+        {currentStep === 'monthly_price' && (
+          <section className="max-w-3xl mx-auto py-8 text-center">
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Set your monthly rent</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">
+              This is the rent tenants will pay per month. You'll choose the payment schedule next.
+            </p>
+            <div className="text-[60px] sm:text-[90px] lg:text-[120px] font-semibold leading-none">
+              ${form.monthlyPrice}
+            </div>
+            <p className="text-xl sm:text-3xl text-muted-foreground mt-3">per month</p>
+            <div className="mt-8 flex justify-center gap-3">
+              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: Math.max(50, form.monthlyPrice - 50) })}>-50</Button>
+              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: Math.max(50, form.monthlyPrice - 10) })}>-10</Button>
+              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: form.monthlyPrice + 10 })}>+10</Button>
+              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: form.monthlyPrice + 50 })}>+50</Button>
+            </div>
+            <div className="max-w-sm mx-auto mt-8">
+              <Label htmlFor="monthly-price-input" className="text-base">Or enter an exact amount</Label>
+              <Input
+                id="monthly-price-input"
+                type="number"
+                min={50}
+                value={form.monthlyPrice}
+                onChange={(e) => update({ monthlyPrice: Math.max(50, Number(e.target.value) || 50) })}
+                className="mt-2 text-center text-lg"
+              />
+            </div>
+          </section>
+        )}
+
+        {currentStep === 'payment_schedule' && (
+          <section className="max-w-3xl mx-auto py-8">
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Payment schedule</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">
+              How often do you want tenants to pay? Tenants must pay according to your chosen schedule.
+            </p>
+            <div className="space-y-4 max-w-xl">
+              {([
+                { value: 'monthly', label: 'Monthly', description: `Pay $${form.monthlyPrice} every month`, multiplier: 1 },
+                { value: 'quarterly', label: 'Quarterly', description: `Pay $${form.monthlyPrice * 3} every 3 months`, multiplier: 3 },
+                { value: 'biannual', label: 'Biannual', description: `Pay $${form.monthlyPrice * 6} every 6 months`, multiplier: 6 },
+                { value: 'annual', label: 'Annual', description: `Pay $${form.monthlyPrice * 12} per year`, multiplier: 12 },
+              ] as const).map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-colors ${
+                    form.paymentSchedule === opt.value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentSchedule"
+                    value={opt.value}
+                    checked={form.paymentSchedule === opt.value}
+                    onChange={() => update({ paymentSchedule: opt.value })}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <div>
+                    <p className="text-xl font-semibold">{opt.label}</p>
+                    <p className="text-base text-muted-foreground">{opt.description}</p>
+                  </div>
+                </label>
+              ))}
             </div>
           </section>
         )}
@@ -1444,9 +1545,11 @@ export function CreateListing() {
             <div className="rounded-2xl border p-5 bg-muted/20">
               <p className="text-base sm:text-2xl text-muted-foreground">Pricing</p>
               <p className="text-xl sm:text-3xl mt-2">
-                {propertyGroup === 'land' || propertyGroup === 'commercial'
-                  ? `Daily rate: $${form.weekdayBasePrice}`
-                  : `Weekday: $${form.weekdayBasePrice} · Weekend: $${weekendPrice}`}
+                {propertyGroup === 'long_term_rental'
+                  ? `Monthly rent: $${form.monthlyPrice} · Schedule: ${form.paymentSchedule}`
+                  : propertyGroup === 'land' || propertyGroup === 'commercial'
+                    ? `Daily rate: $${form.weekdayBasePrice}`
+                    : `Weekday: $${form.weekdayBasePrice} · Weekend: $${weekendPrice}`}
               </p>
             </div>
 

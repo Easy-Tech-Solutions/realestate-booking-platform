@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     bookings_collection, booking_detail, pending_bookings,
-    confirm_booking, decline_booking, search_alerts, saved_search_detail,
+    confirm_booking, decline_booking, request_payment, my_payment_requests,
+    search_alerts, saved_search_detail,
     saved_searches, test_search, property_comparisons, comparison_detail,
     shared_comparison, add_to_comparison, remove_from_comparison
 )
@@ -12,6 +13,8 @@ urlpatterns = [
     path('pending/', pending_bookings, name='pending_bookings'),
     path('<int:id>/confirm/', confirm_booking, name='confirm_booking'),
     path('<int:id>/decline/', decline_booking, name='decline_booking'),
+    path('<int:id>/request-payment/', request_payment, name='request_payment'),
+    path('payment-requests/', my_payment_requests, name='my_payment_requests'),
     path('searches/', saved_searches, name='saved_searches'),
     path('searches/<int:id>/', saved_search_detail, name='saved_search_detail'),
     path('searches/alerts/', search_alerts, name='search_alerts'),

@@ -73,4 +73,8 @@ export const usersAPI = {
       method: 'DELETE',
     });
   },
+
+  deleteAccount: async (): Promise<{ message: string; scheduled_deletion_at: string }> => {
+    return fetchWithAuth('/api/users/me/delete/', { method: 'POST' });
+  },
 };

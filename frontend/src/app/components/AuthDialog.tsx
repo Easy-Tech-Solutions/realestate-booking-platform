@@ -79,7 +79,11 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Enter a valid email address';
     }
 
-    if (view === 'login' || view === 'register') {
+    if (view === 'login') {
+      if (!formData.password) newErrors.password = 'Password is required';
+    }
+
+    if (view === 'register') {
       const pwErr = validatePassword(formData.password);
       if (pwErr) newErrors.password = pwErr;
     }

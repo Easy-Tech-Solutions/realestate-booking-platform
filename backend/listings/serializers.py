@@ -93,6 +93,7 @@ class ListingSerializer(serializers.ModelSerializer):
             "weekly_discount_enabled", "weekly_discount_percent",
             "monthly_discount_enabled", "monthly_discount_percent",
             "exterior_camera", "noise_monitor", "weapons_on_property",
+            "pricing_type", "payment_schedule",
             "is_available", "status", "created_at", "updated_at",
             "gallery_images", "hotel_rooms", "main_image", "main_image_url",
             "owner_username", "owner_id", "owner_first_name", "owner_last_name",

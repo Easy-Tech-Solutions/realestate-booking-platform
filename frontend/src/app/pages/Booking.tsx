@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { Smartphone, Wallet, ChevronRight, Shield, Star, BedDouble, Users } from 'lucide-react';
+import { Smartphone, Wallet, ChevronRight, Shield, Star } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Button } from '../components/ui/button';
@@ -12,20 +12,13 @@ import { Textarea } from '../components/ui/textarea';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import { PaymentMethod } from '../../core/types';
-import { bookingsAPI, paymentAPI } from '../../services/api.service';
+import { bookingsAPI } from '../../services/api.service';
 import { fetchWithAuth } from '../../services/api/shared/client';
 
-// MTN MoMo is async — after we kick off the request-to-pay, the user has to
-// approve the prompt on their phone. We poll the verify endpoint until the
-// payment either completes or the user declines / it times out. Numbers
-// chosen so a real-world approval (3-15s) feels responsive, while a stuck
-// request gives up gracefully instead of hanging the UI forever.
 const MOMO_POLL_INTERVAL_MS = 3000;
-const MOMO_POLL_TIMEOUT_MS = 3 * 60 * 1000;  // 3 minutes
+const MOMO_POLL_TIMEOUT_MS = 3 * 60 * 1000;
 
 const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
-// Stripe keys must start with pk_test_ or pk_live_ followed by at least 20 chars.
-// Guard against placeholder values like "pk_test_your_stripe_publishable_key_here".
 const isValidStripeKey = (key?: string): key is string =>
   !!key && /^pk_(test|live)_[a-zA-Z0-9]{20,}$/.test(key);
 const stripePromise = isValidStripeKey(STRIPE_KEY) ? loadStripe(STRIPE_KEY) : null;
@@ -33,7 +26,7 @@ const stripePromise = isValidStripeKey(STRIPE_KEY) ? loadStripe(STRIPE_KEY) : nu
 function BookingForm() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { property, checkIn, checkOut, guests, pricing, selectedRoom, roomQuantity: stateRoomQuantity } = location.state || {};
+  const { property, checkIn, checkOut, guests, selectedRoom, roomQuantity: stateRoomQuantity } = location.state || {};
 
   const stripe = useStripe();
   const elements = useElements();
@@ -43,25 +36,25 @@ function BookingForm() {
   const [specialRequests, setSpecialRequests] = useState('');
   const [agreedToRules, setAgreedToRules] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  // MoMo-specific async state. 'awaiting' is shown while we poll for the
-  // user to approve the prompt on their phone.
   const [momoStatus, setMomoStatus] = useState<'idle' | 'awaiting'>('idle');
-
-  const BOOKING_FEE = 3;
+  const [bookingFee, setBookingFee] = useState(3);
 
   const currentProperty = property;
   const currentCheckIn = checkIn;
   const currentCheckOut = checkOut;
   const currentGuests = guests || 1;
   const currentRoomQuantity = stateRoomQuantity || 1;
-  const currentPricing = pricing || { subtotal: 0, cleaningFee: 0, serviceFee: 0, taxes: 0, total: 0 };
 
-  // For hotels with multiple rooms, multiply subtotal by room quantity
-  const baseSubtotal = (currentPricing.subtotal || 0) * currentRoomQuantity;
-  const baseServiceFee = (currentPricing.serviceFee || 0) * currentRoomQuantity;
-
-  // Remove cleaning fee & taxes; add flat $3 booking fee
-  const displayTotal = baseSubtotal + baseServiceFee + BOOKING_FEE;
+  // Fetch the live booking fee from the server so it matches what we'll charge.
+  useEffect(() => {
+    fetchWithAuth<{ amount_cents: number }>('/api/payments/stripe/booking-fee-intent/', {
+      method: 'POST',
+      body: JSON.stringify({ listing_id: currentProperty?.id, currency: 'usd' }),
+    })
+      .then((r) => setBookingFee(r.amount_cents / 100))
+      .catch(() => { /* keep default $3 if prefetch fails */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!currentProperty) {
     return (
@@ -94,6 +87,7 @@ function BookingForm() {
 
     setIsProcessing(true);
     let stripePaymentIntentId: string | undefined;
+
     try {
       const startDate = currentCheckIn instanceof Date
         ? currentCheckIn.toISOString().split('T')[0]
@@ -105,15 +99,13 @@ function BookingForm() {
       if (paymentMethod === 'stripe') {
         let clientSecret: string;
         try {
+          // Charge only the booking fee at this stage.
           const result = await fetchWithAuth<{ client_secret: string; amount_cents: number }>(
-            '/api/payments/stripe/payment-intent/',
+            '/api/payments/stripe/booking-fee-intent/',
             {
               method: 'POST',
               body: JSON.stringify({
                 listing_id: currentProperty.id,
-                check_in:   startDate,
-                check_out:  endDate,
-                ...(selectedRoom ? { room_id: selectedRoom.id } : {}),
                 currency: 'usd',
               }),
             }
@@ -166,10 +158,8 @@ function BookingForm() {
         ...(stripePaymentIntentId ? { stripe_payment_intent_id: stripePaymentIntentId } : {}),
       });
 
-      // MTN MoMo: send a request-to-pay push, then poll for the user's
-      // approval. Until this completes we don't let them onto the
-      // confirmation page — no payment, no confirmation.
       if (paymentMethod === 'mtn_momo') {
+        const { paymentAPI } = await import('../../services/api.service');
         const payment = await paymentAPI.initiateMomoPayment(booking.id, phoneNumber);
         const paymentId = payment?.id || payment?.payment?.id;
         if (!paymentId) {
@@ -178,9 +168,7 @@ function BookingForm() {
         }
 
         setMomoStatus('awaiting');
-        toast.info('Check your phone — approve the MoMo prompt to complete the booking.', {
-          duration: 8000,
-        });
+        toast.info('Check your phone — approve the MoMo prompt to complete the booking.', { duration: 8000 });
 
         const started = Date.now();
         let confirmed = false;
@@ -188,18 +176,10 @@ function BookingForm() {
           await new Promise((r) => setTimeout(r, MOMO_POLL_INTERVAL_MS));
           try {
             const result = await paymentAPI.verifyPayment(paymentId);
-            const status = result?.payment?.status || result?.status;
-            if (status === 'completed') {
-              confirmed = true;
-              break;
-            }
-            if (status === 'failed') {
-              toast.error('Payment was declined or failed. Please try again.');
-              return;
-            }
-          } catch {
-            // Transient verify error — keep polling until the overall timeout.
-          }
+            const s = result?.payment?.status || result?.status;
+            if (s === 'completed') { confirmed = true; break; }
+            if (s === 'failed') { toast.error('Payment was declined or failed.'); return; }
+          } catch { /* keep polling */ }
         }
 
         if (!confirmed) {
@@ -208,25 +188,21 @@ function BookingForm() {
         }
       }
 
-      const confirmedBooking = {
-        ...booking,
-        property: currentProperty,
-        checkIn: startDate,
-        checkOut: endDate,
-        guests: currentGuests,
-        roomQuantity: currentRoomQuantity,
-        totalPrice: displayTotal,
-        basePrice: baseSubtotal,
-        cleaningFee: 0,
-        serviceFee: baseServiceFee,
-        bookingFee: BOOKING_FEE,
-        taxes: 0,
-        paymentMethod,
-      };
-
-      toast.success(paymentMethod === 'mtn_momo' ? 'Payment received!' : 'Booking requested!');
+      toast.success('Booking request submitted! The owner will review and contact you to agree on terms.');
       navigate('/booking/confirmed', {
-        state: { booking: confirmedBooking },
+        state: {
+          booking: {
+            ...booking,
+            property: currentProperty,
+            checkIn: startDate,
+            checkOut: endDate,
+            guests: currentGuests,
+            roomQuantity: currentRoomQuantity,
+            totalPrice: bookingFee,
+            bookingFee,
+            paymentMethod,
+          },
+        },
       });
     } catch (err: any) {
       toast.error(err.message || 'Booking failed. Please try again.');
@@ -249,7 +225,10 @@ function BookingForm() {
             Back
           </button>
 
-          <h1 className="text-3xl font-semibold mb-8">Confirm and pay</h1>
+          <h1 className="text-3xl font-semibold mb-2">Review and book</h1>
+          <p className="text-muted-foreground mb-8 text-sm">
+            Pay the booking fee to reserve your spot. The property rental amount will be agreed separately with the owner.
+          </p>
 
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
 
@@ -269,7 +248,7 @@ function BookingForm() {
                       className="flex items-center gap-4 p-4 border-2 border-border rounded-xl cursor-pointer hover:border-primary transition-colors has-[:checked]:border-primary has-[:checked]:bg-secondary/30"
                     >
                       <RadioGroupItem value="stripe" id="stripe" />
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="4" fill="#635BFF"/><path d="M11.2 9.5c0-.8.7-1.1 1.8-1.1 1.6 0 3.6.5 5 1.3V6.2C16.7 5.4 14.8 5 12.9 5 9.5 5 7 6.8 7 10c0 4.9 6.7 4.1 6.7 6.2 0 1-.8 1.3-1.9 1.3-1.7 0-3.8-.7-5.5-1.6v3.6C7.7 20.4 9.8 21 12 21c3.5 0 6.1-1.7 6.1-5-.1-5.3-6.9-4.3-6.9-6.5z" fill="white"/></svg>
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#635BFF"/><path d="M11.2 9.5c0-.8.7-1.1 1.8-1.1 1.6 0 3.6.5 5 1.3V6.2C16.7 5.4 14.8 5 12.9 5 9.5 5 7 6.8 7 10c0 4.9 6.7 4.1 6.7 6.2 0 1-.8 1.3-1.9 1.3-1.7 0-3.8-.7-5.5-1.6v3.6C7.7 20.4 9.8 21 12 21c3.5 0 6.1-1.7 6.1-5-.1-5.3-6.9-4.3-6.9-6.5z" fill="white"/></svg>
                       <div>
                         <p className="font-semibold">Credit or Debit Card</p>
                         <p className="text-sm text-muted-foreground">Visa, Mastercard, Amex</p>
@@ -303,14 +282,12 @@ function BookingForm() {
                 </RadioGroup>
               </div>
 
-              {/* Payment details */}
               {paymentMethod === 'stripe' && (
                 <div className="space-y-4">
                   <Label>Card details</Label>
                   {!stripePromise ? (
                     <div className="border border-destructive/40 bg-destructive/5 rounded-lg p-4 text-sm text-destructive">
-                      Stripe is not configured. Please set a valid <code className="font-mono">VITE_STRIPE_PUBLISHABLE_KEY</code>{' '}
-                      (format: <code className="font-mono">pk_test_…</code> or <code className="font-mono">pk_live_…</code>) in your environment variables.
+                      Stripe is not configured. Please set a valid <code className="font-mono">VITE_STRIPE_PUBLISHABLE_KEY</code>.
                     </div>
                   ) : (
                     <div className="border border-border rounded-lg px-4 py-3 min-h-[52px] flex items-center">
@@ -325,10 +302,7 @@ function BookingForm() {
                                 '::placeholder': { color: '#9ca3af' },
                                 iconColor: '#6b7280',
                               },
-                              invalid: {
-                                color: '#ef4444',
-                                iconColor: '#ef4444',
-                              },
+                              invalid: { color: '#ef4444', iconColor: '#ef4444' },
                             },
                             hidePostalCode: true,
                           }}
@@ -364,11 +338,10 @@ function BookingForm() {
 
               <Separator />
 
-              {/* Special requests */}
               <div>
-                <h2 className="text-xl font-semibold mb-4">Add special requests (optional)</h2>
+                <h2 className="text-xl font-semibold mb-4">Add a message to the owner (optional)</h2>
                 <Textarea
-                  placeholder="Let the host know if you have any special requests..."
+                  placeholder="Introduce yourself or share any special requests..."
                   value={specialRequests}
                   onChange={(e) => setSpecialRequests(e.target.value)}
                   rows={4}
@@ -377,7 +350,6 @@ function BookingForm() {
 
               <Separator />
 
-              {/* Ground rules */}
               <div>
                 <h2 className="text-xl font-semibold mb-4">Ground rules</h2>
                 <p className="text-muted-foreground mb-4">
@@ -404,8 +376,7 @@ function BookingForm() {
                 <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
                   <p className="font-medium text-foreground">Check your phone to approve the payment</p>
                   <p className="text-muted-foreground mt-1">
-                    We sent a MoMo prompt to {phoneNumber}. Approve it on your MTN Mobile Money app to
-                    complete the booking. This page will update automatically.
+                    We sent a MoMo prompt to {phoneNumber}. Approve it on your MTN Mobile Money app.
                   </p>
                 </div>
               )}
@@ -421,7 +392,7 @@ function BookingForm() {
                   ? 'Waiting for MoMo approval…'
                   : isProcessing
                     ? 'Processing…'
-                    : `Confirm and pay ${formatCurrency(displayTotal)}`}
+                    : `Book now — pay ${formatCurrency(bookingFee)} booking fee`}
               </Button>
             </div>
 
@@ -437,7 +408,7 @@ function BookingForm() {
                     className="w-28 h-20 sm:w-32 sm:h-24 rounded-lg object-cover flex-shrink-0"
                   />
                   <div className="min-w-0">
-                    <p className="text-sm text-muted-foreground truncate">{currentProperty.propertyType}</p>
+                    <p className="text-sm text-muted-foreground capitalize truncate">{currentProperty.propertyType}</p>
                     <h3 className="font-semibold line-clamp-2">{currentProperty.title}</h3>
                     <div className="flex items-center gap-1 text-sm mt-1">
                       <Star className="w-3 h-3 fill-current" />
@@ -451,35 +422,8 @@ function BookingForm() {
 
                 <Separator />
 
-                {/* Selected room (hotels only) */}
-                {selectedRoom && (
-                  <>
-                    <div className="space-y-2">
-                      <h2 className="text-lg font-semibold">Selected room</h2>
-                      <div className="rounded-lg border border-border p-3 space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium">{selectedRoom.name}</p>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground capitalize">
-                            {selectedRoom.roomType}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <BedDouble className="w-3 h-3" /> {selectedRoom.beds} {selectedRoom.bedType} bed{selectedRoom.beds > 1 ? 's' : ''}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3 h-3" /> Up to {selectedRoom.maxOccupancy} guests
-                          </span>
-                        </div>
-                        <p className="text-sm font-semibold">{formatCurrency(selectedRoom.pricePerNight)}<span className="text-xs font-normal text-muted-foreground"> / night</span></p>
-                      </div>
-                    </div>
-                    <Separator />
-                  </>
-                )}
-
-                {/* Trip dates & guests */}
-                <div className="space-y-4">
+                {/* Trip dates */}
+                <div className="space-y-3">
                   <h2 className="text-lg font-semibold">Your booking</h2>
                   <div className="flex justify-between items-start">
                     <div>
@@ -492,50 +436,27 @@ function BookingForm() {
                       Edit
                     </Button>
                   </div>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">Guests</p>
-                      <p className="text-sm text-muted-foreground">{currentGuests} guest{currentGuests !== 1 ? 's' : ''}</p>
-                    </div>
-                    <Button variant="link" className="p-0 h-auto text-sm" onClick={() => navigate(-1)}>
-                      Edit
-                    </Button>
-                  </div>
                 </div>
 
                 <Separator />
 
-                {/* Price breakdown */}
+                {/* Fee breakdown */}
                 <div>
-                  <h2 className="text-lg font-semibold mb-4">Price details</h2>
+                  <h2 className="text-lg font-semibold mb-4">Payment due now</h2>
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
-                      <span>
-                        {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : (currentProperty.price || 0))} ×{' '}
-                        {currentPricing.nights || (currentPricing.subtotal && (selectedRoom?.pricePerNight || currentProperty.price)
-                          ? Math.round(currentPricing.subtotal / (selectedRoom?.pricePerNight || currentProperty.price))
-                          : 0)}{' '}
-                        nights{currentRoomQuantity > 1 ? ` × ${currentRoomQuantity} rooms` : ''}
-                      </span>
-                      <span>{formatCurrency(baseSubtotal)}</span>
-                      <span>{formatCurrency(currentPricing.subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Service fee</span>
-                      <span>{formatCurrency(baseServiceFee)}</span>
-                    </div>
-                    <div className="flex justify-between">
                       <span>Booking fee</span>
-                      <span>{formatCurrency(BOOKING_FEE)}</span>
+                      <span>{formatCurrency(bookingFee)}</span>
                     </div>
                   </div>
-
                   <Separator className="my-4" />
-
                   <div className="flex justify-between font-semibold text-base">
-                    <span>Total (USD)</span>
-                    <span>{formatCurrency(displayTotal)}</span>
+                    <span>Total due now</span>
+                    <span>{formatCurrency(bookingFee)}</span>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    The property rental amount will be requested separately after you and the owner reach an agreement.
+                  </p>
                 </div>
 
                 {/* Secure payment badge */}

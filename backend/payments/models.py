@@ -177,6 +177,78 @@ class SavedCard(models.Model):
         super().save(*args, **kwargs)
 
 
+class PlatformFee(models.Model):
+    """
+    Singleton configuration for platform-wide fees.
+    Edit via Django admin — only one row is ever stored.
+    """
+    TRANSACTION_FEE_TYPES = [
+        ('fixed', 'Fixed Amount (USD)'),
+        ('percentage', 'Percentage of transaction'),
+        ('range', 'Range (Min–Max USD)'),
+    ]
+
+    booking_fee = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal('3.00'),
+        help_text='Flat fee charged at booking time (USD)',
+    )
+    transaction_fee_type = models.CharField(
+        max_length=20, choices=TRANSACTION_FEE_TYPES, default='fixed',
+        help_text='How the payment-method transaction fee is calculated',
+    )
+    transaction_fee_value = models.DecimalField(
+        max_digits=8, decimal_places=4, default=Decimal('0.00'),
+        help_text='Fixed USD amount or percentage rate (e.g. 2.9 for 2.9%)',
+    )
+    transaction_fee_min = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text='Minimum USD fee (range type only)',
+    )
+    transaction_fee_max = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text='Maximum USD fee (range type only)',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Platform Fee Configuration'
+        verbose_name_plural = 'Platform Fee Configuration'
+
+    def __str__(self):
+        return f'Booking fee: ${self.booking_fee} | Transaction: {self.get_transaction_fee_type_display()}'
+
+    def save(self, *args, **kwargs):
+        # Enforce singleton — only one configuration row allowed.
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        pass  # Prevent deletion of the singleton row
+
+    @classmethod
+    def get_current(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def compute_transaction_fee(self, amount_usd: Decimal) -> Decimal:
+        """Return the transaction fee for a given amount."""
+        if self.transaction_fee_type == 'fixed':
+            return self.transaction_fee_value
+        if self.transaction_fee_type == 'percentage':
+            fee = amount_usd * self.transaction_fee_value / Decimal('100')
+            return fee
+        if self.transaction_fee_type == 'range':
+            fee = amount_usd * Decimal('0.029')  # default 2.9% for range
+            lo = self.transaction_fee_min or Decimal('0')
+            hi = self.transaction_fee_max
+            if fee < lo:
+                return lo
+            if hi and fee > hi:
+                return hi
+            return fee
+        return Decimal('0')
+
+
 class WebhookLog(models.Model):
     gateway = models.ForeignKey(PaymentGateway, on_delete=models.CASCADE)
     event_type = models.CharField(max_length=50)

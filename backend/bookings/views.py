@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from .models import Booking, SavedSearch, SearchAlert, PropertyComparison, ComparisonItem
+from .models import Booking, PaymentRequest, SavedSearch, SearchAlert, PropertyComparison, ComparisonItem
 from .serializers import (
     BookingSerializer, BookingConfrimationSerializer, BookingCreateSerializer,
     SearchAlertSerializer, SavedSearchSerializer, SavedSearchCreateSerializer,
@@ -259,6 +259,77 @@ def decline_booking(request, id):
         booking.save()
         return Response(BookingSerializer(booking, context={'request': request}).data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def request_payment(request, id):
+    """Owner sends a payment request to the guest after agreeing on terms."""
+    try:
+        booking = Booking.objects.get(pk=id)
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if booking.listing.owner != request.user:
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    if booking.status != 'requested':
+        return Response(
+            {'error': f'Cannot send payment request for a booking in "{booking.status}" status.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if hasattr(booking, 'payment_request'):
+        return Response({'error': 'A payment request has already been sent for this booking.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    amount = request.data.get('amount')
+    notes = request.data.get('notes', '')
+    if not amount:
+        return Response({'error': 'amount is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from decimal import Decimal, InvalidOperation
+        amount_decimal = Decimal(str(amount))
+        if amount_decimal <= 0:
+            raise ValueError
+    except (InvalidOperation, ValueError):
+        return Response({'error': 'amount must be a positive number'}, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        PaymentRequest.objects.create(
+            booking=booking,
+            amount=amount_decimal,
+            notes=notes,
+            created_by=request.user,
+        )
+        booking.status = 'payment_requested'
+        booking.save(update_fields=['status'])
+
+    return Response(BookingSerializer(booking, context={'request': request}).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_payment_requests(request):
+    """Return pending payment requests for the authenticated guest."""
+    requests = PaymentRequest.objects.filter(
+        booking__user=request.user,
+        is_paid=False,
+    ).select_related('booking', 'booking__listing', 'created_by')
+    data = [
+        {
+            'id': pr.id,
+            'booking_id': pr.booking_id,
+            'listing_title': pr.booking.listing.title,
+            'amount': str(pr.amount),
+            'currency': pr.currency,
+            'notes': pr.notes,
+            'created_at': pr.created_at.isoformat(),
+            'owner_name': f'{pr.created_by.first_name} {pr.created_by.last_name}'.strip() or pr.created_by.username,
+        }
+        for pr in requests
+    ]
+    return Response(data)
 
 
 @api_view(['GET', 'POST'])

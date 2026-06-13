@@ -83,6 +83,21 @@ class Listing(models.Model):
     exterior_camera = models.BooleanField(default=False)
     noise_monitor = models.BooleanField(default=False)
     weapons_on_property = models.BooleanField(default=False)
+    PRICING_TYPES = [
+        ('nightly', 'Per Night'),
+        ('monthly', 'Per Month'),
+    ]
+    PAYMENT_SCHEDULES = [
+        ('monthly', 'Monthly'),
+        ('quarterly', 'Every 3 Months'),
+        ('biannual', 'Every 6 Months'),
+        ('annual', 'Annual'),
+    ]
+    pricing_type = models.CharField(max_length=10, choices=PRICING_TYPES, default='nightly')
+    payment_schedule = models.CharField(
+        max_length=15, choices=PAYMENT_SCHEDULES, null=True, blank=True,
+        help_text='Required for monthly-priced listings (room, apartment, house)',
+    )
     cancellation_policy = models.CharField(max_length=20, choices=CANCELLATION_POLICIES, default='flexible')
     is_available = models.BooleanField(default=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending_review')
