@@ -13,6 +13,10 @@ export const usersAPI = {
     return fetchWithAuth('/api/users/admin/stats/');
   },
 
+  deleteAccount: async (): Promise<void> => {
+    await fetchWithAuth('/api/users/me/delete/', { method: 'DELETE' });
+  },
+
   suspendUser: async (userId: string, payload: { suspension_type: string; reason: string; ends_at?: string | null }): Promise<any> => {
     return fetchWithAuth('/api/suspensions/', {
       method: 'POST',

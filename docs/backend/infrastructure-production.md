@@ -224,6 +224,54 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d api.yourdomain.com
 ```
 
+### 11.1 Same-origin requirement for the auth refresh cookie
+
+The refresh token is delivered **only** as an httpOnly cookie — it is no longer
+returned in the login response body or stored in `localStorage` (hardens against
+XSS token theft; see TEST-AUTH-02 in `docs/SECURITY_TESTING.md`). For the browser
+to send that cookie to `/api/auth/refresh-token/`, the SPA and API **must be
+served same-site** (same registrable domain). Choose one:
+
+**Option A — single origin (recommended).** Serve the SPA and proxy the API
+under one host, so the cookie is host-only with `SameSite=Lax`:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name app.yourdomain.com;
+
+    location /api/    { proxy_pass http://127.0.0.1:8000; proxy_set_header Host $host;
+                        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                        proxy_set_header X-Forwarded-Proto $scheme; }
+    location /static/ { alias /srv/realestate/app/backend/static/; }
+    location /media/  { alias /srv/realestate/app/backend/media/; }
+    location /        { root /srv/realestate/app/frontend/dist; try_files $uri /index.html; }
+}
+```
+
+Frontend build: set `VITE_API_URL=""` so API calls are relative to the SPA
+origin. Backend env: leave `AUTH_REFRESH_COOKIE_SAMESITE=Lax` (default) and
+`AUTH_REFRESH_COOKIE_DOMAIN` unset.
+
+**Option B — sibling subdomains.** SPA on `app.yourdomain.com`, API on
+`api.yourdomain.com`. They share the registrable domain `yourdomain.com`, so
+they are same-site and `SameSite=Lax` cookies are sent. Set:
+
+```
+AUTH_REFRESH_COOKIE_DOMAIN=.yourdomain.com
+```
+
+so the cookie is shared across subdomains, and ensure the SPA origin is in
+`CORS_ALLOWED_ORIGINS` / `FRONTEND_ORIGIN`.
+
+**Do NOT** run the SPA and API on unrelated domains (e.g. a `*.vercel.app`
+frontend with an `*.onrender.com` API). That is cross-site: `SameSite=Lax`
+cookies are not sent, and `SameSite=None` cookies are blocked by
+Safari/Brave/Firefox — the exact failure that previously forced the insecure
+localStorage fallback. If unavoidable short-term, set
+`AUTH_REFRESH_COOKIE_SAMESITE=None`, accept that some browsers will not keep
+users logged in, and treat moving same-site as a release blocker.
+
 ## 12. Email Provider Validation
 
 Before go-live, confirm:

@@ -197,6 +197,13 @@ export const supportAPI = {
     }));
   },
 
+  adminMarkContactRead: async (id: number): Promise<void> => {
+    await fetchWithAuth(`/api/support/admin/contact/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_read: true }),
+    });
+  },
+
   adminGetStats: async () => {
     return fetchWithAuth<{
       open: number;

@@ -32,6 +32,33 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+def _set_refresh_cookie(response, refresh):
+    """Attach the refresh token as an httpOnly, first-party cookie.
+
+    The token is delivered ONLY via this cookie (never the JSON body) so it is
+    not reachable by JavaScript — mitigates XSS token theft (TEST-AUTH-02).
+    Cookie attributes are centralised in settings.AUTH_REFRESH_COOKIE_*.
+    """
+    response.set_cookie(
+        settings.AUTH_REFRESH_COOKIE_NAME,
+        str(refresh),
+        httponly=True,
+        secure=settings.AUTH_REFRESH_COOKIE_SECURE,
+        samesite=settings.AUTH_REFRESH_COOKIE_SAMESITE,
+        domain=settings.AUTH_REFRESH_COOKIE_DOMAIN,
+        max_age=settings.AUTH_REFRESH_COOKIE_MAX_AGE,
+        path=settings.AUTH_REFRESH_COOKIE_PATH,
+    )
+
+
+def _delete_refresh_cookie(response):
+    response.delete_cookie(
+        settings.AUTH_REFRESH_COOKIE_NAME,
+        path=settings.AUTH_REFRESH_COOKIE_PATH,
+        domain=settings.AUTH_REFRESH_COOKIE_DOMAIN,
+    )
+
+
 def _get_active_suspension(user):
     from suspensions.models import Suspension
     return (
@@ -192,42 +219,29 @@ def login_view(request):
     #Geneate JWT tokens
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
-    refresh_token = str(refresh)
 
-    # The refresh token is returned in the JSON body so the SPA can persist it
-    # in localStorage. The cookie is kept for now as a soft fallback for
-    # already-issued sessions but the SPA no longer reads it; it can be removed
-    # in a later cleanup once nobody is relying on it.
+    # The refresh token is delivered ONLY as an httpOnly cookie (never in the
+    # JSON body) so JavaScript — and therefore any XSS — cannot read it.
     response = Response({
         "access": access_token,
-        "refresh": refresh_token,
         "user": UserSerializer(user).data,
     })
-    response.set_cookie(
-        'refresh_token',
-        refresh_token,
-        httponly=True,
-        secure=not settings.DEBUG,
-        samesite='None' if not settings.DEBUG else 'Lax',
-        max_age=60 * 60 * 24 * 7,  # 7 days — matches SimpleJWT REFRESH_TOKEN_LIFETIME
-        path='/api/auth/',
-    )
+    _set_refresh_cookie(response, refresh)
     return response
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
     try:
-        refresh_token = request.COOKIES.get("refresh_token") or request.data.get("refresh")
+        refresh_token = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME) or request.data.get("refresh")
         if refresh_token:
             try:
-                token = RefreshToken(refresh_token)
-                token.blacklist()
+                RefreshToken(refresh_token).blacklist()
             except TokenError:
                 pass
 
         response = Response({"message": "Logged out successfully"}, status=status.HTTP_205_RESET_CONTENT)
-        response.delete_cookie('refresh_token', path='/api/auth/')
+        _delete_refresh_cookie(response)
         return response
 
     except Exception as e:
@@ -236,42 +250,49 @@ def logout_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def refresh_token_view(request):
-    refresh_token = request.COOKIES.get("refresh_token") or request.data.get("refresh")
+    refresh_token = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME) or request.data.get("refresh")
     if not refresh_token:
         return Response({"error": "Refresh token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
-        refresh = RefreshToken(refresh_token)
-
-        # Block suspended users from minting new access tokens
-        user_id = refresh.get("user_id")
-        if user_id:
-            try:
-                user = User.objects.get(pk=user_id)
-                suspension = _get_active_suspension(user)
-                if suspension:
-                    return Response(_suspension_response(suspension), status=status.HTTP_403_FORBIDDEN)
-            except User.DoesNotExist:
-                pass
-
-        access_token = str(refresh.access_token)
-        response = Response({"access": access_token, "access_token": access_token})
-
-        # Rotate refresh cookie if SimpleJWT issues a new one
-        new_refresh = refresh.get("new_refresh", None)
-        if new_refresh:
-            response.set_cookie(
-                'refresh_token',
-                str(new_refresh),
-                httponly=True,
-                secure=not settings.DEBUG,
-                samesite='None' if not settings.DEBUG else 'Lax',
-                max_age=60 * 60 * 24 * 7,
-                path='/api/auth/',
-            )
-
+        # Constructing the token verifies signature, expiry AND the blacklist.
+        # A replayed (already-rotated) refresh token is blacklisted, so this
+        # raises TokenError -> 401. That is our refresh-token reuse detection.
+        old_refresh = RefreshToken(refresh_token)
+    except TokenError:
+        response = Response({"error": "Invalid or expired refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+        _delete_refresh_cookie(response)
         return response
-    except Exception:
-        return Response({"error": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user_id = old_refresh.get("user_id")
+    try:
+        user = User.objects.get(pk=user_id) if user_id else None
+    except User.DoesNotExist:
+        user = None
+    if user is None or not user.is_active:
+        response = Response({"error": "Invalid or expired refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+        _delete_refresh_cookie(response)
+        return response
+
+    # Block suspended users from minting new access tokens
+    suspension = _get_active_suspension(user)
+    if suspension:
+        return Response(_suspension_response(suspension), status=status.HTTP_403_FORBIDDEN)
+
+    # Rotate: blacklist the presented token and issue a fresh refresh token.
+    # This resets the 14-day sliding window on every refresh and guarantees the
+    # old token cannot be reused (the reuse check above will reject it).
+    try:
+        old_refresh.blacklist()
+    except AttributeError:
+        # token_blacklist app not installed — degrade to a non-rotating refresh.
+        pass
+
+    new_refresh = RefreshToken.for_user(user)
+    access_token = str(new_refresh.access_token)
+    response = Response({"access": access_token, "access_token": access_token})
+    _set_refresh_cookie(response, new_refresh)
+    return response
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me(request):
@@ -397,24 +418,15 @@ def _unique_username_from_email(email):
 
 def _issue_tokens_for_user(user, http_status=200):
     refresh = RefreshToken.for_user(user)
-    refresh_token = str(refresh)
+    # Refresh token is delivered only as an httpOnly cookie (not in the body).
     response = Response(
         {
             "access": str(refresh.access_token),
-            "refresh": refresh_token,
             "user": UserSerializer(user).data,
         },
         status=http_status,
     )
-    response.set_cookie(
-        'refresh_token',
-        refresh_token,
-        httponly=True,
-        secure=not settings.DEBUG,
-        samesite='None' if not settings.DEBUG else 'Lax',
-        max_age=60 * 60 * 24 * 7,
-        path='/api/auth/',
-    )
+    _set_refresh_cookie(response, refresh)
     return response
 
 
