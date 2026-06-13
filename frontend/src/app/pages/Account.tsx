@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { AlertTriangle, Camera, CreditCard, Eye, EyeOff, Plus, Star, Trash2, Pencil } from 'lucide-react';
+import { Camera, CreditCard, Eye, EyeOff, Plus, Star, Trash2, Pencil } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -18,7 +18,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '../components/ui/alert-dialog';
-import { useNavigate } from 'react-router';
 import { useApp } from '../../hooks/useApp';
 import { getInitials } from '../../core/utils';
 import { toast } from 'sonner';
@@ -329,70 +328,6 @@ function CardTile({ card, onEdit, onDelete, onSetDefault }: CardTileProps) {
           </Button>
         )}
       </div>
-    </div>
-  );
-}
-
-// ── Danger Zone ───────────────────────────────────────────────────────────────
-
-function DangerZone() {
-  const navigate = useNavigate();
-  const [confirming, setConfirming] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    try {
-      const res = await usersAPI.deleteAccount();
-      toast.success(`Your account has been deactivated. It will be permanently deleted on ${new Date(res.scheduled_deletion_at).toLocaleDateString()}.`);
-      navigate('/');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete account. Please try again.');
-    } finally {
-      setIsDeleting(false);
-      setConfirming(false);
-    }
-  };
-
-  return (
-    <div className="border border-destructive/50 rounded-xl p-6">
-      <div className="flex items-center gap-2 mb-2">
-        <AlertTriangle className="w-5 h-5 text-destructive" />
-        <h2 className="text-xl font-semibold text-destructive">Danger zone</h2>
-      </div>
-      <p className="text-sm text-muted-foreground mb-4">
-        Deleting your account will deactivate it immediately. Your data is archived for 30 days, during which an admin can reactivate it. After 30 days your account and all associated data will be permanently deleted and cannot be recovered.
-      </p>
-
-      {!confirming ? (
-        <Button variant="destructive" onClick={() => setConfirming(true)}>
-          Delete my account
-        </Button>
-      ) : (
-        <div className="space-y-4">
-          <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
-            <p className="font-semibold mb-1">Are you absolutely sure?</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Your account will be deactivated immediately</li>
-              <li>You will be logged out and unable to log back in</li>
-              <li>All your listings, bookings, and messages will become inaccessible</li>
-              <li>After 30 days your data will be permanently deleted</li>
-            </ul>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? 'Deleting…' : 'Yes, delete my account'}
-            </Button>
-            <Button variant="outline" onClick={() => setConfirming(false)} disabled={isDeleting}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
