@@ -530,13 +530,18 @@ def nearby_listings(request):
     Returns published listings within `radius` km (default 50, max 200), sorted by distance.
     """
     try:
-        user_lat = float(request.query_params["lat"])
-        user_lng = float(request.query_params["lng"])
+        lat_raw = request.query_params["lat"]
+        lng_raw = request.query_params["lng"]
+        if lat_raw.strip().lower() == "nan" or lng_raw.strip().lower() == "nan":
+            raise ValueError("NaN is not a valid coordinate")
+        user_lat = float(lat_raw)
+        user_lng = float(lng_raw)
     except (KeyError, ValueError):
-        return Response({"error": "lat and lng query params are required."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "lat and lng query params are required and must be valid numbers."}, status=status.HTTP_400_BAD_REQUEST)
 
+    radius_raw = request.query_params.get("radius", "50")
     try:
-        radius_km = min(float(request.query_params.get("radius", 50)), 200)
+        radius_km = 50 if radius_raw.strip().lower() == "nan" else min(float(radius_raw), 200)
     except ValueError:
         radius_km = 50
 
