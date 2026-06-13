@@ -19,6 +19,13 @@ class User(AbstractUser):
     archived_at = models.DateTimeField(null=True, blank=True)
     scheduled_deletion_at = models.DateTimeField(null=True, blank=True)
 
+    # Soft-delete marker. When set, the account is considered closed: the user
+    # cannot log in, their listings are unpublished, and their public-facing
+    # name is replaced with "Deleted User". Historical bookings, payments and
+    # reviews keep their FK to this row so financial / audit history stays
+    # intact.
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
     def save(self, *args, **kwargs):
         # Keep Django admin flags and app role aligned.
         if self.is_superuser or self.is_staff or self.role == 'admin':

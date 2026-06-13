@@ -101,6 +101,11 @@ class Listing(models.Model):
     cancellation_policy = models.CharField(max_length=20, choices=CANCELLATION_POLICIES, default='flexible')
     is_available = models.BooleanField(default=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending_review')
+    # Soft-delete marker. Set when the host clicks "Delete listing". The row
+    # is kept so historical bookings/payments/reviews still resolve, but the
+    # listing is hidden from every public surface (search, detail page,
+    # category pages) by an explicit `deleted_at__isnull=True` filter.
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     main_image = models.ImageField(upload_to='listings/main/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -12,6 +12,7 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import PhoneChangeRequest, Profile
 from .utils import generate_otp, send_phone_change_email_otp, send_phone_change_sms_otp
+from .deletion import delete_account
 from authapp.throttles import PhoneChangeRateThrottle
 
 User = get_user_model()
@@ -385,3 +386,18 @@ def update_profile(request):
 
     fresh_user = User.objects.select_related('profile').get(pk=user.pk)
     return Response(UserSerializer(fresh_user).data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_my_account(request):
+    """Soft-delete the authenticated user's account.
+
+    Blocked if the user has any active/upcoming bookings as guest *or* as
+    host on their listings. Returns 400 with a specific reason in that case
+    so the frontend can render it verbatim.
+    """
+    ok, error = delete_account(request.user)
+    if not ok:
+        return Response({'detail': error}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(status=status.HTTP_204_NO_CONTENT)
