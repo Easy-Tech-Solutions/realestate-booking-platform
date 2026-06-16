@@ -23,10 +23,19 @@ class BookingSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'customer', 'customer_username', 'customer_first_name', 'customer_last_name',
             'listing', 'listing_title', 'listing_owner', 'hotel_room', 'start_date', 'end_date',
-            'status', 'notes', 'requested_at', 'confirmed_at', 'declined_at', 'owner_notes',
+            'status', 'notes', 'requested_at', 'confirmed_at', 'declined_at', 'cancelled_at', 'owner_notes',
             'decline_reason', 'total_price', 'stripe_payment_intent_id', 'days_until_expiry'
         ]
-        read_only_fields = ['customer', 'requested_at', 'confirmed_at', 'declined_at', 'total_price']
+        # Lifecycle and host/system-controlled fields are read-only here so the
+        # generic PUT /api/bookings/<id>/ cannot mutate them. Status transitions
+        # must go through the role-gated confirm/decline endpoints — otherwise a
+        # guest could PUT {"status": "confirmed"} on their own booking and bypass
+        # host approval (TEST-AUTHZ-04 / CWE-285). owner_notes & decline_reason
+        # are host fields; stripe_payment_intent_id is set during the create flow.
+        read_only_fields = [
+            'customer', 'requested_at', 'confirmed_at', 'declined_at', 'cancelled_at', 'total_price',
+            'status', 'owner_notes', 'decline_reason', 'stripe_payment_intent_id',
+        ]
 
     def get_days_until_expiry(self, obj):
         if obj.status == 'requested' and obj.requested_at:
