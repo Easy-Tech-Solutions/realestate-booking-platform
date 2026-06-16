@@ -163,7 +163,7 @@ def bookings_collection(request):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(["GET", "PUT", "DELETE"])
+@api_view(["GET", "DELETE"])
 @permission_classes([IsAuthenticated])
 def booking_detail(request, id):
     try:
@@ -186,18 +186,22 @@ def booking_detail(request, id):
     if request.method == "GET":
         return Response(BookingSerializer(booking, context={'request': request}).data)
 
-    elif request.method == "PUT":
-        if booking.customer != request.user and not (request.user.is_staff or request.user.is_superuser):
-            return Response({"error": "Only booking owner can update this booking"}, status=status.HTTP_403_FORBIDDEN)
-        serializer = BookingSerializer(booking, data=request.data, partial=True, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(BookingSerializer(booking, context={'request': request}).data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
     elif request.method == "DELETE":
-        booking.delete()
-        return Response({"message": "Booking deleted"}, status=status.HTTP_204_NO_CONTENT)
+        # Soft cancel: keep the row for history / audit / dispute records instead
+        # of hard-deleting. The partial unique constraint excludes 'cancelled',
+        # so the guest can still re-book the same property/dates afterwards.
+        if booking.status == 'cancelled':
+            # Idempotent — already cancelled.
+            return Response(BookingSerializer(booking, context={'request': request}).data)
+        if booking.status in ('declined', 'completed'):
+            return Response(
+                {"error": f"A {booking.get_status_display().lower()} booking cannot be cancelled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        booking.status = 'cancelled'
+        booking.cancelled_at = timezone.now()
+        booking.save(update_fields=['status', 'cancelled_at'])
+        return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

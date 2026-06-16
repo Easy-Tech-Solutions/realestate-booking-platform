@@ -29,6 +29,7 @@ class Booking(models.Model):
     requested_at = models.DateTimeField(auto_now_add=True)
     confirmed_at = models.DateTimeField(null=True, blank=True)
     declined_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
     owner_notes = models.TextField(blank=True)
     decline_reason = models.TextField(blank=True)
     total_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
