@@ -3,14 +3,19 @@ from . import views
 
 urlpatterns = [
     path('initiate/', views.initiate_payment, name='initiate_payment'),
+    path('viewing/initiate/', views.initiate_viewing_payment, name='initiate_viewing_payment'),
     path('verify/', views.verify_payment, name='verify_payment'),
     path('refund/', views.process_refund, name='process_refund'),
     path('user/', views.user_payments, name='user_payments'),
+    path('admin/payouts/', views.admin_payouts, name='admin_payouts'),
+    path('admin/payouts/<uuid:payout_id>/mark-paid/', views.admin_mark_payout_paid, name='admin_mark_payout_paid'),
     path('<uuid:payment_id>/', views.payment_detail, name='payment_detail'),
     path('webhooks/mtn_momo/', views.mtn_momo_webhook, name='mtn_momo_webhook'),
     path('webhooks/stripe/', views.stripe_webhook, name='stripe_webhook'),
     path('stripe/payment-intent/', views.create_stripe_payment_intent, name='stripe_payment_intent'),
+    path('stripe/booking-payment-intent/', views.create_booking_payment_intent, name='stripe_booking_payment_intent'),
     path('stripe/booking-fee-intent/', views.create_booking_fee_intent, name='stripe_booking_fee_intent'),
+    path('stripe/viewing-fee-intent/', views.create_viewing_fee_intent, name='stripe_viewing_fee_intent'),
     path('cards/', views.saved_cards, name='saved_cards'),
     path('cards/<int:card_id>/', views.saved_card_detail, name='saved_card_detail'),
 ]

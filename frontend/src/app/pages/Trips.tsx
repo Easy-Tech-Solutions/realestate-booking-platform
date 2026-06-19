@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { Booking } from '../../core/types';
+import { bookingStatusMeta } from '../../core/bookingStatus';
 import { useUserTrips } from '../../hooks/queries/useTrips';
 
 export function Trips() {
@@ -65,13 +66,8 @@ export function Trips() {
         <div className="md:col-span-2 space-y-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${
-                trip.booking.status === 'confirmed' ? 'bg-primary/10 text-primary' :
-                trip.booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                trip.booking.status === 'cancelled' ? 'bg-red-100 text-red-600' :
-                'bg-gray-100 text-gray-600'
-              }`}>
-                {trip.booking.status}
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${bookingStatusMeta(trip.booking.status).className}`}>
+                {bookingStatusMeta(trip.booking.status).label}
               </span>
             </div>
             <h3 className="text-xl font-semibold mb-2">{trip.property.title}</h3>
@@ -94,12 +90,43 @@ export function Trips() {
             </span>
           </div>
 
+          {trip.booking.status === 'awaiting_payment' && (
+            <div className="rounded-lg bg-blue-50 text-blue-800 text-sm px-3 py-2">
+              Your host confirmed this reservation. Complete payment
+              {typeof trip.booking.daysUntilExpiry === 'number'
+                ? ` within ${trip.booking.daysUntilExpiry} day${trip.booking.daysUntilExpiry === 1 ? '' : 's'}`
+                : ' soon'}{' '}
+              to secure it.
+            </div>
+          )}
+          {trip.booking.status === 'pending_host' && (
+            <div className="rounded-lg bg-yellow-50 text-yellow-800 text-sm px-3 py-2">
+              Waiting for the host to confirm your reservation.
+            </div>
+          )}
+          {trip.booking.status === 'payment_received' && (
+            <div className="rounded-lg bg-indigo-50 text-indigo-800 text-sm px-3 py-2">
+              Payment received — we're confirming it. Your host's contact will be shared once confirmed.
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-border">
             <div>
               <p className="text-sm text-muted-foreground">Total price</p>
               <p className="text-xl font-semibold">{formatCurrency(trip.estimatedTotal)}</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {!isPast && trip.booking.status === 'awaiting_payment' && (
+                <Button
+                  onClick={() =>
+                    navigate(`/booking/${trip.booking.id}/pay`, {
+                      state: { booking: { ...trip.booking, property: trip.property } },
+                    })
+                  }
+                >
+                  Complete payment
+                </Button>
+              )}
               {!isPast && trip.booking.status !== 'cancelled' && (
                 <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setCancelTarget(trip.booking)}>
                   Cancel
@@ -110,7 +137,7 @@ export function Trips() {
                   <Star className="w-4 h-4 mr-1" /> Review
                 </Button>
               )}
-              <Button onClick={() => navigate(`/rooms/${trip.property.id}`)}>
+              <Button variant={trip.booking.status === 'awaiting_payment' ? 'outline' : 'default'} onClick={() => navigate(`/rooms/${trip.property.id}`)}>
                 {isPast ? 'Book again' : 'View details'}
               </Button>
             </div>

@@ -13,6 +13,7 @@ from .models import Payment, PaymentGateway, WebhookLog, SavedCard
 from .serializers import (
     PaymentInitiateSerializer, PaymentVerifySerializer, RefundSerializer,
     PaymentSerializer, RefundDetailSerializer, SavedCardSerializer,
+    ViewingPaymentInitiateSerializer,
 )
 from .services import PaymentService
 
@@ -76,6 +77,60 @@ def initiate_payment(request):
 
     return Response({'success': False, 'errors': serializer.errors},
                     status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def initiate_viewing_payment(request):
+    """
+    Initiate a mobile-money/bank payment of the non-refundable viewing fee.
+    Mirrors initiate_payment but charges ViewingAppointment.viewing_fee and
+    links the Payment to the viewing instead of a booking. (Stripe uses the
+    dedicated create_viewing_fee_intent endpoint.)
+    """
+    serializer = ViewingPaymentInitiateSerializer(data=request.data, context={'request': request})
+    if not serializer.is_valid():
+        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        viewing = serializer.validated_data['viewing_id']
+        gateway_name = serializer.validated_data['gateway']
+        payment_method = serializer.validated_data['payment_method']
+        phone_number = serializer.validated_data['phone_number']
+        currency_code = serializer.validated_data['currency']
+
+        from decimal import Decimal as _D
+        amount = _D(str(viewing.viewing_fee))
+
+        payment = PaymentService.create_payment(
+            viewing=viewing,
+            gateway_name=gateway_name,
+            amount=amount,
+            currency_code=currency_code,
+            payment_method=payment_method,
+            phone_number=phone_number,
+            network_provider='MTN',
+        )
+
+        result = PaymentService.process_payment(payment, {
+            'amount': amount, 'phone_number': phone_number, 'currency': currency_code,
+        })
+
+        if result.get('success'):
+            return Response({
+                'success': True,
+                'payment': PaymentSerializer(payment, context={'request': request}).data,
+                'message': result.get('message', 'Payment request sent successfully'),
+            }, status=status.HTTP_201_CREATED)
+
+        return Response({
+            'success': False,
+            'error': result.get('error', 'Payment processing failed'),
+            'details': result.get('details'),
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        return Response({'success': False, 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -199,6 +254,63 @@ def payment_detail(request, payment_id):
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def _is_admin(user):
+    return user.role == 'admin' or user.is_superuser
+
+
+def _serialize_payout(p):
+    return {
+        'id': str(p.id),
+        'booking_id': p.booking_id,
+        'listing_title': p.booking.listing.title if p.booking_id else '',
+        'host_name': (p.host.get_full_name() or p.host.username),
+        'host_id': p.host_id,
+        'gross_amount': str(p.gross_amount),
+        'service_fee_amount': str(p.service_fee_amount),
+        'net_amount': str(p.net_amount),
+        'currency': p.currency,
+        'status': p.status,
+        'reference': p.reference,
+        'paid_at': p.paid_at.isoformat() if p.paid_at else None,
+        'created_at': p.created_at.isoformat(),
+    }
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_payouts(request):
+    """Admin: list host payouts, optionally filtered by ?status=pending|paid."""
+    if not _is_admin(request.user):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from .models import Payout
+    qs = Payout.objects.select_related('host', 'booking__listing').order_by('-created_at')
+    status_filter = request.GET.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    return Response([_serialize_payout(p) for p in qs])
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_mark_payout_paid(request, payout_id):
+    """Admin: mark a payout as paid (records who/when and an optional reference)."""
+    if not _is_admin(request.user):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from django.utils import timezone as _tz
+    from .models import Payout
+    try:
+        payout = Payout.objects.select_related('host', 'booking__listing').get(pk=payout_id)
+    except Payout.DoesNotExist:
+        return Response({'error': 'Payout not found'}, status=status.HTTP_404_NOT_FOUND)
+    if payout.status != 'paid':
+        payout.status = 'paid'
+        payout.paid_at = _tz.now()
+        payout.paid_by = request.user
+        payout.reference = request.data.get('reference', '')
+        payout.save(update_fields=['status', 'paid_at', 'paid_by', 'reference'])
+    return Response(_serialize_payout(payout))
+
+
 @csrf_exempt
 def mtn_momo_webhook(request):
     """
@@ -304,6 +416,106 @@ def create_booking_fee_intent(request):
                 'user_id': str(request.user.id),
                 'listing_id': str(listing_id) if listing_id else '',
                 'type': 'booking_fee',
+            },
+        )
+        return Response({'client_secret': intent.client_secret, 'amount_cents': amount_cents})
+    except ImportError:
+        return Response({'error': 'Stripe library is not installed on the server'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_viewing_fee_intent(request):
+    """
+    Creates a Stripe PaymentIntent for a property viewing fee. The amount is
+    taken server-side from the viewing's stored (non-refundable) fee — never
+    from the client. Settlement marks the viewing paid via the Stripe webhook.
+    """
+    from django.conf import settings as django_settings
+    from bookings.models import ViewingAppointment
+
+    stripe_secret = getattr(django_settings, 'STRIPE_SECRET_KEY', '') or ''
+    if not stripe_secret:
+        return Response({'error': 'Stripe is not configured on the server'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    viewing_id = request.data.get('viewing_id')
+    currency = request.data.get('currency', 'usd').lower()
+
+    try:
+        viewing = ViewingAppointment.objects.get(pk=viewing_id, guest=request.user)
+    except ViewingAppointment.DoesNotExist:
+        return Response({'error': 'Viewing not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if viewing.is_fee_paid:
+        return Response({'error': 'Viewing fee already paid'}, status=status.HTTP_400_BAD_REQUEST)
+
+    amount_cents = round(float(viewing.viewing_fee) * 100)
+
+    try:
+        import stripe
+        stripe.api_key = stripe_secret
+        intent = stripe.PaymentIntent.create(
+            amount=amount_cents,
+            currency=currency,
+            metadata={
+                'user_id': str(request.user.id),
+                'viewing_id': str(viewing.id),
+                'type': 'viewing_fee',
+            },
+        )
+        return Response({'client_secret': intent.client_secret, 'amount_cents': amount_cents})
+    except ImportError:
+        return Response({'error': 'Stripe library is not installed on the server'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_booking_payment_intent(request):
+    """
+    Creates a Stripe PaymentIntent for the rent of a host-confirmed booking.
+    The amount is the booking's stored total (rent + service fee), computed
+    server-side — never trusted from the client. On success the Stripe webhook
+    (type=property_payment) moves the booking to 'payment_received'.
+    """
+    from django.conf import settings as django_settings
+    from bookings.models import Booking
+
+    stripe_secret = getattr(django_settings, 'STRIPE_SECRET_KEY', '') or ''
+    if not stripe_secret:
+        return Response({'error': 'Stripe is not configured on the server'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    booking_id = request.data.get('booking_id')
+    currency = request.data.get('currency', 'usd').lower()
+
+    try:
+        booking = Booking.objects.get(pk=booking_id, customer=request.user)
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if booking.status not in ('awaiting_payment', 'payment_requested'):
+        return Response(
+            {'error': f'This booking is not awaiting payment (status: {booking.status}).'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if booking.total_price is None:
+        return Response({'error': 'Booking has no price set'}, status=status.HTTP_400_BAD_REQUEST)
+
+    amount_cents = round(float(booking.total_price) * 100)
+
+    try:
+        import stripe
+        stripe.api_key = stripe_secret
+        intent = stripe.PaymentIntent.create(
+            amount=amount_cents,
+            currency=currency,
+            metadata={
+                'user_id': str(request.user.id),
+                'booking_id': str(booking.id),
+                'type': 'property_payment',
             },
         )
         return Response({'client_secret': intent.client_secret, 'amount_cents': amount_cents})
@@ -444,7 +656,20 @@ def stripe_webhook(request):
             pi_id, pi_type, meta.get('listing_id'), meta.get('user_id'), pi.get('amount'),
         )
 
-        if pi_type == 'booking_fee':
+        if pi_type == 'viewing_fee':
+            # Viewing fee paid — mark the viewing so admins can schedule it.
+            viewing_id = meta.get('viewing_id')
+            if viewing_id:
+                from bookings.models import ViewingAppointment
+                from bookings.services import mark_viewing_fee_paid
+                try:
+                    viewing = ViewingAppointment.objects.get(pk=viewing_id)
+                    viewing.stripe_payment_intent_id = pi_id
+                    viewing.save(update_fields=['stripe_payment_intent_id'])
+                    mark_viewing_fee_paid(viewing)
+                except ViewingAppointment.DoesNotExist:
+                    pass
+        elif pi_type == 'booking_fee':
             # Booking fee paid — update status to 'requested' (booking confirmed pending owner review)
             booking_id = meta.get('booking_id')
             if booking_id:
@@ -472,10 +697,17 @@ def stripe_webhook(request):
                     pass
             else:
                 try:
-                    booking = Booking.objects.get(pk=booking_id, status='payment_requested')
-                    booking.status = 'payment_received'
+                    # Current flow: the guest pays while the booking is in
+                    # 'awaiting_payment'. 'payment_requested' is the legacy path.
+                    booking = Booking.objects.get(
+                        pk=booking_id,
+                        status__in=['awaiting_payment', 'payment_requested'],
+                    )
                     booking.stripe_payment_intent_id = pi_id
-                    booking.save(update_fields=['status', 'stripe_payment_intent_id'])
+                    booking.save(update_fields=['stripe_payment_intent_id'])
+                    # Move to payment_received and notify admins to confirm/disburse.
+                    from bookings.services import mark_guest_paid
+                    mark_guest_paid(booking)
                     try:
                         pr = booking.payment_request
                         pr.is_paid = True

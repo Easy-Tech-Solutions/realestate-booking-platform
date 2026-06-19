@@ -483,6 +483,22 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = env_bool('CELERY_ALWAYS_EAGER', DEBUG)
 CELERY_TASK_EAGER_PROPAGATES = True
 
+# Periodic tasks (run `celery -A realestate_backend beat` in production).
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    # Expire reservations the host never confirmed within the 7-day window.
+    'expire-unconfirmed-reservations': {
+        'task': 'bookings.tasks.expire_unconfirmed_reservations',
+        'schedule': crontab(minute=0),  # top of every hour
+    },
+    # Expire host-confirmed reservations the guest never paid for (10-day window).
+    'expire-unpaid-reservations': {
+        'task': 'bookings.tasks.expire_unpaid_reservations',
+        'schedule': crontab(minute=5),  # five past every hour
+    },
+}
+
 # ── Security settings applied in all environments ──────────────────────────
 X_FRAME_OPTIONS = 'DENY'
 SECURE_CONTENT_TYPE_NOSNIFF = True

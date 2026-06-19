@@ -55,6 +55,9 @@ const PropertyDetails = lazyPage(() => import('./pages/PropertyDetails').then((m
 const Search = lazyPage(() => import('./pages/Search').then((module) => ({ default: module.Search })));
 const Booking = lazyPage(() => import('./pages/Booking').then((module) => ({ default: module.Booking })));
 const BookingConfirmed = lazyPage(() => import('./pages/BookingConfirmed').then((module) => ({ default: module.BookingConfirmed })));
+const CompletePayment = lazyPage(() => import('./pages/CompletePayment').then((module) => ({ default: module.CompletePayment })));
+const RequestViewing = lazyPage(() => import('./pages/RequestViewing').then((module) => ({ default: module.RequestViewing })));
+const Viewings = lazyPage(() => import('./pages/Viewings').then((module) => ({ default: module.Viewings })));
 const Trips = lazyPage(() => import('./pages/Trips').then((module) => ({ default: module.Trips })));
 const Wishlists = lazyPage(() => import('./pages/Wishlists').then((module) => ({ default: module.Wishlists })));
 const Messages = lazyPage(() => import('./pages/Messages').then((module) => ({ default: module.Messages })));
@@ -93,6 +96,30 @@ export const router = createBrowserRouter([
       { path: 'search', Component: Search },
       { path: 'book', Component: Booking },
       { path: 'booking/confirmed', Component: BookingConfirmed },
+      {
+        path: 'booking/:id/pay',
+        element: (
+          <ProtectedRoute>
+            <CompletePayment />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'rooms/:id/viewing',
+        element: (
+          <ProtectedRoute>
+            <RequestViewing />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'viewings',
+        element: (
+          <ProtectedRoute>
+            <Viewings />
+          </ProtectedRoute>
+        ),
+      },
       { path: 'trips', Component: Trips },
       { path: 'wishlists', Component: Wishlists },
       {

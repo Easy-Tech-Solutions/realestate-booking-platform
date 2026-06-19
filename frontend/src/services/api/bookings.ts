@@ -1,6 +1,6 @@
-import type { Booking } from '../../core/types';
+import type { Booking, Payout } from '../../core/types';
 import { fetchWithAuth } from './shared/client';
-import { normalizeBooking } from './shared/normalizers';
+import { normalizeBooking, normalizePayout } from './shared/normalizers';
 
 export const bookingsAPI = {
   create: async (bookingData: { listing: string; start_date: string; end_date: string; notes?: string; hotel_room?: string; stripe_payment_intent_id?: string; payment_method?: 'stripe' | 'mtn_momo' }): Promise<Booking> => {
@@ -38,8 +38,27 @@ export const bookingsAPI = {
     return normalizeBooking(data);
   },
 
+  // Admin-only: confirm a received payment → finalizes the booking, shares host
+  // contact, and creates the host payout.
+  confirmPayment: async (id: string): Promise<Booking> => {
+    const data = await fetchWithAuth(`/api/bookings/${id}/confirm-payment/`, { method: 'POST' });
+    return normalizeBooking(data);
+  },
+
   getPending: async (): Promise<Booking[]> => {
     const data = await fetchWithAuth<unknown[]>('/api/bookings/pending/');
     return data.map(normalizeBooking);
+  },
+
+  // Admin: bookings whose payment is awaiting confirmation.
+  getPaymentReceived: async (): Promise<Booking[]> => {
+    const data = await fetchWithAuth<unknown[]>('/api/bookings/admin/payment-received/');
+    return data.map(normalizeBooking);
+  },
+
+  // Host: my payout records.
+  getMyPayouts: async (): Promise<Payout[]> => {
+    const data = await fetchWithAuth<unknown[]>('/api/bookings/payouts/');
+    return data.map(normalizePayout);
   },
 };

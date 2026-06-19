@@ -1,6 +1,8 @@
 export { authAPI } from './auth';
 export { propertiesAPI } from './properties';
 export { bookingsAPI } from './bookings';
+export { viewingsAPI } from './viewings';
+export { payoutsAPI } from './payouts';
 export { reviewsAPI } from './reviews';
 export { messagesAPI } from './messages';
 export { wishlistsAPI } from './wishlists';

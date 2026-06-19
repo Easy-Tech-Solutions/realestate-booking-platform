@@ -71,13 +71,14 @@ import {
   ResponsiveContainer, LineChart, Line,
 } from 'recharts';
 import type { Booking, BookingStatus, Conversation, Property } from '../../core/types';
+import { bookingStatusMeta } from '../../core/bookingStatus';
 import { toast } from 'sonner';
 import { getErrorMessage } from '../../services/api/shared/errors';
 import { useSendMessage } from '../../hooks/queries/useMessages';
 import { useQuery } from '@tanstack/react-query';
 import { useDeleteHostProperty, useHostDashboardData, useRespondToHostReview, useUpdateHostProperty } from '../../hooks/queries/useHostDashboard';
 
-type Section = 'overview' | 'properties' | 'bookings' | 'accepted' | 'declined' | 'past' | 'messages' | 'pricing' | 'reviews';
+type Section = 'overview' | 'properties' | 'bookings' | 'accepted' | 'declined' | 'past' | 'earnings' | 'messages' | 'pricing' | 'reviews';
 
 type DashboardMessage = {
   id: string;
@@ -95,6 +96,7 @@ const navItems: { id: Section; label: string; icon: React.ElementType; badge?: n
   { id: 'accepted', label: 'Accepted Bookings', icon: CheckCircle2 },
   { id: 'declined', label: 'Declined Bookings', icon: XCircle },
   { id: 'past', label: 'Past Bookings', icon: History },
+  { id: 'earnings', label: 'Earnings', icon: TrendingUp },
   { id: 'messages', label: 'Messages', icon: MessageSquare },
   { id: 'pricing', label: 'Pricing', icon: DollarSign },
   { id: 'reviews', label: 'Recent Reviews', icon: Star },
@@ -594,7 +596,7 @@ function getMonthKey(dateString?: string) {
   return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString('en-US', { month: 'short' });
 }
 
-const VALID_SECTIONS: Section[] = ['overview', 'properties', 'bookings', 'accepted', 'declined', 'past', 'messages', 'pricing', 'reviews'];
+const VALID_SECTIONS: Section[] = ['overview', 'properties', 'bookings', 'accepted', 'declined', 'past', 'earnings', 'messages', 'pricing', 'reviews'];
 
 export function HostDashboard() {
   const navigate = useNavigate();
@@ -605,6 +607,11 @@ export function HostDashboard() {
     initialSection && VALID_SECTIONS.includes(initialSection) ? initialSection : 'overview'
   );
   const [bookingActionId, setBookingActionId] = useState<string | null>(null);
+
+  const payoutsQuery = useQuery({
+    queryKey: ['payouts', 'host'],
+    queryFn: () => bookingsAPI.getMyPayouts(),
+  });
 
   // Keep activeSection in sync when the URL search param changes (e.g. user
   // clicks a "/host?section=bookings" notification while already on /host).
@@ -620,7 +627,7 @@ export function HostDashboard() {
     setBookingActionId(id);
     try {
       await bookingsAPI.confirm(id);
-      toast.success('Booking confirmed');
+      toast.success('Reservation confirmed — the guest can now complete payment.');
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.me });
     } catch (error) {
       toast.error(getErrorMessage(error, 'Failed to confirm booking'));
@@ -1035,8 +1042,9 @@ export function HostDashboard() {
               booking.user?.firstName ||
               booking.userId ||
               'Guest';
-            const isPending = booking.status === 'pending';
+            const isPending = booking.status === 'pending_host' || booking.status === 'pending';
             const isBusy = bookingActionId === booking.id;
+            const statusMeta = bookingStatusMeta(booking.status);
             return (
               <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-border rounded-lg">
                 <div className="flex-1">
@@ -1045,7 +1053,13 @@ export function HostDashboard() {
                     {booking.checkIn} - {booking.checkOut} · {booking.guests} guests
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">{property?.title || booking.propertyId}</p>
-                  <p className="text-sm font-semibold mt-1 capitalize">{booking.status}</p>
+                  <p className="text-sm font-semibold mt-1">{statusMeta.label}</p>
+                  {booking.status === 'awaiting_payment' && (
+                    <p className="text-xs text-muted-foreground mt-0.5">Awaiting the guest's payment.</p>
+                  )}
+                  {booking.status === 'payment_received' && (
+                    <p className="text-xs text-muted-foreground mt-0.5">Payment received — awaiting admin confirmation.</p>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap flex-shrink-0">
                   {isPending ? (
@@ -1055,7 +1069,7 @@ export function HostDashboard() {
                         onClick={() => handleConfirmBooking(booking.id)}
                         disabled={isBusy}
                       >
-                        {isBusy ? 'Please wait…' : 'Accept'}
+                        {isBusy ? 'Please wait…' : 'Confirm'}
                       </Button>
                       <Button
                         size="sm"
@@ -1069,14 +1083,11 @@ export function HostDashboard() {
                   ) : (
                     <span
                       className={cn(
-                        'inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold capitalize select-none',
-                        booking.status === 'confirmed' && 'bg-primary/10 text-primary',
-                        booking.status === 'declined' && 'bg-destructive/10 text-destructive',
-                        booking.status === 'cancelled' && 'bg-muted text-muted-foreground',
-                        booking.status === 'completed' && 'bg-muted text-foreground',
+                        'inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold select-none',
+                        statusMeta.className,
                       )}
                     >
-                      {booking.status === 'confirmed' ? 'Accepted' : booking.status}
+                      {statusMeta.label}
                     </span>
                   )}
                   <Button variant="outline" size="sm" onClick={() => setActiveSection('messages')}>
@@ -1287,6 +1298,70 @@ export function HostDashboard() {
 
   const sectionTitle = navItems.find((item) => item.id === activeSection)?.label ?? 'Host Dashboard';
 
+  const renderEarnings = () => {
+    const payouts = payoutsQuery.data || [];
+    const pending = payouts.filter((p) => p.status === 'pending');
+    const paid = payouts.filter((p) => p.status === 'paid');
+    const pendingTotal = pending.reduce((sum, p) => sum + p.netAmount, 0);
+    const paidTotal = paid.reduce((sum, p) => sum + p.netAmount, 0);
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Earnings &amp; Payouts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Your net payouts after Home Konet's {''}commission. Payouts are disbursed by the Home
+            Konet team after a guest's payment is confirmed.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-4 mb-6">
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground">Awaiting payout</p>
+              <p className="text-2xl font-bold">{formatCurrency(pendingTotal)}</p>
+              <p className="text-xs text-muted-foreground">{pending.length} payout{pending.length === 1 ? '' : 's'}</p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-sm text-muted-foreground">Paid out</p>
+              <p className="text-2xl font-bold">{formatCurrency(paidTotal)}</p>
+              <p className="text-xs text-muted-foreground">{paid.length} payout{paid.length === 1 ? '' : 's'}</p>
+            </div>
+          </div>
+
+          {payoutsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading payouts…</p>
+          ) : payouts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No payouts yet. They appear here once a guest's payment is confirmed.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {payouts.map((p) => (
+                <div key={p.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-4 border border-border rounded-lg">
+                  <div>
+                    <p className="font-medium">{p.listingTitle}</p>
+                    <p className="text-xs text-muted-foreground">Booking #{p.bookingId}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Gross {formatCurrency(p.grossAmount)} · commission -{formatCurrency(p.serviceFeeAmount)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-semibold">{formatCurrency(p.netAmount)}</p>
+                    <span className={cn(
+                      'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold',
+                      p.status === 'paid' ? 'bg-primary/10 text-primary' : 'bg-yellow-100 text-yellow-700',
+                    )}>
+                      {p.status === 'paid' ? `Paid${p.paidAt ? ' · ' + new Date(p.paidAt).toLocaleDateString() : ''}` : 'Awaiting payout'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case 'overview':
@@ -1294,13 +1369,15 @@ export function HostDashboard() {
       case 'properties':
         return renderProperties();
       case 'bookings':
-        return renderBookings(['pending'], 'Upcoming Bookings', 'No pending bookings.');
+        return renderBookings(['pending_host', 'pending'], 'Reservation Requests', 'No reservation requests awaiting your confirmation.');
       case 'accepted':
-        return renderBookings(['confirmed'], 'Accepted Bookings', "You haven't accepted any bookings yet.");
+        return renderBookings(['awaiting_payment', 'payment_received', 'confirmed'], 'Accepted Bookings', "You haven't accepted any reservations yet.");
       case 'declined':
-        return renderBookings(['declined'], 'Declined Bookings', "You haven't declined any bookings yet.");
+        return renderBookings(['declined'], 'Declined Bookings', "You haven't declined any reservations yet.");
       case 'past':
-        return renderBookings(['cancelled', 'completed'], 'Past Bookings', 'No past bookings yet.');
+        return renderBookings(['cancelled', 'completed', 'expired_unconfirmed', 'expired_unpaid'], 'Past Bookings', 'No past bookings yet.');
+      case 'earnings':
+        return renderEarnings();
       case 'messages':
         return renderMessages();
       case 'pricing':

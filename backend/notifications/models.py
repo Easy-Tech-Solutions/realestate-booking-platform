@@ -11,11 +11,20 @@ class NotificationType(models.TextChoices):
     BOOKING_DECLINED   = 'booking_declined',   'Booking Declined'
     BOOKING_CANCELLED  = 'booking_cancelled',  'Booking Cancelled'
     BOOKING_COMPLETED  = 'booking_completed',  'Booking Completed'
+    # Reservation flow (revised booking flow)
+    RESERVATION_PENDING_ADMIN = 'reservation_pending_admin', 'New Reservation (Admin)'  # → admins
+    BOOKING_READY_TO_PAY      = 'booking_ready_to_pay',      'Reservation Confirmed — Pay Now'  # → guest
+    PAYMENT_AWAITING_ADMIN    = 'payment_awaiting_admin',    'Payment Awaiting Confirmation'    # → admins
+    RESERVATION_EXPIRED       = 'reservation_expired',       'Reservation Expired'              # → guest/host
+    # Viewing appointments (Path C)
+    VIEWING_REQUESTED  = 'viewing_requested',  'Viewing Requested'   # → admins
+    VIEWING_SCHEDULED  = 'viewing_scheduled',  'Viewing Scheduled'   # → guest
     # Payments
     PAYMENT_RECEIVED      = 'payment_received',      'Payment Received'         # → guest (paid)
     PAYMENT_RECEIVED_HOST = 'payment_received_host', 'Payment Received (Host)'  # → host (earned)
     PAYMENT_FAILED        = 'payment_failed',        'Payment Failed'
     PAYMENT_REFUNDED      = 'payment_refunded',      'Payment Refunded'
+    PAYOUT_PENDING        = 'payout_pending',        'Payout Pending'           # → admins
     # Messaging
     NEW_MESSAGE        = 'new_message',        'New Message'
     # Listings

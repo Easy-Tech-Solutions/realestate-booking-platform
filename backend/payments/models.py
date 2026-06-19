@@ -71,8 +71,22 @@ class Payment(models.Model):
         ('bank_transfer', 'Bank Transfer'),
     ]
 
+    PAYMENT_PURPOSE_CHOICES = [
+        ('booking', 'Booking / Rent'),
+        ('viewing_fee', 'Viewing Appointment Fee'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='payments')
+    # Exactly one of booking / viewing is set, depending on `purpose`.
+    booking = models.ForeignKey(
+        'bookings.Booking', on_delete=models.CASCADE, related_name='payments',
+        null=True, blank=True,
+    )
+    viewing = models.ForeignKey(
+        'bookings.ViewingAppointment', on_delete=models.CASCADE, related_name='payments',
+        null=True, blank=True,
+    )
+    purpose = models.CharField(max_length=20, choices=PAYMENT_PURPOSE_CHOICES, default='booking')
     gateway = models.ForeignKey(PaymentGateway, on_delete=models.PROTECT)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
@@ -142,6 +156,50 @@ class Refund(models.Model):
         return f'Payment {self.id} - {self.amount} for Payment {self.payment.id}'
     
 
+class Payout(models.Model):
+    """
+    Disbursement owed to a host after a guest payment is confirmed.
+
+    All guest payments land in Home Konet's account; the host is paid out
+    separately by the team. This record tracks what each host is owed and
+    whether it has been paid, so admins always know the outstanding balance.
+
+    net_amount = gross_amount (rent) − service_fee_amount (host's 4% commission).
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    booking = models.OneToOneField('bookings.Booking', on_delete=models.CASCADE, related_name='payout')
+    host = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payouts')
+
+    gross_amount = models.DecimalField(max_digits=12, decimal_places=2)       # rent the guest paid for the stay
+    service_fee_amount = models.DecimalField(max_digits=12, decimal_places=2)  # platform commission deducted from host
+    net_amount = models.DecimalField(max_digits=12, decimal_places=2)         # what the host receives
+    currency = models.CharField(max_length=3, default='USD')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reference = models.CharField(max_length=255, blank=True, help_text='Disbursement transaction reference')
+    paid_at = models.DateTimeField(null=True, blank=True)
+    paid_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='payouts_processed',
+    )
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Payout to {self.host.username} — {self.net_amount} {self.currency} ({self.status})'
+
+
 class SavedCard(models.Model):
     CARD_TYPE_CHOICES = [
         ('visa', 'Visa'),
@@ -192,6 +250,18 @@ class PlatformFee(models.Model):
         max_digits=8, decimal_places=2, default=Decimal('3.00'),
         help_text='Flat fee charged at booking time (USD)',
     )
+    viewing_fee = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal('3.00'),
+        help_text='Flat fee charged for a long-term property viewing appointment (USD). Non-refundable.',
+    )
+    service_fee_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('4.00'),
+        help_text=(
+            'Platform service fee, applied to BOTH sides of a booking: added on '
+            'top of what the guest pays AND deducted from what the host receives. '
+            'e.g. 4.00 means the platform earns 8% of the rent overall.'
+        ),
+    )
     transaction_fee_type = models.CharField(
         max_length=20, choices=TRANSACTION_FEE_TYPES, default='fixed',
         help_text='How the payment-method transaction fee is calculated',
@@ -230,6 +300,11 @@ class PlatformFee(models.Model):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
 
+    @property
+    def service_fee_rate(self) -> Decimal:
+        """The service fee as a fraction (e.g. 0.04 for 4%)."""
+        return (self.service_fee_percent or Decimal('0')) / Decimal('100')
+
     def compute_transaction_fee(self, amount_usd: Decimal) -> Decimal:
         """Return the transaction fee for a given amount."""
         if self.transaction_fee_type == 'fixed':
@@ -247,6 +322,23 @@ class PlatformFee(models.Model):
                 return hi
             return fee
         return Decimal('0')
+
+
+def get_service_fee_rate() -> Decimal:
+    """
+    The platform service fee as a fraction (e.g. Decimal('0.04')).
+
+    Single source of truth for the fee, read from the admin-editable
+    PlatformFee singleton. The same rate is added on top of the guest's
+    total and deducted from the host's payout — so the platform earns
+    twice this rate overall.
+    """
+    return PlatformFee.get_current().service_fee_rate
+
+
+def get_viewing_fee() -> Decimal:
+    """The flat viewing-appointment fee (USD), read from PlatformFee."""
+    return PlatformFee.get_current().viewing_fee
 
 
 class WebhookLog(models.Model):

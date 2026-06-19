@@ -589,12 +589,55 @@ def listing_availability(request, listing_id):
     return Response({"booked_dates": booked_dates})
 
 
+# Months required upfront for each long-term payment schedule.
+MONTHS_PER_SCHEDULE = {'monthly': 1, 'quarterly': 3, 'biannual': 6, 'annual': 12}
+
+
 def compute_listing_pricing(listing, start, end, room=None):
     """Compute the full pricing breakdown for a stay. Shared by the pricing
     endpoint and booking creation so the email/receipt total matches what the
-    guest saw at checkout."""
-    from datetime import date as _date, timedelta as _td
+    guest saw at checkout.
 
+    Two pricing models:
+      * Nightly (hotels, short stays): subtotal = nights × nightly rate, with
+        weekend premiums and length-of-stay discounts.
+      * Monthly (long-term rentals): the guest pays the host-defined upfront
+        amount = monthly price × the number of months in `payment_schedule`
+        (e.g. 6-month upfront on a $60/mo listing → $360 + service fee). Nights
+        and nightly discounts do not apply.
+    The service fee (read from PlatformFee) is added on top either way.
+    """
+    from datetime import date as _date, timedelta as _td
+    from payments.models import get_service_fee_rate
+
+    fee_rate = float(get_service_fee_rate())
+
+    # ---- Long-term (monthly) pricing -------------------------------------
+    # Hotel rooms are always nightly; only whole long-term listings price by month.
+    if room is None and getattr(listing, 'pricing_type', 'nightly') == 'monthly':
+        schedule = listing.payment_schedule or 'monthly'
+        months_upfront = MONTHS_PER_SCHEDULE.get(schedule, 1)
+        monthly_price = float(listing.price)
+        subtotal = monthly_price * months_upfront
+        service_fee = subtotal * fee_rate
+        return {
+            "pricing_type": "monthly",
+            "nights": (end - start).days if (start and end) else 0,
+            "base_price": monthly_price,
+            "monthly_price": monthly_price,
+            "months_upfront": months_upfront,
+            "payment_schedule": schedule,
+            "subtotal": subtotal,
+            "discount": 0.0,
+            "discount_label": None,
+            "discounted_subtotal": subtotal,
+            "cleaning_fee": 0.0,
+            "service_fee": service_fee,
+            "taxes": 0.0,
+            "total": subtotal + service_fee,
+        }
+
+    # ---- Nightly pricing -------------------------------------------------
     nights = (end - start).days
     base_price = float(room.price_per_night) if room else float(listing.price)
     weekend_premium = listing.weekend_premium_percent / 100.0
@@ -625,11 +668,15 @@ def compute_listing_pricing(listing, start, end, room=None):
     # the nightly subtotal plus the platform service fee. Kept as 0.0 in the
     # response so any consumer that still reads these keys keeps working.
     cleaning_fee = 0.0
-    service_fee = discounted_subtotal * 0.04
+    # Service fee rate (fee_rate) comes from the admin-editable PlatformFee
+    # config so the guest's checkout total matches the receipt email and host
+    # payout math.
+    service_fee = discounted_subtotal * fee_rate
     taxes = 0.0
     total = discounted_subtotal + service_fee
 
     return {
+        "pricing_type": "nightly",
         "nights": nights,
         "base_price": base_price,
         "subtotal": subtotal,
@@ -684,8 +731,13 @@ def listing_pricing(request, listing_id):
     total = pricing["total"]
 
     return Response({
+        "pricing_type": pricing.get("pricing_type", "nightly"),
         "nights": nights,
         "base_price": base_price,
+        # Long-term only — null/0 for nightly stays.
+        "monthly_price": pricing.get("monthly_price"),
+        "months_upfront": pricing.get("months_upfront"),
+        "payment_schedule": pricing.get("payment_schedule"),
         "subtotal": round(subtotal, 2),
         "discount": round(discount, 2),
         "discount_label": discount_label,

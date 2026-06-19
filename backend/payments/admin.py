@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import PaymentGateway, Currency, Payment, Refund, WebhookLog, PlatformFee
+from django.utils import timezone
+from django.contrib import messages
+from .models import PaymentGateway, Currency, Payment, Refund, WebhookLog, PlatformFee, Payout
 
 
 @admin.register(PaymentGateway)
@@ -36,8 +38,8 @@ class CurrencyAdmin(admin.ModelAdmin):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ['id', 'user', 'customer_full_name', 'booking', 'amount', 'currency', 'status', 'payment_method', 'created_at']
-    list_filter = ['status', 'payment_method', 'gateway', 'currency']
+    list_display = ['id', 'user', 'customer_full_name', 'purpose', 'booking', 'viewing', 'amount', 'currency', 'status', 'payment_method', 'created_at']
+    list_filter = ['status', 'purpose', 'payment_method', 'gateway', 'currency']
     # Searching by full name works via the ORM's double-underscore traversal:
     # `user__first_name` resolves to the User row's first_name column at query
     # time, so we never duplicate the name onto the Payment row.
@@ -51,7 +53,7 @@ class PaymentAdmin(admin.ModelAdmin):
         'gateway_transaction_id',
     ]
     readonly_fields = ['id', 'created_at', 'processed_at', 'completed_at', 'amount_in_usd', 'gateway_response']
-    raw_id_fields = ['booking', 'user']
+    raw_id_fields = ['booking', 'viewing', 'user']
     date_hierarchy = 'created_at'
 
     @admin.display(description='Full name', ordering='user__last_name')
@@ -82,12 +84,26 @@ class RefundAdmin(admin.ModelAdmin):
 
 @admin.register(PlatformFee)
 class PlatformFeeAdmin(admin.ModelAdmin):
-    list_display = ['booking_fee', 'transaction_fee_type', 'transaction_fee_value', 'updated_at']
+    list_display = ['service_fee_percent', 'viewing_fee', 'booking_fee', 'transaction_fee_type', 'transaction_fee_value', 'updated_at']
     readonly_fields = ['updated_at']
     fieldsets = (
-        ('Booking Fee', {
+        ('Service Fee', {
+            'fields': ('service_fee_percent',),
+            'description': (
+                'Platform service fee percentage. Applied to BOTH sides of every booking: '
+                'added on top of what the guest pays AND deducted from what the host receives. '
+                'e.g. enter 4 to charge the guest +4% and pay the host −4% (the platform earns 8% overall). '
+                'Edit here any time — no code change needed.'
+            ),
+        }),
+        ('Viewing Appointment Fee', {
+            'fields': ('viewing_fee',),
+            'description': 'Flat, non-refundable fee a guest pays to book a long-term property viewing (in USD).',
+        }),
+        ('Booking Fee (legacy)', {
             'fields': ('booking_fee',),
-            'description': 'Flat fee charged to the guest at booking time (in USD). This is independent of the property rental price.',
+            'classes': ('collapse',),
+            'description': 'Legacy flat fee. No longer charged at reservation under the current booking flow.',
         }),
         ('Transaction Fee (added to guest total at payment)', {
             'fields': ('transaction_fee_type', 'transaction_fee_value', 'transaction_fee_min', 'transaction_fee_max'),
@@ -108,6 +124,59 @@ class PlatformFeeAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Payout)
+class PayoutAdmin(admin.ModelAdmin):
+    list_display = ['host_full_name', 'host_momo', 'booking', 'net_amount', 'currency', 'status', 'created_at']
+    list_filter = ['status', 'currency', 'created_at']
+    search_fields = [
+        'host__username', 'host__first_name', 'host__last_name', 'host__email',
+        'booking__listing__title', 'reference',
+    ]
+    # Everything except the disbursement details is system-computed at creation
+    # time, so only status / reference / paid_by / notes are editable.
+    readonly_fields = [
+        'booking', 'host', 'host_momo', 'gross_amount', 'service_fee_amount',
+        'net_amount', 'currency', 'created_at', 'updated_at', 'paid_at',
+    ]
+    date_hierarchy = 'created_at'
+    actions = ['mark_paid']
+
+    # Payouts are created automatically when an admin confirms a payment — they
+    # are never hand-entered (the amounts are derived from the booking).
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(description='Host', ordering='host__last_name')
+    def host_full_name(self, obj):
+        return obj.host.get_full_name() or obj.host.username
+
+    @admin.display(description='Host MoMo #')
+    def host_momo(self, obj):
+        return getattr(getattr(obj.host, 'profile', None), 'momo_number', '') or '—'
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        # "Paid by" should only ever be a staff/admin user.
+        if db_field.name == 'paid_by':
+            kwargs['queryset'] = db_field.related_model.objects.filter(is_staff=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        # Auto-stamp the disbursement metadata when an admin flips a payout to
+        # "paid" on the change form (mirrors the bulk action).
+        if obj.status == 'paid' and obj.paid_at is None:
+            obj.paid_at = timezone.now()
+            if obj.paid_by is None:
+                obj.paid_by = request.user
+        super().save_model(request, obj, form, change)
+
+    @admin.action(description='Mark selected payouts as paid')
+    def mark_paid(self, request, queryset):
+        updated = queryset.filter(status='pending').update(
+            status='paid', paid_at=timezone.now(), paid_by=request.user,
+        )
+        self.message_user(request, f'{updated} payout(s) marked as paid.', messages.SUCCESS)
 
 
 @admin.register(WebhookLog)
