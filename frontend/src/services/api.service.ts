@@ -10,12 +10,14 @@ export {
   messagesAPI,
   notificationsAPI,
   paymentAPI,
+  payoutsAPI,
   propertiesAPI,
   reportsAPI,
   reviewsAPI,
   setTokens,
   suspensionsAPI,
   usersAPI,
+  viewingsAPI,
   wishlistsAPI,
 } from './api';
 export type { SavedCard } from './api';

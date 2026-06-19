@@ -1,7 +1,11 @@
 from django.urls import path
 from .views import (
     bookings_collection, booking_detail, pending_bookings,
-    confirm_booking, decline_booking, request_payment, my_payment_requests,
+    confirm_booking, decline_booking, admin_confirm_payment,
+    admin_payment_received_bookings,
+    request_payment, my_payment_requests,
+    viewing_slots, viewings_collection, reserve_from_viewing,
+    my_payouts,
     search_alerts, saved_search_detail,
     saved_searches, test_search, property_comparisons, comparison_detail,
     shared_comparison, add_to_comparison, remove_from_comparison
@@ -13,8 +17,16 @@ urlpatterns = [
     path('pending/', pending_bookings, name='pending_bookings'),
     path('<int:id>/confirm/', confirm_booking, name='confirm_booking'),
     path('<int:id>/decline/', decline_booking, name='decline_booking'),
+    path('<int:id>/confirm-payment/', admin_confirm_payment, name='admin_confirm_payment'),
+    path('admin/payment-received/', admin_payment_received_bookings, name='admin_payment_received_bookings'),
     path('<int:id>/request-payment/', request_payment, name='request_payment'),
     path('payment-requests/', my_payment_requests, name='my_payment_requests'),
+    # Viewing appointments (Path C)
+    path('viewings/', viewings_collection, name='viewings_collection'),
+    path('viewings/slots/<int:listing_id>/', viewing_slots, name='viewing_slots'),
+    path('viewings/<int:viewing_id>/reserve/', reserve_from_viewing, name='reserve_from_viewing'),
+    # Payouts (host)
+    path('payouts/', my_payouts, name='my_payouts'),
     path('searches/', saved_searches, name='saved_searches'),
     path('searches/<int:id>/', saved_search_detail, name='saved_search_detail'),
     path('searches/alerts/', search_alerts, name='search_alerts'),

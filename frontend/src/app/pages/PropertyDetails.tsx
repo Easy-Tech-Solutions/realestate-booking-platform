@@ -977,9 +977,26 @@ export function PropertyDetails() {
                     </div>
                   </div>
 
-                  <Button onClick={handleReserve} className="w-full mb-4" size="lg">
+                  <Button onClick={handleReserve} className="w-full mb-3" size="lg">
                     Reserve
                   </Button>
+
+                  {property.pricingType === 'monthly' && (
+                    <Button
+                      variant="outline"
+                      className="w-full mb-4"
+                      size="lg"
+                      onClick={() => {
+                        if (!isAuthenticated) {
+                          toast.error('Please log in to request a viewing');
+                          return;
+                        }
+                        navigate(`/rooms/${property.id}/viewing`, { state: { property } });
+                      }}
+                    >
+                      Request a viewing first
+                    </Button>
+                  )}
 
                   <p className="text-center text-sm text-muted-foreground mb-4">
                     You won't be charged yet

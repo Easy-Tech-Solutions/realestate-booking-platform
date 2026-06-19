@@ -48,6 +48,9 @@ export interface Property {
   createdAt: string;
   status?: 'draft' | 'published';
   hotelRooms?: HotelRoom[];
+  // Pricing model: 'monthly' marks a long-term rental (viewing flow available).
+  pricingType?: 'nightly' | 'monthly';
+  paymentSchedule?: string | null;
 }
 
 export interface Location {
@@ -111,6 +114,50 @@ export interface Booking {
   specialRequests?: string;
   hotelRoomId?: string;
   hotelRoom?: HotelRoom;
+  // Revised booking flow fields
+  requiresViewing?: boolean;
+  hostConfirmDeadline?: string;
+  hostConfirmedAt?: string;
+  paymentDueAt?: string;
+  daysUntilExpiry?: number;
+  createdAt: string;
+}
+
+export type ViewingStatus =
+  | 'requested'
+  | 'fee_paid'
+  | 'scheduled'
+  | 'completed'
+  | 'reserved'
+  | 'cancelled'
+  | 'expired';
+
+export interface ViewingAppointment {
+  id: string;
+  listingId: string;
+  listingTitle: string;
+  viewingDate: string;
+  status: ViewingStatus;
+  statusDisplay: string;
+  viewingFee: number;
+  isFeePaid: boolean;
+  feePaidAt?: string;
+  scheduledAt?: string;
+  bookingId?: string;
+  createdAt: string;
+}
+
+export interface Payout {
+  id: string;
+  bookingId: string;
+  listingTitle: string;
+  hostName: string;
+  grossAmount: number;
+  serviceFeeAmount: number;
+  netAmount: number;
+  currency: string;
+  status: 'pending' | 'paid' | 'cancelled';
+  paidAt?: string;
   createdAt: string;
 }
 
@@ -255,11 +302,18 @@ export type PropertyType =
   | 'yurt';
 
 export type BookingStatus =
-  | 'pending'
-  | 'confirmed'
+  // Revised booking flow
+  | 'pending_host'        // reserved free; awaiting host confirmation
+  | 'awaiting_payment'    // host confirmed; listing pulled; 10-day pay window
+  | 'payment_received'    // guest paid; awaiting admin confirmation
+  | 'confirmed'           // admin confirmed; host contact shared
   | 'declined'
+  | 'expired_unconfirmed' // host did not confirm in time
+  | 'expired_unpaid'      // guest did not pay in time; listing relisted
   | 'cancelled'
-  | 'completed';
+  | 'completed'
+  // Legacy (kept so old rows/UI still resolve)
+  | 'pending';
 
 export type PaymentStatus = 
   | 'pending' 
