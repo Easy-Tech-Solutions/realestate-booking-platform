@@ -80,6 +80,7 @@ export function normalizeListing(l: any): Property {
     hotelRooms: Array.isArray(l.hotel_rooms) ? l.hotel_rooms.map(normalizeHotelRoom) : undefined,
     pricingType: (l.pricing_type as 'nightly' | 'monthly') || 'nightly',
     paymentSchedule: l.payment_schedule ?? null,
+    leaseTermMonths: l.lease_term_months ?? null,
   };
 }
 

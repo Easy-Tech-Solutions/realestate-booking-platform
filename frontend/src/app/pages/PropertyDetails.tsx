@@ -27,6 +27,12 @@ import { fallbackIcon, iconMap } from '../../core/icon-map';
 import { queryKeys } from '../../hooks/queries/keys';
 import { LiberiaMap } from '../components/LiberiaMap';
 
+function addMonths(d: Date, months: number): Date {
+  const x = new Date(d);
+  x.setMonth(x.getMonth() + months);
+  return x;
+}
+
 function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [hovered, setHovered] = useState(0);
   return (
@@ -85,6 +91,9 @@ export function PropertyDetails() {
     return () => clearInterval(timer);
   }, [isAutoPlaying, propertyQuery.data?.images?.length]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  // Long-term (monthly) listings: the guest picks a single move-in date and the
+  // end date is derived from the host's fixed lease term.
+  const [moveInDate, setMoveInDate] = useState<Date | undefined>();
   const [guests, setGuests] = useState(2);
 
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -105,15 +114,25 @@ export function PropertyDetails() {
   });
   const [selectedRoom, setSelectedRoom] = useState<HotelRoom | null>(null);
   const [roomQuantity, setRoomQuantity] = useState(1);
+  // Long-term listings derive the date range from move-in + lease term; nightly
+  // listings use the calendar range. Everything downstream (pricing, reserve)
+  // reads these effective dates.
+  const isMonthly = propertyQuery.data?.pricingType === 'monthly';
+  const leaseMonths = propertyQuery.data?.leaseTermMonths || 12;
+  const effFrom = isMonthly ? moveInDate : dateRange?.from;
+  const effTo = isMonthly
+    ? (moveInDate ? addMonths(moveInDate, leaseMonths) : undefined)
+    : dateRange?.to;
+
   const pricingQuery = usePropertyPricing(
     id,
-    dateRange?.from?.toISOString().split('T')[0],
-    dateRange?.to?.toISOString().split('T')[0],
+    effFrom?.toISOString().split('T')[0],
+    effTo?.toISOString().split('T')[0],
     selectedRoom?.id,
   );
 
-  const startDateStr = dateRange?.from?.toISOString().split('T')[0];
-  const endDateStr = dateRange?.to?.toISOString().split('T')[0];
+  const startDateStr = effFrom?.toISOString().split('T')[0];
+  const endDateStr = effTo?.toISOString().split('T')[0];
   const isHotel = propertyQuery.data?.propertyType === 'hotels';
 
   const roomAvailabilityQuery = useQuery({
@@ -229,8 +248,8 @@ export function PropertyDetails() {
       toast.error("You can't book your own listing.");
       return;
     }
-    if (!dateRange?.from || !dateRange?.to) {
-      toast.error('Please select check-in and check-out dates');
+    if (!effFrom || !effTo) {
+      toast.error(isMonthly ? 'Please select a move-in date' : 'Please select check-in and check-out dates');
       return;
     }
     const hotelRooms = propertyQuery.data?.hotelRooms ?? [];
@@ -239,7 +258,7 @@ export function PropertyDetails() {
       return;
     }
     navigate('/book', {
-      state: { property, checkIn: dateRange.from, checkOut: dateRange.to, guests, pricing, selectedRoom, roomQuantity },
+      state: { property, checkIn: effFrom, checkOut: effTo, guests, pricing, selectedRoom, roomQuantity },
     });
   };
 
@@ -662,24 +681,48 @@ export function PropertyDetails() {
                 </>
               )}
 
-              {/* Calendar */}
+              {/* Date selection */}
               <div>
-                <h2 className="text-2xl font-semibold mb-6">Select dates</h2>
-                <div className="flex justify-center">
-                  <Calendar
-                    mode="range"
-                    selected={dateRange}
-                    onSelect={handleDateRangeSelect}
-                    onDayClick={handleDayClick}
-                    modifiers={{ booked: isBookedDate }}
-                    modifiersClassNames={{
-                      booked: 'line-through opacity-50 text-muted-foreground',
-                    }}
-                    numberOfMonths={2}
-                    disabled={isPastDate}
-                    className="border rounded-xl p-4"
-                  />
-                </div>
+                {isMonthly ? (
+                  <>
+                    <h2 className="text-2xl font-semibold mb-2">Choose your move-in date</h2>
+                    <p className="text-muted-foreground mb-6 text-sm">
+                      This is a {leaseMonths === 12 ? '1-year' : leaseMonths === 24 ? '2-year' : leaseMonths === 36 ? '3-year' : `${leaseMonths}-month`} lease.
+                      {moveInDate && effTo && (
+                        <> Lease runs {formatDate(moveInDate, 'MMM dd, yyyy')} – {formatDate(effTo, 'MMM dd, yyyy')}.</>
+                      )}
+                    </p>
+                    <div className="flex justify-center">
+                      <Calendar
+                        mode="single"
+                        selected={moveInDate}
+                        onSelect={(d) => setMoveInDate(d)}
+                        numberOfMonths={2}
+                        disabled={isPastDate}
+                        className="border rounded-xl p-4"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-semibold mb-6">Select dates</h2>
+                    <div className="flex justify-center">
+                      <Calendar
+                        mode="range"
+                        selected={dateRange}
+                        onSelect={handleDateRangeSelect}
+                        onDayClick={handleDayClick}
+                        modifiers={{ booked: isBookedDate }}
+                        modifiersClassNames={{
+                          booked: 'line-through opacity-50 text-muted-foreground',
+                        }}
+                        numberOfMonths={2}
+                        disabled={isPastDate}
+                        className="border rounded-xl p-4"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <Separator />
@@ -946,15 +989,15 @@ export function PropertyDetails() {
                   <div className="space-y-3 mb-4">
                     <div className="grid grid-cols-2 border border-border rounded-xl overflow-hidden">
                       <div className="p-3 border-r border-border">
-                        <label className="text-xs font-semibold block mb-1">CHECK-IN</label>
+                        <label className="text-xs font-semibold block mb-1">{isMonthly ? 'MOVE-IN' : 'CHECK-IN'}</label>
                         <p className="text-sm">
-                          {dateRange?.from ? formatDate(dateRange.from, 'MM/dd/yyyy') : 'Add date'}
+                          {effFrom ? formatDate(effFrom, 'MM/dd/yyyy') : 'Add date'}
                         </p>
                       </div>
                       <div className="p-3">
-                        <label className="text-xs font-semibold block mb-1">CHECKOUT</label>
+                        <label className="text-xs font-semibold block mb-1">{isMonthly ? 'LEASE ENDS' : 'CHECKOUT'}</label>
                         <p className="text-sm">
-                          {dateRange?.to ? formatDate(dateRange.to, 'MM/dd/yyyy') : 'Add date'}
+                          {effTo ? formatDate(effTo, 'MM/dd/yyyy') : 'Add date'}
                         </p>
                       </div>
                     </div>
