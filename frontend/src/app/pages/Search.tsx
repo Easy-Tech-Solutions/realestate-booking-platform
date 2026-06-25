@@ -174,7 +174,7 @@ export function Search() {
                               >
                                 {p.title}
                               </button>
-                              <p className="text-xs text-gray-500">{formatCurrency(p.price)}/night</p>
+                              <p className="text-xs text-gray-500">{formatCurrency(p.price)}/{p.pricingType === 'monthly' ? 'month' : 'night'}</p>
                             </Popup>
                           </Marker>
                         ) : null)}

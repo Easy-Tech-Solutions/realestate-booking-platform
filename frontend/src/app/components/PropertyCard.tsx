@@ -158,7 +158,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
 
           <div className="pt-1">
             <span className="font-semibold">{formatCurrency(property.price)}</span>
-            <span className="text-muted-foreground"> night</span>
+            <span className="text-muted-foreground"> {property.pricingType === 'monthly' ? 'month' : 'night'}</span>
           </div>
         </div>
       </motion.div>

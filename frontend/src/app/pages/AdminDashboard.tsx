@@ -453,7 +453,7 @@ export function AdminDashboard() {
                             </div>
                           </TableCell>
                           <TableCell>{p.host?.firstName} {p.host?.lastName}</TableCell>
-                          <TableCell>{formatCurrency(p.price)}/night</TableCell>
+                          <TableCell>{formatCurrency(p.price)}/{p.pricingType === 'monthly' ? 'month' : 'night'}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Button variant="outline" size="sm" onClick={() => navigate(`/rooms/${p.id}`)}>

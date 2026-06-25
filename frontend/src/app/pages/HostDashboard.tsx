@@ -469,7 +469,7 @@ function EditPropertyDialog({
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pricing</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Base price / night (USD)</Label>
+            <Label>Base price / {property.pricingType === 'monthly' ? 'month' : 'night'} (USD)</Label>
             <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
           </div>
           <div className="space-y-2">
@@ -975,7 +975,7 @@ export function HostDashboard() {
                     <p className="text-sm text-muted-foreground truncate">
                       {property.location.city}, {property.location.state} · {property.rating.toFixed(1)}★ · {property.reviewCount} reviews
                     </p>
-                    <p className="text-sm font-semibold mt-1">{formatCurrency(property.price)}/night</p>
+                    <p className="text-sm font-semibold mt-1">{formatCurrency(property.price)}/{property.pricingType === 'monthly' ? 'month' : 'night'}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 flex-shrink-0">
