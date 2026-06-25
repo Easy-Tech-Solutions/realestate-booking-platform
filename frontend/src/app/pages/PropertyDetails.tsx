@@ -216,9 +216,15 @@ export function PropertyDetails() {
     }
   };
 
+  const isOwner = !!user && !!property && String(user.id) === String(property.hostId);
+
   const handleReserve = () => {
     if (!isAuthenticated) {
       toast.error('Please log in to make a reservation');
+      return;
+    }
+    if (isOwner) {
+      toast.error("You can't book your own listing.");
       return;
     }
     if (!dateRange?.from || !dateRange?.to) {
@@ -977,30 +983,39 @@ export function PropertyDetails() {
                     </div>
                   </div>
 
-                  <Button onClick={handleReserve} className="w-full mb-3" size="lg">
-                    Reserve
-                  </Button>
+                  {isOwner ? (
+                    <div className="rounded-lg bg-secondary/40 p-4 text-center text-sm text-muted-foreground mb-4">
+                      This is your listing. Manage it from your{' '}
+                      <button className="underline font-medium" onClick={() => navigate('/host')}>host dashboard</button>.
+                    </div>
+                  ) : (
+                    <>
+                      <Button onClick={handleReserve} className="w-full mb-3" size="lg">
+                        Reserve
+                      </Button>
 
-                  {property.pricingType === 'monthly' && (
-                    <Button
-                      variant="outline"
-                      className="w-full mb-4"
-                      size="lg"
-                      onClick={() => {
-                        if (!isAuthenticated) {
-                          toast.error('Please log in to request a viewing');
-                          return;
-                        }
-                        navigate(`/rooms/${property.id}/viewing`, { state: { property } });
-                      }}
-                    >
-                      Request a viewing first
-                    </Button>
+                      {property.pricingType === 'monthly' && (
+                        <Button
+                          variant="outline"
+                          className="w-full mb-4"
+                          size="lg"
+                          onClick={() => {
+                            if (!isAuthenticated) {
+                              toast.error('Please log in to request a viewing');
+                              return;
+                            }
+                            navigate(`/rooms/${property.id}/viewing`, { state: { property } });
+                          }}
+                        >
+                          Request a viewing first
+                        </Button>
+                      )}
+
+                      <p className="text-center text-sm text-muted-foreground mb-4">
+                        You won't be charged yet
+                      </p>
+                    </>
                   )}
-
-                  <p className="text-center text-sm text-muted-foreground mb-4">
-                    You won't be charged yet
-                  </p>
 
                   {pricing && (
                     <>
@@ -1043,7 +1058,11 @@ export function PropertyDetails() {
             <p className="text-xs text-muted-foreground">{nights} nights · {formatCurrency(pricing.total)} total</p>
           )}
         </div>
-        <Button onClick={handleReserve} size="lg">Reserve</Button>
+        {isOwner ? (
+          <Button variant="outline" size="lg" onClick={() => navigate('/host')}>Your listing</Button>
+        ) : (
+          <Button onClick={handleReserve} size="lg">Reserve</Button>
+        )}
       </div>
 
       {/* Image Gallery Modal */}
