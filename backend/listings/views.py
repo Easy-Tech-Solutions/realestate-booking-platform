@@ -116,7 +116,11 @@ def listings_collection(request):
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         serializer = ListingSerializer(data=request.data)
         if serializer.is_valid():
-            listing = serializer.save(owner=request.user)
+            # No admin-review step for now: a submitted listing publishes
+            # immediately. Drafts (saved via "Save & exit") stay drafts. Forced
+            # here in the view so it can't fall back to a pending_review default.
+            new_status = 'draft' if request.data.get('status') == 'draft' else 'published'
+            listing = serializer.save(owner=request.user, status=new_status)
             return Response(ListingSerializer(listing, context={"request": request}).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -901,7 +905,7 @@ def hotel_room_image_detail(request, listing_id, room_id, image_id):
 def my_drafts(request):
     if not request.user.is_authenticated:
         return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-    drafts = Listing.objects.filter(owner=request.user, status='draft').order_by('-updated_at')
+    drafts = Listing.objects.filter(owner=request.user, status='draft', deleted_at__isnull=True).order_by('-updated_at')
     return Response(ListingSerializer(drafts, many=True, context={"request": request}).data)
 
 
@@ -910,7 +914,7 @@ def my_listings(request):
     """Authenticated host: see all own listings (all statuses)."""
     if not request.user.is_authenticated:
         return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-    items = Listing.objects.filter(owner=request.user).exclude(status='draft').order_by('-created_at')
+    items = Listing.objects.filter(owner=request.user, deleted_at__isnull=True).exclude(status='draft').order_by('-created_at')
     return Response(ListingSerializer(items, many=True, context={"request": request}).data)
 
 

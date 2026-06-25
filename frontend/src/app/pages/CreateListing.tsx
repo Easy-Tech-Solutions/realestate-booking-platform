@@ -48,6 +48,7 @@ type WizardStep =
   | 'discounts'
   | 'weekday_price'
   | 'weekend_price'
+  | 'charge_model'
   | 'monthly_price'
   | 'payment_schedule'
   | 'lease_term'
@@ -69,19 +70,19 @@ function getPropertyGroup(type: string): PropertyGroup {
 const STEPS_BY_GROUP: Record<PropertyGroup, WizardStep[]> = {
   long_term_rental: [
     'welcome', 'step1_intro', 'property_type', 'location',
-    'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
+    'basics', 'amenities', 'photos', 'title', 'highlights',
     'step3_intro', 'monthly_price', 'payment_schedule', 'lease_term',
     'safety', 'final_details',
   ],
   airbnb: [
     'welcome', 'step1_intro', 'property_type', 'privacy_type', 'location',
-    'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
+    'basics', 'amenities', 'photos', 'title', 'highlights',
     'step3_intro', 'discounts', 'weekday_price', 'weekend_price',
     'safety', 'final_details',
   ],
   residential: [
     'welcome', 'step1_intro', 'property_type', 'privacy_type', 'location',
-    'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
+    'basics', 'amenities', 'photos', 'title', 'highlights',
     'step3_intro', 'discounts', 'weekday_price', 'weekend_price',
     'safety', 'final_details',
   ],
@@ -101,6 +102,15 @@ const STEPS_BY_GROUP: Record<PropertyGroup, WizardStep[]> = {
     'amenities', 'photos', 'title', 'description',
     'step3_intro', 'discounts', 'weekday_price', 'final_details',
   ],
+};
+
+// Months of rent required upfront for each payment schedule. The lease term
+// must be at least this long (you can't demand a year's rent on a 6-month lease).
+const SCHEDULE_TO_MONTHS: Record<'monthly' | 'quarterly' | 'biannual' | 'annual', number> = {
+  monthly: 1,
+  quarterly: 3,
+  biannual: 6,
+  annual: 12,
 };
 
 const HOTEL_AMENITIES = [
@@ -296,7 +306,7 @@ export function CreateListing() {
     propertyType: 'apartment',
     privacyType: 'entire_place',
 
-    country: 'Rwanda',
+    country: 'Liberia',
     address1: '',
     address2: '',
     city: '',
@@ -334,6 +344,7 @@ export function CreateListing() {
     weekdayBasePrice: 42,
     weekendPremiumPercent: 1,
 
+    pricingModel: 'monthly' as 'monthly' | 'nightly',
     monthlyPrice: 500,
     paymentSchedule: 'monthly' as 'monthly' | 'quarterly' | 'biannual' | 'annual',
     leaseTermMonths: 12 as 6 | 12 | 24 | 36,
@@ -348,9 +359,36 @@ export function CreateListing() {
   });
 
   const propertyGroup = useMemo(() => getPropertyGroup(form.propertyType), [form.propertyType]);
-  const steps = useMemo(() => STEPS_BY_GROUP[propertyGroup], [propertyGroup]);
+  const steps = useMemo(() => {
+    // For long-term rentals the host first picks how they charge (per month or
+    // per night), then we show the matching pricing steps.
+    if (propertyGroup === 'long_term_rental') {
+      const pricingSteps: WizardStep[] = form.pricingModel === 'nightly'
+        ? ['weekday_price', 'weekend_price']
+        : ['monthly_price', 'payment_schedule', 'lease_term'];
+      return [
+        'welcome', 'step1_intro', 'property_type', 'location',
+        'basics', 'amenities', 'photos', 'title', 'highlights',
+        'step3_intro', 'charge_model', ...pricingSteps,
+        'safety', 'final_details',
+      ] as WizardStep[];
+    }
+    return STEPS_BY_GROUP[propertyGroup];
+  }, [propertyGroup, form.pricingModel]);
   const currentStep = steps[stepIndex];
   const groupLabels = GROUP_LABELS[propertyGroup];
+
+  // Keep the lease term valid for the chosen payment schedule: if the host
+  // raises the schedule (e.g. to annual) past the current term, bump the term
+  // up to the shortest still-valid option.
+  useEffect(() => {
+    const min = SCHEDULE_TO_MONTHS[form.paymentSchedule];
+    if (form.leaseTermMonths < min) {
+      const next = ([6, 12, 24, 36] as const).find((m) => m >= min) ?? 36;
+      update({ leaseTermMonths: next });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.paymentSchedule]);
 
   const currentAmenities = useMemo(() => {
     if (propertyGroup === 'hotel') return HOTEL_AMENITIES;
@@ -421,7 +459,7 @@ export function CreateListing() {
       payload.append('address', composedAddress || form.address1 || '');
       payload.append('city', form.city || '');
       payload.append('state', form.state || '');
-      payload.append('country', form.country || 'Rwanda');
+      payload.append('country', form.country || 'Liberia');
       payload.append('price', String(form.weekdayBasePrice || 0));
       payload.append('amenities', JSON.stringify(form.amenities));
       payload.append('highlights', JSON.stringify(form.highlights));
@@ -648,9 +686,12 @@ export function CreateListing() {
       payload.append('city', form.city);
       payload.append('state', form.state);
       payload.append('country', form.country);
-      payload.append('price', String(propertyGroup === 'long_term_rental' ? form.monthlyPrice : form.weekdayBasePrice));
-      payload.append('pricing_type', propertyGroup === 'long_term_rental' ? 'monthly' : 'nightly');
-      if (propertyGroup === 'long_term_rental') {
+      // A long-term listing is only "monthly" if the host chose that model;
+      // they can also publish a long-term property for per-night stays.
+      const isMonthlyListing = propertyGroup === 'long_term_rental' && form.pricingModel === 'monthly';
+      payload.append('price', String(isMonthlyListing ? form.monthlyPrice : form.weekdayBasePrice));
+      payload.append('pricing_type', isMonthlyListing ? 'monthly' : 'nightly');
+      if (isMonthlyListing) {
         payload.append('payment_schedule', form.paymentSchedule);
         payload.append('lease_term_months', String(form.leaseTermMonths));
       }
@@ -726,7 +767,7 @@ export function CreateListing() {
       }
 
       localStorage.removeItem(DRAFT_KEY);
-      toast.success('Listing submitted for review! Our team will approve it shortly.');
+      toast.success('Listing published! It\'s now live for guests.');
       navigate('/host');
     } catch (error: any) {
       if (error?.status === 401) {
@@ -1475,8 +1516,9 @@ export function CreateListing() {
                 id="weekday-price-input"
                 type="number"
                 min={10}
-                value={form.weekdayBasePrice}
-                onChange={(e) => update({ weekdayBasePrice: Math.max(10, Number(e.target.value) || 10) })}
+                value={form.weekdayBasePrice || ''}
+                onChange={(e) => update({ weekdayBasePrice: e.target.value === '' ? 0 : Number(e.target.value) })}
+                onBlur={() => { if (!form.weekdayBasePrice || form.weekdayBasePrice < 10) update({ weekdayBasePrice: 10 }); }}
                 className="mt-2 text-center text-lg"
               />
             </div>
@@ -1518,6 +1560,43 @@ export function CreateListing() {
           </section>
         )}
 
+        {currentStep === 'charge_model' && (
+          <section className="max-w-3xl mx-auto py-8">
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">How do you charge?</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">
+              Choose whether tenants pay per month (long-term lease) or per night (short stays).
+            </p>
+            <div className="space-y-4 max-w-xl">
+              {([
+                { value: 'monthly', label: 'Per month', description: 'Long-term rental — tenants commit to a lease and pay monthly rent.' },
+                { value: 'nightly', label: 'Per night', description: 'Short stays — guests book nights, like an Airbnb.' },
+              ] as const).map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-colors ${
+                    form.pricingModel === opt.value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="pricingModel"
+                    value={opt.value}
+                    checked={form.pricingModel === opt.value}
+                    onChange={() => update({ pricingModel: opt.value })}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <div>
+                    <p className="text-xl font-semibold">{opt.label}</p>
+                    <p className="text-base text-muted-foreground">{opt.description}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </section>
+        )}
+
         {currentStep === 'monthly_price' && (
           <section className="max-w-3xl mx-auto py-8 text-center">
             <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Set your monthly rent</h2>
@@ -1540,8 +1619,9 @@ export function CreateListing() {
                 id="monthly-price-input"
                 type="number"
                 min={50}
-                value={form.monthlyPrice}
-                onChange={(e) => update({ monthlyPrice: Math.max(50, Number(e.target.value) || 50) })}
+                value={form.monthlyPrice || ''}
+                onChange={(e) => update({ monthlyPrice: e.target.value === '' ? 0 : Number(e.target.value) })}
+                onBlur={() => { if (!form.monthlyPrice || form.monthlyPrice < 50) update({ monthlyPrice: 50 }); }}
                 className="mt-2 text-center text-lg"
               />
             </div>
@@ -1587,7 +1667,11 @@ export function CreateListing() {
           </section>
         )}
 
-        {currentStep === 'lease_term' && (
+        {currentStep === 'lease_term' && (() => {
+          // The lease can't be shorter than the upfront payment period — you
+          // can't require, say, a year's rent upfront on a 6-month lease.
+          const minLeaseMonths = SCHEDULE_TO_MONTHS[form.paymentSchedule];
+          return (
           <section className="max-w-3xl mx-auto py-8">
             <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Lease term</h2>
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">
@@ -1599,13 +1683,17 @@ export function CreateListing() {
                 { value: 12, label: '1 year' },
                 { value: 24, label: '2 years' },
                 { value: 36, label: '3 years' },
-              ] as const).map((opt) => (
+              ] as const).map((opt) => {
+                const disabled = opt.value < minLeaseMonths;
+                return (
                 <label
                   key={opt.value}
-                  className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-colors ${
-                    form.leaseTermMonths === opt.value
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
+                  className={`flex items-center gap-4 p-4 border-2 rounded-xl transition-colors ${
+                    disabled
+                      ? 'border-border opacity-50 cursor-not-allowed'
+                      : form.leaseTermMonths === opt.value
+                        ? 'border-primary bg-primary/5 cursor-pointer'
+                        : 'border-border hover:border-primary/50 cursor-pointer'
                   }`}
                 >
                   <input
@@ -1614,16 +1702,22 @@ export function CreateListing() {
                     value={opt.value}
                     checked={form.leaseTermMonths === opt.value}
                     onChange={() => update({ leaseTermMonths: opt.value })}
+                    disabled={disabled}
                     className="w-4 h-4 accent-primary"
                   />
                   <div>
                     <p className="text-xl font-semibold">{opt.label}</p>
+                    {disabled && (
+                      <p className="text-sm text-muted-foreground">Too short for your {form.paymentSchedule} payment schedule</p>
+                    )}
                   </div>
                 </label>
-              ))}
+              );
+              })}
             </div>
           </section>
-        )}
+          );
+        })()}
 
         {currentStep === 'safety' && (
           <section className="max-w-3xl mx-auto py-8">

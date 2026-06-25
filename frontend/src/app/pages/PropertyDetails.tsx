@@ -262,6 +262,120 @@ export function PropertyDetails() {
     });
   };
 
+  // The checkout card is shared between the desktop sticky sidebar and the
+  // mobile layout (where it sits right below the calendar).
+  const bookingCard = (
+    <div className="border border-border rounded-xl p-4 sm:p-6 shadow-xl">
+      <div className="flex items-baseline gap-1 mb-4">
+        <span className="text-2xl font-semibold">
+          {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)}
+        </span>
+        <span className="text-muted-foreground">{selectedRoom ? 'night' : priceUnit}</span>
+        {selectedRoom && (
+          <span className="text-xs text-muted-foreground ml-1">· {selectedRoom.name}</span>
+        )}
+      </div>
+
+      <div className="space-y-3 mb-4">
+        <div className="grid grid-cols-2 border border-border rounded-xl overflow-hidden">
+          <div className="p-3 border-r border-border">
+            <label className="text-xs font-semibold block mb-1">{isMonthly ? 'MOVE-IN' : 'CHECK-IN'}</label>
+            <p className="text-sm">{effFrom ? formatDate(effFrom, 'MM/dd/yyyy') : 'Add date'}</p>
+          </div>
+          <div className="p-3">
+            <label className="text-xs font-semibold block mb-1">{isMonthly ? 'LEASE ENDS' : 'CHECKOUT'}</label>
+            <p className="text-sm">{effTo ? formatDate(effTo, 'MM/dd/yyyy') : 'Add date'}</p>
+          </div>
+        </div>
+
+        <div className="border border-border rounded-xl p-3">
+          <label className="text-xs font-semibold block mb-1">GUESTS</label>
+          <div className="flex items-center justify-between">
+            <span className="text-sm">{guests} guest{guests > 1 ? 's' : ''}</span>
+            <div className="flex items-center gap-2">
+              <button
+                aria-label="Decrease guests"
+                onClick={() => setGuests(g => Math.max(1, g - 1))}
+                className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
+                disabled={guests <= 1}
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <button
+                aria-label="Increase guests"
+                onClick={() => setGuests(g => Math.min(property.guests || 10, g + 1))}
+                className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
+                disabled={property.guests > 0 && guests >= property.guests}
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {isOwner ? (
+        <div className="rounded-lg bg-secondary/40 p-4 text-center text-sm text-muted-foreground mb-4">
+          This is your listing. Manage it from your{' '}
+          <button className="underline font-medium" onClick={() => navigate('/host')}>host dashboard</button>.
+        </div>
+      ) : (
+        <>
+          <Button onClick={handleReserve} className="w-full mb-3" size="lg">Reserve</Button>
+
+          {property.pricingType === 'monthly' && (
+            <Button
+              variant="outline"
+              className="w-full mb-4"
+              size="lg"
+              onClick={() => {
+                if (!isAuthenticated) {
+                  toast.error('Please log in to request a viewing');
+                  return;
+                }
+                navigate(`/rooms/${property.id}/viewing`, { state: { property } });
+              }}
+            >
+              Request a viewing first
+            </Button>
+          )}
+
+          <p className="text-center text-sm text-muted-foreground mb-4">You won't be charged yet</p>
+        </>
+      )}
+
+      {pricing && (
+        <>
+          <div className="space-y-3 mb-4">
+            <div className="flex justify-between text-sm">
+              <span className="underline">
+                {pricing.pricingType === 'monthly'
+                  ? `First ${pricing.monthsUpfront || 1} month${(pricing.monthsUpfront || 1) > 1 ? 's' : ''}`
+                  : `${formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)} x ${nights} nights`}
+              </span>
+              <span>{formatCurrency(pricing.subtotal)}</span>
+            </div>
+            {pricing.discount > 0 && (
+              <div className="flex justify-between text-sm text-green-700">
+                <span className="underline">{pricing.discountLabel || 'Discount'}</span>
+                <span>-{formatCurrency(pricing.discount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm">
+              <span className="underline">Service fee</span>
+              <span>{formatCurrency(pricing.serviceFee)}</span>
+            </div>
+          </div>
+          <Separator className="my-4" />
+          <div className="flex justify-between font-semibold">
+            <span>Total</span>
+            <span>{formatCurrency(pricing.total)}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <>
       <div className="min-h-screen bg-background pb-20">
@@ -725,6 +839,9 @@ export function PropertyDetails() {
                 )}
               </div>
 
+              {/* Checkout card — mobile only, directly below the calendar */}
+              <div className="lg:hidden">{bookingCard}</div>
+
               <Separator />
 
               {/* Reviews */}
@@ -972,126 +1089,11 @@ export function PropertyDetails() {
               </div>
             </div>
 
-            {/* Booking Widget - shown inline on mobile above content, sticky on desktop */}
-            <div className="lg:col-span-1 lg:order-2">
+            {/* Booking Widget — sticky sidebar on desktop. On mobile it's
+                rendered inline directly below the calendar (see above). */}
+            <div className="hidden lg:block lg:col-span-1 lg:order-2">
               <div className="sticky top-24">
-                <div className="border border-border rounded-xl p-4 sm:p-6 shadow-xl">
-                  <div className="flex items-baseline gap-1 mb-4">
-                    <span className="text-2xl font-semibold">
-                      {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)}
-                    </span>
-                    <span className="text-muted-foreground">{selectedRoom ? 'night' : priceUnit}</span>
-                    {selectedRoom && (
-                      <span className="text-xs text-muted-foreground ml-1">· {selectedRoom.name}</span>
-                    )}
-                  </div>
-
-                  <div className="space-y-3 mb-4">
-                    <div className="grid grid-cols-2 border border-border rounded-xl overflow-hidden">
-                      <div className="p-3 border-r border-border">
-                        <label className="text-xs font-semibold block mb-1">{isMonthly ? 'MOVE-IN' : 'CHECK-IN'}</label>
-                        <p className="text-sm">
-                          {effFrom ? formatDate(effFrom, 'MM/dd/yyyy') : 'Add date'}
-                        </p>
-                      </div>
-                      <div className="p-3">
-                        <label className="text-xs font-semibold block mb-1">{isMonthly ? 'LEASE ENDS' : 'CHECKOUT'}</label>
-                        <p className="text-sm">
-                          {effTo ? formatDate(effTo, 'MM/dd/yyyy') : 'Add date'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="border border-border rounded-xl p-3">
-                      <label className="text-xs font-semibold block mb-1">GUESTS</label>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">{guests} guest{guests > 1 ? 's' : ''}</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            aria-label="Decrease guests"
-                            onClick={() => setGuests(g => Math.max(1, g - 1))}
-                            className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
-                            disabled={guests <= 1}
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <button
-                            aria-label="Increase guests"
-                            onClick={() => setGuests(g => Math.min(property.guests || 10, g + 1))}
-                            className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
-                            disabled={property.guests > 0 && guests >= property.guests}
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {isOwner ? (
-                    <div className="rounded-lg bg-secondary/40 p-4 text-center text-sm text-muted-foreground mb-4">
-                      This is your listing. Manage it from your{' '}
-                      <button className="underline font-medium" onClick={() => navigate('/host')}>host dashboard</button>.
-                    </div>
-                  ) : (
-                    <>
-                      <Button onClick={handleReserve} className="w-full mb-3" size="lg">
-                        Reserve
-                      </Button>
-
-                      {property.pricingType === 'monthly' && (
-                        <Button
-                          variant="outline"
-                          className="w-full mb-4"
-                          size="lg"
-                          onClick={() => {
-                            if (!isAuthenticated) {
-                              toast.error('Please log in to request a viewing');
-                              return;
-                            }
-                            navigate(`/rooms/${property.id}/viewing`, { state: { property } });
-                          }}
-                        >
-                          Request a viewing first
-                        </Button>
-                      )}
-
-                      <p className="text-center text-sm text-muted-foreground mb-4">
-                        You won't be charged yet
-                      </p>
-                    </>
-                  )}
-
-                  {pricing && (
-                    <>
-                      <div className="space-y-3 mb-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="underline">
-                            {pricing.pricingType === 'monthly'
-                              ? `First ${pricing.monthsUpfront || 1} month${(pricing.monthsUpfront || 1) > 1 ? 's' : ''}`
-                              : `${formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)} x ${nights} nights`}
-                          </span>
-                          <span>{formatCurrency(pricing.subtotal)}</span>
-                        </div>
-                        {pricing.discount > 0 && (
-                          <div className="flex justify-between text-sm text-green-700">
-                            <span className="underline">{pricing.discountLabel || 'Discount'}</span>
-                            <span>-{formatCurrency(pricing.discount)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm">
-                          <span className="underline">Service fee</span>
-                          <span>{formatCurrency(pricing.serviceFee)}</span>
-                        </div>
-                      </div>
-                      <Separator className="my-4" />
-                      <div className="flex justify-between font-semibold">
-                        <span>Total</span>
-                        <span>{formatCurrency(pricing.total)}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
+                {bookingCard}
               </div>
             </div>
           </div>
