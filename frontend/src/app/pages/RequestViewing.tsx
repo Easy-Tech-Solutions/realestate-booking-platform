@@ -15,7 +15,10 @@ import { viewingsAPI, paymentAPI, propertiesAPI } from '../../services/api.servi
 import { getErrorMessage } from '../../services/api/shared/errors';
 
 const MOMO_POLL_INTERVAL_MS = 3000;
-const MOMO_POLL_TIMEOUT_MS = 3 * 60 * 1000;
+// MoMo is asynchronous — most approvals land within ~2 min. If it takes longer
+// we stop blocking the UI and tell the guest it's still processing (the webhook
+// reconciles it server-side); we never tell them it "failed".
+const MOMO_POLL_TIMEOUT_MS = 2 * 60 * 1000;
 
 const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 const isValidStripeKey = (key?: string): key is string =>
@@ -129,11 +132,22 @@ function ViewingForm() {
           if (s === 'failed') { toast.error('Payment was declined or failed.'); return; }
         } catch { /* keep polling */ }
       }
-      if (!confirmed) {
-        toast.error('Payment timed out. You can retry from your trips.');
-        return;
-      }
-      finish();
+      if (confirmed) { finish(); return; }
+
+      // Stopped polling without a definitive result. The payment may still
+      // complete via the gateway callback — check the viewing's actual state
+      // before deciding what to tell the guest. Never offer a "retry" (the fee
+      // is non-refundable; a retry would double-charge).
+      try {
+        const mine = await viewingsAPI.getMine();
+        if (mine.find((x) => x.id === viewing.id)?.isFeePaid) { finish(); return; }
+      } catch { /* fall through to processing message */ }
+
+      toast.info(
+        "Your payment is still processing — we'll confirm it shortly. Track it under My Viewings.",
+        { duration: 8000 }
+      );
+      navigate('/viewings');
     } catch (err) {
       toast.error(getErrorMessage(err) || 'Payment failed. Please try again.');
     } finally {

@@ -15,7 +15,10 @@ import { bookingsAPI, paymentAPI } from '../../services/api.service';
 import { getErrorMessage } from '../../services/api/shared/errors';
 
 const MOMO_POLL_INTERVAL_MS = 3000;
-const MOMO_POLL_TIMEOUT_MS = 3 * 60 * 1000;
+// MoMo is asynchronous — most approvals land within ~2 min. If it takes longer
+// we stop blocking and tell the guest it's still processing (the webhook
+// reconciles it server-side); we never tell them it "failed".
+const MOMO_POLL_TIMEOUT_MS = 2 * 60 * 1000;
 
 const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 const isValidStripeKey = (key?: string): key is string =>
@@ -151,11 +154,21 @@ function PaymentForm() {
           if (s === 'failed') { toast.error('Payment was declined or failed.'); return; }
         } catch { /* keep polling */ }
       }
-      if (!confirmed) {
-        toast.error('Payment timed out. You can retry from your trips.');
-        return;
-      }
-      finish();
+      if (confirmed) { finish(); return; }
+
+      // Stopped polling without a definitive result — the payment may still
+      // complete via the gateway callback. Check the booking's real state
+      // before messaging; never offer a blind "retry" that could double-charge.
+      try {
+        const fresh = await bookingsAPI.getById(bookingId!);
+        if (fresh.status === 'payment_received' || fresh.status === 'confirmed') { finish(); return; }
+      } catch { /* fall through */ }
+
+      toast.info(
+        "Your payment is still processing — we'll confirm it shortly. Track it under My Trips.",
+        { duration: 8000 }
+      );
+      navigate('/trips');
     } catch (err) {
       toast.error(getErrorMessage(err) || 'Payment failed. Please try again.');
     } finally {
