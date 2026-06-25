@@ -158,7 +158,15 @@ export function Trips() {
   return (
     <div className="min-h-screen bg-background py-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-20">
-        <h1 className="text-3xl font-semibold mb-8">My Bookings</h1>
+        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-8">
+          <h1 className="text-3xl font-semibold">My Bookings</h1>
+          <button
+            className="text-sm text-primary underline underline-offset-2"
+            onClick={() => navigate('/viewings')}
+          >
+            Looking for a property viewing? See My Viewings →
+          </button>
+        </div>
 
         {isLoading && <p className="text-muted-foreground mb-6">Loading your bookings...</p>}
 

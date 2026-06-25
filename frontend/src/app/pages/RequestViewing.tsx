@@ -78,7 +78,7 @@ function ViewingForm() {
 
   const finish = () => {
     toast.success('Viewing fee paid! Our team will schedule and confirm your appointment.');
-    navigate('/trips');
+    navigate('/viewings');
   };
 
   const handlePay = async () => {
