@@ -217,6 +217,8 @@ export function PropertyDetails() {
   };
 
   const isOwner = !!user && !!property && String(user.id) === String(property.hostId);
+  // Long-term (monthly) listings are priced per month; everything else per night.
+  const priceUnit = property?.pricingType === 'monthly' ? 'month' : 'night';
 
   const handleReserve = () => {
     if (!isAuthenticated) {
@@ -935,7 +937,7 @@ export function PropertyDetails() {
                     <span className="text-2xl font-semibold">
                       {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)}
                     </span>
-                    <span className="text-muted-foreground">night</span>
+                    <span className="text-muted-foreground">{selectedRoom ? 'night' : priceUnit}</span>
                     {selectedRoom && (
                       <span className="text-xs text-muted-foreground ml-1">· {selectedRoom.name}</span>
                     )}
@@ -1021,7 +1023,11 @@ export function PropertyDetails() {
                     <>
                       <div className="space-y-3 mb-4">
                         <div className="flex justify-between text-sm">
-                          <span className="underline">{formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)} x {nights} nights</span>
+                          <span className="underline">
+                            {pricing.pricingType === 'monthly'
+                              ? `First ${pricing.monthsUpfront || 1} month${(pricing.monthsUpfront || 1) > 1 ? 's' : ''}`
+                              : `${formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)} x ${nights} nights`}
+                          </span>
                           <span>{formatCurrency(pricing.subtotal)}</span>
                         </div>
                         {pricing.discount > 0 && (
@@ -1053,9 +1059,13 @@ export function PropertyDetails() {
       <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-white border-t border-border px-4 py-3 flex items-center justify-between shadow-lg">
         <div>
           <span className="text-lg font-semibold">{formatCurrency(property.price)}</span>
-          <span className="text-muted-foreground text-sm"> / night</span>
+          <span className="text-muted-foreground text-sm"> / {priceUnit}</span>
           {nights > 0 && pricing && (
-            <p className="text-xs text-muted-foreground">{nights} nights · {formatCurrency(pricing.total)} total</p>
+            <p className="text-xs text-muted-foreground">
+              {pricing.pricingType === 'monthly'
+                ? `${pricing.monthsUpfront || 1} month${(pricing.monthsUpfront || 1) > 1 ? 's' : ''} upfront · ${formatCurrency(pricing.total)} total`
+                : `${nights} nights · ${formatCurrency(pricing.total)} total`}
+            </p>
           )}
         </div>
         {isOwner ? (
