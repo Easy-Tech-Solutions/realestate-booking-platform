@@ -801,6 +801,105 @@ def notify_report_updated(report):
     )
 
 
+# ---- Host application helpers ------------------------------------------------
+
+def _notify_group(group_name, notification_type, title, message, data=None):
+    """Fan a notification out to every active member of a Django Group."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    recipients = User.objects.filter(groups__name=group_name, is_active=True).distinct()
+    for member in recipients:
+        create_notification(
+            user=member,
+            notification_type=notification_type,
+            title=title,
+            message=message,
+            data=data or {},
+        )
+
+
+def _host_application_data(application):
+    return {
+        'application_id': application.id,
+        'applicant_name': application.full_name,
+        'status':         application.status,
+    }
+
+
+def notify_host_application_submitted(application):
+    """A user submitted a host application — notify the Product Support Officers."""
+    from hostapplications.models import GROUP_PRODUCT_SUPPORT
+    _notify_group(
+        GROUP_PRODUCT_SUPPORT,
+        notification_type='host_application_submitted',
+        title='New Host Application',
+        message=(
+            f'{application.full_name} applied to become a host. '
+            f'Review the application to approve or decline it.'
+        ),
+        data=_host_application_data(application),
+    )
+
+
+def notify_host_application_advanced(application):
+    """
+    An application was approved at one stage — notify the next stage's reviewers.
+    Routed by the application's new status.
+    """
+    from hostapplications.models import (
+        HostApplication, GROUP_COMPLIANCE, GROUP_SUPERVISOR,
+    )
+    next_group = {
+        HostApplication.Status.PS_APPROVED:         GROUP_COMPLIANCE,
+        HostApplication.Status.COMPLIANCE_APPROVED: GROUP_SUPERVISOR,
+    }.get(application.status)
+    if not next_group:
+        return
+
+    _notify_group(
+        next_group,
+        notification_type='host_application_advanced',
+        title='Host Application Awaiting Review',
+        message=(
+            f"{application.full_name}'s host application has advanced to your stage. "
+            f'Please review it to approve or decline.'
+        ),
+        data=_host_application_data(application),
+    )
+
+
+def notify_host_application_declined(application):
+    """Notify the applicant that their application was declined, with the reason."""
+    create_notification(
+        user=application.applicant,
+        notification_type='host_application_declined',
+        title='Host Application Declined',
+        message=(
+            'Unfortunately your application to become a host was not approved. '
+            f'Reason: {application.decline_reason or "No reason provided."}'
+        ),
+        data={
+            'application_id': application.id,
+            'decline_reason': application.decline_reason,
+            'declined_stage': application.declined_stage,
+        },
+    )
+
+
+def notify_host_application_approved(application):
+    """Notify the applicant that they are now a host and can list properties."""
+    create_notification(
+        user=application.applicant,
+        notification_type='host_application_approved',
+        title="You're Approved — Welcome, Host!",
+        message=(
+            'Congratulations! Your application has been approved and your account '
+            'is now a host account. You can start listing your properties.'
+        ),
+        data={'application_id': application.id},
+    )
+
+
 def notify_phone_number_changed(user, old_number, new_number, network_provider):
     """
     Notify the user that their mobile wallet number was successfully changed.

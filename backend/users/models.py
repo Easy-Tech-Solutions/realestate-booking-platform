@@ -27,14 +27,20 @@ class User(AbstractUser):
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     def save(self, *args, **kwargs):
-        # Keep Django admin flags and app role aligned.
-        if self.is_superuser or self.is_staff or self.role == 'admin':
+        # A superuser, or anyone with the app-level 'admin' role, is always a
+        # full admin: staff + superuser. This keeps existing admins unchanged.
+        #
+        # NOTE: is_staff is deliberately NOT a trigger here. That lets us create
+        # limited-privilege staff (e.g. the Product Support / Compliance /
+        # Supervisor officers) as is_staff=True, is_superuser=False, role='user'
+        # — they reach the admin panel but only get the abilities granted by
+        # their Django Group, instead of bypassing every permission check as a
+        # superuser would. Officers also keep role='user' so they get no
+        # host/admin powers on the React frontend (which keys off role only).
+        if self.is_superuser or self.role == 'admin':
             self.role = 'admin'
             self.is_staff = True
             self.is_superuser = True
-        else:
-            self.is_staff = False
-            self.is_superuser = False
 
         super().save(*args, **kwargs)
 

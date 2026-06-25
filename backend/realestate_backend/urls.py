@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/newsletter/', include('newsletter.urls')),
     path('api/testimonials/', include('testimonials.urls')),
     path('api/support/', include('support.urls')),
+    path('api/host-applications/', include('hostapplications.urls')),
 ]
 
 if settings.DEBUG:
