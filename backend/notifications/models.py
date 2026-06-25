@@ -18,6 +18,7 @@ class NotificationType(models.TextChoices):
     RESERVATION_EXPIRED       = 'reservation_expired',       'Reservation Expired'              # → guest/host
     # Viewing appointments (Path C)
     VIEWING_REQUESTED  = 'viewing_requested',  'Viewing Requested'   # → admins
+    VIEWING_FEE_PAID   = 'viewing_fee_paid',   'Viewing Fee Paid'    # → guest (receipt)
     VIEWING_SCHEDULED  = 'viewing_scheduled',  'Viewing Scheduled'   # → guest
     # Payments
     PAYMENT_RECEIVED      = 'payment_received',      'Payment Received'         # → guest (paid)
