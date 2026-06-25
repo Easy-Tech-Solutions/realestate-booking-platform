@@ -50,6 +50,7 @@ type WizardStep =
   | 'weekend_price'
   | 'monthly_price'
   | 'payment_schedule'
+  | 'lease_term'
   | 'safety'
   | 'final_details';
 
@@ -69,7 +70,7 @@ const STEPS_BY_GROUP: Record<PropertyGroup, WizardStep[]> = {
   long_term_rental: [
     'welcome', 'step1_intro', 'property_type', 'location',
     'basics', 'amenities', 'photos', 'title', 'highlights', 'description',
-    'step3_intro', 'monthly_price', 'payment_schedule',
+    'step3_intro', 'monthly_price', 'payment_schedule', 'lease_term',
     'safety', 'final_details',
   ],
   airbnb: [
@@ -335,6 +336,7 @@ export function CreateListing() {
 
     monthlyPrice: 500,
     paymentSchedule: 'monthly' as 'monthly' | 'quarterly' | 'biannual' | 'annual',
+    leaseTermMonths: 12 as 6 | 12 | 24 | 36,
 
     exteriorCamera: false,
     noiseMonitor: false,
@@ -650,6 +652,7 @@ export function CreateListing() {
       payload.append('pricing_type', propertyGroup === 'long_term_rental' ? 'monthly' : 'nightly');
       if (propertyGroup === 'long_term_rental') {
         payload.append('payment_schedule', form.paymentSchedule);
+        payload.append('lease_term_months', String(form.leaseTermMonths));
       }
       payload.append('bedrooms', String(propertyGroup === 'hotel' || propertyGroup === 'commercial' ? 0 : form.bedrooms));
       payload.append('beds', String(propertyGroup === 'land' || propertyGroup === 'commercial' || propertyGroup === 'long_term_rental' ? 0 : propertyGroup === 'hotel' ? 0 : form.beds));
@@ -1577,6 +1580,44 @@ export function CreateListing() {
                   <div>
                     <p className="text-xl font-semibold">{opt.label}</p>
                     <p className="text-base text-muted-foreground">{opt.description}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {currentStep === 'lease_term' && (
+          <section className="max-w-3xl mx-auto py-8">
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">Lease term</h2>
+            <p className="text-base sm:text-2xl text-muted-foreground mb-8">
+              How long is the lease? This is the commitment length tenants agree to.
+            </p>
+            <div className="space-y-4 max-w-xl">
+              {([
+                { value: 6, label: '6 months' },
+                { value: 12, label: '1 year' },
+                { value: 24, label: '2 years' },
+                { value: 36, label: '3 years' },
+              ] as const).map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-colors ${
+                    form.leaseTermMonths === opt.value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="leaseTermMonths"
+                    value={opt.value}
+                    checked={form.leaseTermMonths === opt.value}
+                    onChange={() => update({ leaseTermMonths: opt.value })}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <div>
+                    <p className="text-xl font-semibold">{opt.label}</p>
                   </div>
                 </label>
               ))}

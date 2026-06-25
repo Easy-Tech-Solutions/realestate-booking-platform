@@ -51,6 +51,8 @@ export interface Property {
   // Pricing model: 'monthly' marks a long-term rental (viewing flow available).
   pricingType?: 'nightly' | 'monthly';
   paymentSchedule?: string | null;
+  // Lease length in months (long-term listings) — sets the booking end date.
+  leaseTermMonths?: number | null;
 }
 
 export interface Location {
