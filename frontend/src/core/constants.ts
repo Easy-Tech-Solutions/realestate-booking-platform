@@ -38,6 +38,8 @@ export const AMENITIES = [
   { id: 'gym', name: 'Gym', icon: 'Dumbbell', category: 'Facilities' },
   { id: 'parking', name: 'Free parking', icon: 'ParkingSquare', category: 'Basic' },
   { id: 'ev-charger', name: 'EV charger', icon: 'Zap', category: 'Parking' },
+  { id: 'front-porch', name: 'Front porch', icon: 'Home', category: 'Outdoor' },
+  { id: 'back-porch', name: 'Back porch', icon: 'Home', category: 'Outdoor' },
   { id: 'workspace', name: 'Dedicated workspace', icon: 'Laptop', category: 'Work' },
   { id: 'bbq', name: 'BBQ grill', icon: 'Flame', category: 'Outdoor' },
   { id: 'fireplace', name: 'Fireplace', icon: 'Flame', category: 'Indoor' },

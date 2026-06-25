@@ -280,7 +280,7 @@ def cancel_phone_change(request):
 def me_dashboard(request):
     user = request.user
 
-    my_listings = Listing.objects.filter(owner=user).order_by('-created_at')
+    my_listings = Listing.objects.filter(owner=user, deleted_at__isnull=True).order_by('-created_at')
     bookings_as_customer = Booking.objects.filter(customer=user).order_by('-requested_at')
     bookings_on_my_listings = Booking.objects.filter(listing__owner=user).order_by('-requested_at')
 
