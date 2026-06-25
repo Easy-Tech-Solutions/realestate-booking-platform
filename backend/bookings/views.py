@@ -77,6 +77,13 @@ def bookings_collection(request):
                     pk=request.data.get('listing')
                 )
 
+                # A host can't reserve their own listing.
+                if listing.owner_id == request.user.id:
+                    return Response(
+                        {'error': 'You cannot book your own listing.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
                 start      = serializer.validated_data['start_date']
                 end        = serializer.validated_data['end_date']
                 hotel_room = serializer.validated_data.get('hotel_room')
@@ -604,6 +611,11 @@ def viewings_collection(request):
         return Response({'error': 'listing and viewing_date are required'}, status=status.HTTP_400_BAD_REQUEST)
 
     listing = get_object_or_404(Listing, pk=listing_id)
+
+    # A host can't request a viewing of their own listing.
+    if listing.owner_id == request.user.id:
+        return Response({'error': 'You cannot request a viewing of your own listing.'}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
         viewing_date = _date.fromisoformat(date_str)
     except ValueError:
@@ -660,6 +672,9 @@ def reserve_from_viewing(request, viewing_id):
         viewing = ViewingAppointment.objects.select_related('listing').get(pk=viewing_id, guest=request.user)
     except ViewingAppointment.DoesNotExist:
         return Response({'error': 'Viewing not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if viewing.listing.owner_id == request.user.id:
+        return Response({'error': 'You cannot reserve your own listing.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if viewing.status != 'completed':
         return Response(

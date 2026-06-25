@@ -110,12 +110,25 @@ def payment_post_save(sender, instance, created, **kwargs):
     if old_status == new_status:
         return
 
-    if new_status == 'completed':
-        notify_payment_received(instance)
-    elif new_status == 'failed':
-        notify_payment_failed(instance)
-    elif new_status in ('refunded', 'partially_refunded'):
-        notify_payment_refunded(instance)
+    # These notifications are booking/rent specific (they read payment.booking).
+    # Viewing-fee payments have no booking — their messaging is handled in
+    # bookings.services.mark_viewing_fee_paid, so skip them here.
+    if not instance.booking_id:
+        return
+
+    # A notification failure must never roll back the payment save.
+    try:
+        if new_status == 'completed':
+            notify_payment_received(instance)
+        elif new_status == 'failed':
+            notify_payment_failed(instance)
+        elif new_status in ('refunded', 'partially_refunded'):
+            notify_payment_refunded(instance)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning(
+            'payment_post_save: notification failed for payment %s', instance.pk, exc_info=True
+        )
 
 
 # ---- Message signals ---------------------------------------------------------

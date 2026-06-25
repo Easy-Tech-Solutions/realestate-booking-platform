@@ -112,7 +112,14 @@ def mark_guest_paid(booking):
     """
     Guest completed payment — move to payment_received and notify admins so
     they can confirm and disburse. Called by the payment-confirmation flow.
+
+    Idempotent and non-downgrading: only advances a still-unpaid reservation, so
+    re-running it (reconciliation, duplicate webhook) never reverts a booking
+    that an admin has already confirmed/completed.
     """
+    ADVANCEABLE = {'awaiting_payment', 'pending_host', 'requested', 'payment_requested'}
+    if booking.status not in ADVANCEABLE:
+        return booking
     booking.status = 'payment_received'
     booking.save(update_fields=['status'])
     try:

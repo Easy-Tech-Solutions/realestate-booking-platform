@@ -104,12 +104,19 @@ class PaymentService:
             if result.get('success'):
                 mtn_status = result.get('status')  # 'pending' | 'completed' | 'failed'
 
-                if mtn_status == 'completed' and payment.status != 'completed':
-                    payment.status = 'completed'
-                    payment.completed_at = timezone.now()
-                    payment.gateway_response = result
-                    payment.save(update_fields=['status', 'completed_at', 'gateway_response'])
-                    cls._on_payment_confirmed(payment)
+                if mtn_status == 'completed':
+                    # Atomic so the payment-completed flag and its side effects
+                    # (mark viewing/booking) commit together — never one without
+                    # the other. _on_payment_confirmed runs even if the payment
+                    # was already marked completed, so a previously-failed side
+                    # effect self-heals on the next poll (it is idempotent).
+                    with transaction.atomic():
+                        if payment.status != 'completed':
+                            payment.status = 'completed'
+                            payment.completed_at = timezone.now()
+                            payment.gateway_response = result
+                            payment.save(update_fields=['status', 'completed_at', 'gateway_response'])
+                        cls._on_payment_confirmed(payment)
 
                 elif mtn_status == 'failed':
                     payment.status = 'failed'
@@ -130,10 +137,14 @@ class PaymentService:
         """
         with transaction.atomic():
             payment.gateway_response = payload
-            if mtn_status == 'SUCCESSFUL' and payment.status != 'completed':
-                payment.status = 'completed'
-                payment.completed_at = timezone.now()
-                payment.save(update_fields=['status', 'completed_at', 'gateway_response'])
+            if mtn_status == 'SUCCESSFUL':
+                if payment.status != 'completed':
+                    payment.status = 'completed'
+                    payment.completed_at = timezone.now()
+                    payment.save(update_fields=['status', 'completed_at', 'gateway_response'])
+                else:
+                    payment.save(update_fields=['gateway_response'])
+                # Idempotent — safe to run even if already completed.
                 cls._on_payment_confirmed(payment)
 
             elif mtn_status in ('FAILED', 'TIMEOUT'):

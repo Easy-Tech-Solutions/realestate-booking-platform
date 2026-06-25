@@ -521,6 +521,9 @@ def notify_payout_pending(payout):
 
 def notify_payment_received(payment):
     """Notify the payer (success confirmation) and the property owner (income alert)."""
+    # Booking/rent payments only — viewing-fee payments have no booking.
+    if not payment.booking_id:
+        return
     listing_title = payment.booking.listing.title
     currency_code = payment.currency.code
 
