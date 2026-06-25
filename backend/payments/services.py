@@ -169,7 +169,7 @@ class PaymentService:
         """
         if payment.purpose == 'viewing_fee' or payment.viewing_id:
             from bookings.services import mark_viewing_fee_paid
-            mark_viewing_fee_paid(payment.viewing)
+            mark_viewing_fee_paid(payment.viewing, payment=payment)
             return
 
         from bookings.services import mark_guest_paid

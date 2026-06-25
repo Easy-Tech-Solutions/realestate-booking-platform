@@ -478,6 +478,41 @@ def notify_viewing_requested(viewing):
     )
 
 
+def notify_viewing_fee_paid(viewing, payment=None):
+    """Receipt to the guest after their (non-refundable) viewing fee is paid.
+
+    Delivered in-app and by email (a notification-and-receipt email). The
+    `payment` gives the exact amount/method/reference; we fall back to the
+    viewing's stored fee if it isn't supplied.
+    """
+    amount = payment.amount if payment is not None else viewing.viewing_fee
+    amount_str = f'{Decimal(str(amount)):.2f}'
+    currency = payment.currency.code if (payment is not None and getattr(payment, 'currency', None)) else 'USD'
+    method = payment.get_payment_method_display() if payment is not None else ''
+    reference = str(payment.id) if payment is not None else ''
+
+    create_notification(
+        user=viewing.guest,
+        notification_type='viewing_fee_paid',
+        title='Viewing Fee Paid — Receipt',
+        message=(
+            f'We received your {amount_str} {currency} viewing fee for '
+            f'"{viewing.listing.title}". Our team will schedule and confirm your '
+            f'visit on {viewing.viewing_date}.'
+        ),
+        data={
+            'viewing_id':     viewing.id,
+            'listing_id':     viewing.listing.id,
+            'listing_title':  viewing.listing.title,
+            'viewing_date':   str(viewing.viewing_date),
+            'amount':         f'{Decimal(str(amount)):.2f}',
+            'currency':       currency,
+            'payment_method': method,
+            'payment_id':     reference,
+        },
+    )
+
+
 def notify_viewing_scheduled(viewing):
     """Admin scheduled/confirmed the viewing — notify the guest."""
     create_notification(

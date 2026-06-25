@@ -88,10 +88,12 @@ def host_confirm_reservation(booking):
     return booking
 
 
-def mark_viewing_fee_paid(viewing):
+def mark_viewing_fee_paid(viewing, payment=None):
     """
     Mark a viewing's non-refundable fee as paid (called once a gateway confirms
-    the charge). Idempotent. Notifies admins so they can schedule the visit.
+    the charge). Idempotent — the notifications fire only on the real transition
+    so reconciliation/duplicate webhooks never double-send. Notifies admins (to
+    schedule) and sends the guest a receipt (in-app + email).
     """
     if viewing is None or viewing.is_fee_paid:
         return viewing
@@ -101,10 +103,11 @@ def mark_viewing_fee_paid(viewing):
         viewing.status = 'fee_paid'
     viewing.save(update_fields=['is_fee_paid', 'fee_paid_at', 'status'])
     try:
-        from notifications.services import notify_viewing_requested
-        notify_viewing_requested(viewing)
+        from notifications.services import notify_viewing_requested, notify_viewing_fee_paid
+        notify_viewing_requested(viewing)          # → admins (schedule it)
+        notify_viewing_fee_paid(viewing, payment)  # → guest (receipt)
     except Exception as exc:
-        logger.warning('Could not notify admins of paid viewing %s: %s', viewing.pk, exc)
+        logger.warning('Could not send notifications for paid viewing %s: %s', viewing.pk, exc)
     return viewing
 
 
