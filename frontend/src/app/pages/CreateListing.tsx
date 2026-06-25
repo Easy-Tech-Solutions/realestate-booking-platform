@@ -681,7 +681,8 @@ export function CreateListing() {
       payload.append('check_in_time', form.checkInTime);
       payload.append('check_out_time', form.checkOutTime);
       payload.append('is_available', 'true');
-      payload.append('status', 'pending_review');
+      // Listings publish immediately — no admin approval step for now.
+      payload.append('status', 'published');
 
       if (form.images[0]) {
         payload.append('main_image', form.images[0]);

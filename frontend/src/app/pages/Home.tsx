@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Search, Star, Quote, Navigation, Loader2, PenLine, X, ArrowRight, Car, Leaf, Landmark, Building2, Mail } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Search, Star, Quote, Navigation, Loader2, PenLine, X, ArrowRight, Car, Leaf, Landmark } from 'lucide-react';
 import bannerImage from '../../assets/banner.jpeg';
 import { useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -155,7 +155,20 @@ export function Home() {
   const { isAuthenticated, user } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
-  const [showBecomeHostDialog, setShowBecomeHostDialog] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
+  // When a logged-out user clicks "Try hosting", remember the intent so we can
+  // route them once they finish logging in / signing up via the dialog.
+  const [pendingHostRedirect, setPendingHostRedirect] = useState(false);
+
+  // Once the dialog-driven login/signup completes, send the user where "Try
+  // hosting" intended: hosts to their dashboard, everyone else to the host
+  // application form.
+  useEffect(() => {
+    if (pendingHostRedirect && isAuthenticated && user) {
+      setPendingHostRedirect(false);
+      navigate(user.isHost ? '/host' : '/become-a-host');
+    }
+  }, [pendingHostRedirect, isAuthenticated, user, navigate]);
   const [scrollPosition, setScrollPosition] = useState(0);
   const categoryScrollRef = React.useRef<HTMLDivElement>(null);
   const categoriesQuery = useQuery({
@@ -383,14 +396,20 @@ export function Home() {
                   <button
                     type="button"
                     onClick={() => {
-                      // Logged-in users go straight to the create-listing flow.
-                      // Logged-out clickers are sent to signup — most people
-                      // hitting this CTA for the first time don't have an
-                      // account yet, so defaulting to login adds friction.
-                      if (isAuthenticated) {
-                        navigate('/host/new');
+                      // Logged-out clickers get the signup dialog (not a full
+                      // page); after auth they're routed by the pending-host
+                      // redirect effect. Defaults to signup since most first-time
+                      // clickers don't have an account yet.
+                      if (!isAuthenticated) {
+                        setAuthMode('register');
+                        setPendingHostRedirect(true);
+                        setShowAuthDialog(true);
+                      } else if (user?.isHost) {
+                        // Already a host → straight to their Properties dashboard.
+                        navigate('/host');
                       } else {
-                        navigate('/login?mode=signup&next=' + encodeURIComponent('/host/new'));
+                        // Regular user → start the host application.
+                        navigate('/become-a-host');
                       }
                     }}
                     className="flex items-center gap-2 px-6 py-3 border border-border rounded-xl font-semibold text-foreground hover:border-primary hover:text-primary transition-colors"
@@ -658,9 +677,9 @@ export function Home() {
             </div>
             <button
               onClick={() => {
-                if (!isAuthenticated) { setShowAuthDialog(true); return; }
-                if (user?.isHost) { navigate('/host/new'); return; }
-                setShowBecomeHostDialog(true);
+                if (!isAuthenticated) { setAuthMode('register'); setPendingHostRedirect(true); setShowAuthDialog(true); return; }
+                if (user?.isHost) { navigate('/host'); return; }
+                navigate('/become-a-host');
               }}
               className="flex-shrink-0 px-8 py-4 bg-white text-primary font-semibold rounded-xl hover:bg-white/90 transition-colors"
             >
@@ -671,68 +690,16 @@ export function Home() {
       )}
 
       {/* ── Auth dialog (sign-in prompt) ── */}
-      <AuthDialog open={showAuthDialog} onClose={() => setShowAuthDialog(false)} />
-
-      {/* ── Become a Host dialog ── */}
-      {showBecomeHostDialog && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={() => setShowBecomeHostDialog(false)}
-        >
-          <div
-            className="relative bg-background rounded-2xl shadow-2xl w-full max-w-md p-8 border border-border"
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={() => setShowBecomeHostDialog(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Building2 className="w-8 h-8 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-semibold mb-2">Want to become a host?</h2>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  To list your property on HomeKonet you need host access. Our team reviews each
-                  application to ensure every listing is legitimate and properly documented.
-                </p>
-              </div>
-
-              <div className="w-full bg-muted/40 rounded-xl p-4 text-left space-y-2 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">How to apply</p>
-                <ol className="list-decimal list-inside space-y-1">
-                  <li>Send us your property ownership documents (title deed, lease agreement, or authorization letter).</li>
-                  <li>Our team reviews your submission — usually within 24–48 hours.</li>
-                  <li>Once approved, host access is granted and you can list your property.</li>
-                </ol>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 w-full pt-2">
-                <Link
-                  to="/contact"
-                  onClick={() => setShowBecomeHostDialog(false)}
-                  className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-primary text-primary-foreground font-semibold rounded-xl hover:bg-primary/90 transition-colors text-sm"
-                >
-                  <Mail className="w-4 h-4" /> Apply via Contact Us
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setShowBecomeHostDialog(false)}
-                  className="flex-1 px-5 py-3 border border-border rounded-xl font-semibold text-sm hover:border-primary hover:text-primary transition-colors"
-                >
-                  Maybe later
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <AuthDialog
+        open={showAuthDialog}
+        onClose={() => {
+          setShowAuthDialog(false);
+          // Abandoned the dialog without logging in → drop the host intent.
+          if (!isAuthenticated) setPendingHostRedirect(false);
+        }}
+        mode={authMode}
+        onModeChange={setAuthMode}
+      />
     </div>
   );
 }

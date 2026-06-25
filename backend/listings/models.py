@@ -100,7 +100,9 @@ class Listing(models.Model):
     )
     cancellation_policy = models.CharField(max_length=20, choices=CANCELLATION_POLICIES, default='flexible')
     is_available = models.BooleanField(default=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending_review')
+    # Listings publish immediately — no admin approval step for now. (Set to
+    # 'pending_review' to re-enable the review queue + approve/reject flow.)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='published')
     # Soft-delete marker. Set when the host clicks "Delete listing". The row
     # is kept so historical bookings/payments/reviews still resolve, but the
     # listing is hidden from every public surface (search, detail page,

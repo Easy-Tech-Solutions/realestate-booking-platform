@@ -110,6 +110,7 @@ INSTALLED_APPS = [
     "newsletter",
     "testimonials",
     "support",
+    "hostapplications",
 ]
 
 MIDDLEWARE = [
