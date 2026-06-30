@@ -20,6 +20,23 @@ class BookingAdmin(admin.ModelAdmin):
     readonly_fields = ['requested_at', 'confirmed_at', 'declined_at']
     actions = ['confirm_bookings', 'decline_bookings']
 
+    def save_model(self, request, obj, form, change):
+        """Flipping the status to 'confirmed' in the change form should create
+        the host payout too — not just via the 'Confirm payment' action — so an
+        admin editing the field directly still gets the disbursement record."""
+        old_status = form.initial.get('status') if change else None
+        super().save_model(request, obj, form, change)
+        if obj.status == 'confirmed' and old_status != 'confirmed' and not hasattr(obj, 'payout'):
+            from .services import create_payout_for_booking
+            payout = create_payout_for_booking(obj)
+            if payout:
+                try:
+                    from notifications.services import notify_payout_pending
+                    notify_payout_pending(payout)
+                except Exception:
+                    pass
+                self.message_user(request, f'Host payout created (net ${payout.net_amount}).', messages.SUCCESS)
+
     @admin.display(description='Customer', ordering='customer__last_name')
     def customer_full_name(self, obj):
         return obj.customer.get_full_name() or obj.customer.username
