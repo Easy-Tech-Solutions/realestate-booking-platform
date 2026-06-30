@@ -36,6 +36,37 @@ def _service_fee_rate() -> Decimal:
     return get_service_fee_rate()
 
 
+def _booking_amounts(booking):
+    """Canonical money breakdown for a booking.
+
+    Uses the amounts stored at reservation time (``total_price`` already
+    includes the guest service fee), which are correct for BOTH nightly and
+    monthly listings. The ``total_amount`` property is nightly-only
+    (price × days) and must NOT be used for monthly rentals — e.g. a $150/mo
+    listing on a 365-day lease would wrongly read $54,750. Falls back to
+    ``total_amount`` only for legacy rows with no stored price.
+    """
+    rate = _service_fee_rate()
+    if booking.total_price:
+        total = Decimal(str(booking.total_price))
+        guest_fee = Decimal(str(booking.service_fee or 0))
+    else:
+        subtotal_legacy = Decimal(str(booking.total_amount))
+        guest_fee = (subtotal_legacy * rate).quantize(Decimal('0.01'))
+        total = subtotal_legacy + guest_fee
+
+    subtotal = (total - guest_fee).quantize(Decimal('0.01'))
+    host_fee = (subtotal * rate).quantize(Decimal('0.01'))
+    host_received = (subtotal - host_fee).quantize(Decimal('0.01'))
+    return {
+        'subtotal': subtotal,                            # rent, excl. fees
+        'guest_service_fee': guest_fee.quantize(Decimal('0.01')),
+        'guest_total': total.quantize(Decimal('0.01')),  # what the guest pays
+        'host_service_fee': host_fee,
+        'host_received': host_received,                   # what the host nets
+    }
+
+
 # ---- Internal helpers --------------------------------------------------------
 
 def _get_or_create_preferences(user):
@@ -151,9 +182,10 @@ def notify_booking_requested(booking):
     owner         = booking.listing.owner
     customer_name = booking.customer.get_full_name() or booking.customer.username
 
-    booking_amount = Decimal(booking.total_amount)
-    host_service_fee = (booking_amount * _service_fee_rate()).quantize(Decimal('0.01'))
-    amount_received = (booking_amount - host_service_fee).quantize(Decimal('0.01'))
+    amounts = _booking_amounts(booking)
+    booking_amount = amounts['subtotal']
+    host_service_fee = amounts['host_service_fee']
+    amount_received = amounts['host_received']
 
     create_notification(
         user=owner,
@@ -183,9 +215,10 @@ def notify_booking_requested(booking):
 
 def notify_booking_submitted(booking):
     """Confirm to the guest that their booking request was submitted."""
-    booking_amount = Decimal(booking.total_amount)
-    service_fee = (booking_amount * _service_fee_rate()).quantize(Decimal('0.01'))
-    total = (booking_amount + service_fee).quantize(Decimal('0.01'))
+    amounts = _booking_amounts(booking)
+    booking_amount = amounts['subtotal']
+    service_fee = amounts['guest_service_fee']
+    total = amounts['guest_total']
 
     create_notification(
         user=booking.customer,
@@ -212,9 +245,10 @@ def notify_booking_submitted(booking):
 
 def notify_booking_confirmed(booking):
     """Notify the customer their booking was confirmed."""
-    booking_amount = Decimal(booking.total_amount)
-    service_fee = (booking_amount * _service_fee_rate()).quantize(Decimal('0.01'))
-    total = (booking_amount + service_fee).quantize(Decimal('0.01'))
+    amounts = _booking_amounts(booking)
+    booking_amount = amounts['subtotal']
+    service_fee = amounts['guest_service_fee']
+    total = amounts['guest_total']
 
     create_notification(
         user=booking.customer,
@@ -366,9 +400,10 @@ def notify_reservation_requested(booking):
 
 def notify_reservation_ready_to_pay(booking):
     """Host confirmed the reservation — tell the guest to pay within the window."""
-    booking_amount = Decimal(booking.total_amount)
-    service_fee = (booking_amount * _service_fee_rate()).quantize(Decimal('0.01'))
-    total = (booking_amount + service_fee).quantize(Decimal('0.01'))
+    amounts = _booking_amounts(booking)
+    booking_amount = amounts['subtotal']
+    service_fee = amounts['guest_service_fee']
+    total = amounts['guest_total']
 
     create_notification(
         user=booking.customer,
@@ -564,11 +599,12 @@ def notify_payment_received(payment):
 
     # Host-side numbers: the "booking amount" the guest paid for the stay
     # (excluding the guest's service fee, which stays with the platform),
-    # minus our 4% commission from the host.
-    booking_amount = Decimal(payment.booking.total_amount)
-    rate = _service_fee_rate()
-    host_service_fee = (booking_amount * rate).quantize(Decimal('0.01'))
-    amount_received = (booking_amount - host_service_fee).quantize(Decimal('0.01'))
+    # minus our commission from the host. Uses the stored booking totals so
+    # monthly listings are correct (not nightly price × days).
+    amounts = _booking_amounts(payment.booking)
+    booking_amount = amounts['subtotal']
+    host_service_fee = amounts['host_service_fee']
+    amount_received = amounts['host_received']
 
     # Guest sees what they actually paid (includes their 4% service fee).
     create_notification(
