@@ -411,7 +411,7 @@ def notify_reservation_ready_to_pay(booking):
         title='Reservation Confirmed — Complete Payment',
         message=(
             f'The host confirmed your reservation for "{booking.listing.title}". '
-            f'Complete your payment of {total} by '
+            f'Complete your payment of ${total} by '
             f'{booking.payment_due_at:%Y-%m-%d %H:%M UTC} to secure it.'
         ),
         data={
