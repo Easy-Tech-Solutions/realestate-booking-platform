@@ -85,9 +85,14 @@ def category_detail(request, id):
 @parser_classes([MultiPartParser, FormParser])
 def listings_collection(request):
     if request.method == "GET":
+        # Only publicly browsable listings: published, not soft-deleted, and
+        # still available. A listing is pulled (is_available=False) once a host
+        # confirms a reservation on it, so it must drop out of browse/search.
         items = ListingFilter(
             request.GET,
-            queryset=Listing.objects.filter(status='published', deleted_at__isnull=True),
+            queryset=Listing.objects.filter(
+                status='published', deleted_at__isnull=True, is_available=True,
+            ),
         )
         qs = items.qs
 
@@ -551,7 +556,10 @@ def nearby_listings(request):
 
     qs = (
         Listing.objects
-        .filter(status="published", latitude__isnull=False, longitude__isnull=False)
+        .filter(
+            status="published", deleted_at__isnull=True, is_available=True,
+            latitude__isnull=False, longitude__isnull=False,
+        )
         .exclude(latitude=0, longitude=0)
         .select_related("owner")
     )
