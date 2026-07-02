@@ -47,6 +47,27 @@ def _relist_listing(listing):
             logger.warning('Could not send listing-available notifications: %s', exc)
 
 
+def release_listing_if_unheld(listing, exclude_booking=None):
+    """
+    Relist a pulled listing, but only if no other booking still holds it.
+
+    A listing is pulled while a single booking holds it (awaiting_payment /
+    payment_received / confirmed). When that booking ends (cancel/decline/expire)
+    the listing should return to public — unless another booking picked it up in
+    the meantime. Idempotent.
+    """
+    holders = Booking.objects.filter(
+        listing=listing,
+        status__in=['awaiting_payment', 'payment_received', 'confirmed'],
+    )
+    if exclude_booking is not None:
+        holders = holders.exclude(pk=exclude_booking.pk)
+    if not holders.exists():
+        _relist_listing(listing)
+        return True
+    return False
+
+
 def _decline_competing_reservations(winning_booking):
     """
     Decline every other pending reservation on the same listing whose dates
@@ -172,14 +193,8 @@ def process_booking_decline(booking, decline_reason='', owner_notes=''):
         booking.owner_notes = owner_notes
     booking.save(update_fields=['status', 'declined_at', 'decline_reason', 'owner_notes'])
 
-    # Relist only if no other booking still holds this listing (a pulled listing
-    # is held by exactly one awaiting_payment/payment_received/confirmed booking).
-    still_held = Booking.objects.filter(
-        listing=booking.listing,
-        status__in=['awaiting_payment', 'payment_received', 'confirmed'],
-    ).exclude(pk=booking.pk).exists()
-    if not still_held:
-        _relist_listing(booking.listing)
+    # Relist if nothing else holds this listing.
+    release_listing_if_unheld(booking.listing, exclude_booking=booking)
 
     # The booking_post_save signal already sends the decline notification when
     # the status flips to 'declined' — no explicit call needed here.

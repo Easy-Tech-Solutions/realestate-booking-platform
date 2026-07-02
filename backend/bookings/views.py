@@ -193,9 +193,17 @@ def booking_detail(request, id):
                 {"error": f"A {booking.get_status_display().lower()} booking cannot be cancelled."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        was_holding = booking.status in ('awaiting_payment', 'payment_received', 'confirmed')
         booking.status = 'cancelled'
         booking.cancelled_at = timezone.now()
         booking.save(update_fields=['status', 'cancelled_at'])
+
+        # If this booking had the listing pulled from public view, put it back
+        # (unless another booking now holds it).
+        if was_holding:
+            from .services import release_listing_if_unheld
+            release_listing_if_unheld(booking.listing, exclude_booking=booking)
+
         return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_200_OK)
 
 
