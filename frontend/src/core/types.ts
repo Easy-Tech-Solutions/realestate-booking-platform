@@ -139,6 +139,8 @@ export interface ViewingAppointment {
   listingId: string;
   listingTitle: string;
   viewingDate: string;
+  viewingTime?: string;        // 'HH:MM:SS' start of the 2-hour block
+  viewingTimeRange?: string;   // e.g. '10:00 AM – 12:00 PM'
   status: ViewingStatus;
   statusDisplay: string;
   viewingFee: number;

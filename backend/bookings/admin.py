@@ -114,7 +114,11 @@ class BookingAdmin(admin.ModelAdmin):
 
 @admin.register(ViewingAppointment)
 class ViewingAppointmentAdmin(admin.ModelAdmin):
-    list_display = ['listing', 'guest_full_name', 'viewing_date', 'status', 'is_fee_paid', 'scheduled_at', 'created_at']
+    list_display = ['listing', 'guest_full_name', 'viewing_date', 'viewing_time_range', 'status', 'is_fee_paid', 'scheduled_at', 'created_at']
+
+    @admin.display(description='Time')
+    def viewing_time_range(self, obj):
+        return obj.viewing_time_range or '—'
     list_filter = ['status', 'is_fee_paid', 'viewing_date']
     search_fields = [
         'listing__title', 'guest__username', 'guest__first_name',

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router';
-import { ChevronRight, Smartphone, CalendarDays, ShieldCheck } from 'lucide-react';
+import { ChevronRight, Smartphone, CalendarDays, Clock, ShieldCheck } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Button } from '../components/ui/button';
@@ -25,6 +25,16 @@ const isValidStripeKey = (key?: string): key is string =>
   !!key && /^pk_(test|live)_[a-zA-Z0-9]{20,}$/.test(key);
 const stripePromise = isValidStripeKey(STRIPE_KEY) ? loadStripe(STRIPE_KEY) : null;
 
+// Six 2-hour viewing blocks, 10:00 AM–5:00 PM. Value is the 'HH:MM' start.
+const TIME_BLOCKS = [
+  { value: '10:00', label: '10:00 AM – 12:00 PM' },
+  { value: '11:00', label: '11:00 AM – 1:00 PM' },
+  { value: '12:00', label: '12:00 PM – 2:00 PM' },
+  { value: '13:00', label: '1:00 PM – 3:00 PM' },
+  { value: '14:00', label: '2:00 PM – 4:00 PM' },
+  { value: '15:00', label: '3:00 PM – 5:00 PM' },
+];
+
 function ViewingForm() {
   const params = useParams();
   const location = useLocation();
@@ -37,6 +47,7 @@ function ViewingForm() {
   const [slots, setSlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedTime, setSelectedTime] = useState<string>('');
 
   // The created (unpaid) viewing; once set, we move to the payment step.
   const [viewing, setViewing] = useState<ViewingAppointment | null>(null);
@@ -64,9 +75,17 @@ function ViewingForm() {
       toast.error('Please choose a Saturday');
       return;
     }
+    if (!selectedTime) {
+      toast.error('Please choose a viewing time');
+      return;
+    }
     setIsProcessing(true);
     try {
-      const v = await viewingsAPI.request({ listing: listingId, viewing_date: selectedDate });
+      const v = await viewingsAPI.request({
+        listing: listingId,
+        viewing_date: selectedDate,
+        viewing_time: selectedTime,
+      });
       setViewing(v);
       toast.success('Slot held — pay the viewing fee to confirm your request.');
     } catch (err) {
@@ -204,7 +223,31 @@ function ViewingForm() {
                 </RadioGroup>
               )}
 
-              <Button onClick={handleRequest} disabled={isProcessing || !selectedDate} className="w-full" size="lg">
+              {slots.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-primary" />
+                    <h2 className="text-lg font-semibold">Choose a time</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Each viewing is a 2-hour visit between 10:00 AM and 5:00 PM.</p>
+                  <RadioGroup value={selectedTime} onValueChange={setSelectedTime}>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {TIME_BLOCKS.map((block) => (
+                        <label
+                          key={block.value}
+                          htmlFor={`time-${block.value}`}
+                          className="flex items-center gap-3 p-3 border-2 border-border rounded-xl cursor-pointer hover:border-primary transition-colors has-[:checked]:border-primary has-[:checked]:bg-secondary/30"
+                        >
+                          <RadioGroupItem value={block.value} id={`time-${block.value}`} />
+                          <span className="text-sm font-medium">{block.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+
+              <Button onClick={handleRequest} disabled={isProcessing || !selectedDate || !selectedTime} className="w-full" size="lg">
                 {isProcessing ? 'Holding slot…' : 'Continue to payment'}
               </Button>
             </div>
@@ -214,7 +257,8 @@ function ViewingForm() {
               <div>
                 <h2 className="text-lg font-semibold mb-1">Pay the viewing fee</h2>
                 <p className="text-sm text-muted-foreground">
-                  {formatDate(viewing.viewingDate, 'EEEE, MMM dd, yyyy')} · {formatCurrency(viewing.viewingFee)} (non-refundable)
+                  {formatDate(viewing.viewingDate, 'EEEE, MMM dd, yyyy')}
+                  {viewing.viewingTimeRange ? ` · ${viewing.viewingTimeRange}` : ''} · {formatCurrency(viewing.viewingFee)} (non-refundable)
                 </p>
               </div>
 
