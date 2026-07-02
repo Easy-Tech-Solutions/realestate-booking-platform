@@ -121,7 +121,14 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      { path: 'trips', Component: Trips },
+      {
+        path: 'trips',
+        element: (
+          <ProtectedRoute>
+            <Trips />
+          </ProtectedRoute>
+        ),
+      },
       { path: 'wishlists', Component: Wishlists },
       {
         path: 'messages',
