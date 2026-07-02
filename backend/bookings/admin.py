@@ -37,6 +37,17 @@ class BookingAdmin(admin.ModelAdmin):
                     pass
                 self.message_user(request, f'Host payout created (net ${payout.net_amount}).', messages.SUCCESS)
 
+        # Changing the status to a "released" state should put the listing back
+        # on the market (unless another booking still holds it) — mirrors the
+        # guest-cancel / host-decline / expiry paths.
+        RELEASING = {'cancelled', 'declined', 'expired_unconfirmed', 'expired_unpaid'}
+        if change and obj.status in RELEASING and old_status not in RELEASING:
+            from .services import release_listing_if_unheld
+            if release_listing_if_unheld(obj.listing, exclude_booking=obj):
+                self.message_user(
+                    request, 'Listing is available again (no active booking holds it).', messages.INFO,
+                )
+
     @admin.display(description='Customer', ordering='customer__last_name')
     def customer_full_name(self, obj):
         return obj.customer.get_full_name() or obj.customer.username
