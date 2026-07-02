@@ -173,9 +173,18 @@ class ViewingAppointment(models.Model):
     # Statuses that still occupy a property's Saturday slot.
     ACTIVE_STATUSES = ['requested', 'fee_paid', 'scheduled', 'completed', 'reserved']
 
+    # Allowed viewing start times — six 2-hour blocks in a 10:00–17:00 window
+    # (the last block, 15:00, ends at 17:00). Stored as 'HH:MM' for validation.
+    START_TIMES = ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00']
+    VIEWING_BLOCK_HOURS = 2
+
     listing = models.ForeignKey('listings.Listing', on_delete=models.CASCADE, related_name='viewings')
     guest = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='viewings')
     viewing_date = models.DateField(help_text='Must be a Saturday.')
+    viewing_time = models.TimeField(
+        null=True, blank=True,
+        help_text='Start of the 2-hour viewing window (10:00–15:00).',
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='requested')
 
     # Viewing fee (flat, non-refundable). Snapshot of the fee at request time.
@@ -215,6 +224,23 @@ class ViewingAppointment(models.Model):
 
     def __str__(self):
         return f'Viewing: {self.guest.username} @ {self.listing.title} on {self.viewing_date} ({self.status})'
+
+    @staticmethod
+    def _fmt_time(t):
+        """Format a time as e.g. '10:00 AM' (cross-platform, no leading zero)."""
+        hour12 = t.hour % 12 or 12
+        return f"{hour12}:{t.minute:02d} {'AM' if t.hour < 12 else 'PM'}"
+
+    @property
+    def viewing_time_range(self):
+        """Human range for the 2-hour window, e.g. '10:00 AM – 12:00 PM'."""
+        if not self.viewing_time:
+            return ''
+        from datetime import datetime, timedelta
+        start = self.viewing_time
+        end = (datetime.combine(datetime.today(), start)
+               + timedelta(hours=self.VIEWING_BLOCK_HOURS)).time()
+        return f'{self._fmt_time(start)} – {self._fmt_time(end)}'
 
 
 class SavedSearch(models.Model):

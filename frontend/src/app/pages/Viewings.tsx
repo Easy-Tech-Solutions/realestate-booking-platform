@@ -94,6 +94,7 @@ export function Viewings() {
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                       <CalendarDays className="w-4 h-4" />
                       {formatDate(v.viewingDate, 'EEEE, MMM dd, yyyy')}
+                      {v.viewingTimeRange ? ` · ${v.viewingTimeRange}` : ''}
                     </div>
                     {!v.isFeePaid && v.status === 'requested' && (
                       <p className="text-sm text-yellow-700 mt-2">

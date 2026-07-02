@@ -230,6 +230,8 @@ export function normalizeViewing(v: any): import('../../../core/types').ViewingA
     listingId: String(v.listing),
     listingTitle: v.listing_title || 'Property',
     viewingDate: v.viewing_date,
+    viewingTime: v.viewing_time || undefined,
+    viewingTimeRange: v.viewing_time_range || '',
     status: v.status,
     statusDisplay: v.status_display || v.status,
     viewingFee: Number(v.viewing_fee || 0),

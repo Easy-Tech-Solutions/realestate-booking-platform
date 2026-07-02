@@ -501,7 +501,8 @@ def notify_viewing_requested(viewing):
         title='New Viewing Request',
         message=(
             f'{guest_name} requested a viewing of "{viewing.listing.title}" '
-            f'on {viewing.viewing_date}. Schedule and confirm the appointment.'
+            f'on {viewing.viewing_date} ({viewing.viewing_time_range}). '
+            f'Schedule and confirm the appointment.'
         ),
         data={
             'viewing_id':    viewing.id,
@@ -509,6 +510,7 @@ def notify_viewing_requested(viewing):
             'listing_title': viewing.listing.title,
             'guest_name':    guest_name,
             'viewing_date':  str(viewing.viewing_date),
+            'viewing_time':  viewing.viewing_time_range,
         },
     )
 
@@ -533,13 +535,14 @@ def notify_viewing_fee_paid(viewing, payment=None):
         message=(
             f'We received your {amount_str} {currency} viewing fee for '
             f'"{viewing.listing.title}". Our team will schedule and confirm your '
-            f'visit on {viewing.viewing_date}.'
+            f'visit on {viewing.viewing_date} ({viewing.viewing_time_range}).'
         ),
         data={
             'viewing_id':     viewing.id,
             'listing_id':     viewing.listing.id,
             'listing_title':  viewing.listing.title,
             'viewing_date':   str(viewing.viewing_date),
+            'viewing_time':   viewing.viewing_time_range,
             'amount':         f'{Decimal(str(amount)):.2f}',
             'currency':       currency,
             'payment_method': method,
@@ -556,13 +559,15 @@ def notify_viewing_scheduled(viewing):
         title='Viewing Scheduled',
         message=(
             f'Your viewing of "{viewing.listing.title}" on {viewing.viewing_date} '
-            f'has been confirmed. A Home Konet representative will meet you there.'
+            f'({viewing.viewing_time_range}) has been confirmed. A Home Konet '
+            f'representative will meet you there.'
         ),
         data={
             'viewing_id':    viewing.id,
             'listing_id':    viewing.listing.id,
             'listing_title': viewing.listing.title,
             'viewing_date':  str(viewing.viewing_date),
+            'viewing_time':  viewing.viewing_time_range,
         },
     )
 

@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from datetime import timedelta, date as _date
+from datetime import timedelta, date as _date, time as _time
 from .models import (
     Booking, PaymentRequest, SavedSearch, SearchAlert, PropertyComparison,
     ComparisonItem, ViewingAppointment, HOST_CONFIRM_DAYS, PAYMENT_WINDOW_DAYS,
@@ -626,6 +626,17 @@ def viewings_collection(request):
     if viewing_date <= timezone.now().date():
         return Response({'error': 'Viewing date must be in the future'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Guest must pick one of the six 2-hour start blocks (10:00–15:00).
+    time_str = (request.data.get('viewing_time') or '').strip()
+    # Normalize 'HH:MM:SS' → 'HH:MM'.
+    time_str = time_str[:5]
+    if time_str not in ViewingAppointment.START_TIMES:
+        return Response(
+            {'error': 'Please choose a viewing time between 10:00 AM and 3:00 PM.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    viewing_time = _time.fromisoformat(time_str)
+
     from payments.models import get_viewing_fee
     try:
         with transaction.atomic():
@@ -644,6 +655,7 @@ def viewings_collection(request):
                 listing=listing,
                 guest=request.user,
                 viewing_date=viewing_date,
+                viewing_time=viewing_time,
                 viewing_fee=get_viewing_fee(),
                 guest_notes=request.data.get('guest_notes', ''),
             )

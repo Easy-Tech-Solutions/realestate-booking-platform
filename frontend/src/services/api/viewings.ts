@@ -22,6 +22,7 @@ export const viewingsAPI = {
   request: async (payload: {
     listing: string;
     viewing_date: string;
+    viewing_time: string; // 'HH:MM' — one of the six 2-hour start blocks
     guest_notes?: string;
   }): Promise<ViewingAppointment> => {
     const data = await fetchWithAuth('/api/bookings/viewings/', {

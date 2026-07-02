@@ -76,12 +76,14 @@ class ViewingAppointmentSerializer(serializers.ModelSerializer):
     listing_title = serializers.CharField(source='listing.title', read_only=True)
     guest_username = serializers.CharField(source='guest.username', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    viewing_time_range = serializers.CharField(read_only=True)
 
     class Meta:
         model = ViewingAppointment
         fields = [
             'id', 'listing', 'listing_title', 'guest', 'guest_username',
-            'viewing_date', 'status', 'status_display', 'viewing_fee',
+            'viewing_date', 'viewing_time', 'viewing_time_range',
+            'status', 'status_display', 'viewing_fee',
             'is_fee_paid', 'fee_paid_at', 'scheduled_at', 'admin_notes',
             'guest_notes', 'booking', 'created_at',
         ]
