@@ -99,8 +99,8 @@ export function Booking() {
           </p>
 
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
-            {/* ── Left column ── */}
-            <div className="space-y-8">
+            {/* ── Left column (form). On mobile it drops below the summary. ── */}
+            <div className="space-y-8 order-2 lg:order-1">
               <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex gap-3">
                 <CalendarCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                 <div className="text-sm">
@@ -159,8 +159,8 @@ export function Booking() {
               </Button>
             </div>
 
-            {/* ── Right column: summary ── */}
-            <div className="sticky top-24">
+            {/* ── Right column: summary. On mobile it appears first. ── */}
+            <div className="order-1 lg:order-2 lg:sticky lg:top-24">
               <div className="border border-border rounded-xl p-4 sm:p-6 space-y-6">
                 <div className="flex gap-4">
                   <img
