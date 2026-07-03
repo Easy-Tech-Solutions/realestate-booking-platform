@@ -30,6 +30,10 @@ function targetHref(n: ApiNotification): string | null {
   if (t === 'booking_requested') {
     return '/host?section=bookings';
   }
+  // Host money notifications → the host Earnings page.
+  if (t === 'payment_received_host' || t.startsWith('payout_')) {
+    return '/host?section=earnings';
+  }
   if (t.startsWith('booking_') || t.startsWith('payment_')) {
     return '/trips';
   }

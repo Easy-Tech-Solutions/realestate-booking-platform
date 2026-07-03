@@ -151,11 +151,6 @@ def mark_guest_paid(booking):
         notify_payment_awaiting_admin(booking)
     except Exception as exc:
         logger.warning('Could not notify admins of payment for booking %s: %s', booking.pk, exc)
-    try:
-        from notifications.services import notify_host_payment_received
-        notify_host_payment_received(booking)
-    except Exception as exc:
-        logger.warning('Could not notify host of payment for booking %s: %s', booking.pk, exc)
     return booking
 
 
@@ -179,6 +174,14 @@ def admin_confirm_payment(booking, admin_user=None):
             notify_payout_pending(payout)
         except Exception as exc:
             logger.warning('Could not notify admins of payout for booking %s: %s', booking.pk, exc)
+
+    # Tell the host their money is in and a disbursement is on the way. Fired at
+    # admin confirmation (not at guest payment) so it reflects a verified payment.
+    try:
+        from notifications.services import notify_host_payment_received
+        notify_host_payment_received(booking)
+    except Exception as exc:
+        logger.warning('Could not notify host of payment for booking %s: %s', booking.pk, exc)
 
     return booking
 
