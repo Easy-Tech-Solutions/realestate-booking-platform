@@ -26,20 +26,19 @@ class BookingAdmin(admin.ModelAdmin):
         admin editing the field directly still gets the disbursement record."""
         old_status = form.initial.get('status') if change else None
         super().save_model(request, obj, form, change)
-        if obj.status == 'confirmed' and old_status != 'confirmed' and not hasattr(obj, 'payout'):
-            from .services import create_payout_for_booking
-            payout = create_payout_for_booking(obj)
-            if payout:
-                try:
-                    from notifications.services import notify_payout_pending
-                    notify_payout_pending(payout)
-                except Exception:
-                    pass
-                self.message_user(request, f'Host payout created (net ${payout.net_amount}).', messages.SUCCESS)
-
-        # Reaching 'payment_received' should tell the host their money is in and
-        # a disbursement is coming (mirrors the guest-payment path).
-        if obj.status == 'payment_received' and old_status != 'payment_received':
+        if obj.status == 'confirmed' and old_status != 'confirmed':
+            # Confirming tells the host their (verified) payment is in and a
+            # disbursement is on the way, and creates the payout.
+            if not hasattr(obj, 'payout'):
+                from .services import create_payout_for_booking
+                payout = create_payout_for_booking(obj)
+                if payout:
+                    try:
+                        from notifications.services import notify_payout_pending
+                        notify_payout_pending(payout)
+                    except Exception:
+                        pass
+                    self.message_user(request, f'Host payout created (net ${payout.net_amount}).', messages.SUCCESS)
             try:
                 from notifications.services import notify_host_payment_received
                 notify_host_payment_received(obj)
