@@ -26,6 +26,7 @@ class NotificationType(models.TextChoices):
     PAYMENT_FAILED        = 'payment_failed',        'Payment Failed'
     PAYMENT_REFUNDED      = 'payment_refunded',      'Payment Refunded'
     PAYOUT_PENDING        = 'payout_pending',        'Payout Pending'           # → admins
+    PAYOUT_PAID           = 'payout_paid',           'Payout Paid'              # → host (disbursed)
     # Messaging
     NEW_MESSAGE        = 'new_message',        'New Message'
     # Listings
