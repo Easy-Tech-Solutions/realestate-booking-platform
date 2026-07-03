@@ -445,6 +445,33 @@ def notify_payment_awaiting_admin(booking):
     )
 
 
+def notify_host_payment_received(booking):
+    """
+    Notify the host that the guest's payment landed and Home Konet will disburse
+    their share. Fired when a booking reaches 'payment_received'.
+    """
+    owner = booking.listing.owner
+    amounts = _booking_amounts(booking)
+    create_notification(
+        user=owner,
+        notification_type='payment_received_host',
+        title='Payment Received',
+        message=(
+            f'The guest has paid for "{booking.listing.title}". '
+            f"You'll receive {amounts['host_received']} after our commission — "
+            f"Home Konet's team will disburse it to your account shortly."
+        ),
+        data={
+            'booking_id':       booking.id,
+            'listing_id':       booking.listing.id,
+            'listing_title':    booking.listing.title,
+            'booking_amount':   f"{amounts['subtotal']:.2f}",
+            'host_service_fee': f"{amounts['host_service_fee']:.2f}",
+            'amount_received':  f"{amounts['host_received']:.2f}",
+        },
+    )
+
+
 def notify_reservation_expired(booking, reason='unpaid'):
     """
     Notify the guest (and host, if the reservation was confirmed) that a
@@ -588,6 +615,28 @@ def notify_payout_pending(payout):
             'host_name':     host_name,
             'net_amount':    f'{payout.net_amount:.2f}',
             'currency':      payout.currency,
+        },
+    )
+
+
+def notify_payout_paid(payout):
+    """Notify the host that their payout has been disbursed to their account."""
+    listing_title = payout.booking.listing.title if payout.booking_id else 'your booking'
+    create_notification(
+        user=payout.host,
+        notification_type='payout_paid',
+        title='Payout Sent',
+        message=(
+            f'Home Konet has disbursed {payout.net_amount} {payout.currency} to you '
+            f'for "{listing_title}". It should reach your account shortly.'
+        ),
+        data={
+            'payout_id':     str(payout.id),
+            'booking_id':    payout.booking_id,
+            'listing_title': listing_title,
+            'net_amount':    f'{payout.net_amount:.2f}',
+            'currency':      payout.currency,
+            'reference':     payout.reference or '',
         },
     )
 

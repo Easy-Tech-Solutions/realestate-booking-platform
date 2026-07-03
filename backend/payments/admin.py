@@ -165,18 +165,33 @@ class PayoutAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         # Auto-stamp the disbursement metadata when an admin flips a payout to
         # "paid" on the change form (mirrors the bulk action).
+        newly_paid = obj.status == 'paid' and (form.initial.get('status') if change else None) != 'paid'
         if obj.status == 'paid' and obj.paid_at is None:
             obj.paid_at = timezone.now()
             if obj.paid_by is None:
                 obj.paid_by = request.user
         super().save_model(request, obj, form, change)
+        if newly_paid:
+            try:
+                from notifications.services import notify_payout_paid
+                notify_payout_paid(obj)
+            except Exception:
+                pass
 
     @admin.action(description='Mark selected payouts as paid')
     def mark_paid(self, request, queryset):
-        updated = queryset.filter(status='pending').update(
-            status='paid', paid_at=timezone.now(), paid_by=request.user,
-        )
-        self.message_user(request, f'{updated} payout(s) marked as paid.', messages.SUCCESS)
+        from notifications.services import notify_payout_paid
+        pending = list(queryset.filter(status='pending').select_related('host', 'booking__listing'))
+        for payout in pending:
+            payout.status = 'paid'
+            payout.paid_at = timezone.now()
+            payout.paid_by = request.user
+            payout.save(update_fields=['status', 'paid_at', 'paid_by'])
+            try:
+                notify_payout_paid(payout)
+            except Exception:
+                pass
+        self.message_user(request, f'{len(pending)} payout(s) marked as paid.', messages.SUCCESS)
 
 
 @admin.register(WebhookLog)

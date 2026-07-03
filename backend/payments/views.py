@@ -308,6 +308,11 @@ def admin_mark_payout_paid(request, payout_id):
         payout.paid_by = request.user
         payout.reference = request.data.get('reference', '')
         payout.save(update_fields=['status', 'paid_at', 'paid_by', 'reference'])
+        try:
+            from notifications.services import notify_payout_paid
+            notify_payout_paid(payout)
+        except Exception:
+            pass
     return Response(_serialize_payout(payout))
 
 

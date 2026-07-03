@@ -37,6 +37,15 @@ class BookingAdmin(admin.ModelAdmin):
                     pass
                 self.message_user(request, f'Host payout created (net ${payout.net_amount}).', messages.SUCCESS)
 
+        # Reaching 'payment_received' should tell the host their money is in and
+        # a disbursement is coming (mirrors the guest-payment path).
+        if obj.status == 'payment_received' and old_status != 'payment_received':
+            try:
+                from notifications.services import notify_host_payment_received
+                notify_host_payment_received(obj)
+            except Exception:
+                pass
+
         # Changing the status to a "released" state should put the listing back
         # on the market (unless another booking still holds it) — mirrors the
         # guest-cancel / host-decline / expiry paths.
