@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -8,6 +9,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+
+from realestate_backend.app_logging import log_transaction
+
+logger = logging.getLogger(__name__)
 
 from .models import Payment, PaymentGateway, WebhookLog, SavedCard
 from .serializers import (
@@ -45,6 +50,15 @@ def initiate_payment(request):
                 phone_number=phone_number,
                 network_provider='MTN',
             )
+            log_transaction(
+                'payment_initiated',
+                user_id=request.user.id,
+                booking_id=booking.id,
+                amount=amount_in_pay_currency,
+                currency=currency_code,
+                payment_method=payment_method,
+                gateway=gateway_name,
+            )
 
             payment_data = {
                 'amount': amount_in_pay_currency,
@@ -55,12 +69,26 @@ def initiate_payment(request):
             result = PaymentService.process_payment(payment, payment_data)
 
             if result.get('success'):
+                log_transaction(
+                    'payment_processing_success',
+                    user_id=request.user.id,
+                    booking_id=booking.id,
+                    gateway=gateway_name,
+                    gateway_status='success',
+                )
                 return Response({
                     'success': True,
                     'payment': PaymentSerializer(payment, context={'request': request}).data,
                     'message': result.get('message', 'Payment request sent successfully'),
                 }, status=status.HTTP_201_CREATED)
 
+            log_transaction(
+                'payment_processing_failed',
+                user_id=request.user.id,
+                booking_id=booking.id,
+                gateway=gateway_name,
+                gateway_status=result.get('error', 'unknown'),
+            )
             return Response({
                 'success': False,
                 'error': result.get('error', 'Payment processing failed'),
@@ -93,6 +121,12 @@ def verify_payment(request):
             result = PaymentService.verify_payment(payment)
 
             if result.get('success'):
+                log_transaction(
+                    'payment_verified',
+                    user_id=request.user.id,
+                    booking_id=payment.booking_id,
+                    gateway_status='verified',
+                )
                 return Response({
                     'success': True,
                     'payment': PaymentSerializer(payment, context={'request': request}).data,
@@ -100,6 +134,12 @@ def verify_payment(request):
                     'booking_status': payment.booking.status,
                 })
 
+            log_transaction(
+                'payment_verification_failed',
+                user_id=request.user.id,
+                booking_id=payment.booking_id,
+                gateway_status=result.get('error', 'unknown'),
+            )
             return Response({
                 'success': False,
                 'error': result.get('error', 'Payment verification failed'),
@@ -139,6 +179,13 @@ def process_refund(request):
             )
 
             if result.get('success'):
+                log_transaction(
+                    'refund_processed',
+                    user_id=request.user.id,
+                    booking_id=payment.booking_id,
+                    amount=serializer.validated_data['amount'],
+                    gateway_status='refunded',
+                )
                 return Response({
                     'success': True,
                     'refund': RefundDetailSerializer(
@@ -438,10 +485,15 @@ def stripe_webhook(request):
         meta = pi.get('metadata', {})
         pi_id = pi.get('id', '')
         pi_type = meta.get('type', '')
-        logger = logging.getLogger(__name__)
-        logger.info(
-            'stripe payment_intent.succeeded pi=%s type=%s listing=%s user=%s amount=%s',
-            pi_id, pi_type, meta.get('listing_id'), meta.get('user_id'), pi.get('amount'),
+        log_transaction(
+            f'stripe_{pi_type}_succeeded',
+            user_id=meta.get('user_id'),
+            booking_id=meta.get('booking_id'),
+            tx_ref=pi_id,
+            gateway='stripe',
+            gateway_status='succeeded',
+            amount=pi.get('amount'),
+            listing_id=meta.get('listing_id'),
         )
 
         if pi_type == 'booking_fee':

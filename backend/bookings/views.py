@@ -1,7 +1,13 @@
+import logging
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+
+from realestate_backend.app_logging import log_activity, log_transaction
+
+logger = logging.getLogger(__name__)
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.db.models import Q
@@ -155,6 +161,13 @@ def bookings_collection(request):
                     booking.status = 'confirmed'
                     booking.confirmed_at = timezone.now()
                     booking.save(update_fields=['status', 'confirmed_at'])
+                log_activity(
+                    request, 'booking_created',
+                    resource_type='booking', resource_id=booking.id,
+                    listing_id=listing.id,
+                    start_date=str(start), end_date=str(end),
+                    status=booking.status,
+                )
                 return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
         except Listing.DoesNotExist:
@@ -233,6 +246,11 @@ def confirm_booking(request, id):
     # Superhost check: auto-assign if owner meets criteria
     _check_superhost(booking.listing.owner)
 
+    log_activity(
+        request, 'booking_confirmed',
+        resource_type='booking', resource_id=booking.id,
+        listing_id=booking.listing_id, customer_id=booking.customer_id,
+    )
     return Response(BookingSerializer(booking, context={'request': request}).data)
 
 
@@ -257,6 +275,12 @@ def decline_booking(request, id):
         booking.owner_notes = serializer.validated_data.get('owner_notes', '')
         booking.decline_reason = serializer.validated_data.get('decline_reason', '')
         booking.save()
+        log_activity(
+            request, 'booking_declined',
+            resource_type='booking', resource_id=booking.id,
+            listing_id=booking.listing_id, customer_id=booking.customer_id,
+            reason=booking.decline_reason,
+        )
         return Response(BookingSerializer(booking, context={'request': request}).data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -305,6 +329,13 @@ def request_payment(request, id):
         booking.status = 'payment_requested'
         booking.save(update_fields=['status'])
 
+    log_transaction(
+        'payment_request_sent',
+        user_id=request.user.id,
+        booking_id=booking.id,
+        amount=amount_decimal,
+        gateway='platform',
+    )
     return Response(BookingSerializer(booking, context={'request': request}).data)
 
 

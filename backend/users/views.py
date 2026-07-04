@@ -1,7 +1,13 @@
+import logging
+
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+
+from realestate_backend.app_logging import log_activity
+
+logger = logging.getLogger(__name__)
 from .serializers import PublicUserSerializer, UserSerializer
 from listings.models import Listing, Favorite
 from listings.serializers import ListingSerializer, FavoriteSerializer
@@ -397,7 +403,9 @@ def delete_my_account(request):
     host on their listings. Returns 400 with a specific reason in that case
     so the frontend can render it verbatim.
     """
+    user_id = request.user.id
     ok, error = delete_account(request.user)
     if not ok:
         return Response({'detail': error}, status=status.HTTP_400_BAD_REQUEST)
+    log_activity(request, 'account_deletion_initiated', resource_type='user', resource_id=user_id)
     return Response(status=status.HTTP_204_NO_CONTENT)

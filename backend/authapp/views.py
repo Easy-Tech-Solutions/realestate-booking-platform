@@ -2,6 +2,8 @@ import logging
 import re
 import secrets
 
+from realestate_backend.app_logging import log_activity
+
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -130,6 +132,7 @@ def register(request):
         message = "User registered successfully. Please check your email to verify your account."
         if not settings.AUTH_REQUIRE_EMAIL_VERIFICATION:
             message = "User registered successfully. You can now log in."
+        log_activity(request, 'user_registered', resource_type='user', resource_id=user.id)
         return Response({"message": message}, status=status.HTTP_201_CREATED)
     except Exception:
         logger.exception("register: failed during user creation or email send")
@@ -203,6 +206,7 @@ def login_view(request):
 
     user = authenticate(request, username=user_obj.username, password=password)
     if user is None:
+        log_activity(request, 'user_login_failed', user_email=email)
         return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if settings.AUTH_REQUIRE_EMAIL_VERIFICATION and not user.email_verified:
@@ -222,6 +226,7 @@ def login_view(request):
 
     # The refresh token is delivered ONLY as an httpOnly cookie (never in the
     # JSON body) so JavaScript — and therefore any XSS — cannot read it.
+    log_activity(request, 'user_login', user=user)
     response = Response({
         "access": access_token,
         "user": UserSerializer(user).data,
@@ -232,6 +237,7 @@ def login_view(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
+    log_activity(request, 'user_logout')
     try:
         refresh_token = request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME) or request.data.get("refresh")
         if refresh_token:

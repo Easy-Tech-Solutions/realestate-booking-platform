@@ -124,6 +124,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Request logger — must come after AuthenticationMiddleware so request.user is set
+    "realestate_backend.request_log_middleware.RequestLogMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "suspensions.middleware.SuspensionMiddleware",
@@ -484,6 +486,9 @@ CELERY_TASK_ALWAYS_EAGER = env_bool('CELERY_ALWAYS_EAGER', DEBUG)
 CELERY_TASK_EAGER_PROPAGATES = True
 
 # ── Security settings applied in all environments ──────────────────────────
+# ── Logging ────────────────────────────────────────────────────────────────
+from realestate_backend.logging_config import LOGGING  # noqa: E402
+
 X_FRAME_OPTIONS = 'DENY'
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_HTTPONLY = True
