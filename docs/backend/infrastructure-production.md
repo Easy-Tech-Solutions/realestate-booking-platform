@@ -29,17 +29,17 @@ sudo apt install -y ufw jq curl
 ## 3. Application User and Directories
 
 ```bash
-sudo adduser --system --group --home /srv/realestate realestate
-sudo mkdir -p /srv/realestate/app
-sudo chown -R realestate:realestate /srv/realestate
+sudo adduser --system --group --home /opt/homekonet homekonet
+sudo mkdir -p /opt/homekonet
+sudo chown -R homekonet:homekonet /opt/homekonet
 ```
 
-Deploy code to /srv/realestate/app and set ownership to the realestate user.
+Deploy code to /opt/homekonet and set ownership to the homekonet user.
 
 ## 4. Python Environment and Dependencies
 
 ```bash
-cd /srv/realestate/app/backend
+cd /opt/homekonet/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
@@ -97,7 +97,7 @@ Required high-priority keys:
 ## 8. Django Migrations and Static
 
 ```bash
-cd /srv/realestate/app/backend
+cd /opt/homekonet/backend
 source .venv/bin/activate
 python manage.py migrate
 python manage.py collectstatic --noinput
@@ -133,9 +133,9 @@ After=network.target
 [Service]
 User=realestate
 Group=realestate
-WorkingDirectory=/srv/realestate/app/backend
-EnvironmentFile=/srv/realestate/app/backend/.env
-ExecStart=/srv/realestate/app/backend/.venv/bin/daphne -b 127.0.0.1 -p 8000 realestate_backend.asgi:application
+WorkingDirectory=/opt/homekonet/backend
+EnvironmentFile=/opt/homekonet/backend/.env
+ExecStart=/opt/homekonet/backend/.venv/bin/daphne -b 127.0.0.1 -p 8000 realestate_backend.asgi:application
 Restart=always
 RestartSec=5
 
@@ -153,9 +153,9 @@ After=network.target redis-server.service
 [Service]
 User=realestate
 Group=realestate
-WorkingDirectory=/srv/realestate/app/backend
-EnvironmentFile=/srv/realestate/app/backend/.env
-ExecStart=/srv/realestate/app/backend/.venv/bin/celery -A realestate_backend worker --loglevel=info
+WorkingDirectory=/opt/homekonet/backend
+EnvironmentFile=/opt/homekonet/backend/.env
+ExecStart=/opt/homekonet/backend/.venv/bin/celery -A realestate_backend worker --loglevel=info
 Restart=always
 RestartSec=5
 
@@ -173,9 +173,9 @@ After=network.target redis-server.service
 [Service]
 User=realestate
 Group=realestate
-WorkingDirectory=/srv/realestate/app/backend
-EnvironmentFile=/srv/realestate/app/backend/.env
-ExecStart=/srv/realestate/app/backend/.venv/bin/celery -A realestate_backend beat --loglevel=info
+WorkingDirectory=/opt/homekonet/backend
+EnvironmentFile=/opt/homekonet/backend/.env
+ExecStart=/opt/homekonet/backend/.venv/bin/celery -A realestate_backend beat --loglevel=info
 Restart=always
 RestartSec=5
 
@@ -208,11 +208,11 @@ server {
     }
 
     location /static/ {
-        alias /srv/realestate/app/backend/static/;
+        alias /opt/homekonet/backend/static/;
     }
 
     location /media/ {
-        alias /srv/realestate/app/backend/media/;
+        alias /opt/homekonet/backend/media/;
     }
 }
 ```
@@ -243,9 +243,9 @@ server {
     location /api/    { proxy_pass http://127.0.0.1:8000; proxy_set_header Host $host;
                         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                         proxy_set_header X-Forwarded-Proto $scheme; }
-    location /static/ { alias /srv/realestate/app/backend/static/; }
-    location /media/  { alias /srv/realestate/app/backend/media/; }
-    location /        { root /srv/realestate/app/frontend/dist; try_files $uri /index.html; }
+    location /static/ { alias /opt/homekonet/backend/static/; }
+    location /media/  { alias /opt/homekonet/backend/media/; }
+    location /        { root /opt/homekonet/frontend/dist; try_files $uri /index.html; }
 }
 ```
 

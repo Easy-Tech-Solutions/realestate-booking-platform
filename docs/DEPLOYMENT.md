@@ -141,14 +141,14 @@ newgrp docker
 su - homekonet
 
 # Clone the repository
-git clone https://github.com/Easy-Tech-Solutions/realestate-booking-platform.git /home/homekonet/app
-cd /home/homekonet/app
+git clone https://github.com/Easy-Tech-Solutions/realestate-booking-platform.git /opt/homekonet
+cd /opt/homekonet
 ```
 
 Expected layout after cloning:
 
 ```
-/home/homekonet/app/
+/opt/homekonet/
 ├── backend/
 │   ├── manage.py
 │   ├── requirements.txt
@@ -667,17 +667,17 @@ sudo certbot certonly --standalone \
   --agree-tos --non-interactive
 
 # Copy certs to the nginx ssl directory
-sudo mkdir -p /home/homekonet/app/nginx/ssl
-sudo cp /etc/letsencrypt/live/homekonet.com/fullchain.pem /home/homekonet/app/nginx/ssl/
-sudo cp /etc/letsencrypt/live/homekonet.com/privkey.pem   /home/homekonet/app/nginx/ssl/
-sudo chown -R homekonet:homekonet /home/homekonet/app/nginx/ssl
-sudo chmod 600 /home/homekonet/app/nginx/ssl/privkey.pem
+sudo mkdir -p /opt/homekonet/nginx/ssl
+sudo cp /etc/letsencrypt/live/homekonet.com/fullchain.pem /opt/homekonet/nginx/ssl/
+sudo cp /etc/letsencrypt/live/homekonet.com/privkey.pem   /opt/homekonet/nginx/ssl/
+sudo chown -R homekonet:homekonet /opt/homekonet/nginx/ssl
+sudo chmod 600 /opt/homekonet/nginx/ssl/privkey.pem
 
 # Auto-renew certs (add to crontab)
 (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet && \
-  cp /etc/letsencrypt/live/homekonet.com/fullchain.pem /home/homekonet/app/nginx/ssl/ && \
-  cp /etc/letsencrypt/live/homekonet.com/privkey.pem   /home/homekonet/app/nginx/ssl/ && \
-  docker compose -f /home/homekonet/app/docker-compose.yml exec frontend nginx -s reload") | crontab -
+  cp /etc/letsencrypt/live/homekonet.com/fullchain.pem /opt/homekonet/nginx/ssl/ && \
+  cp /etc/letsencrypt/live/homekonet.com/privkey.pem   /opt/homekonet/nginx/ssl/ && \
+  docker compose -f /opt/homekonet/docker-compose.yml exec frontend nginx -s reload") | crontab -
 ```
 
 ---
@@ -685,7 +685,7 @@ sudo chmod 600 /home/homekonet/app/nginx/ssl/privkey.pem
 ## 11. Build and Deploy (Docker)
 
 ```bash
-cd /home/homekonet/app
+cd /opt/homekonet
 
 # Build all images (pass Vite build args for the frontend)
 docker compose build --no-cache \
@@ -806,7 +806,7 @@ For production, consider shipping these logs to a log aggregator (Datadog, Loki,
 ## 15. Updating the Application
 
 ```bash
-cd /home/homekonet/app
+cd /opt/homekonet
 
 # Pull latest code
 git pull origin main
@@ -888,19 +888,19 @@ At minimum, set up an uptime check on your domain (UptimeRobot free tier covers 
 
 ```bash
 # Create backup directory
-mkdir -p /home/homekonet/backups
+mkdir -p /opt/homekonet/backups
 
 # Dump
 docker compose exec -T db pg_dump -U $POSTGRES_USER $POSTGRES_DB \
-  | gzip > /home/homekonet/backups/db_$(date +%Y%m%d_%H%M%S).sql.gz
+  | gzip > /opt/homekonet/backups/db_$(date +%Y%m%d_%H%M%S).sql.gz
 
 # Schedule daily backups at 02:00
-(crontab -l 2>/dev/null; echo "0 2 * * * docker compose -f /home/homekonet/app/docker-compose.yml \
+(crontab -l 2>/dev/null; echo "0 2 * * * docker compose -f /opt/homekonet/docker-compose.yml \
   exec -T db pg_dump -U \$POSTGRES_USER \$POSTGRES_DB | gzip > \
-  /home/homekonet/backups/db_\$(date +\%Y\%m\%d_\%H\%M\%S).sql.gz") | crontab -
+  /opt/homekonet/backups/db_\$(date +\%Y\%m\%d_\%H\%M\%S).sql.gz") | crontab -
 
 # Keep only the last 30 days of backups
-(crontab -l 2>/dev/null; echo "30 2 * * * find /home/homekonet/backups -name 'db_*.sql.gz' -mtime +30 -delete") | crontab -
+(crontab -l 2>/dev/null; echo "30 2 * * * find /opt/homekonet/backups -name 'db_*.sql.gz' -mtime +30 -delete") | crontab -
 ```
 
 > **Using Neon?** Use Neon's built-in branching and point-in-time restore instead of manual dumps.
@@ -908,7 +908,7 @@ docker compose exec -T db pg_dump -U $POSTGRES_USER $POSTGRES_DB \
 ### Restore from a backup
 
 ```bash
-gunzip -c /home/homekonet/backups/db_YYYYMMDD_HHMMSS.sql.gz \
+gunzip -c /opt/homekonet/backups/db_YYYYMMDD_HHMMSS.sql.gz \
   | docker compose exec -T db psql -U $POSTGRES_USER $POSTGRES_DB
 ```
 
