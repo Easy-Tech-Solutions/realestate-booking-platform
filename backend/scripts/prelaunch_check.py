@@ -69,14 +69,14 @@ def run_checks(allow_dev: bool) -> list[CheckResult]:
     if allow_dev:
         warnable(
             "Secret key quality",
-            bool(secret_key) and secret_key != "change-me-in-prod" and len(secret_key) >= 32,
+            bool(secret_key) and secret_key not in ("change-me-in-prod", "change-me-in-production") and len(secret_key) >= 32,
             "SECRET_KEY appears non-default and strong enough.",
             "SECRET_KEY is missing, default, or too short (<32 chars).",
         )
     else:
         require(
             "Secret key quality",
-            bool(secret_key) and secret_key != "change-me-in-prod" and len(secret_key) >= 32,
+            bool(secret_key) and secret_key not in ("change-me-in-prod", "change-me-in-production") and len(secret_key) >= 32,
             "SECRET_KEY appears non-default and strong enough.",
             "SECRET_KEY is missing, default, or too short (<32 chars).",
         )
