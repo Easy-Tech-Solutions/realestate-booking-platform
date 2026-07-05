@@ -78,6 +78,13 @@ jobs:
       - name: npm audit (HIGH+)
         run: npm audit --audit-level=high
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install semgrep
+        run: pip install semgrep
+
       - name: Semgrep (React + TypeScript rules)
         run: semgrep --config=p/react --config=p/typescript src/ --error
 

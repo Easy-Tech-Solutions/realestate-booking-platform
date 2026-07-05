@@ -26,7 +26,10 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-else:
+elif not getattr(settings, 'CLOUDINARY_URL', None) and getattr(settings, 'MEDIA_ROOT', None):
+    # Only serve local media files when Cloudinary is NOT configured AND a real
+    # MEDIA_ROOT is set. With Cloudinary active, MEDIA_ROOT is empty (Django default)
+    # which would cause serve() to resolve paths against the CWD — a security hole.
     urlpatterns += [
         re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
     ]
