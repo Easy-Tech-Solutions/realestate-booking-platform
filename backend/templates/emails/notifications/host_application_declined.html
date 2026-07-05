@@ -1,0 +1,10 @@
+{% extends "emails/notifications/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Host Application Declined</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">Your application was not approved</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border-radius:6px;padding:20px;margin:0 0 24px;border-left:4px solid #ef4444;">
+  {% if data.decline_reason %}<tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Reason:</strong> {{ data.decline_reason }}</td></tr>{% endif %}
+</table>
+<p style="margin:0 0 24px;color:#444444;font-size:15px;line-height:1.6;">You're welcome to submit a new application addressing the feedback above.</p>
+<a href="{{ site_url }}" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">Back to {{ site_name }}</a>
+{% endblock %}

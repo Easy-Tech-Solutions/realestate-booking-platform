@@ -93,14 +93,26 @@ class Listing(models.Model):
         ('biannual', 'Every 6 Months'),
         ('annual', 'Annual'),
     ]
+    LEASE_TERMS = [
+        (6, '6 months'),
+        (12, '1 year'),
+        (24, '2 years'),
+        (36, '3 years'),
+    ]
     pricing_type = models.CharField(max_length=10, choices=PRICING_TYPES, default='nightly')
     payment_schedule = models.CharField(
         max_length=15, choices=PAYMENT_SCHEDULES, null=True, blank=True,
         help_text='Required for monthly-priced listings (room, apartment, house)',
     )
+    lease_term_months = models.PositiveIntegerField(
+        choices=LEASE_TERMS, null=True, blank=True,
+        help_text='Lease length for long-term (monthly) listings — sets the booking end date.',
+    )
     cancellation_policy = models.CharField(max_length=20, choices=CANCELLATION_POLICIES, default='flexible')
     is_available = models.BooleanField(default=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending_review')
+    # Listings publish immediately — no admin approval step for now. (Set to
+    # 'pending_review' to re-enable the review queue + approve/reject flow.)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='published')
     # Soft-delete marker. Set when the host clicks "Delete listing". The row
     # is kept so historical bookings/payments/reviews still resolve, but the
     # listing is hidden from every public surface (search, detail page,

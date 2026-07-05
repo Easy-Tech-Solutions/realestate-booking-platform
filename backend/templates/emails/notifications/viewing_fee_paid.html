@@ -1,0 +1,13 @@
+{% extends "emails/notifications/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Viewing Fee Paid</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">Here's your receipt. Our team will schedule and confirm your visit.</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0faf0;border-radius:6px;padding:20px;margin:0 0 24px;border-left:4px solid #22c55e;">
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Property:</strong> {{ data.listing_title }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Viewing date:</strong> {{ data.viewing_date }}</td></tr>
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Amount paid:</strong> {{ data.amount }} {{ data.currency }}{% if data.payment_method %} ({{ data.payment_method }}){% endif %}</td></tr>
+  {% if data.payment_id %}<tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Reference:</strong> #{{ data.payment_id }}</td></tr>{% endif %}
+</table>
+<p style="margin:0 0 24px;color:#666666;font-size:13px;">The viewing fee is non-refundable. After the visit, if you're satisfied, you can reserve the property from your account.</p>
+<a href="{{ site_url }}/viewings" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">View My Viewings</a>
+{% endblock %}

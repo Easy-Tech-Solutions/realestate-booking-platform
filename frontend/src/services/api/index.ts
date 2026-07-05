@@ -1,6 +1,8 @@
 export { authAPI } from './auth';
 export { propertiesAPI } from './properties';
 export { bookingsAPI } from './bookings';
+export { viewingsAPI } from './viewings';
+export { payoutsAPI } from './payouts';
 export { reviewsAPI } from './reviews';
 export { messagesAPI } from './messages';
 export { wishlistsAPI } from './wishlists';
@@ -16,5 +18,7 @@ export { newsletterAPI } from './newsletter';
 export { testimonialsAPI } from './testimonials';
 export { supportAPI } from './support';
 export type { SupportTicket, TicketMessage, TicketAttachment, ContactInquiry, SearchResult } from './support';
+export { hostApplicationsAPI } from './hostApplications';
+export type { HostApplication } from './hostApplications';
 export type { Testimonial } from './testimonials';
 export { clearTokens, getAccessToken, setTokens, attemptTokenRefresh } from './shared/client';

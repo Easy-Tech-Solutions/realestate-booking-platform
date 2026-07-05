@@ -16,7 +16,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Skeleton } from '../components/ui/skeleton';
 import { formatCurrency } from '../../core/utils';
 import { toast } from 'sonner';
-import { usersAPI, propertiesAPI } from '../../services/api';
+import { usersAPI, propertiesAPI, bookingsAPI, payoutsAPI } from '../../services/api';
+import type { Booking, Payout } from '../../core/types';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
@@ -29,6 +30,7 @@ const menuItems = [
   { id: 'properties',  label: 'Property Management', icon: Building2 },
   { id: 'bookings',    label: 'Bookings',             icon: Calendar },
   { id: 'payments',    label: 'Payments',             icon: CreditCard },
+  { id: 'payouts',     label: 'Host Payouts',         icon: DollarSign },
   { id: 'support',     label: 'Support Tickets',      icon: Headphones },
   { id: 'security',    label: 'Security',             icon: Shield },
   { id: 'settings',    label: 'Settings',             icon: Settings },
@@ -87,6 +89,47 @@ export function AdminDashboard() {
   const [assignInput, setAssignInput]           = useState('');
   const [supportTab, setSupportTab]             = useState<'tickets' | 'contact'>('tickets');
 
+  // Payments awaiting confirmation + host payouts
+  const [paymentReceived, setPaymentReceived] = useState<Booking[]>([]);
+  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [payoutTab, setPayoutTab] = useState<'pending' | 'paid'>('pending');
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
+
+  const loadPaymentsAndPayouts = useCallback(async () => {
+    const [pr, po] = await Promise.all([
+      bookingsAPI.getPaymentReceived().catch(() => [] as Booking[]),
+      payoutsAPI.adminList().catch(() => [] as Payout[]),
+    ]);
+    setPaymentReceived(pr);
+    setPayouts(po);
+  }, []);
+
+  const handleConfirmPayment = async (id: string) => {
+    setActionBusyId(id);
+    try {
+      await bookingsAPI.confirmPayment(id);
+      toast.success('Payment confirmed — host contact shared and payout created.');
+      await loadPaymentsAndPayouts();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to confirm payment');
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
+  const handleMarkPayoutPaid = async (id: string) => {
+    setActionBusyId(id);
+    try {
+      await payoutsAPI.adminMarkPaid(id);
+      toast.success('Payout marked as paid.');
+      await loadPaymentsAndPayouts();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to mark payout paid');
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -108,6 +151,7 @@ export function AdminDashboard() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadPaymentsAndPayouts(); }, [loadPaymentsAndPayouts]);
 
   const handleSuspendUser = async (userId: string, username: string) => {
     try {
@@ -409,7 +453,7 @@ export function AdminDashboard() {
                             </div>
                           </TableCell>
                           <TableCell>{p.host?.firstName} {p.host?.lastName}</TableCell>
-                          <TableCell>{formatCurrency(p.price)}/night</TableCell>
+                          <TableCell>{formatCurrency(p.price)}/{p.pricingType === 'monthly' ? 'month' : 'night'}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Button variant="outline" size="sm" onClick={() => navigate(`/rooms/${p.id}`)}>
@@ -551,6 +595,54 @@ export function AdminDashboard() {
   // ── Payments ──────────────────────────────────────────────────────────────
   const renderPayments = () => (
     <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-semibold mb-1">Payments awaiting confirmation</h2>
+        <p className="text-sm text-muted-foreground">
+          All guest payments land in the Home Konet account. Confirm each one to share the host's
+          contact with the guest and create the host payout.
+        </p>
+      </div>
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Guest</TableHead>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Dates</TableHead>
+                  <TableHead>Total paid</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paymentReceived.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
+                      No payments awaiting confirmation.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paymentReceived.map((b) => (
+                    <TableRow key={b.id}>
+                      <TableCell className="font-medium">{b.user?.firstName || b.userId}</TableCell>
+                      <TableCell className="max-w-[180px] truncate">{b.property?.title}</TableCell>
+                      <TableCell className="text-sm">{b.checkIn} → {b.checkOut}</TableCell>
+                      <TableCell>{formatCurrency(b.totalPrice)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" disabled={actionBusyId === b.id} onClick={() => handleConfirmPayment(b.id)}>
+                          {actionBusyId === b.id ? 'Confirming…' : 'Confirm payment'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
       <h2 className="text-2xl font-semibold">Recent Payments</h2>
       <Card>
         <CardContent className="p-0">
@@ -593,6 +685,87 @@ export function AdminDashboard() {
       </Card>
     </div>
   );
+
+  // ── Host Payouts ──────────────────────────────────────────────────────────
+  const renderPayouts = () => {
+    const filtered = payouts.filter((p) => p.status === payoutTab);
+    const pendingTotal = payouts
+      .filter((p) => p.status === 'pending')
+      .reduce((sum, p) => sum + p.netAmount, 0);
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold mb-1">Host Payouts</h2>
+          <p className="text-sm text-muted-foreground">
+            Amounts owed to hosts after the 4% commission. Mark a payout as paid once you've
+            disbursed it from the Home Konet account.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <StatCard label="Pending payouts" value={payouts.filter((p) => p.status === 'pending').length} icon={DollarSign} />
+          <StatCard label="Total owed" value={formatCurrency(pendingTotal)} icon={TrendingUp} sub="Net of commission" />
+        </div>
+
+        <div className="flex gap-2">
+          {(['pending', 'paid'] as const).map((tab) => (
+            <Button key={tab} variant={payoutTab === tab ? 'default' : 'outline'} size="sm" onClick={() => setPayoutTab(tab)}>
+              {tab === 'pending' ? 'Pending' : 'Paid'}
+            </Button>
+          ))}
+        </div>
+
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Host</TableHead>
+                    <TableHead>Property</TableHead>
+                    <TableHead>Gross</TableHead>
+                    <TableHead>Commission</TableHead>
+                    <TableHead>Net payout</TableHead>
+                    {payoutTab === 'pending' ? <TableHead className="text-right">Action</TableHead> : <TableHead>Paid on</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                        No {payoutTab} payouts.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filtered.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.hostName || '—'}
+                          <span className="block text-xs text-muted-foreground">Booking #{p.bookingId}</span>
+                        </TableCell>
+                        <TableCell className="max-w-[180px] truncate">{p.listingTitle}</TableCell>
+                        <TableCell>{formatCurrency(p.grossAmount)}</TableCell>
+                        <TableCell className="text-muted-foreground">-{formatCurrency(p.serviceFeeAmount)}</TableCell>
+                        <TableCell className="font-semibold">{formatCurrency(p.netAmount)}</TableCell>
+                        {payoutTab === 'pending' ? (
+                          <TableCell className="text-right">
+                            <Button size="sm" disabled={actionBusyId === p.id} onClick={() => handleMarkPayoutPaid(p.id)}>
+                              {actionBusyId === p.id ? 'Saving…' : 'Mark paid'}
+                            </Button>
+                          </TableCell>
+                        ) : (
+                          <TableCell className="text-sm">{p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '—'}</TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
 
   // ── Security ──────────────────────────────────────────────────────────────
   const renderSecurity = () => (
@@ -962,6 +1135,7 @@ export function AdminDashboard() {
       case 'properties': return renderPropertyManagement();
       case 'bookings':   return renderBookings();
       case 'payments':   return renderPayments();
+      case 'payouts':    return renderPayouts();
       case 'support':    return renderSupport();
       case 'security':   return renderSecurity();
       case 'settings':   return renderSettings();

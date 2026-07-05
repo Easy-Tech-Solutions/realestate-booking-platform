@@ -1,3 +1,6 @@
+from django.conf import settings
+
+
 class SecurityHeadersMiddleware:
     """
     Adds Content-Security-Policy and Permissions-Policy headers that
@@ -22,6 +25,15 @@ class SecurityHeadersMiddleware:
         "frame-ancestors 'none'"
     )
 
+    # The Unfold admin is built on Alpine.js, which evaluates its directive
+    # expressions with new Function() and therefore needs 'unsafe-eval'. Add it
+    # ONLY for admin pages (see __call__) so the public API/app keep the strict
+    # policy above. The admin is frame-ancestors 'none', so it isn't embeddable.
+    CSP_ADMIN = CSP.replace(
+        "script-src 'self' https://js.stripe.com;",
+        "script-src 'self' 'unsafe-eval' https://js.stripe.com;",
+    )
+
     PERMISSIONS_POLICY = (
         "camera=(), "
         "microphone=(), "
@@ -36,6 +48,8 @@ class SecurityHeadersMiddleware:
 
     def __call__(self, request):
         response = self.get_response(request)
-        response.setdefault('Content-Security-Policy', self.CSP)
+        admin_prefix = '/' + getattr(settings, 'ADMIN_URL', 'admin/')
+        csp = self.CSP_ADMIN if request.path.startswith(admin_prefix) else self.CSP
+        response.setdefault('Content-Security-Policy', csp)
         response.setdefault('Permissions-Policy', self.PERMISSIONS_POLICY)
         return response

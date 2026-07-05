@@ -1,27 +1,29 @@
 import logging
+from datetime import timedelta, date as _date, time as _time
 
+from django.db import transaction
+from django.db.models import Avg as _Avg, Q
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
 
+from listings.models import HotelRoom, Listing
+from listings.serializers import ListingSerializer
 from realestate_backend.app_logging import log_activity, log_transaction
-
-logger = logging.getLogger(__name__)
-from django.shortcuts import get_object_or_404
-from django.db import transaction
-from django.db.models import Q
-from django.utils import timezone
-from .models import Booking, PaymentRequest, SavedSearch, SearchAlert, PropertyComparison, ComparisonItem
+from .models import (
+    Booking, PaymentRequest, SavedSearch, SearchAlert, PropertyComparison,
+    ComparisonItem, ViewingAppointment, HOST_CONFIRM_DAYS, PAYMENT_WINDOW_DAYS,
+)
 from .serializers import (
     BookingSerializer, BookingConfrimationSerializer, BookingCreateSerializer,
     SearchAlertSerializer, SavedSearchSerializer, SavedSearchCreateSerializer,
     PropertyComparisonSerializer, ComparisonCreateSerializer, ComparisonItemSerializer
 )
-from listings.models import Listing
-from listings.serializers import ListingSerializer
-from listings.models import HotelRoom
-from django.db.models import Avg as _Avg
+
+logger = logging.getLogger(__name__)
 
 
 def _check_superhost(owner):
@@ -63,36 +65,49 @@ def bookings_collection(request):
         return Response(BookingSerializer(bookings, many=True, context={'request': request}).data)
 
     elif request.method == "POST":
+        # Revised booking flow: a reservation is FREE. No payment is taken here.
+        # The guest pays only after the host confirms (see confirm_booking →
+        # awaiting_payment). Short-stay always requires host confirmation too —
+        # there is no instant auto-confirm anymore.
         try:
             serializer = BookingCreateSerializer(data=request.data)
             if not serializer.is_valid():
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
             with transaction.atomic():
-                # Lock the listing row so concurrent booking requests queue up
-                # rather than racing through the availability check simultaneously.
+                # Lock the listing row so concurrent reservation requests queue
+                # up rather than racing through the availability check.
                 listing = Listing.objects.select_for_update().get(
                     pk=request.data.get('listing')
                 )
 
-                start        = serializer.validated_data['start_date']
-                end          = serializer.validated_data['end_date']
-                hotel_room   = serializer.validated_data.get('hotel_room')
-                stripe_pi_id = serializer.validated_data.get('stripe_payment_intent_id')
-                payment_method = serializer.validated_data.pop('payment_method', 'mtn_momo')
+                # A host can't reserve their own listing.
+                if listing.owner_id == request.user.id:
+                    return Response(
+                        {'error': 'You cannot book your own listing.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
-                # Declined and cancelled bookings do not block re-booking.
+                start      = serializer.validated_data['start_date']
+                end        = serializer.validated_data['end_date']
+                hotel_room = serializer.validated_data.get('hotel_room')
+                # These are irrelevant at (free) reservation time — drop them so
+                # they're not persisted onto the booking.
+                serializer.validated_data.pop('payment_method', None)
+                serializer.validated_data.pop('stripe_payment_intent_id', None)
+
+                # A guest can't hold two active reservations for the same dates.
                 existing_booking = Booking.objects.filter(
                     customer=request.user,
                     listing=listing,
                     start_date=start,
                     end_date=end,
-                ).exclude(status__in=['declined', 'cancelled']).first()
-
+                    status__in=Booking.ACTIVE_STATUSES,
+                ).first()
                 if existing_booking:
                     return Response({
-                        'error': 'You already have a booking for this property on these dates',
-                        'existing_booking_id': existing_booking.id
+                        'error': 'You already have an active reservation for this property on these dates',
+                        'existing_booking_id': existing_booking.id,
                     }, status=status.HTTP_400_BAD_REQUEST)
 
                 if hotel_room:
@@ -102,8 +117,9 @@ def bookings_collection(request):
                     if _get_available_room_count(hotel_room, start, end) < 1:
                         return Response({'error': 'Room not available for selected dates'}, status=status.HTTP_400_BAD_REQUEST)
                 else:
-                    # For non-hotel listings, reject if another confirmed booking
-                    # already overlaps the requested dates (half-open interval).
+                    # Reject only if a CONFIRMED booking already overlaps. Multiple
+                    # *pending* reservations on the same dates are allowed — the
+                    # host picks the winner (the others are auto-declined then).
                     conflict = Booking.objects.filter(
                         listing=listing,
                         status='confirmed',
@@ -116,59 +132,36 @@ def bookings_collection(request):
                             status=status.HTTP_409_CONFLICT,
                         )
 
-                # Stripe payments: require and verify PI before creating booking.
-                # MoMo: booking is created first, payment initiated after.
-                from django.conf import settings as _settings
-                if payment_method == 'stripe' and not stripe_pi_id:
-                    return Response(
-                        {'error': 'stripe_payment_intent_id is required for Stripe payments'},
-                        status=status.HTTP_402_PAYMENT_REQUIRED,
-                    )
-
-                if stripe_pi_id:
-                    try:
-                        import stripe as _stripe
-                        _stripe.api_key = getattr(_settings, 'STRIPE_SECRET_KEY', '')
-                        intent = _stripe.PaymentIntent.retrieve(stripe_pi_id)
-                    except Exception:
-                        return Response({'error': 'Could not verify payment'}, status=status.HTTP_400_BAD_REQUEST)
-
-                    if intent.status != 'succeeded':
-                        return Response({'error': 'Payment has not been completed'}, status=status.HTTP_402_PAYMENT_REQUIRED)
-
-                    # Replay check — this PI must not be linked to any other booking.
-                    if Booking.objects.filter(stripe_payment_intent_id=stripe_pi_id).exists():
-                        return Response({'error': 'Payment has already been used for another booking'}, status=status.HTTP_409_CONFLICT)
-
-                    # Amount check — PI amount must match the canonical booking price.
-                    from listings.views import compute_listing_pricing as _pricing_fn
-                    _pricing   = _pricing_fn(listing, start, end, room=hotel_room)
-                    _BOOKING_FEE_CENTS = 300
-                    expected_cents = round((_pricing['discounted_subtotal'] + _pricing['service_fee']) * 100) + _BOOKING_FEE_CENTS
-                    if intent.amount != expected_cents:
-                        return Response(
-                            {'error': f'Payment amount mismatch (expected {expected_cents} cents)'},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-
-                # Compute the full grand total so it matches what the guest saw.
+                # Lock in the amounts the guest will pay once the host confirms,
+                # so the figure matches what they saw at reservation time.
                 from listings.views import compute_listing_pricing
                 pricing = compute_listing_pricing(listing, start, end, room=hotel_room)
                 total_price = round(pricing["total"], 2)
-                booking = serializer.save(customer=request.user, total_price=total_price)
-                # Instant book: auto-confirm if listing is set to instant
-                if listing.booking_mode == 'instant':
-                    booking.status = 'confirmed'
-                    booking.confirmed_at = timezone.now()
-                    booking.save(update_fields=['status', 'confirmed_at'])
-                log_activity(
-                    request, 'booking_created',
-                    resource_type='booking', resource_id=booking.id,
-                    listing_id=listing.id,
-                    start_date=str(start), end_date=str(end),
-                    status=booking.status,
+                service_fee = round(pricing["service_fee"], 2)
+
+                booking = serializer.save(
+                    customer=request.user,
+                    status='pending_host',
+                    total_price=total_price,
+                    service_fee=service_fee,
+                    host_confirm_deadline=timezone.now() + timedelta(days=HOST_CONFIRM_DAYS),
                 )
-                return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+            # Notify the host (to confirm) and admins — outside the lock.
+            try:
+                from notifications.services import notify_reservation_requested
+                notify_reservation_requested(booking)
+            except Exception:
+                pass
+
+            log_activity(
+                request, 'booking_created',
+                resource_type='booking', resource_id=booking.id,
+                listing_id=listing.id,
+                start_date=str(start), end_date=str(end),
+                status=booking.status,
+            )
+            return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
         except Listing.DoesNotExist:
             return Response({'error': 'Listing not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -176,7 +169,7 @@ def bookings_collection(request):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(["GET", "PUT", "DELETE"])
+@api_view(["GET", "DELETE"])
 @permission_classes([IsAuthenticated])
 def booking_detail(request, id):
     try:
@@ -199,18 +192,30 @@ def booking_detail(request, id):
     if request.method == "GET":
         return Response(BookingSerializer(booking, context={'request': request}).data)
 
-    elif request.method == "PUT":
-        if booking.customer != request.user and not (request.user.is_staff or request.user.is_superuser):
-            return Response({"error": "Only booking owner can update this booking"}, status=status.HTTP_403_FORBIDDEN)
-        serializer = BookingSerializer(booking, data=request.data, partial=True, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(BookingSerializer(booking, context={'request': request}).data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
     elif request.method == "DELETE":
-        booking.delete()
-        return Response({"message": "Booking deleted"}, status=status.HTTP_204_NO_CONTENT)
+        # Soft cancel: keep the row for history / audit / dispute records instead
+        # of hard-deleting. The partial unique constraint excludes 'cancelled',
+        # so the guest can still re-book the same property/dates afterwards.
+        if booking.status == 'cancelled':
+            # Idempotent — already cancelled.
+            return Response(BookingSerializer(booking, context={'request': request}).data)
+        if booking.status in ('declined', 'completed'):
+            return Response(
+                {"error": f"A {booking.get_status_display().lower()} booking cannot be cancelled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        was_holding = booking.status in ('awaiting_payment', 'payment_received', 'confirmed')
+        booking.status = 'cancelled'
+        booking.cancelled_at = timezone.now()
+        booking.save(update_fields=['status', 'cancelled_at'])
+
+        # If this booking had the listing pulled from public view, put it back
+        # (unless another booking now holds it).
+        if was_holding:
+            from .services import release_listing_if_unheld
+            release_listing_if_unheld(booking.listing, exclude_booking=booking)
+
+        return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -218,13 +223,27 @@ def booking_detail(request, id):
 def pending_bookings(request):
     if request.user.role not in ['agent', 'admin']:
         return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
-    bookings = Booking.objects.filter(listing__owner=request.user, status='requested').order_by('-requested_at')
+    bookings = Booking.objects.filter(
+        listing__owner=request.user,
+        status__in=['pending_host', 'requested', 'pending'],  # legacy statuses included
+    ).order_by('-requested_at')
     return Response(BookingSerializer(bookings, many=True, context={'request': request}).data)
+
+
+# Statuses a host can act on when confirming/declining a reservation
+# ('requested'/'pending' are legacy rows from before the flow change).
+_HOST_ACTIONABLE = ('pending_host', 'requested', 'pending')
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def confirm_booking(request, id):
+    """
+    Host confirms a reservation. This does NOT finalize the booking — it moves
+    it to 'awaiting_payment', pulls the listing from public view, starts the
+    10-day payment clock, and auto-declines competing reservations. The guest
+    then pays, and an admin confirms the payment (see admin_confirm_payment).
+    """
     try:
         booking = Booking.objects.get(pk=id)
     except Booking.DoesNotExist:
@@ -233,15 +252,11 @@ def confirm_booking(request, id):
     if booking.listing.owner != request.user:
         return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
 
-    # 'pending' is legacy data from the original migration (before the model
-    # default was changed to 'requested'); accept both so old bookings can
-    # still be actioned.
-    if booking.status not in ('requested', 'pending'):
+    if booking.status not in _HOST_ACTIONABLE:
         return Response({'error': 'Booking cannot be confirmed'}, status=status.HTTP_400_BAD_REQUEST)
 
-    booking.status = 'confirmed'
-    booking.confirmed_at = timezone.now()
-    booking.save()
+    from .services import host_confirm_reservation
+    host_confirm_reservation(booking)
 
     # Superhost check: auto-assign if owner meets criteria
     _check_superhost(booking.listing.owner)
@@ -265,24 +280,64 @@ def decline_booking(request, id):
     if booking.listing.owner != request.user:
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-    if booking.status not in ('requested', 'pending'):
+    if booking.status not in _HOST_ACTIONABLE:
         return Response({"error": "Booking cannot be declined"}, status=status.HTTP_400_BAD_REQUEST)
 
     serializer = BookingConfrimationSerializer(data=request.data)
     if serializer.is_valid():
-        booking.status = 'declined'
-        booking.declined_at = timezone.now()
-        booking.owner_notes = serializer.validated_data.get('owner_notes', '')
-        booking.decline_reason = serializer.validated_data.get('decline_reason', '')
-        booking.save()
+        from .services import process_booking_decline
+        process_booking_decline(
+            booking,
+            decline_reason=serializer.validated_data.get('decline_reason', ''),
+            owner_notes=serializer.validated_data.get('owner_notes', ''),
+        )
         log_activity(
             request, 'booking_declined',
             resource_type='booking', resource_id=booking.id,
             listing_id=booking.listing_id, customer_id=booking.customer_id,
-            reason=booking.decline_reason,
+            reason=serializer.validated_data.get('decline_reason', ''),
         )
         return Response(BookingSerializer(booking, context={'request': request}).data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_confirm_payment(request, id):
+    """
+    Admin confirms a received payment. All guest payments land in Home Konet's
+    account, so an admin verifies each one — this finalizes the booking
+    ('confirmed'), shares host contact, and creates the host Payout record.
+    """
+    if request.user.role != 'admin' and not request.user.is_superuser:
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        booking = Booking.objects.get(pk=id)
+    except Booking.DoesNotExist:
+        return Response({'error': 'Booking not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if booking.status != 'payment_received':
+        return Response(
+            {'error': f'Only a booking with a received payment can be confirmed (current: {booking.status}).'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from .services import admin_confirm_payment as _confirm
+    _confirm(booking, admin_user=request.user)
+    return Response(BookingSerializer(booking, context={'request': request}).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_payment_received_bookings(request):
+    """Admin: bookings whose payment is awaiting confirmation."""
+    if request.user.role != 'admin' and not request.user.is_superuser:
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    bookings = Booking.objects.filter(status='payment_received').select_related(
+        'listing', 'customer'
+    ).order_by('requested_at')
+    return Response(BookingSerializer(bookings, many=True, context={'request': request}).data)
 
 
 @api_view(['POST'])
@@ -529,3 +584,210 @@ def remove_from_comparison(request):
         return Response(PropertyComparisonSerializer(comparison, context={'request': request}).data)
     except (PropertyComparison.DoesNotExist, Listing.DoesNotExist, ComparisonItem.DoesNotExist):
         return Response({'error': 'Comparison, property or item not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# ===== Viewing appointments (Path C — long-term verification) ================
+
+_SATURDAY = 5  # Python date.weekday(): Monday=0 ... Saturday=5
+
+
+def _next_saturdays(after_date, count, exclude=None):
+    """Return the next `count` Saturdays strictly after `after_date`,
+    skipping any dates in `exclude`."""
+    exclude = exclude or set()
+    days_ahead = (_SATURDAY - after_date.weekday()) % 7
+    if days_ahead == 0:
+        days_ahead = 7  # never offer "today" — start from the next Saturday
+    sat = after_date + timedelta(days=days_ahead)
+    out = []
+    while len(out) < count:
+        if sat not in exclude:
+            out.append(sat)
+        sat += timedelta(days=7)
+    return out
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def viewing_slots(request, listing_id):
+    """Return the next available Saturday viewing slots for a listing.
+
+    One slot per property per Saturday: any Saturday already held by an active
+    viewing for this listing is skipped, so the next free Saturday is offered.
+    """
+    listing = get_object_or_404(Listing, pk=listing_id)
+    taken = set(
+        ViewingAppointment.objects.filter(
+            listing=listing,
+            status__in=ViewingAppointment.ACTIVE_STATUSES,
+        ).values_list('viewing_date', flat=True)
+    )
+    slots = _next_saturdays(timezone.now().date(), 8, exclude=taken)
+    return Response({
+        'listing': listing.id,
+        'available_saturdays': [s.isoformat() for s in slots],
+    })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def viewings_collection(request):
+    """GET: the requester's viewing appointments. POST: request a new viewing."""
+    from .serializers import ViewingAppointmentSerializer
+
+    if request.method == 'GET':
+        viewings = ViewingAppointment.objects.filter(
+            guest=request.user
+        ).select_related('listing').order_by('-created_at')
+        return Response(ViewingAppointmentSerializer(viewings, many=True, context={'request': request}).data)
+
+    # POST — request a viewing on a chosen Saturday.
+    listing_id = request.data.get('listing')
+    date_str = request.data.get('viewing_date')
+    if not listing_id or not date_str:
+        return Response({'error': 'listing and viewing_date are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    listing = get_object_or_404(Listing, pk=listing_id)
+
+    # A host can't request a viewing of their own listing.
+    if listing.owner_id == request.user.id:
+        return Response({'error': 'You cannot request a viewing of your own listing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        viewing_date = _date.fromisoformat(date_str)
+    except ValueError:
+        return Response({'error': 'Invalid viewing_date. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if viewing_date.weekday() != _SATURDAY:
+        return Response({'error': 'Viewings are only available on Saturdays'}, status=status.HTTP_400_BAD_REQUEST)
+    if viewing_date <= timezone.now().date():
+        return Response({'error': 'Viewing date must be in the future'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Guest must pick one of the six 2-hour start blocks (10:00–15:00).
+    time_str = (request.data.get('viewing_time') or '').strip()
+    # Normalize 'HH:MM:SS' → 'HH:MM'.
+    time_str = time_str[:5]
+    if time_str not in ViewingAppointment.START_TIMES:
+        return Response(
+            {'error': 'Please choose a viewing time between 10:00 AM and 3:00 PM.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    viewing_time = _time.fromisoformat(time_str)
+
+    from payments.models import get_viewing_fee
+    try:
+        with transaction.atomic():
+            # Honor the one-slot-per-Saturday rule even under concurrency.
+            slot_taken = ViewingAppointment.objects.select_for_update().filter(
+                listing=listing,
+                viewing_date=viewing_date,
+                status__in=ViewingAppointment.ACTIVE_STATUSES,
+            ).exists()
+            if slot_taken:
+                return Response(
+                    {'error': 'That Saturday is already booked for this property. Please choose another.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            viewing = ViewingAppointment.objects.create(
+                listing=listing,
+                guest=request.user,
+                viewing_date=viewing_date,
+                viewing_time=viewing_time,
+                viewing_fee=get_viewing_fee(),
+                guest_notes=request.data.get('guest_notes', ''),
+            )
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from notifications.services import notify_viewing_requested
+        notify_viewing_requested(viewing)
+    except Exception:
+        pass
+
+    from .serializers import ViewingAppointmentSerializer
+    return Response(ViewingAppointmentSerializer(viewing, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reserve_from_viewing(request, viewing_id):
+    """Guest clicks "Reserve Property" after a completed viewing (Path C).
+
+    Creates a reservation already in 'awaiting_payment' with the 10-day clock
+    running, and pulls the listing from public view.
+    """
+    try:
+        viewing = ViewingAppointment.objects.select_related('listing').get(pk=viewing_id, guest=request.user)
+    except ViewingAppointment.DoesNotExist:
+        return Response({'error': 'Viewing not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if viewing.listing.owner_id == request.user.id:
+        return Response({'error': 'You cannot reserve your own listing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if viewing.status != 'completed':
+        return Response(
+            {'error': 'You can only reserve after the viewing has been completed.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if viewing.booking_id:
+        return Response({'error': 'You have already reserved this property.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    start_str = request.data.get('start_date')
+    end_str = request.data.get('end_date')
+    if not start_str or not end_str:
+        return Response({'error': 'start_date and end_date are required'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        start = _date.fromisoformat(start_str)
+        end = _date.fromisoformat(end_str)
+    except ValueError:
+        return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+    if start >= end:
+        return Response({'error': 'End date must be after start date'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # A guest can only hold one active booking per listing+dates (enforced by a
+    # partial unique index). Surface that as a clean 400 rather than a 500.
+    if Booking.objects.filter(
+        customer=request.user, listing=viewing.listing,
+        start_date=start, end_date=end,
+        status__in=['pending_host', 'awaiting_payment', 'payment_received', 'confirmed'],
+    ).exists():
+        return Response(
+            {'error': 'You already have an active booking for these dates.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from listings.views import compute_listing_pricing
+    pricing = compute_listing_pricing(viewing.listing, start, end)
+    total_price = round(pricing['total'], 2)
+    service_fee = round(pricing['service_fee'], 2)
+
+    from .services import reserve_property_from_viewing
+    booking = reserve_property_from_viewing(viewing, start, end, total_price, service_fee)
+    return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+
+# ===== Payouts ===============================================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_payouts(request):
+    """Return the authenticated host's payout records."""
+    from payments.models import Payout
+    payouts = Payout.objects.filter(host=request.user).select_related('booking', 'booking__listing')
+    data = [
+        {
+            'id': str(p.id),
+            'booking_id': p.booking_id,
+            'listing_title': p.booking.listing.title,
+            'gross_amount': str(p.gross_amount),
+            'service_fee_amount': str(p.service_fee_amount),
+            'net_amount': str(p.net_amount),
+            'currency': p.currency,
+            'status': p.status,
+            'paid_at': p.paid_at.isoformat() if p.paid_at else None,
+            'created_at': p.created_at.isoformat(),
+        }
+        for p in payouts
+    ]
+    return Response(data)

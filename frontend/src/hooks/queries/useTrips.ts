@@ -80,24 +80,19 @@ export function useUserTrips(enabled: boolean) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Statuses that drop a reservation out of the "upcoming" list.
+  const INACTIVE = new Set<Booking['status']>([
+    'cancelled', 'declined', 'completed', 'expired_unconfirmed', 'expired_unpaid',
+  ]);
+
   const upcomingTrips = trips.filter(({ booking }) => {
     const checkOutDate = new Date(booking.checkOut);
-    return (
-      booking.status !== 'cancelled' &&
-      booking.status !== 'declined' &&
-      booking.status !== 'completed' &&
-      checkOutDate >= today
-    );
+    return !INACTIVE.has(booking.status) && checkOutDate >= today;
   });
 
   const pastTrips = trips.filter(({ booking }) => {
     const checkOutDate = new Date(booking.checkOut);
-    return (
-      booking.status === 'cancelled' ||
-      booking.status === 'declined' ||
-      booking.status === 'completed' ||
-      checkOutDate < today
-    );
+    return INACTIVE.has(booking.status) || checkOutDate < today;
   });
 
   const cancelMutation = useMutation({

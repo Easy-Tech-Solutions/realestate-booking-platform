@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard, Info, HelpCircle, Mail } from 'lucide-react';
+import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard, Info, HelpCircle, Mail, CalendarCheck } from 'lucide-react';
 import logo from '../../assets/logo2.jpg';
 import { Button } from './ui/button';
 import {
@@ -158,6 +158,10 @@ export function Header() {
                       <DropdownMenuItem onClick={() => navigate('/trips')}>
                         <HomeIcon className="w-4 h-4 mr-2" />
                         My Bookings
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/viewings')}>
+                        <CalendarCheck className="w-4 h-4 mr-2" />
+                        My Viewings
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate('/wishlists')}>
                         <Heart className="w-4 h-4 mr-2" />

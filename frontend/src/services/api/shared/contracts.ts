@@ -5,8 +5,13 @@ export interface AuthLoginResponse {
 }
 
 export interface ListingPricingResponse {
+  pricing_type?: 'nightly' | 'monthly';
   nights: number;
   base_price: number;
+  // Long-term (monthly) only
+  monthly_price?: number | null;
+  months_upfront?: number | null;
+  payment_schedule?: string | null;
   subtotal: number;
   discount: number;
   discount_label: string | null;

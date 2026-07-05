@@ -38,7 +38,7 @@ function validatePassword(password: string): string | undefined {
 export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProps) {
   const { login, register, loginWithGoogle } = useApp();
 
-  const [view, setView] = useState<AuthView>(mode);
+  const [view, setView] = useState<AuthView>(mode ?? 'login');
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -52,7 +52,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
   const [showPassword2, setShowPassword2] = useState(false);
 
   useEffect(() => {
-    setView(mode);
+    setView(mode ?? 'login');
   }, [mode, open]);
 
   const resetForm = () => {

@@ -21,9 +21,15 @@ const initiatePayment = async (payload: {
   return data.payment || data;
 };
 
+interface StripeIntentResponse {
+  client_secret: string;
+  amount_cents: number;
+}
+
 export const paymentAPI = {
   initiatePayment,
 
+  // ── Rent / booking payment (after host confirmation) ──────────────────────
   initiateMomoPayment: async (bookingId: string, phoneNumber: string): Promise<any> => {
     return initiatePayment({
       booking_id: bookingId,
@@ -31,6 +37,37 @@ export const paymentAPI = {
       gateway: 'mtn_momo',
       payment_method: 'mobile_money',
       currency: 'USD',
+    });
+  },
+
+  // Stripe PaymentIntent for the rent (amount computed server-side from the booking).
+  createBookingPaymentIntent: async (bookingId: string): Promise<StripeIntentResponse> => {
+    return fetchWithAuth<StripeIntentResponse>('/api/payments/stripe/booking-payment-intent/', {
+      method: 'POST',
+      body: JSON.stringify({ booking_id: bookingId, currency: 'usd' }),
+    });
+  },
+
+  // ── Viewing appointment fee ($3) ──────────────────────────────────────────
+  initiateViewingMomoPayment: async (viewingId: string, phoneNumber: string): Promise<any> => {
+    const data = await fetchWithAuth<PaymentEnvelope>('/api/payments/viewing/initiate/', {
+      method: 'POST',
+      body: JSON.stringify({
+        viewing_id: viewingId,
+        phone_number: phoneNumber,
+        gateway: 'mtn_momo',
+        payment_method: 'mobile_money',
+        currency: 'USD',
+      }),
+    });
+    return data.payment || data;
+  },
+
+  // Stripe PaymentIntent for the viewing fee (amount computed server-side).
+  createViewingFeeIntent: async (viewingId: string): Promise<StripeIntentResponse> => {
+    return fetchWithAuth<StripeIntentResponse>('/api/payments/stripe/viewing-fee-intent/', {
+      method: 'POST',
+      body: JSON.stringify({ viewing_id: viewingId, currency: 'usd' }),
     });
   },
 

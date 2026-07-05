@@ -78,6 +78,9 @@ export function normalizeListing(l: any): Property {
     createdAt: l.created_at,
     status: l.status as 'draft' | 'published' | undefined,
     hotelRooms: Array.isArray(l.hotel_rooms) ? l.hotel_rooms.map(normalizeHotelRoom) : undefined,
+    pricingType: (l.pricing_type as 'nightly' | 'monthly') || 'nightly',
+    paymentSchedule: l.payment_schedule ?? null,
+    leaseTermMonths: l.lease_term_months ?? null,
   };
 }
 
@@ -114,11 +117,20 @@ export function normalizeHotelRoomAvailability(r: any): HotelRoomAvailability {
 }
 
 export function normalizeBooking(b: any): Booking {
+  // Map backend statuses to the frontend union. New-flow statuses pass through
+  // unchanged; legacy rows ('requested'/'pending'/'payment_requested') are
+  // folded onto their closest new-flow equivalents.
   const statusMap: Record<string, Booking['status']> = {
-    requested: 'pending',
-    pending: 'pending',
+    requested: 'pending_host',
+    pending: 'pending_host',
+    pending_host: 'pending_host',
+    awaiting_payment: 'awaiting_payment',
+    payment_requested: 'awaiting_payment',
+    payment_received: 'payment_received',
     confirmed: 'confirmed',
     declined: 'declined',
+    expired_unconfirmed: 'expired_unconfirmed',
+    expired_unpaid: 'expired_unpaid',
     cancelled: 'cancelled',
     completed: 'completed',
   };
@@ -196,14 +208,54 @@ export function normalizeBooking(b: any): Booking {
     totalPrice: Number(b.total_price || 0),
     basePrice: Number(b.base_price || 0),
     cleaningFee: 0,
-    serviceFee: 0,
+    serviceFee: Number(b.service_fee || 0),
     taxes: 0,
-    status: statusMap[b.status] || 'pending',
+    status: statusMap[b.status] || 'pending_host',
     paymentStatus: (b.payment_status as Booking['paymentStatus']) || 'pending',
     paymentMethod: (b.payment_method as Booking['paymentMethod']) || 'stripe',
     specialRequests: b.notes,
     hotelRoomId: b.hotel_room ? String(b.hotel_room) : undefined,
+    requiresViewing: Boolean(b.requires_viewing),
+    hostConfirmDeadline: b.host_confirm_deadline || undefined,
+    hostConfirmedAt: b.host_confirmed_at || undefined,
+    paymentDueAt: b.payment_due_at || undefined,
+    daysUntilExpiry: typeof b.days_until_expiry === 'number' ? b.days_until_expiry : undefined,
     createdAt: b.requested_at,
+  };
+}
+
+export function normalizeViewing(v: any): import('../../../core/types').ViewingAppointment {
+  return {
+    id: String(v.id),
+    listingId: String(v.listing),
+    listingTitle: v.listing_title || 'Property',
+    viewingDate: v.viewing_date,
+    viewingTime: v.viewing_time || undefined,
+    viewingTimeRange: v.viewing_time_range || '',
+    status: v.status,
+    statusDisplay: v.status_display || v.status,
+    viewingFee: Number(v.viewing_fee || 0),
+    isFeePaid: Boolean(v.is_fee_paid),
+    feePaidAt: v.fee_paid_at || undefined,
+    scheduledAt: v.scheduled_at || undefined,
+    bookingId: v.booking ? String(v.booking) : undefined,
+    createdAt: v.created_at,
+  };
+}
+
+export function normalizePayout(p: any): import('../../../core/types').Payout {
+  return {
+    id: String(p.id),
+    bookingId: String(p.booking_id ?? p.booking ?? ''),
+    listingTitle: p.listing_title || 'Property',
+    hostName: p.host_name || '',
+    grossAmount: Number(p.gross_amount || 0),
+    serviceFeeAmount: Number(p.service_fee_amount || 0),
+    netAmount: Number(p.net_amount || 0),
+    currency: p.currency || 'USD',
+    status: p.status || 'pending',
+    paidAt: p.paid_at || undefined,
+    createdAt: p.created_at,
   };
 }
 

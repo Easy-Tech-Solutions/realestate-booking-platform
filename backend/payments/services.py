@@ -20,16 +20,27 @@ class PaymentService:
             return None
 
     @classmethod
-    def create_payment(cls, booking, gateway_name: str, amount: float,
-                       currency_code: str, payment_method: str, **kwargs) -> Payment:
+    def create_payment(cls, gateway_name: str, amount: float,
+                       currency_code: str, payment_method: str,
+                       booking=None, viewing=None, **kwargs) -> Payment:
+        """Create a pending Payment for either a booking (rent) or a viewing fee.
+
+        Exactly one of `booking` / `viewing` must be supplied. Works the same
+        for every gateway — only the purpose and the linked object differ.
+        """
+        if (booking is None) == (viewing is None):
+            raise ValueError('Provide exactly one of booking or viewing')
+
         with transaction.atomic():
             currency = Currency.objects.get(code=currency_code)
             gateway = PaymentGateway.objects.get(name=gateway_name)
 
             payment = Payment.objects.create(
                 booking=booking,
+                viewing=viewing,
+                purpose='booking' if booking else 'viewing_fee',
                 gateway=gateway,
-                user=booking.customer,
+                user=booking.customer if booking else viewing.guest,
                 amount=amount,
                 currency=currency,
                 payment_method=payment_method,
@@ -93,12 +104,19 @@ class PaymentService:
             if result.get('success'):
                 mtn_status = result.get('status')  # 'pending' | 'completed' | 'failed'
 
-                if mtn_status == 'completed' and payment.status != 'completed':
-                    payment.status = 'completed'
-                    payment.completed_at = timezone.now()
-                    payment.gateway_response = result
-                    payment.save(update_fields=['status', 'completed_at', 'gateway_response'])
-                    cls._on_payment_confirmed(payment)
+                if mtn_status == 'completed':
+                    # Atomic so the payment-completed flag and its side effects
+                    # (mark viewing/booking) commit together — never one without
+                    # the other. _on_payment_confirmed runs even if the payment
+                    # was already marked completed, so a previously-failed side
+                    # effect self-heals on the next poll (it is idempotent).
+                    with transaction.atomic():
+                        if payment.status != 'completed':
+                            payment.status = 'completed'
+                            payment.completed_at = timezone.now()
+                            payment.gateway_response = result
+                            payment.save(update_fields=['status', 'completed_at', 'gateway_response'])
+                        cls._on_payment_confirmed(payment)
 
                 elif mtn_status == 'failed':
                     payment.status = 'failed'
@@ -119,10 +137,14 @@ class PaymentService:
         """
         with transaction.atomic():
             payment.gateway_response = payload
-            if mtn_status == 'SUCCESSFUL' and payment.status != 'completed':
-                payment.status = 'completed'
-                payment.completed_at = timezone.now()
-                payment.save(update_fields=['status', 'completed_at', 'gateway_response'])
+            if mtn_status == 'SUCCESSFUL':
+                if payment.status != 'completed':
+                    payment.status = 'completed'
+                    payment.completed_at = timezone.now()
+                    payment.save(update_fields=['status', 'completed_at', 'gateway_response'])
+                else:
+                    payment.save(update_fields=['gateway_response'])
+                # Idempotent — safe to run even if already completed.
                 cls._on_payment_confirmed(payment)
 
             elif mtn_status in ('FAILED', 'TIMEOUT'):
@@ -135,18 +157,23 @@ class PaymentService:
     @classmethod
     def _on_payment_confirmed(cls, payment: Payment) -> None:
         """
-        Centralised post-payment logic — confirm the booking only.
+        Centralised post-payment logic, routed by what was paid for.
 
-        Funds are held in the platform's MoMo account (escrow) until the
-        guest has actually checked in; payout to the host is then triggered
-        manually via the admin dashboard. Do NOT call ``transfer_to_owner``
-        here — that would auto-forward the money on payment and defeat the
-        escrow guarantee.
+        Viewing fee: mark the viewing as paid so admins can schedule the visit.
+
+        Booking/rent: move the reservation to 'payment_received'. All funds are
+        held in the platform's account; an admin then confirms the payment
+        (which finalizes the booking and creates the host Payout). We do NOT
+        auto-confirm or auto-forward funds here — that preserves the escrow
+        guarantee and the admin verification step.
         """
-        booking = payment.booking
-        booking.status = 'confirmed'
-        booking.confirmed_at = timezone.now()
-        booking.save(update_fields=['status', 'confirmed_at'])
+        if payment.purpose == 'viewing_fee' or payment.viewing_id:
+            from bookings.services import mark_viewing_fee_paid
+            mark_viewing_fee_paid(payment.viewing, payment=payment)
+            return
+
+        from bookings.services import mark_guest_paid
+        mark_guest_paid(payment.booking)
 
     @classmethod
     def transfer_to_owner(cls, payment: Payment) -> Dict[str, Any]:

@@ -138,7 +138,11 @@ export const propertiesAPI = {
   },
 
   calculatePricing: async (id: string, startDate: string, endDate: string, roomId?: string): Promise<{
+    pricingType: 'nightly' | 'monthly';
     nights: number;
+    monthlyPrice: number | null;
+    monthsUpfront: number | null;
+    paymentSchedule: string | null;
     subtotal: number;
     discount: number;
     discountLabel: string | null;
@@ -152,7 +156,11 @@ export const propertiesAPI = {
     if (roomId) url += `&room_id=${encodeURIComponent(roomId)}`;
     const data = await fetchWithAuth<ListingPricingResponse>(url);
     return {
+      pricingType: data.pricing_type || 'nightly',
       nights: data.nights,
+      monthlyPrice: data.monthly_price ?? null,
+      monthsUpfront: data.months_upfront ?? null,
+      paymentSchedule: data.payment_schedule ?? null,
       subtotal: data.subtotal,
       discount: data.discount,
       discountLabel: data.discount_label,

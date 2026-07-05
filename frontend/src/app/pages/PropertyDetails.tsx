@@ -27,6 +27,12 @@ import { fallbackIcon, iconMap } from '../../core/icon-map';
 import { queryKeys } from '../../hooks/queries/keys';
 import { LiberiaMap } from '../components/LiberiaMap';
 
+function addMonths(d: Date, months: number): Date {
+  const x = new Date(d);
+  x.setMonth(x.getMonth() + months);
+  return x;
+}
+
 function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [hovered, setHovered] = useState(0);
   return (
@@ -85,6 +91,9 @@ export function PropertyDetails() {
     return () => clearInterval(timer);
   }, [isAutoPlaying, propertyQuery.data?.images?.length]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  // Long-term (monthly) listings: the guest picks a single move-in date and the
+  // end date is derived from the host's fixed lease term.
+  const [moveInDate, setMoveInDate] = useState<Date | undefined>();
   const [guests, setGuests] = useState(2);
 
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -105,15 +114,25 @@ export function PropertyDetails() {
   });
   const [selectedRoom, setSelectedRoom] = useState<HotelRoom | null>(null);
   const [roomQuantity, setRoomQuantity] = useState(1);
+  // Long-term listings derive the date range from move-in + lease term; nightly
+  // listings use the calendar range. Everything downstream (pricing, reserve)
+  // reads these effective dates.
+  const isMonthly = propertyQuery.data?.pricingType === 'monthly';
+  const leaseMonths = propertyQuery.data?.leaseTermMonths || 12;
+  const effFrom = isMonthly ? moveInDate : dateRange?.from;
+  const effTo = isMonthly
+    ? (moveInDate ? addMonths(moveInDate, leaseMonths) : undefined)
+    : dateRange?.to;
+
   const pricingQuery = usePropertyPricing(
     id,
-    dateRange?.from?.toISOString().split('T')[0],
-    dateRange?.to?.toISOString().split('T')[0],
+    effFrom?.toISOString().split('T')[0],
+    effTo?.toISOString().split('T')[0],
     selectedRoom?.id,
   );
 
-  const startDateStr = dateRange?.from?.toISOString().split('T')[0];
-  const endDateStr = dateRange?.to?.toISOString().split('T')[0];
+  const startDateStr = effFrom?.toISOString().split('T')[0];
+  const endDateStr = effTo?.toISOString().split('T')[0];
   const isHotel = propertyQuery.data?.propertyType === 'hotels';
 
   const roomAvailabilityQuery = useQuery({
@@ -216,13 +235,21 @@ export function PropertyDetails() {
     }
   };
 
+  const isOwner = !!user && !!property && String(user.id) === String(property.hostId);
+  // Long-term (monthly) listings are priced per month; everything else per night.
+  const priceUnit = property?.pricingType === 'monthly' ? 'month' : 'night';
+
   const handleReserve = () => {
     if (!isAuthenticated) {
       toast.error('Please log in to make a reservation');
       return;
     }
-    if (!dateRange?.from || !dateRange?.to) {
-      toast.error('Please select check-in and check-out dates');
+    if (isOwner) {
+      toast.error("You can't book your own listing.");
+      return;
+    }
+    if (!effFrom || !effTo) {
+      toast.error(isMonthly ? 'Please select a move-in date' : 'Please select check-in and check-out dates');
       return;
     }
     const hotelRooms = propertyQuery.data?.hotelRooms ?? [];
@@ -231,9 +258,123 @@ export function PropertyDetails() {
       return;
     }
     navigate('/book', {
-      state: { property, checkIn: dateRange.from, checkOut: dateRange.to, guests, pricing, selectedRoom, roomQuantity },
+      state: { property, checkIn: effFrom, checkOut: effTo, guests, pricing, selectedRoom, roomQuantity },
     });
   };
+
+  // The checkout card is shared between the desktop sticky sidebar and the
+  // mobile layout (where it sits right below the calendar).
+  const bookingCard = (
+    <div className="border border-border rounded-xl p-4 sm:p-6 shadow-xl">
+      <div className="flex items-baseline gap-1 mb-4">
+        <span className="text-2xl font-semibold">
+          {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)}
+        </span>
+        <span className="text-muted-foreground">{selectedRoom ? 'night' : priceUnit}</span>
+        {selectedRoom && (
+          <span className="text-xs text-muted-foreground ml-1">· {selectedRoom.name}</span>
+        )}
+      </div>
+
+      <div className="space-y-3 mb-4">
+        <div className="grid grid-cols-2 border border-border rounded-xl overflow-hidden">
+          <div className="p-3 border-r border-border">
+            <label className="text-xs font-semibold block mb-1">{isMonthly ? 'MOVE-IN' : 'CHECK-IN'}</label>
+            <p className="text-sm">{effFrom ? formatDate(effFrom, 'MM/dd/yyyy') : 'Add date'}</p>
+          </div>
+          <div className="p-3">
+            <label className="text-xs font-semibold block mb-1">{isMonthly ? 'LEASE ENDS' : 'CHECKOUT'}</label>
+            <p className="text-sm">{effTo ? formatDate(effTo, 'MM/dd/yyyy') : 'Add date'}</p>
+          </div>
+        </div>
+
+        <div className="border border-border rounded-xl p-3">
+          <label className="text-xs font-semibold block mb-1">GUESTS</label>
+          <div className="flex items-center justify-between">
+            <span className="text-sm">{guests} guest{guests > 1 ? 's' : ''}</span>
+            <div className="flex items-center gap-2">
+              <button
+                aria-label="Decrease guests"
+                onClick={() => setGuests(g => Math.max(1, g - 1))}
+                className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
+                disabled={guests <= 1}
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <button
+                aria-label="Increase guests"
+                onClick={() => setGuests(g => Math.min(property.guests || 10, g + 1))}
+                className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
+                disabled={property.guests > 0 && guests >= property.guests}
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {isOwner ? (
+        <div className="rounded-lg bg-secondary/40 p-4 text-center text-sm text-muted-foreground mb-4">
+          This is your listing. Manage it from your{' '}
+          <button className="underline font-medium" onClick={() => navigate('/host')}>host dashboard</button>.
+        </div>
+      ) : (
+        <>
+          <Button onClick={handleReserve} className="w-full mb-3" size="lg">Reserve</Button>
+
+          {property.pricingType === 'monthly' && (
+            <Button
+              variant="outline"
+              className="w-full mb-4"
+              size="lg"
+              onClick={() => {
+                if (!isAuthenticated) {
+                  toast.error('Please log in to request a viewing');
+                  return;
+                }
+                navigate(`/rooms/${property.id}/viewing`, { state: { property } });
+              }}
+            >
+              Request a viewing first
+            </Button>
+          )}
+
+          <p className="text-center text-sm text-muted-foreground mb-4">You won't be charged yet</p>
+        </>
+      )}
+
+      {pricing && (
+        <>
+          <div className="space-y-3 mb-4">
+            <div className="flex justify-between text-sm">
+              <span className="underline">
+                {pricing.pricingType === 'monthly'
+                  ? `First ${pricing.monthsUpfront || 1} month${(pricing.monthsUpfront || 1) > 1 ? 's' : ''}`
+                  : `${formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)} x ${nights} nights`}
+              </span>
+              <span>{formatCurrency(pricing.subtotal)}</span>
+            </div>
+            {pricing.discount > 0 && (
+              <div className="flex justify-between text-sm text-green-700">
+                <span className="underline">{pricing.discountLabel || 'Discount'}</span>
+                <span>-{formatCurrency(pricing.discount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm">
+              <span className="underline">Service fee</span>
+              <span>{formatCurrency(pricing.serviceFee)}</span>
+            </div>
+          </div>
+          <Separator className="my-4" />
+          <div className="flex justify-between font-semibold">
+            <span>Total</span>
+            <span>{formatCurrency(pricing.total)}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -654,25 +795,52 @@ export function PropertyDetails() {
                 </>
               )}
 
-              {/* Calendar */}
+              {/* Date selection */}
               <div>
-                <h2 className="text-2xl font-semibold mb-6">Select dates</h2>
-                <div className="flex justify-center">
-                  <Calendar
-                    mode="range"
-                    selected={dateRange}
-                    onSelect={handleDateRangeSelect}
-                    onDayClick={handleDayClick}
-                    modifiers={{ booked: isBookedDate }}
-                    modifiersClassNames={{
-                      booked: 'line-through opacity-50 text-muted-foreground',
-                    }}
-                    numberOfMonths={2}
-                    disabled={isPastDate}
-                    className="border rounded-xl p-4"
-                  />
-                </div>
+                {isMonthly ? (
+                  <>
+                    <h2 className="text-2xl font-semibold mb-2">Choose your move-in date</h2>
+                    <p className="text-muted-foreground mb-6 text-sm">
+                      This is a {leaseMonths === 12 ? '1-year' : leaseMonths === 24 ? '2-year' : leaseMonths === 36 ? '3-year' : `${leaseMonths}-month`} lease.
+                      {moveInDate && effTo && (
+                        <> Lease runs {formatDate(moveInDate, 'MMM dd, yyyy')} – {formatDate(effTo, 'MMM dd, yyyy')}.</>
+                      )}
+                    </p>
+                    <div className="flex justify-center">
+                      <Calendar
+                        mode="single"
+                        selected={moveInDate}
+                        onSelect={(d) => setMoveInDate(d)}
+                        numberOfMonths={2}
+                        disabled={isPastDate}
+                        className="border rounded-xl p-4"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-semibold mb-6">Select dates</h2>
+                    <div className="flex justify-center">
+                      <Calendar
+                        mode="range"
+                        selected={dateRange}
+                        onSelect={handleDateRangeSelect}
+                        onDayClick={handleDayClick}
+                        modifiers={{ booked: isBookedDate }}
+                        modifiersClassNames={{
+                          booked: 'line-through opacity-50 text-muted-foreground',
+                        }}
+                        numberOfMonths={2}
+                        disabled={isPastDate}
+                        className="border rounded-xl p-4"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
+
+              {/* Checkout card — mobile only, directly below the calendar */}
+              <div className="lg:hidden">{bookingCard}</div>
 
               <Separator />
 
@@ -921,96 +1089,11 @@ export function PropertyDetails() {
               </div>
             </div>
 
-            {/* Booking Widget - shown inline on mobile above content, sticky on desktop */}
-            <div className="lg:col-span-1 lg:order-2">
+            {/* Booking Widget — sticky sidebar on desktop. On mobile it's
+                rendered inline directly below the calendar (see above). */}
+            <div className="hidden lg:block lg:col-span-1 lg:order-2">
               <div className="sticky top-24">
-                <div className="border border-border rounded-xl p-4 sm:p-6 shadow-xl">
-                  <div className="flex items-baseline gap-1 mb-4">
-                    <span className="text-2xl font-semibold">
-                      {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)}
-                    </span>
-                    <span className="text-muted-foreground">night</span>
-                    {selectedRoom && (
-                      <span className="text-xs text-muted-foreground ml-1">· {selectedRoom.name}</span>
-                    )}
-                  </div>
-
-                  <div className="space-y-3 mb-4">
-                    <div className="grid grid-cols-2 border border-border rounded-xl overflow-hidden">
-                      <div className="p-3 border-r border-border">
-                        <label className="text-xs font-semibold block mb-1">CHECK-IN</label>
-                        <p className="text-sm">
-                          {dateRange?.from ? formatDate(dateRange.from, 'MM/dd/yyyy') : 'Add date'}
-                        </p>
-                      </div>
-                      <div className="p-3">
-                        <label className="text-xs font-semibold block mb-1">CHECKOUT</label>
-                        <p className="text-sm">
-                          {dateRange?.to ? formatDate(dateRange.to, 'MM/dd/yyyy') : 'Add date'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="border border-border rounded-xl p-3">
-                      <label className="text-xs font-semibold block mb-1">GUESTS</label>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">{guests} guest{guests > 1 ? 's' : ''}</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            aria-label="Decrease guests"
-                            onClick={() => setGuests(g => Math.max(1, g - 1))}
-                            className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
-                            disabled={guests <= 1}
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <button
-                            aria-label="Increase guests"
-                            onClick={() => setGuests(g => Math.min(property.guests || 10, g + 1))}
-                            className="w-6 h-6 rounded-full border border-border flex items-center justify-center hover:border-foreground disabled:opacity-40"
-                            disabled={property.guests > 0 && guests >= property.guests}
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Button onClick={handleReserve} className="w-full mb-4" size="lg">
-                    Reserve
-                  </Button>
-
-                  <p className="text-center text-sm text-muted-foreground mb-4">
-                    You won't be charged yet
-                  </p>
-
-                  {pricing && (
-                    <>
-                      <div className="space-y-3 mb-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="underline">{formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)} x {nights} nights</span>
-                          <span>{formatCurrency(pricing.subtotal)}</span>
-                        </div>
-                        {pricing.discount > 0 && (
-                          <div className="flex justify-between text-sm text-green-700">
-                            <span className="underline">{pricing.discountLabel || 'Discount'}</span>
-                            <span>-{formatCurrency(pricing.discount)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm">
-                          <span className="underline">Service fee</span>
-                          <span>{formatCurrency(pricing.serviceFee)}</span>
-                        </div>
-                      </div>
-                      <Separator className="my-4" />
-                      <div className="flex justify-between font-semibold">
-                        <span>Total</span>
-                        <span>{formatCurrency(pricing.total)}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
+                {bookingCard}
               </div>
             </div>
           </div>
@@ -1021,12 +1104,20 @@ export function PropertyDetails() {
       <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-white border-t border-border px-4 py-3 flex items-center justify-between shadow-lg">
         <div>
           <span className="text-lg font-semibold">{formatCurrency(property.price)}</span>
-          <span className="text-muted-foreground text-sm"> / night</span>
+          <span className="text-muted-foreground text-sm"> / {priceUnit}</span>
           {nights > 0 && pricing && (
-            <p className="text-xs text-muted-foreground">{nights} nights · {formatCurrency(pricing.total)} total</p>
+            <p className="text-xs text-muted-foreground">
+              {pricing.pricingType === 'monthly'
+                ? `${pricing.monthsUpfront || 1} month${(pricing.monthsUpfront || 1) > 1 ? 's' : ''} upfront · ${formatCurrency(pricing.total)} total`
+                : `${nights} nights · ${formatCurrency(pricing.total)} total`}
+            </p>
           )}
         </div>
-        <Button onClick={handleReserve} size="lg">Reserve</Button>
+        {isOwner ? (
+          <Button variant="outline" size="lg" onClick={() => navigate('/host')}>Your listing</Button>
+        ) : (
+          <Button onClick={handleReserve} size="lg">Reserve</Button>
+        )}
       </div>
 
       {/* Image Gallery Modal */}

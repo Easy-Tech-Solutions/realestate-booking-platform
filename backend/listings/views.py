@@ -85,9 +85,14 @@ def category_detail(request, id):
 @parser_classes([MultiPartParser, FormParser])
 def listings_collection(request):
     if request.method == "GET":
+        # Only publicly browsable listings: published, not soft-deleted, and
+        # still available. A listing is pulled (is_available=False) once a host
+        # confirms a reservation on it, so it must drop out of browse/search.
         items = ListingFilter(
             request.GET,
-            queryset=Listing.objects.filter(status='published', deleted_at__isnull=True),
+            queryset=Listing.objects.filter(
+                status='published', deleted_at__isnull=True, is_available=True,
+            ),
         )
         qs = items.qs
 
@@ -116,7 +121,11 @@ def listings_collection(request):
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         serializer = ListingSerializer(data=request.data)
         if serializer.is_valid():
-            listing = serializer.save(owner=request.user)
+            # No admin-review step for now: a submitted listing publishes
+            # immediately. Drafts (saved via "Save & exit") stay drafts. Forced
+            # here in the view so it can't fall back to a pending_review default.
+            new_status = 'draft' if request.data.get('status') == 'draft' else 'published'
+            listing = serializer.save(owner=request.user, status=new_status)
             return Response(ListingSerializer(listing, context={"request": request}).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -547,7 +556,10 @@ def nearby_listings(request):
 
     qs = (
         Listing.objects
-        .filter(status="published", latitude__isnull=False, longitude__isnull=False)
+        .filter(
+            status="published", deleted_at__isnull=True, is_available=True,
+            latitude__isnull=False, longitude__isnull=False,
+        )
         .exclude(latitude=0, longitude=0)
         .select_related("owner")
     )
@@ -589,12 +601,55 @@ def listing_availability(request, listing_id):
     return Response({"booked_dates": booked_dates})
 
 
+# Months required upfront for each long-term payment schedule.
+MONTHS_PER_SCHEDULE = {'monthly': 1, 'quarterly': 3, 'biannual': 6, 'annual': 12}
+
+
 def compute_listing_pricing(listing, start, end, room=None):
     """Compute the full pricing breakdown for a stay. Shared by the pricing
     endpoint and booking creation so the email/receipt total matches what the
-    guest saw at checkout."""
-    from datetime import date as _date, timedelta as _td
+    guest saw at checkout.
 
+    Two pricing models:
+      * Nightly (hotels, short stays): subtotal = nights × nightly rate, with
+        weekend premiums and length-of-stay discounts.
+      * Monthly (long-term rentals): the guest pays the host-defined upfront
+        amount = monthly price × the number of months in `payment_schedule`
+        (e.g. 6-month upfront on a $60/mo listing → $360 + service fee). Nights
+        and nightly discounts do not apply.
+    The service fee (read from PlatformFee) is added on top either way.
+    """
+    from datetime import date as _date, timedelta as _td
+    from payments.models import get_service_fee_rate
+
+    fee_rate = float(get_service_fee_rate())
+
+    # ---- Long-term (monthly) pricing -------------------------------------
+    # Hotel rooms are always nightly; only whole long-term listings price by month.
+    if room is None and getattr(listing, 'pricing_type', 'nightly') == 'monthly':
+        schedule = listing.payment_schedule or 'monthly'
+        months_upfront = MONTHS_PER_SCHEDULE.get(schedule, 1)
+        monthly_price = float(listing.price)
+        subtotal = monthly_price * months_upfront
+        service_fee = subtotal * fee_rate
+        return {
+            "pricing_type": "monthly",
+            "nights": (end - start).days if (start and end) else 0,
+            "base_price": monthly_price,
+            "monthly_price": monthly_price,
+            "months_upfront": months_upfront,
+            "payment_schedule": schedule,
+            "subtotal": subtotal,
+            "discount": 0.0,
+            "discount_label": None,
+            "discounted_subtotal": subtotal,
+            "cleaning_fee": 0.0,
+            "service_fee": service_fee,
+            "taxes": 0.0,
+            "total": subtotal + service_fee,
+        }
+
+    # ---- Nightly pricing -------------------------------------------------
     nights = (end - start).days
     base_price = float(room.price_per_night) if room else float(listing.price)
     weekend_premium = listing.weekend_premium_percent / 100.0
@@ -625,11 +680,15 @@ def compute_listing_pricing(listing, start, end, room=None):
     # the nightly subtotal plus the platform service fee. Kept as 0.0 in the
     # response so any consumer that still reads these keys keeps working.
     cleaning_fee = 0.0
-    service_fee = discounted_subtotal * 0.04
+    # Service fee rate (fee_rate) comes from the admin-editable PlatformFee
+    # config so the guest's checkout total matches the receipt email and host
+    # payout math.
+    service_fee = discounted_subtotal * fee_rate
     taxes = 0.0
     total = discounted_subtotal + service_fee
 
     return {
+        "pricing_type": "nightly",
         "nights": nights,
         "base_price": base_price,
         "subtotal": subtotal,
@@ -684,8 +743,13 @@ def listing_pricing(request, listing_id):
     total = pricing["total"]
 
     return Response({
+        "pricing_type": pricing.get("pricing_type", "nightly"),
         "nights": nights,
         "base_price": base_price,
+        # Long-term only — null/0 for nightly stays.
+        "monthly_price": pricing.get("monthly_price"),
+        "months_upfront": pricing.get("months_upfront"),
+        "payment_schedule": pricing.get("payment_schedule"),
         "subtotal": round(subtotal, 2),
         "discount": round(discount, 2),
         "discount_label": discount_label,
@@ -849,7 +913,7 @@ def hotel_room_image_detail(request, listing_id, room_id, image_id):
 def my_drafts(request):
     if not request.user.is_authenticated:
         return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-    drafts = Listing.objects.filter(owner=request.user, status='draft').order_by('-updated_at')
+    drafts = Listing.objects.filter(owner=request.user, status='draft', deleted_at__isnull=True).order_by('-updated_at')
     return Response(ListingSerializer(drafts, many=True, context={"request": request}).data)
 
 
@@ -858,7 +922,7 @@ def my_listings(request):
     """Authenticated host: see all own listings (all statuses)."""
     if not request.user.is_authenticated:
         return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-    items = Listing.objects.filter(owner=request.user).exclude(status='draft').order_by('-created_at')
+    items = Listing.objects.filter(owner=request.user, deleted_at__isnull=True).exclude(status='draft').order_by('-created_at')
     return Response(ListingSerializer(items, many=True, context={"request": request}).data)
 
 

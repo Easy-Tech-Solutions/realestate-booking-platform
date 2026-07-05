@@ -1,6 +1,23 @@
 from rest_framework import serializers
 from .models import Payment, Currency, Refund, SavedCard
-from bookings.models import Booking
+from bookings.models import Booking, ViewingAppointment
+
+# Mobile-money / bank gateways routed through PaymentService (Stripe uses its
+# own PaymentIntent endpoints).
+_GATEWAY_CHOICES = ['mtn_momo', 'flutterwave', 'orange_money', 'paystack']
+
+
+def _validate_gateway(value):
+    if value not in _GATEWAY_CHOICES:
+        raise serializers.ValidationError("Invalid payment gateway")
+    return value
+
+
+def _validate_currency(value):
+    if not Currency.objects.filter(code=value, is_active=True).exists():
+        raise serializers.ValidationError("Currency not supported")
+    return value
+
 
 class PaymentInitiateSerializer(serializers.ModelSerializer):
     #Serializer for initiating payments
@@ -18,25 +35,51 @@ class PaymentInitiateSerializer(serializers.ModelSerializer):
     def validate_booking_id(self,value):
         try:
             booking = Booking.objects.get(pk=value, customer=self.context['request'].user)
-            if booking.status != 'requested':
-                raise serializers.ValidationError("Booking must be in 'requested' status")
+            # New flow: rent is paid once the host has confirmed the reservation.
+            # 'requested' is accepted for legacy rows.
+            if booking.status not in ('awaiting_payment', 'requested'):
+                raise serializers.ValidationError("Booking must be awaiting payment")
             if booking.payments.filter(status__in=['completed', 'processing']).exists():
                 raise serializers.ValidationError("Payment already exists for this booking")
             return booking
         except Booking.DoesNotExist:
             raise serializers.ValidationError("Booking not found")
-    
+
 
     def validate_gateway(self, value):
-        if value not in ['mtn_momo', 'flutterwave', 'orange_money']:
-            raise serializers.ValidationError("Invalid payment gateway")
-        return value
-    
+        return _validate_gateway(value)
+
 
     def validate_currency(self, value):
-        if not Currency.objects.filter(code=value, is_active=True).exists():
-            raise serializers.ValidationError("Currency not supported")
-        return value
+        return _validate_currency(value)
+
+
+class ViewingPaymentInitiateSerializer(serializers.Serializer):
+    """Initiate a (mobile-money/bank) payment of the non-refundable viewing fee."""
+    viewing_id = serializers.IntegerField()
+    gateway = serializers.CharField(max_length=20)
+    payment_method = serializers.CharField(max_length=20)
+    phone_number = serializers.CharField(max_length=20)
+    currency = serializers.CharField(max_length=3)
+
+    def validate_viewing_id(self, value):
+        try:
+            viewing = ViewingAppointment.objects.get(pk=value, guest=self.context['request'].user)
+        except ViewingAppointment.DoesNotExist:
+            raise serializers.ValidationError("Viewing not found")
+        if viewing.is_fee_paid:
+            raise serializers.ValidationError("Viewing fee already paid")
+        if viewing.status != 'requested':
+            raise serializers.ValidationError("Fee can only be paid for a newly requested viewing")
+        if viewing.payments.filter(status__in=['completed', 'processing']).exists():
+            raise serializers.ValidationError("A payment is already in progress for this viewing")
+        return viewing
+
+    def validate_gateway(self, value):
+        return _validate_gateway(value)
+
+    def validate_currency(self, value):
+        return _validate_currency(value)
     
 
 class PaymentVerifySerializer(serializers.Serializer):
@@ -63,8 +106,8 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = [
-            'id', 'booking', 'booking_title', 'user', 'customer_username',
-            'gateway', 'gateway_name', 'amount', 'currency', 'currency_code', 
+            'id', 'booking', 'booking_title', 'viewing', 'purpose', 'user', 'customer_username',
+            'gateway', 'gateway_name', 'amount', 'currency', 'currency_code',
             'currency_symbol', 'payment_method', 'status', 'phone_number',
             'card_last4', 'card_type', 'created_at', 'completed_at'
         ]

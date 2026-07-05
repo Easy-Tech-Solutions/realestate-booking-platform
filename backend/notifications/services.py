@@ -20,17 +20,51 @@ from decimal import Decimal
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
-# Platform commission on host payouts. Distinct from the guest-side service
-# fee (which is added on top of the booking subtotal); this one is subtracted
-# from what the host receives.
-HOST_SERVICE_FEE_RATE = Decimal('0.04')
-
-# Service fee added on top of the booking subtotal that the guest pays. Must
-# stay in sync with the rate used by compute_listing_pricing in listings/views.py
-# so the guest's receipt email matches what they were charged at checkout.
-GUEST_SERVICE_FEE_RATE = Decimal('0.04')
-
 logger = logging.getLogger(__name__)
+
+
+def _service_fee_rate() -> Decimal:
+    """
+    Platform service fee as a fraction (e.g. Decimal('0.04')).
+
+    Read from the admin-editable PlatformFee config so the rate lives in one
+    place. The same rate is added on top of what the guest pays AND deducted
+    from what the host receives, so the platform earns twice this rate overall.
+    Imported lazily to avoid an import cycle with the payments app.
+    """
+    from payments.models import get_service_fee_rate
+    return get_service_fee_rate()
+
+
+def _booking_amounts(booking):
+    """Canonical money breakdown for a booking.
+
+    Uses the amounts stored at reservation time (``total_price`` already
+    includes the guest service fee), which are correct for BOTH nightly and
+    monthly listings. The ``total_amount`` property is nightly-only
+    (price × days) and must NOT be used for monthly rentals — e.g. a $150/mo
+    listing on a 365-day lease would wrongly read $54,750. Falls back to
+    ``total_amount`` only for legacy rows with no stored price.
+    """
+    rate = _service_fee_rate()
+    if booking.total_price:
+        total = Decimal(str(booking.total_price))
+        guest_fee = Decimal(str(booking.service_fee or 0))
+    else:
+        subtotal_legacy = Decimal(str(booking.total_amount))
+        guest_fee = (subtotal_legacy * rate).quantize(Decimal('0.01'))
+        total = subtotal_legacy + guest_fee
+
+    subtotal = (total - guest_fee).quantize(Decimal('0.01'))
+    host_fee = (subtotal * rate).quantize(Decimal('0.01'))
+    host_received = (subtotal - host_fee).quantize(Decimal('0.01'))
+    return {
+        'subtotal': subtotal,                            # rent, excl. fees
+        'guest_service_fee': guest_fee.quantize(Decimal('0.01')),
+        'guest_total': total.quantize(Decimal('0.01')),  # what the guest pays
+        'host_service_fee': host_fee,
+        'host_received': host_received,                   # what the host nets
+    }
 
 
 # ---- Internal helpers --------------------------------------------------------
@@ -122,13 +156,21 @@ def create_notification(
             'created_at': notification.created_at.isoformat(),
         })
 
-        # Queue Web Push via Celery
-        from .tasks import send_push_notification_task
-        send_push_notification_task.delay(notification.id)
+        # Queue Web Push via Celery. Dispatch must never break the caller — a
+        # broker hiccup (or, in local dev, an eager task raising) should not
+        # roll back the booking/payment that triggered the notification.
+        try:
+            from .tasks import send_push_notification_task
+            send_push_notification_task.delay(notification.id)
+        except Exception as exc:
+            logger.warning('Could not queue push for notification %s: %s', notification.id, exc)
 
     # Email is independent of the in-app toggle — its own per-type pref decides.
     if send_email and user.email and prefs.email_enabled_for(notification_type):
-        send_notification_email.delay(notification.id)
+        try:
+            send_notification_email.delay(notification.id)
+        except Exception as exc:
+            logger.warning('Could not queue email for notification %s: %s', notification.id, exc)
 
     return notification
 
@@ -140,9 +182,10 @@ def notify_booking_requested(booking):
     owner         = booking.listing.owner
     customer_name = booking.customer.get_full_name() or booking.customer.username
 
-    booking_amount = Decimal(booking.total_amount)
-    host_service_fee = (booking_amount * HOST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
-    amount_received = (booking_amount - host_service_fee).quantize(Decimal('0.01'))
+    amounts = _booking_amounts(booking)
+    booking_amount = amounts['subtotal']
+    host_service_fee = amounts['host_service_fee']
+    amount_received = amounts['host_received']
 
     create_notification(
         user=owner,
@@ -172,9 +215,10 @@ def notify_booking_requested(booking):
 
 def notify_booking_submitted(booking):
     """Confirm to the guest that their booking request was submitted."""
-    booking_amount = Decimal(booking.total_amount)
-    service_fee = (booking_amount * GUEST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
-    total = (booking_amount + service_fee).quantize(Decimal('0.01'))
+    amounts = _booking_amounts(booking)
+    booking_amount = amounts['subtotal']
+    service_fee = amounts['guest_service_fee']
+    total = amounts['guest_total']
 
     create_notification(
         user=booking.customer,
@@ -201,9 +245,10 @@ def notify_booking_submitted(booking):
 
 def notify_booking_confirmed(booking):
     """Notify the customer their booking was confirmed."""
-    booking_amount = Decimal(booking.total_amount)
-    service_fee = (booking_amount * GUEST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
-    total = (booking_amount + service_fee).quantize(Decimal('0.01'))
+    amounts = _booking_amounts(booking)
+    booking_amount = amounts['subtotal']
+    service_fee = amounts['guest_service_fee']
+    total = amounts['guest_total']
 
     create_notification(
         user=booking.customer,
@@ -313,19 +358,307 @@ def notify_booking_completed(booking):
     )
 
 
+# ---- Reservation flow helpers (revised booking flow) -------------------------
+
+def _notify_admins(notification_type, title, message, data=None):
+    """Fan a notification out to every admin user."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    for admin in User.objects.filter(role='admin'):
+        create_notification(
+            user=admin,
+            notification_type=notification_type,
+            title=title,
+            message=message,
+            data=data or {},
+        )
+
+
+def notify_reservation_requested(booking):
+    """
+    A guest reserved a property (free). Notify the host (to confirm) and admins.
+    Reuses the host-facing 'booking_requested' notification for the host.
+    """
+    notify_booking_requested(booking)
+
+    customer_name = booking.customer.get_full_name() or booking.customer.username
+    _notify_admins(
+        notification_type='reservation_pending_admin',
+        title='New Reservation',
+        message=(
+            f'{customer_name} reserved "{booking.listing.title}" '
+            f'({booking.start_date} → {booking.end_date}). Awaiting host confirmation.'
+        ),
+        data={
+            'booking_id':    booking.id,
+            'listing_id':    booking.listing.id,
+            'listing_title': booking.listing.title,
+            'customer_name': customer_name,
+        },
+    )
+
+
+def notify_reservation_ready_to_pay(booking):
+    """Host confirmed the reservation — tell the guest to pay within the window."""
+    amounts = _booking_amounts(booking)
+    booking_amount = amounts['subtotal']
+    service_fee = amounts['guest_service_fee']
+    total = amounts['guest_total']
+
+    create_notification(
+        user=booking.customer,
+        notification_type='booking_ready_to_pay',
+        title='Reservation Confirmed — Complete Payment',
+        message=(
+            f'The host confirmed your reservation for "{booking.listing.title}". '
+            f'Complete your payment of ${total} by '
+            f'{booking.payment_due_at:%Y-%m-%d %H:%M UTC} to secure it.'
+        ),
+        data={
+            'booking_id':     booking.id,
+            'listing_id':     booking.listing.id,
+            'listing_title':  booking.listing.title,
+            'booking_amount': f'{booking_amount:.2f}',
+            'service_fee':    f'{service_fee:.2f}',
+            'total_amount':   f'{total:.2f}',
+            'payment_due_at': booking.payment_due_at.isoformat() if booking.payment_due_at else None,
+        },
+    )
+
+
+def notify_payment_awaiting_admin(booking):
+    """A guest paid — notify admins that the payment needs confirmation."""
+    customer_name = booking.customer.get_full_name() or booking.customer.username
+    _notify_admins(
+        notification_type='payment_awaiting_admin',
+        title='Payment Awaiting Confirmation',
+        message=(
+            f'{customer_name} paid for "{booking.listing.title}". '
+            f'Confirm the payment to release host contact details and create the payout.'
+        ),
+        data={
+            'booking_id':    booking.id,
+            'listing_id':    booking.listing.id,
+            'listing_title': booking.listing.title,
+            'customer_name': customer_name,
+        },
+    )
+
+
+def notify_host_payment_received(booking):
+    """
+    Notify the host that the guest's payment landed and Home Konet will disburse
+    their share. Fired when a booking reaches 'payment_received'.
+    """
+    owner = booking.listing.owner
+    amounts = _booking_amounts(booking)
+    create_notification(
+        user=owner,
+        notification_type='payment_received_host',
+        title='Payment Received',
+        message=(
+            f'The guest has paid for "{booking.listing.title}". '
+            f"You'll receive {amounts['host_received']} after our commission — "
+            f"Home Konet's team will disburse it to your account shortly."
+        ),
+        data={
+            'booking_id':       booking.id,
+            'listing_id':       booking.listing.id,
+            'listing_title':    booking.listing.title,
+            'booking_amount':   f"{amounts['subtotal']:.2f}",
+            'host_service_fee': f"{amounts['host_service_fee']:.2f}",
+            'amount_received':  f"{amounts['host_received']:.2f}",
+        },
+    )
+
+
+def notify_reservation_expired(booking, reason='unpaid'):
+    """
+    Notify the guest (and host, if the reservation was confirmed) that a
+    reservation expired. reason is 'unconfirmed' (host never confirmed) or
+    'unpaid' (guest never paid in time → listing relisted).
+    """
+    if reason == 'unconfirmed':
+        guest_msg = (
+            f'Your reservation for "{booking.listing.title}" expired because the '
+            f'host did not confirm in time. You can reserve it again if it is still available.'
+        )
+    else:
+        guest_msg = (
+            f'Your reservation for "{booking.listing.title}" expired because payment '
+            f'was not completed in time. The property has been relisted.'
+        )
+
+    create_notification(
+        user=booking.customer,
+        notification_type='reservation_expired',
+        title='Reservation Expired',
+        message=guest_msg,
+        data={
+            'booking_id':    booking.id,
+            'listing_id':    booking.listing.id,
+            'listing_title': booking.listing.title,
+            'reason':        reason,
+        },
+    )
+
+    if reason == 'unpaid':
+        create_notification(
+            user=booking.listing.owner,
+            notification_type='reservation_expired',
+            title='Reservation Expired — Property Relisted',
+            message=(
+                f'A confirmed reservation for "{booking.listing.title}" expired '
+                f'because the guest did not pay in time. The property has been relisted.'
+            ),
+            data={
+                'booking_id':    booking.id,
+                'listing_id':    booking.listing.id,
+                'listing_title': booking.listing.title,
+                'reason':        reason,
+            },
+        )
+
+
+def notify_viewing_requested(viewing):
+    """A guest requested a property viewing — notify admins to schedule it."""
+    guest_name = viewing.guest.get_full_name() or viewing.guest.username
+    _notify_admins(
+        notification_type='viewing_requested',
+        title='New Viewing Request',
+        message=(
+            f'{guest_name} requested a viewing of "{viewing.listing.title}" '
+            f'on {viewing.viewing_date} ({viewing.viewing_time_range}). '
+            f'Schedule and confirm the appointment.'
+        ),
+        data={
+            'viewing_id':    viewing.id,
+            'listing_id':    viewing.listing.id,
+            'listing_title': viewing.listing.title,
+            'guest_name':    guest_name,
+            'viewing_date':  str(viewing.viewing_date),
+            'viewing_time':  viewing.viewing_time_range,
+        },
+    )
+
+
+def notify_viewing_fee_paid(viewing, payment=None):
+    """Receipt to the guest after their (non-refundable) viewing fee is paid.
+
+    Delivered in-app and by email (a notification-and-receipt email). The
+    `payment` gives the exact amount/method/reference; we fall back to the
+    viewing's stored fee if it isn't supplied.
+    """
+    amount = payment.amount if payment is not None else viewing.viewing_fee
+    amount_str = f'{Decimal(str(amount)):.2f}'
+    currency = payment.currency.code if (payment is not None and getattr(payment, 'currency', None)) else 'USD'
+    method = payment.get_payment_method_display() if payment is not None else ''
+    reference = str(payment.id) if payment is not None else ''
+
+    create_notification(
+        user=viewing.guest,
+        notification_type='viewing_fee_paid',
+        title='Viewing Fee Paid — Receipt',
+        message=(
+            f'We received your {amount_str} {currency} viewing fee for '
+            f'"{viewing.listing.title}". Our team will schedule and confirm your '
+            f'visit on {viewing.viewing_date} ({viewing.viewing_time_range}).'
+        ),
+        data={
+            'viewing_id':     viewing.id,
+            'listing_id':     viewing.listing.id,
+            'listing_title':  viewing.listing.title,
+            'viewing_date':   str(viewing.viewing_date),
+            'viewing_time':   viewing.viewing_time_range,
+            'amount':         f'{Decimal(str(amount)):.2f}',
+            'currency':       currency,
+            'payment_method': method,
+            'payment_id':     reference,
+        },
+    )
+
+
+def notify_viewing_scheduled(viewing):
+    """Admin scheduled/confirmed the viewing — notify the guest."""
+    create_notification(
+        user=viewing.guest,
+        notification_type='viewing_scheduled',
+        title='Viewing Scheduled',
+        message=(
+            f'Your viewing of "{viewing.listing.title}" on {viewing.viewing_date} '
+            f'({viewing.viewing_time_range}) has been confirmed. A Home Konet '
+            f'representative will meet you there.'
+        ),
+        data={
+            'viewing_id':    viewing.id,
+            'listing_id':    viewing.listing.id,
+            'listing_title': viewing.listing.title,
+            'viewing_date':  str(viewing.viewing_date),
+            'viewing_time':  viewing.viewing_time_range,
+        },
+    )
+
+
+def notify_payout_pending(payout):
+    """Notify admins that a host payout is now owed."""
+    host_name = payout.host.get_full_name() or payout.host.username
+    _notify_admins(
+        notification_type='payout_pending',
+        title='Host Payout Pending',
+        message=(
+            f'A payout of {payout.net_amount} {payout.currency} is owed to '
+            f'{host_name} for "{payout.booking.listing.title}".'
+        ),
+        data={
+            'payout_id':     str(payout.id),
+            'booking_id':    payout.booking_id,
+            'host_name':     host_name,
+            'net_amount':    f'{payout.net_amount:.2f}',
+            'currency':      payout.currency,
+        },
+    )
+
+
+def notify_payout_paid(payout):
+    """Notify the host that their payout has been disbursed to their account."""
+    listing_title = payout.booking.listing.title if payout.booking_id else 'your booking'
+    create_notification(
+        user=payout.host,
+        notification_type='payout_paid',
+        title='Payout Sent',
+        message=(
+            f'Home Konet has disbursed {payout.net_amount} {payout.currency} to you '
+            f'for "{listing_title}". It should reach your account shortly.'
+        ),
+        data={
+            'payout_id':     str(payout.id),
+            'booking_id':    payout.booking_id,
+            'listing_title': listing_title,
+            'net_amount':    f'{payout.net_amount:.2f}',
+            'currency':      payout.currency,
+            'reference':     payout.reference or '',
+        },
+    )
+
+
 # ---- Payment helpers ---------------------------------------------------------
 
 def notify_payment_received(payment):
     """Notify the payer (success confirmation) and the property owner (income alert)."""
+    # Booking/rent payments only — viewing-fee payments have no booking.
+    if not payment.booking_id:
+        return
     listing_title = payment.booking.listing.title
     currency_code = payment.currency.code
 
     # Host-side numbers: the "booking amount" the guest paid for the stay
     # (excluding the guest's service fee, which stays with the platform),
-    # minus our 4% commission from the host.
-    booking_amount = Decimal(payment.booking.total_amount)
-    host_service_fee = (booking_amount * HOST_SERVICE_FEE_RATE).quantize(Decimal('0.01'))
-    amount_received = (booking_amount - host_service_fee).quantize(Decimal('0.01'))
+    # minus our commission from the host. Uses the stored booking totals so
+    # monthly listings are correct (not nightly price × days).
+    amounts = _booking_amounts(payment.booking)
+    booking_amount = amounts['subtotal']
+    host_service_fee = amounts['host_service_fee']
+    amount_received = amounts['host_received']
 
     # Guest sees what they actually paid (includes their 4% service fee).
     create_notification(
@@ -353,7 +686,7 @@ def notify_payment_received(payment):
             title='Payment Received',
             message=(
                 f'A guest has paid for "{listing_title}". You will receive '
-                f'{amount_received} {currency_code} after our {HOST_SERVICE_FEE_RATE * 100:.0f}% commission.'
+                f'{amount_received} {currency_code} after our {rate * 100:.0f}% commission.'
             ),
             data={
                 'payment_id':       str(payment.id),
@@ -593,6 +926,105 @@ def notify_report_updated(report):
             'new_status':  report.status,
             'admin_notes': report.admin_notes,
         },
+    )
+
+
+# ---- Host application helpers ------------------------------------------------
+
+def _notify_group(group_name, notification_type, title, message, data=None):
+    """Fan a notification out to every active member of a Django Group."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    recipients = User.objects.filter(groups__name=group_name, is_active=True).distinct()
+    for member in recipients:
+        create_notification(
+            user=member,
+            notification_type=notification_type,
+            title=title,
+            message=message,
+            data=data or {},
+        )
+
+
+def _host_application_data(application):
+    return {
+        'application_id': application.id,
+        'applicant_name': application.full_name,
+        'status':         application.status,
+    }
+
+
+def notify_host_application_submitted(application):
+    """A user submitted a host application — notify the Product Support Officers."""
+    from hostapplications.models import GROUP_PRODUCT_SUPPORT
+    _notify_group(
+        GROUP_PRODUCT_SUPPORT,
+        notification_type='host_application_submitted',
+        title='New Host Application',
+        message=(
+            f'{application.full_name} applied to become a host. '
+            f'Review the application to approve or decline it.'
+        ),
+        data=_host_application_data(application),
+    )
+
+
+def notify_host_application_advanced(application):
+    """
+    An application was approved at one stage — notify the next stage's reviewers.
+    Routed by the application's new status.
+    """
+    from hostapplications.models import (
+        HostApplication, GROUP_COMPLIANCE, GROUP_SUPERVISOR,
+    )
+    next_group = {
+        HostApplication.Status.PS_APPROVED:         GROUP_COMPLIANCE,
+        HostApplication.Status.COMPLIANCE_APPROVED: GROUP_SUPERVISOR,
+    }.get(application.status)
+    if not next_group:
+        return
+
+    _notify_group(
+        next_group,
+        notification_type='host_application_advanced',
+        title='Host Application Awaiting Review',
+        message=(
+            f"{application.full_name}'s host application has advanced to your stage. "
+            f'Please review it to approve or decline.'
+        ),
+        data=_host_application_data(application),
+    )
+
+
+def notify_host_application_declined(application):
+    """Notify the applicant that their application was declined, with the reason."""
+    create_notification(
+        user=application.applicant,
+        notification_type='host_application_declined',
+        title='Host Application Declined',
+        message=(
+            'Unfortunately your application to become a host was not approved. '
+            f'Reason: {application.decline_reason or "No reason provided."}'
+        ),
+        data={
+            'application_id': application.id,
+            'decline_reason': application.decline_reason,
+            'declined_stage': application.declined_stage,
+        },
+    )
+
+
+def notify_host_application_approved(application):
+    """Notify the applicant that they are now a host and can list properties."""
+    create_notification(
+        user=application.applicant,
+        notification_type='host_application_approved',
+        title="You're Approved — Welcome, Host!",
+        message=(
+            'Congratulations! Your application has been approved and your account '
+            'is now a host account. You can start listing your properties.'
+        ),
+        data={'application_id': application.id},
     )
 
 

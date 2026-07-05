@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Booking, SavedSearch, SearchAlert, ComparisonItem, PropertyComparison
+from .models import Booking, SavedSearch, SearchAlert, ComparisonItem, PropertyComparison, ViewingAppointment
 from listings.serializers import ListingSerializer
 from django.utils import timezone
 
@@ -23,16 +23,31 @@ class BookingSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'customer', 'customer_username', 'customer_first_name', 'customer_last_name',
             'listing', 'listing_title', 'listing_owner', 'hotel_room', 'start_date', 'end_date',
-            'status', 'notes', 'requested_at', 'confirmed_at', 'declined_at', 'owner_notes',
-            'decline_reason', 'total_price', 'stripe_payment_intent_id', 'days_until_expiry'
+            'status', 'notes', 'requested_at', 'confirmed_at', 'declined_at', 'cancelled_at', 'owner_notes',
+            'decline_reason', 'total_price', 'service_fee', 'stripe_payment_intent_id', 'days_until_expiry',
+            'requires_viewing', 'host_confirm_deadline', 'host_confirmed_at', 'payment_due_at',
         ]
-        read_only_fields = ['customer', 'requested_at', 'confirmed_at', 'declined_at', 'total_price']
+        # Lifecycle and host/system-controlled fields are read-only here so the
+        # generic PUT /api/bookings/<id>/ cannot mutate them. Status transitions
+        # must go through the role-gated confirm/decline endpoints — otherwise a
+        # guest could PUT {"status": "confirmed"} on their own booking and bypass
+        # host approval (TEST-AUTHZ-04 / CWE-285). owner_notes & decline_reason
+        # are host fields; stripe_payment_intent_id is set during the create flow.
+        read_only_fields = [
+            'customer', 'requested_at', 'confirmed_at', 'declined_at', 'cancelled_at', 'total_price',
+            'status', 'owner_notes', 'decline_reason', 'stripe_payment_intent_id',
+        ]
 
     def get_days_until_expiry(self, obj):
-        if obj.status == 'requested' and obj.requested_at:
-            from datetime import timedelta
-            expiry_time = obj.requested_at + timedelta(hours=48)
-            remaining = expiry_time - timezone.now()
+        # Days left on whichever reservation clock is currently running:
+        # the 7-day host-confirm window, or the 10-day payment window.
+        deadline = None
+        if obj.status == 'pending_host':
+            deadline = obj.host_confirm_deadline
+        elif obj.status == 'awaiting_payment':
+            deadline = obj.payment_due_at
+        if deadline:
+            remaining = deadline - timezone.now()
             return max(0, remaining.days)
         return 0
 
@@ -55,6 +70,27 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         if data['start_date'] < timezone.now().date():
             raise serializers.ValidationError('Start date cannot be in the past')
         return data
+
+
+class ViewingAppointmentSerializer(serializers.ModelSerializer):
+    listing_title = serializers.CharField(source='listing.title', read_only=True)
+    guest_username = serializers.CharField(source='guest.username', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    viewing_time_range = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = ViewingAppointment
+        fields = [
+            'id', 'listing', 'listing_title', 'guest', 'guest_username',
+            'viewing_date', 'viewing_time', 'viewing_time_range',
+            'status', 'status_display', 'viewing_fee',
+            'is_fee_paid', 'fee_paid_at', 'scheduled_at', 'admin_notes',
+            'guest_notes', 'booking', 'created_at',
+        ]
+        read_only_fields = [
+            'guest', 'status', 'viewing_fee', 'is_fee_paid', 'fee_paid_at',
+            'scheduled_at', 'admin_notes', 'booking', 'created_at',
+        ]
 
 
 class SavedSearchSerializer(serializers.ModelSerializer):
