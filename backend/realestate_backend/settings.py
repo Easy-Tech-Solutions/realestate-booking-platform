@@ -433,8 +433,9 @@ else:
             "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
         },
     }
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+    MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
+    media_root = os.environ.get("MEDIA_ROOT", "")
+    MEDIA_ROOT = os.path.abspath(media_root or os.path.join(BASE_DIR, "media"))
     os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -519,6 +520,9 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', True)
+    # The Docker healthcheck hits Daphne directly over plain HTTP (it never goes
+    # through the nginx/TLS front door), so exempt it from the HTTPS redirect.
+    SECURE_REDIRECT_EXEMPT = [r'^api/health/$']
     SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True

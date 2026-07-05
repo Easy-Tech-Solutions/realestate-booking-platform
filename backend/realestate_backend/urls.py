@@ -1,13 +1,23 @@
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
+from django.db import connection
+from django.http import JsonResponse
 from django.urls import path, include, re_path
 from django.views.static import serve
 
 handler404 = 'realestate_backend.error_views.handler_404'
 handler500 = 'realestate_backend.error_views.handler_500'
 
+
+def health_check(request):
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT 1')
+    return JsonResponse({'status': 'ok'})
+
+
 urlpatterns = [
+    path('api/health/', health_check),
     path(settings.ADMIN_URL, admin.site.urls),
     path('api/auth/', include('authapp.urls')),
     path('api/listings/', include('listings.urls')),

@@ -17,6 +17,11 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
             from py_vapid import Vapid
+            from py_vapid.utils import b64urlencode
+            from cryptography.hazmat.primitives.serialization import (
+                Encoding,
+                PublicFormat,
+            )
         except ImportError:
             self.stderr.write(self.style.ERROR(
                 'pywebpush is not installed. Run: pip install pywebpush'
@@ -26,8 +31,12 @@ class Command(BaseCommand):
         vapid = Vapid()
         vapid.generate_keys()
 
-        private_key = vapid.private_key_urlsafe
-        public_key = vapid.public_key_urlsafe
+        private_raw = vapid.private_key.private_numbers().private_value.to_bytes(32, 'big')
+        public_raw = vapid.public_key.public_bytes(
+            encoding=Encoding.X962, format=PublicFormat.UncompressedPoint
+        )
+        private_key = b64urlencode(private_raw)
+        public_key = b64urlencode(public_raw)
 
         self.stdout.write(self.style.SUCCESS('\n✓ VAPID keys generated\n'))
         self.stdout.write('Add these to your environment / .env file:\n')

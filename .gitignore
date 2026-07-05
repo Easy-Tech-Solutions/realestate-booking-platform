@@ -45,6 +45,9 @@ wheels/
 .env.local
 .env.*.local
 
+# TLS certificates
+nginx/ssl/
+
 # IDE and Editor
 .vscode/
 .idea/
