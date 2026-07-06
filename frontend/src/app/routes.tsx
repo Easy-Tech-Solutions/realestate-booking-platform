@@ -172,30 +172,6 @@ export const router = createBrowserRouter([
         ),
       },
       { path: 'dashboard', Component: UserDashboard },
-      {
-        path: 'admin',
-        element: (
-          <ProtectedRoute requireAdmin>
-            <AdminDashboard />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'admin/reports',
-        element: (
-          <ProtectedRoute requireAdmin>
-            <AdminReports />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'admin/suspensions',
-        element: (
-          <ProtectedRoute requireAdmin>
-            <AdminSuspensions />
-          </ProtectedRoute>
-        ),
-      },
       { path: 'notifications', Component: Notifications },
       { path: 'login', Component: Login },
       { path: 'verify-email', Component: VerifyEmail },
