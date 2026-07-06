@@ -884,44 +884,34 @@ At minimum, set up an uptime check on your domain (UptimeRobot free tier covers 
 
 ## 17. Backup and Restore
 
-### Back up the PostgreSQL database
+This deployment runs Postgres on Neon rather than in a local container, so
+database backup and server backup are two separate concerns.
+
+### Database
+
+Neon takes continuous backups and supports point-in-time restore and
+branching out of the box — no manual `pg_dump` cron job needed. See the
+[Neon docs](https://neon.tech/docs/introduction/backup-restore) for
+point-in-time recovery.
+
+### Media files and secrets
+
+Everything else this server holds that isn't in git or in Neon — uploaded
+media, `.env` secrets, the TLS cert — is covered by `scripts/backup.sh` /
+`scripts/restore.sh`. See **[MIGRATION.md](../MIGRATION.md)** for full usage,
+including a crontab snippet for scheduled off-box backups.
 
 ```bash
-# Create backup directory
-mkdir -p /opt/homekonet/backups
-
-# Dump
-docker compose exec -T db pg_dump -U $POSTGRES_USER $POSTGRES_DB \
-  | gzip > /opt/homekonet/backups/db_$(date +%Y%m%d_%H%M%S).sql.gz
-
-# Schedule daily backups at 02:00
-(crontab -l 2>/dev/null; echo "0 2 * * * docker compose -f /opt/homekonet/docker-compose.yml \
-  exec -T db pg_dump -U \$POSTGRES_USER \$POSTGRES_DB | gzip > \
-  /opt/homekonet/backups/db_\$(date +\%Y\%m\%d_\%H\%M\%S).sql.gz") | crontab -
-
-# Keep only the last 30 days of backups
-(crontab -l 2>/dev/null; echo "30 2 * * * find /opt/homekonet/backups -name 'db_*.sql.gz' -mtime +30 -delete") | crontab -
+cd /opt/homekonet
+bash scripts/backup.sh   # -> backups/homekonet-backup-<timestamp>.tar.gz.gpg (encrypted)
 ```
 
-> **Using Neon?** Use Neon's built-in branching and point-in-time restore instead of manual dumps.
+### Full server migration
 
-### Restore from a backup
-
-```bash
-gunzip -c /opt/homekonet/backups/db_YYYYMMDD_HHMMSS.sql.gz \
-  | docker compose exec -T db psql -U $POSTGRES_USER $POSTGRES_DB
-```
-
-### Media files
-
-When `CLOUDINARY_URL` is configured (recommended), all uploads are stored in Cloudinary — no local backup needed. If running without Cloudinary:
-
-```bash
-docker run --rm \
-  -v app_backend_logs:/logs \
-  -v /home/homekonet/backups:/backup \
-  alpine tar czf /backup/logs_$(date +%Y%m%d).tar.gz /logs
-```
+To move this deployment to a different server entirely (new VPS, provider
+change, etc.), see **[MIGRATION.md](../MIGRATION.md)** — it covers what needs
+to move (media, secrets, TLS) versus what doesn't (the database, since Neon
+is already off-server).
 
 ---
 
