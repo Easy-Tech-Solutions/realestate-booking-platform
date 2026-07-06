@@ -51,6 +51,9 @@ nginx/ssl/
 # User-uploaded media (heavy binary files; not part of source control)
 backend/media/
 
+# Migration backups (scripts/backup.sh) — contain secrets, never commit
+backups/
+
 # IDE and Editor
 .vscode/
 .idea/
