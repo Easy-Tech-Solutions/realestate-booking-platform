@@ -399,7 +399,7 @@ def request_payment(request, id):
 def my_payment_requests(request):
     """Return pending payment requests for the authenticated guest."""
     requests = PaymentRequest.objects.filter(
-        booking__user=request.user,
+        booking__customer=request.user,
         is_paid=False,
     ).select_related('booking', 'booking__listing', 'created_by')
     data = [

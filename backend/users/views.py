@@ -205,7 +205,14 @@ def initiate_phone_change(request):
         },
     )
 
-    send_phone_change_email_otp(user, otp)
+    try:
+        send_phone_change_email_otp(user, otp)
+    except Exception:
+        logger.exception("initiate_phone_change: failed to send email OTP")
+        return Response(
+            {'error': 'Could not send the verification code. Please try again in a moment.'},
+            status=503,
+        )
     send_phone_change_sms_otp(new_phone_number, otp, network_provider)
 
     return Response({

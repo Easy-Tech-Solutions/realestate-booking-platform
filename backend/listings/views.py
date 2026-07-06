@@ -1,6 +1,6 @@
 from rest_framework.decorators import api_view, parser_classes
 from django.db import models
-from django.db.models import Avg, Count, Sum, Q
+from django.db.models import Avg, Count, Sum, Q, Prefetch
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -28,6 +28,22 @@ def _check_image_size(request):
 from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory, HotelRoom, HotelRoomImage
 from bookings.models import Booking
 from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer, HotelRoomImageSerializer
+
+
+def _optimize_listings(qs):
+    """Attach everything ListingSerializer needs up front so serializing a list
+    doesn't issue owner/profile/gallery/hotel-room/review queries per listing."""
+    return qs.select_related('owner', 'owner__profile').prefetch_related(
+        'gallery_images',
+        Prefetch(
+            'hotel_rooms',
+            queryset=HotelRoom.objects.filter(is_active=True).prefetch_related('images'),
+            to_attr='_prefetched_active_hotel_rooms',
+        ),
+    ).annotate(
+        avg_rating=Avg('reviews__rating'),
+        review_count_agg=Count('reviews', distinct=True),
+    )
 from .filters import ListingFilter
 from django.contrib.auth import get_user_model
 from rest_framework.pagination import PageNumberPagination
@@ -90,9 +106,9 @@ def listings_collection(request):
         # confirms a reservation on it, so it must drop out of browse/search.
         items = ListingFilter(
             request.GET,
-            queryset=Listing.objects.filter(
+            queryset=_optimize_listings(Listing.objects.filter(
                 status='published', deleted_at__isnull=True, is_available=True,
-            ),
+            )),
         )
         qs = items.qs
 
@@ -913,7 +929,7 @@ def hotel_room_image_detail(request, listing_id, room_id, image_id):
 def my_drafts(request):
     if not request.user.is_authenticated:
         return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-    drafts = Listing.objects.filter(owner=request.user, status='draft', deleted_at__isnull=True).order_by('-updated_at')
+    drafts = _optimize_listings(Listing.objects.filter(owner=request.user, status='draft', deleted_at__isnull=True).order_by('-updated_at'))
     return Response(ListingSerializer(drafts, many=True, context={"request": request}).data)
 
 
@@ -922,7 +938,7 @@ def my_listings(request):
     """Authenticated host: see all own listings (all statuses)."""
     if not request.user.is_authenticated:
         return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-    items = Listing.objects.filter(owner=request.user, deleted_at__isnull=True).exclude(status='draft').order_by('-created_at')
+    items = _optimize_listings(Listing.objects.filter(owner=request.user, deleted_at__isnull=True).exclude(status='draft').order_by('-created_at'))
     return Response(ListingSerializer(items, many=True, context={"request": request}).data)
 
 
@@ -931,7 +947,7 @@ def pending_review_listings(request):
     """Admin-only: listings waiting for review."""
     if not request.user.is_authenticated or not (request.user.is_staff or getattr(request.user, 'role', '') == 'admin'):
         return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
-    items = Listing.objects.filter(status='pending_review').order_by('-created_at')
+    items = _optimize_listings(Listing.objects.filter(status='pending_review').order_by('-created_at'))
     return Response(ListingSerializer(items, many=True, context={"request": request}).data)
 
 
