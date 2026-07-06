@@ -320,7 +320,13 @@ def password_reset_request(request):
         return Response({"message": "If an account with that email exists, a password reset link has been sent."}, status=status.HTTP_200_OK)
 
     from .utils import send_password_reset_email
-    send_password_reset_email(user)
+    try:
+        send_password_reset_email(user)
+    except Exception:
+        # Don't 500, and don't let a send failure distinguish this response
+        # from the "no such account" branch above (that would leak account
+        # existence to an attacker probing for valid emails).
+        logger.exception("password_reset_request: failed to send reset email")
     return Response({"message": "If an account with that email exists, a password reset link has been sent."}, status=status.HTTP_200_OK)
 
 

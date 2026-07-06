@@ -166,9 +166,8 @@ def initiate_viewing_payment(request):
 def verify_payment(request):
     serializer = PaymentVerifySerializer(data=request.data)
     if serializer.is_valid():
+        payment = get_object_or_404(Payment, pk=serializer.validated_data['payment_id'])
         try:
-            payment = get_object_or_404(Payment, pk=serializer.validated_data['payment_id'])
-
             if payment.user != request.user:
                 return Response({'success': False, 'error': 'Permission denied'},
                                 status=status.HTTP_403_FORBIDDEN)
@@ -216,9 +215,8 @@ def process_refund(request):
     serializer = RefundSerializer(data=request.data)
 
     if serializer.is_valid():
+        payment = get_object_or_404(Payment, pk=serializer.validated_data['payment_id'])
         try:
-            payment = get_object_or_404(Payment, pk=serializer.validated_data['payment_id'])
-
             if payment.user != request.user:
                 return Response({'success': False, 'error': 'Permission denied'},
                                 status=status.HTTP_403_FORBIDDEN)
@@ -285,9 +283,8 @@ def user_payments(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def payment_detail(request, payment_id):
+    payment = get_object_or_404(Payment, pk=payment_id)
     try:
-        payment = get_object_or_404(Payment, pk=payment_id)
-
         if payment.user != request.user:
             return Response({'success': False, 'error': 'Permission denied'},
                             status=status.HTTP_403_FORBIDDEN)

@@ -139,15 +139,22 @@ class ListingSerializer(serializers.ModelSerializer):
             return False
 
     def get_average_rating(self, obj):
-        from django.db.models import Avg
-        result = obj.reviews.aggregate(avg=Avg('rating'))['avg']
+        if hasattr(obj, 'avg_rating'):
+            result = obj.avg_rating
+        else:
+            from django.db.models import Avg
+            result = obj.reviews.aggregate(avg=Avg('rating'))['avg']
         return round(result, 2) if result else None
 
     def get_review_count(self, obj):
+        if hasattr(obj, 'review_count_agg'):
+            return obj.review_count_agg
         return obj.reviews.count()
 
     def get_hotel_rooms(self, obj):
-        active_rooms = obj.hotel_rooms.filter(is_active=True)
+        active_rooms = getattr(obj, '_prefetched_active_hotel_rooms', None)
+        if active_rooms is None:
+            active_rooms = obj.hotel_rooms.filter(is_active=True)
         return HotelRoomSerializer(active_rooms, many=True).data
 
     def _normalize_list_field(self, value, field_name):
