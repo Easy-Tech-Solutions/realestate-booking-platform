@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ChevronDown, Search } from 'lucide-react';
+import { Calendar, ChevronDown, CreditCard, Home, Lock, Search, Undo2, User } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../core/utils';
 
 interface FAQItem {
@@ -9,14 +10,14 @@ interface FAQItem {
 
 interface FAQCategory {
   title: string;
-  emoji: string;
+  icon: LucideIcon;
   items: FAQItem[];
 }
 
 const FAQ_DATA: FAQCategory[] = [
   {
     title: 'Booking & Reservations',
-    emoji: '📅',
+    icon: Calendar,
     items: [
       {
         question: 'How do I book a property on HomeKonet?',
@@ -47,7 +48,7 @@ const FAQ_DATA: FAQCategory[] = [
   },
   {
     title: 'Payments',
-    emoji: '💳',
+    icon: CreditCard,
     items: [
       {
         question: 'What payment methods does HomeKonet accept?',
@@ -78,7 +79,7 @@ const FAQ_DATA: FAQCategory[] = [
   },
   {
     title: 'Cancellations & Refunds',
-    emoji: '↩️',
+    icon: Undo2,
     items: [
       {
         question: 'What is HomeKonet\'s cancellation policy?',
@@ -104,7 +105,7 @@ const FAQ_DATA: FAQCategory[] = [
   },
   {
     title: 'Accounts & Profiles',
-    emoji: '👤',
+    icon: User,
     items: [
       {
         question: 'How do I create an account?',
@@ -135,7 +136,7 @@ const FAQ_DATA: FAQCategory[] = [
   },
   {
     title: 'For Hosts',
-    emoji: '🏠',
+    icon: Home,
     items: [
       {
         question: 'How do I list my property on HomeKonet?',
@@ -166,7 +167,7 @@ const FAQ_DATA: FAQCategory[] = [
   },
   {
     title: 'Safety & Trust',
-    emoji: '🔒',
+    icon: Lock,
     items: [
       {
         question: 'How does HomeKonet verify listings?',
@@ -281,13 +282,13 @@ export function FAQ() {
                 type="button"
                 onClick={() => setActiveCategory(activeCategory === cat.title ? null : cat.title)}
                 className={cn(
-                  'px-4 py-2 rounded-full text-sm font-medium border transition-colors',
+                  'inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-colors',
                   activeCategory === cat.title
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'border-border text-muted-foreground hover:border-primary hover:text-primary',
                 )}
               >
-                {cat.emoji} {cat.title}
+                <cat.icon className="w-4 h-4" /> {cat.title}
               </button>
             ))}
           </div>
@@ -303,7 +304,7 @@ export function FAQ() {
             {filtered.map((cat) => (
               <div key={cat.title} className="bg-card border border-border rounded-2xl p-6">
                 <h2 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <span>{cat.emoji}</span> {cat.title}
+                  <cat.icon className="w-5 h-5 text-primary" /> {cat.title}
                 </h2>
                 <div>
                   {cat.items.map((item) => (

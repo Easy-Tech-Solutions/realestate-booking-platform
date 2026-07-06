@@ -1,10 +1,11 @@
 import React from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Lock, User as UserIcon, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Checkbox } from '../components/ui/checkbox';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 
@@ -27,6 +28,7 @@ export function Login() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
   const [showPassword2, setShowPassword2] = React.useState(false);
+  const [agreedToTerms, setAgreedToTerms] = React.useState(false);
 
   // Keep the URL's ?mode= in sync with the toggle so deep-links stay accurate.
   const switchMode = (next: Mode) => {
@@ -76,6 +78,10 @@ export function Login() {
       toast.error('Passwords do not match');
       return;
     }
+    if (!agreedToTerms) {
+      toast.error('You must agree to the Terms of Service and Privacy Policy');
+      return;
+    }
     setIsLoading(true);
     try {
       const result = await register({
@@ -91,6 +97,7 @@ export function Login() {
       switchMode('login');
       setPassword('');
       setPassword2('');
+      setAgreedToTerms(false);
     } catch (error: any) {
       toast.error(error?.message || 'Registration failed');
     } finally {
@@ -131,6 +138,20 @@ export function Login() {
             ? 'Sign up to list your property or book a stay.'
             : 'Enter your email and password to access your account.'}
         </p>
+
+        {isSignup && (
+          <p className="text-sm text-muted-foreground mb-6">
+            By creating an account, you agree to our{' '}
+            <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">
+              Privacy Policy
+            </Link>
+            .
+          </p>
+        )}
 
         <div className="space-y-4 mb-6">
           <div className="flex justify-center">
@@ -251,8 +272,30 @@ export function Login() {
             </div>
           )}
 
+          {isSignup && (
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="agreeToTerms"
+                checked={agreedToTerms}
+                onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+                className="mt-0.5"
+              />
+              <Label htmlFor="agreeToTerms" className="font-normal leading-snug cursor-pointer">
+                I have read and agree to the{' '}
+                <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">
+                  Privacy Policy
+                </Link>
+                .
+              </Label>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button type="submit" className="w-full sm:w-auto" disabled={isLoading}>
+            <Button type="submit" className="w-full sm:w-auto" disabled={isLoading || (isSignup && !agreedToTerms)}>
               {isLoading
                 ? (isSignup ? 'Creating account…' : 'Logging in…')
                 : (isSignup ? 'Sign up' : 'Log in')}

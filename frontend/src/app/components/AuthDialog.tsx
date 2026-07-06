@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { X, Mail, Lock, User as UserIcon, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Checkbox } from './ui/checkbox';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { authAPI } from '../../services/api.service';
@@ -24,6 +26,7 @@ interface FormErrors {
   email?: string;
   password?: string;
   password2?: string;
+  agreedToTerms?: string;
 }
 
 function validatePassword(password: string): string | undefined {
@@ -50,6 +53,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
   const [errors, setErrors] = useState<FormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   useEffect(() => {
     setView(mode ?? 'login');
@@ -58,6 +62,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
   const resetForm = () => {
     setFormData({ email: '', password: '', password2: '', first_name: '', last_name: '' });
     setErrors({});
+    setAgreedToTerms(false);
   };
 
   const handleClose = () => {
@@ -91,6 +96,10 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     if (view === 'register') {
       if (!formData.password2) newErrors.password2 = 'Please confirm your password';
       else if (formData.password !== formData.password2) newErrors.password2 = 'Passwords do not match';
+    }
+
+    if (view === 'register' && !agreedToTerms) {
+      newErrors.agreedToTerms = 'You must agree to the Terms of Service and Privacy Policy';
     }
 
     setErrors(newErrors);
@@ -189,6 +198,19 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
             <p className="text-sm text-muted-foreground">
               {view === 'login' ? 'Log in to continue your journey' : view === 'register' ? 'Create an account to get started' : 'Enter your email and we will send you a password reset link'}
             </p>
+            {view === 'register' && (
+              <p className="text-sm text-muted-foreground mt-2">
+                By creating an account, you agree to our{' '}
+                <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">
+                  Privacy Policy
+                </Link>
+                .
+              </p>
+            )}
           </div>
 
           {view !== 'forgot-password' && (
@@ -270,7 +292,35 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              {view === 'register' && (
+                <div className="space-y-1">
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      id="agreedToTerms"
+                      checked={agreedToTerms}
+                      onCheckedChange={(checked) => {
+                        setAgreedToTerms(checked === true);
+                        if (errors.agreedToTerms) setErrors(prev => ({ ...prev, agreedToTerms: undefined }));
+                      }}
+                      className="mt-0.5"
+                    />
+                    <Label htmlFor="agreedToTerms" className="font-normal leading-snug cursor-pointer">
+                      I have read and agree to the{' '}
+                      <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">
+                        Terms of Service
+                      </Link>{' '}
+                      and{' '}
+                      <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">
+                        Privacy Policy
+                      </Link>
+                      .
+                    </Label>
+                  </div>
+                  {errors.agreedToTerms && <p className="text-xs text-destructive">{errors.agreedToTerms}</p>}
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isLoading || (view === 'register' && !agreedToTerms)}>
                 {isLoading ? 'Please wait...' : view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Send reset link'}
               </Button>
             </form>

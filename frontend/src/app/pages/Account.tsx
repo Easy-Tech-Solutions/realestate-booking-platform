@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { Camera, CreditCard, Eye, EyeOff, Plus, Star, Trash2, Pencil } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -787,6 +787,26 @@ export function Account() {
                   {i < arr.length - 1 && <Separator />}
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Legal */}
+          <div className="border border-border rounded-xl p-6">
+            <h2 className="text-xl font-semibold mb-6">Legal</h2>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between py-3">
+                <p className="font-medium">Terms of Service</p>
+                <Link to="/terms" className="text-sm text-primary font-semibold hover:underline">
+                  View
+                </Link>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between py-3">
+                <p className="font-medium">Privacy Policy</p>
+                <Link to="/privacy" className="text-sm text-primary font-semibold hover:underline">
+                  View
+                </Link>
+              </div>
             </div>
           </div>
 
