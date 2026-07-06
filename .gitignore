@@ -48,6 +48,9 @@ wheels/
 # TLS certificates
 nginx/ssl/
 
+# User-uploaded media (heavy binary files; not part of source control)
+backend/media/
+
 # IDE and Editor
 .vscode/
 .idea/
