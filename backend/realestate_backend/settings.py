@@ -354,12 +354,34 @@ AUTH_REFRESH_COOKIE_DOMAIN = os.environ.get("AUTH_REFRESH_COOKIE_DOMAIN") or Non
 AUTH_REFRESH_COOKIE_SECURE = not DEBUG
 AUTH_REFRESH_COOKIE_MAX_AGE = int(SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
 
-EMAIL_BACKEND = os.environ.get(
-    "EMAIL_BACKEND",
-    "django.core.mail.backends.console.EmailBackend"
-    if DEBUG
-    else "anymail.backends.sendinblue.EmailBackend",
+# Email transport selection.
+#   EMAIL_BACKEND_MODE picks the transport: 'console' (dev), 'smtp', or 'brevo'.
+#   Defaults to console in DEBUG, brevo otherwise (backwards compatible).
+#   An explicit EMAIL_BACKEND env var still wins if provided.
+# NOTE: Django's SMTP backend reads EMAIL_HOST / EMAIL_PORT / EMAIL_HOST_USER /
+# EMAIL_HOST_PASSWORD / EMAIL_USE_TLS from *settings*, so those must be assigned
+# here from the environment — otherwise the SMTP backend silently falls back to
+# localhost:25 with no auth and every send fails.
+EMAIL_BACKEND_MODE = os.environ.get("EMAIL_BACKEND_MODE", "console" if DEBUG else "brevo").lower()
+
+_EMAIL_BACKENDS = {
+    "console": "django.core.mail.backends.console.EmailBackend",
+    "smtp":    "django.core.mail.backends.smtp.EmailBackend",
+    "brevo":   "anymail.backends.sendinblue.EmailBackend",
+}
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND") or _EMAIL_BACKENDS.get(
+    EMAIL_BACKEND_MODE, _EMAIL_BACKENDS["console"]
 )
+
+# SMTP settings (used when the SMTP backend is active).
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+
+# Brevo (Sendinblue) transactional API, used when EMAIL_BACKEND_MODE=brevo.
 ANYMAIL = {
     "SENDINBLUE_API_KEY": os.environ.get("BREVO_API_KEY", ""),
 }
