@@ -50,12 +50,22 @@ def send_notification_email(self, notification_id: int):
     site_url = getattr(settings, 'FRONTEND_ORIGIN', '') \
         or getattr(settings, 'LOCAL_DOMAIN', 'http://localhost:5173')
 
+    # Admin URL for staff-facing emails (e.g. host-application reviews). The
+    # admin is served same-origin as the frontend in production, and ADMIN_URL
+    # is configurable (DJANGO_ADMIN_URL), so build it from settings rather than
+    # hardcoding '/admin/'.
+    admin_path = getattr(settings, 'ADMIN_URL', 'admin/').lstrip('/')
+    admin_url = site_url.rstrip('/') + '/' + admin_path
+    if not admin_url.endswith('/'):
+        admin_url += '/'
+
     context = {
         'user':         user,
         'notification': notification,
         'data':         notification.data,
         'site_name':    getattr(settings, 'SITE_NAME', 'Real Estate Platform'),
         'site_url':     site_url,
+        'admin_url':    admin_url,
     }
 
     # Try the specific template first, fall back to the generic one
