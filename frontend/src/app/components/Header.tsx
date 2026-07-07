@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard, Info, HelpCircle, Mail, CalendarCheck } from 'lucide-react';
 import logo from '../../assets/logo2.jpg';
@@ -14,16 +14,23 @@ import { useApp } from '../../hooks/useApp';
 import { AuthDialog } from './AuthDialog';
 import { SearchDialog } from './SearchDialog';
 import { getInitials } from '../../core/utils';
-import { authAPI, usersAPI } from '../../services/api.service';
-import { toast } from 'sonner';
 
 export function Header() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout, setUser } = useApp();
+  const { user, isAuthenticated, logout } = useApp();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [isBecomingHost, setIsBecomingHost] = useState(false);
+  // Remember a "become a host" intent so we can route the user after they
+  // finish logging in / signing up via the dialog.
+  const [pendingHostRedirect, setPendingHostRedirect] = useState(false);
+
+  useEffect(() => {
+    if (pendingHostRedirect && isAuthenticated && user) {
+      setPendingHostRedirect(false);
+      navigate(user.isHost ? '/host' : '/become-a-host');
+    }
+  }, [pendingHostRedirect, isAuthenticated, user, navigate]);
 
   const handleAuthClick = (mode: 'login' | 'register') => {
     setAuthMode(mode);
@@ -35,32 +42,19 @@ export function Header() {
     navigate('/');
   };
 
-  const handleBecomeHost = async () => {
+  const handleBecomeHost = () => {
     if (!isAuthenticated) {
-      // Match the "List Your Property" CTA: first-time clickers most likely
-      // don't have an account, so default to signup. The dialog has a built-in
-      // "Already have an account? Log in" link for returning users.
-      handleAuthClick('register');
+      // Open the signup dialog; the effect above routes them once authed.
+      // First-time clickers most likely don't have an account, so default to
+      // signup — the dialog has an "Already have an account? Log in" link.
+      setAuthMode('register');
+      setPendingHostRedirect(true);
+      setShowAuthDialog(true);
       return;
     }
-
-    if (user?.isHost) {
-      navigate('/host');
-      return;
-    }
-
-    setIsBecomingHost(true);
-    try {
-      await usersAPI.updateMyProfile({ role: 'agent' });
-      const refreshedUser = await authAPI.getCurrentUser();
-      setUser(refreshedUser);
-      toast.success('You are now a host. Welcome to hosting!');
-      navigate('/host');
-    } catch (error: any) {
-      toast.error(error?.message || 'Unable to switch to host right now. Please try again.');
-    } finally {
-      setIsBecomingHost(false);
-    }
+    // Hosts go to their dashboard; regular users start the host application.
+    // Becoming a host now goes through the review flow, not instant promotion.
+    navigate(user?.isHost ? '/host' : '/become-a-host');
   };
 
   return (
@@ -111,10 +105,9 @@ export function Header() {
                 <Button
                   variant="ghost"
                   className="hidden sm:inline-flex"
-                  onClick={user?.isHost ? () => navigate('/host') : handleBecomeHost}
-                  disabled={isBecomingHost}
+                  onClick={handleBecomeHost}
                 >
-                  {user?.isHost ? 'Switch to hosting' : isBecomingHost ? 'Setting up host...' : 'Become a host'}
+                  {user?.isHost ? 'Switch to hosting' : 'Become a host'}
                 </Button>
               )}
 
@@ -239,7 +232,11 @@ export function Header() {
 
       <AuthDialog
         open={showAuthDialog}
-        onClose={() => setShowAuthDialog(false)}
+        onClose={() => {
+          setShowAuthDialog(false);
+          // Abandoned the dialog without logging in → drop the host intent.
+          if (!isAuthenticated) setPendingHostRedirect(false);
+        }}
         mode={authMode}
         onModeChange={setAuthMode}
       />
