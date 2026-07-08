@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Hotel,
   XCircle,
+  FileText,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
@@ -1431,6 +1432,15 @@ export function HostDashboard() {
 
         <SidebarFooter className="border-t border-sidebar-border">
           <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => window.open('/property-owner-agreement', '_blank', 'noopener')}
+                tooltip="Property Owner Agreement"
+              >
+                <FileText />
+                <span>Owner Agreement</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton onClick={() => navigate('/')} tooltip="Back to site">
                 <Home />

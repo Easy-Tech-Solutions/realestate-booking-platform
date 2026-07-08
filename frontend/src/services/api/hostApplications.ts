@@ -18,6 +18,15 @@ export interface HostApplication {
   updated_at: string;
 }
 
+export interface AgreementStatus {
+  version: string;
+  effective_date: string;
+  title: string;
+  accepted: boolean;
+  accepted_version: string | null;
+  accepted_at: string | null;
+}
+
 export const hostApplicationsAPI = {
   /** The current user's latest application, or null if they've never applied. */
   getMine: async (): Promise<HostApplication | null> => {
@@ -31,6 +40,18 @@ export const hostApplicationsAPI = {
     return fetchWithAuth<HostApplication>('/api/host-applications/', {
       method: 'POST',
       body: formData,
+    });
+  },
+
+  /** Current Property Owner Agreement version + whether this user has accepted it. */
+  agreementStatus: async (): Promise<AgreementStatus> => {
+    return fetchWithAuth<AgreementStatus>('/api/host-applications/agreement/');
+  },
+
+  /** Record acceptance of the current agreement version (used when re-accepting). */
+  acceptAgreement: async (): Promise<AgreementStatus> => {
+    return fetchWithAuth<AgreementStatus>('/api/host-applications/agreement/accept/', {
+      method: 'POST',
     });
   },
 };

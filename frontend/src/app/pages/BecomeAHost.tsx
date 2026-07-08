@@ -34,7 +34,8 @@ export function BecomeAHost() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [headshot, setHeadshot] = useState<File | null>(null);
   const [idDocument, setIdDocument] = useState<File | null>(null);
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState | 'headshot' | 'idDocument', string>>>({});
+  const [agreed, setAgreed] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState | 'headshot' | 'idDocument' | 'agreement', string>>>({});
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export function BecomeAHost() {
     if (!form.phone.trim()) errs.phone = 'Phone number is required';
     if (!headshot) errs.headshot = 'A headshot / passport photo is required';
     if (!idDocument) errs.idDocument = 'A photo of your national ID / passport is required';
+    if (!agreed) errs.agreement = 'You must agree to the Property Owner Agreement to continue';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -74,6 +76,7 @@ export function BecomeAHost() {
       payload.append('phone', form.phone.trim());
       if (headshot) payload.append('headshot', headshot);
       if (idDocument) payload.append('id_document', idDocument);
+      payload.append('agreement_accepted', 'true');
 
       const created = await hostApplicationsAPI.create(payload);
       setApplication(created);
@@ -81,6 +84,7 @@ export function BecomeAHost() {
       setForm(INITIAL_FORM);
       setHeadshot(null);
       setIdDocument(null);
+      setAgreed(false);
       toast.success('Application submitted — we’ll review it shortly.');
     } catch (err: unknown) {
       const data = (err as { data?: { non_field_errors?: string[] } })?.data;
@@ -253,7 +257,44 @@ export function BecomeAHost() {
               onSelect={(f) => { setIdDocument(f); setErrors((p) => ({ ...p, idDocument: '' })); }}
             />
 
-            <Button type="submit" className="w-full" disabled={submitting} size="lg">
+            {/* Property Owner Agreement */}
+            <div className="pt-1 border-t border-border">
+              <p className="text-sm text-muted-foreground mt-4 mb-3">
+                By submitting this application, you agree to the Home Konet{' '}
+                <Link
+                  to="/property-owner-agreement"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary font-medium hover:underline"
+                >
+                  Property Owner Agreement
+                </Link>
+                .
+              </p>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => { setAgreed(e.target.checked); setErrors((p) => ({ ...p, agreement: '' })); }}
+                  className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary shrink-0"
+                />
+                <span className="text-sm text-foreground">
+                  I have read and agree to the{' '}
+                  <Link
+                    to="/property-owner-agreement"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary font-medium hover:underline"
+                  >
+                    Property Owner Agreement
+                  </Link>
+                  .
+                </span>
+              </label>
+              {errors.agreement && <p className="text-xs text-destructive mt-1">{errors.agreement}</p>}
+            </div>
+
+            <Button type="submit" className="w-full" disabled={submitting || !agreed} size="lg">
               {submitting ? 'Submitting...' : 'Submit application'}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
