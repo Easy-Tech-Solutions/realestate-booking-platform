@@ -109,3 +109,36 @@ class HostApplication(models.Model):
     @property
     def is_active(self):
         return self.status in self.ACTIVE_STATUSES
+
+
+class AgreementAcceptance(models.Model):
+    """
+    Immutable audit record that a user accepted a legal agreement version.
+
+    One row per (user, agreement, version). Acceptance is keyed by version so
+    that publishing a new agreement version requires a fresh acceptance, while
+    an already-accepted version is never re-prompted.
+    """
+    AGREEMENT_PROPERTY_OWNER = 'property_owner'
+    AGREEMENT_CHOICES = [
+        (AGREEMENT_PROPERTY_OWNER, 'Property Owner Listing Agreement'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='agreement_acceptances',
+    )
+    agreement = models.CharField(
+        max_length=40, choices=AGREEMENT_CHOICES, default=AGREEMENT_PROPERTY_OWNER, db_index=True,
+    )
+    version = models.CharField(max_length=20)
+    accepted_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-accepted_at']
+        unique_together = ('user', 'agreement', 'version')
+
+    def __str__(self):
+        return f'{self.user} accepted {self.agreement} v{self.version} @ {self.accepted_at:%Y-%m-%d %H:%M}'

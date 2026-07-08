@@ -7,4 +7,9 @@ urlpatterns = [
 
     # GET  /api/host-applications/me/   → my latest application + status
     path('me/', views.my_host_application, name='my-host-application'),
+
+    # GET  /api/host-applications/agreement/         → current version + my acceptance
+    path('agreement/', views.agreement_status, name='agreement-status'),
+    # POST /api/host-applications/agreement/accept/  → record acceptance
+    path('agreement/accept/', views.accept_agreement, name='agreement-accept'),
 ]

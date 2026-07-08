@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .models import HostApplication
+from .models import HostApplication, AgreementAcceptance
 from .services import (
     ps_decision, compliance_decision, supervisor_decision, InvalidTransition,
 )
@@ -184,3 +184,21 @@ class HostApplicationAdmin(admin.ModelAdmin):
             '<span style="color:{}; font-weight:bold;">{}</span>',
             colors.get(obj.status, '#000'), obj.get_status_display(),
         )
+
+
+@admin.register(AgreementAcceptance)
+class AgreementAcceptanceAdmin(admin.ModelAdmin):
+    """Read-only audit log of agreement acceptances."""
+    list_display  = ['id', 'user', 'agreement', 'version', 'accepted_at', 'ip_address']
+    list_filter   = ['agreement', 'version', 'accepted_at']
+    search_fields = ['user__username', 'user__email', 'version', 'ip_address']
+    readonly_fields = ['user', 'agreement', 'version', 'accepted_at', 'ip_address']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser

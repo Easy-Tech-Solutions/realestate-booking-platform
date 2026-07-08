@@ -3,6 +3,7 @@ import type { ComponentType } from 'react';
 import { createBrowserRouter, useRouteError } from 'react-router';
 import { RootLayout } from './layouts/RootLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AgreementGuard } from './components/AgreementGuard';
 
 function ChunkErrorFallback() {
   const error = useRouteError() as Error | undefined;
@@ -64,6 +65,7 @@ const Messages = lazyPage(() => import('./pages/Messages').then((module) => ({ d
 const Account = lazyPage(() => import('./pages/Account').then((module) => ({ default: module.Account })));
 const HostDashboard = lazyPage(() => import('./pages/HostDashboard').then((module) => ({ default: module.HostDashboard })));
 const BecomeAHost = lazyPage(() => import('./pages/BecomeAHost').then((module) => ({ default: module.BecomeAHost })));
+const PropertyOwnerAgreement = lazyPage(() => import('./pages/PropertyOwnerAgreement').then((module) => ({ default: module.PropertyOwnerAgreement })));
 const CreateListing = lazyPage(() => import('./pages/CreateListing').then((module) => ({ default: module.CreateListing })));
 const UserDashboard = lazyPage(() => import('./pages/UserDashboard').then((module) => ({ default: module.UserDashboard })));
 const AdminDashboard = lazyPage(() => import('./pages/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
@@ -159,7 +161,9 @@ export const router = createBrowserRouter([
         path: 'host/new',
         element: (
           <ProtectedRoute requireHost>
-            <CreateListing />
+            <AgreementGuard>
+              <CreateListing />
+            </AgreementGuard>
           </ProtectedRoute>
         ),
       },
@@ -179,6 +183,7 @@ export const router = createBrowserRouter([
       { path: 'help', Component: Help },
       { path: 'terms', Component: Terms },
       { path: 'privacy', Component: Privacy },
+      { path: 'property-owner-agreement', Component: PropertyOwnerAgreement },
       { path: '*', Component: NotFound },
       { path: 'reset-password', Component: ResetPassword },
       { path: 'reviews', Component: AllReviews },
