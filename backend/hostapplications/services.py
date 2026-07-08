@@ -48,7 +48,8 @@ def ps_decision(application, approve, officer, reason=''):
     if approve:
         application.status = HostApplication.Status.PS_APPROVED
         application.save(update_fields=['status', 'ps_reviewed_by', 'ps_reviewed_at', 'updated_at'])
-        _safe_notify('notify_host_application_advanced', application)
+        _safe_notify('notify_host_application_advanced', application)   # → next reviewers
+        _safe_notify('notify_host_application_progress', application)   # → applicant
         return application
 
     application.save(update_fields=['ps_reviewed_by', 'ps_reviewed_at'])
@@ -68,7 +69,8 @@ def compliance_decision(application, approve, officer, reason=''):
         application.save(update_fields=[
             'status', 'compliance_reviewed_by', 'compliance_reviewed_at', 'updated_at',
         ])
-        _safe_notify('notify_host_application_advanced', application)
+        _safe_notify('notify_host_application_advanced', application)   # → next reviewers
+        _safe_notify('notify_host_application_progress', application)   # → applicant
         return application
 
     application.save(update_fields=['compliance_reviewed_by', 'compliance_reviewed_at'])

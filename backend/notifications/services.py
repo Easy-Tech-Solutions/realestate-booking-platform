@@ -996,6 +996,38 @@ def notify_host_application_advanced(application):
     )
 
 
+def notify_host_application_progress(application):
+    """
+    Tell the applicant their application cleared a review stage and moved to the
+    next one. Fired on each intermediate approval (not the final one — that uses
+    notify_host_application_approved).
+    """
+    from hostapplications.models import HostApplication
+    labels = {
+        HostApplication.Status.PS_APPROVED:         ('Product Support', 'the Compliance team'),
+        HostApplication.Status.COMPLIANCE_APPROVED: ('Compliance', 'a Supervisor for final approval'),
+    }.get(application.status)
+    if not labels:
+        return
+    passed_stage, next_stage = labels
+
+    create_notification(
+        user=application.applicant,
+        notification_type='host_application_progress',
+        title='Your Host Application Is Moving Forward',
+        message=(
+            f'Good news — your host application passed the {passed_stage} review '
+            f'and is now with {next_stage}. We\'ll email you at each step.'
+        ),
+        data={
+            'application_id': application.id,
+            'passed_stage':   passed_stage,
+            'next_stage':     next_stage,
+            'status':         application.status,
+        },
+    )
+
+
 def notify_host_application_declined(application):
     """Notify the applicant that their application was declined, with the reason."""
     create_notification(

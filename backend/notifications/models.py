@@ -47,6 +47,7 @@ class NotificationType(models.TextChoices):
     # Host applications (Host Application & Approval flow)
     HOST_APPLICATION_SUBMITTED = 'host_application_submitted', 'Host Application Submitted'  # → reviewers
     HOST_APPLICATION_ADVANCED  = 'host_application_advanced',  'Host Application Advanced'   # → next reviewers
+    HOST_APPLICATION_PROGRESS  = 'host_application_progress',  'Host Application Progress'   # → applicant
     HOST_APPLICATION_DECLINED  = 'host_application_declined',  'Host Application Declined'   # → applicant
     HOST_APPLICATION_APPROVED  = 'host_application_approved',  'Host Application Approved'   # → applicant
 
