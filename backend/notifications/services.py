@@ -996,6 +996,20 @@ def notify_host_application_advanced(application):
     )
 
 
+def notify_host_application_received(application):
+    """Confirm to the applicant that their host application was received."""
+    create_notification(
+        user=application.applicant,
+        notification_type='host_application_received',
+        title='We Received Your Host Application',
+        message=(
+            'Thanks for applying to become a host on Home Konet. Our team is now '
+            "reviewing your application — we'll email you at each step."
+        ),
+        data={'application_id': application.id},
+    )
+
+
 def notify_host_application_progress(application):
     """
     Tell the applicant their application cleared a review stage and moved to the

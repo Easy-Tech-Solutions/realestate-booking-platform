@@ -50,10 +50,14 @@ def host_applications_collection(request):
     # timestamp + user). The serializer already enforced the checkbox was ticked.
     agreements.record_acceptance(request.user, ip_address=_client_ip(request))
 
-    # Notify the Product Support Officers that a new application is waiting.
+    # Notify the Product Support Officers that a new application is waiting, and
+    # confirm receipt to the applicant.
     try:
-        from notifications.services import notify_host_application_submitted
-        notify_host_application_submitted(application)
+        from notifications.services import (
+            notify_host_application_submitted, notify_host_application_received,
+        )
+        notify_host_application_submitted(application)   # → reviewers
+        notify_host_application_received(application)     # → applicant
     except Exception:
         pass  # Never let a notification failure break the submission.
 
