@@ -6,9 +6,21 @@ from .models import HostApplication
 class HostApplicationCreateSerializer(serializers.ModelSerializer):
     """Used by an authenticated user to submit a host application."""
 
+    # Not a model field — the applicant must tick the Property Owner Agreement
+    # checkbox. Acceptance itself is recorded server-side (with version/IP) in
+    # the view so the client can't spoof the version.
+    agreement_accepted = serializers.BooleanField(write_only=True)
+
     class Meta:
         model = HostApplication
-        fields = ['full_name', 'address', 'phone', 'headshot', 'id_document']
+        fields = ['full_name', 'address', 'phone', 'headshot', 'id_document', 'agreement_accepted']
+
+    def validate_agreement_accepted(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                'You must agree to the Property Owner Agreement to apply.'
+            )
+        return value
 
     def validate(self, attrs):
         request = self.context.get('request')
@@ -19,6 +31,8 @@ class HostApplicationCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 'You already have an application under review.'
             )
+        # Drop the non-model flag before .save() creates the HostApplication.
+        attrs.pop('agreement_accepted', None)
         return attrs
 
 
