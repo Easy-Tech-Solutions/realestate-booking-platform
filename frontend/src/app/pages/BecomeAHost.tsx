@@ -128,15 +128,15 @@ export function BecomeAHost() {
           You’ll get an email at <span className="font-medium text-foreground">{application!.email}</span> at
           each step.
         </p>
-        <ol className="flex items-center justify-center gap-2 mb-2">
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-6 mb-2">
           {STAGES.map((stage, idx) => {
             const done = idx < currentIdx;
             const active = idx === currentIdx;
             return (
-              <li key={stage.key} className="flex items-center gap-2">
+              <div key={stage.key} className="flex items-center gap-2">
                 <span
                   className={[
-                    'flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold border',
+                    'flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold border shrink-0',
                     done ? 'bg-green-500 border-green-500 text-white'
                       : active ? 'bg-primary border-primary text-primary-foreground'
                       : 'bg-muted border-border text-muted-foreground',
@@ -144,14 +144,13 @@ export function BecomeAHost() {
                 >
                   {done ? '✓' : idx + 1}
                 </span>
-                <span className={active ? 'text-foreground font-medium text-sm' : 'text-muted-foreground text-sm'}>
+                <span className={`whitespace-nowrap text-sm ${active ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
                   {stage.label}
                 </span>
-                {idx < STAGES.length - 1 && <span className="w-6 h-px bg-border" />}
-              </li>
+              </div>
             );
           })}
-        </ol>
+        </div>
       </StatusShell>
     );
   }
