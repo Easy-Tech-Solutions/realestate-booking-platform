@@ -46,6 +46,7 @@ class NotificationType(models.TextChoices):
     PHONE_NUMBER_CHANGED = 'phone_number_changed', 'Phone Number Changed'
     # Host applications (Host Application & Approval flow)
     HOST_APPLICATION_SUBMITTED = 'host_application_submitted', 'Host Application Submitted'  # → reviewers
+    HOST_APPLICATION_RECEIVED  = 'host_application_received',  'Host Application Received'   # → applicant
     HOST_APPLICATION_ADVANCED  = 'host_application_advanced',  'Host Application Advanced'   # → next reviewers
     HOST_APPLICATION_PROGRESS  = 'host_application_progress',  'Host Application Progress'   # → applicant
     HOST_APPLICATION_DECLINED  = 'host_application_declined',  'Host Application Declined'   # → applicant
