@@ -1,0 +1,10 @@
+{% extends "emails/notifications/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Your Property Is Live!</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">Verification complete</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#ecfdf5;border-radius:6px;padding:20px;margin:0 0 24px;border-left:4px solid #10b981;">
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>{{ data.listing_title }}</strong> passed verification and is now published on Home Konet.</td></tr>
+</table>
+<p style="margin:0 0 24px;color:#444444;font-size:15px;line-height:1.6;">Guests can now find and book your property. You can manage it any time from your host dashboard.</p>
+<a href="{{ site_url }}/rooms/{{ data.listing_id }}" style="display:inline-block;background:#004406;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">View Your Listing</a>
+{% endblock %}
