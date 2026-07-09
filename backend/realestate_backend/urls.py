@@ -32,6 +32,7 @@ urlpatterns = [
     path('api/testimonials/', include('testimonials.urls')),
     path('api/support/', include('support.urls')),
     path('api/host-applications/', include('hostapplications.urls')),
+    path('api/property-verifications/', include('propertyverifications.urls')),
 ]
 
 if settings.DEBUG:

@@ -51,6 +51,14 @@ class NotificationType(models.TextChoices):
     HOST_APPLICATION_PROGRESS  = 'host_application_progress',  'Host Application Progress'   # → applicant
     HOST_APPLICATION_DECLINED  = 'host_application_declined',  'Host Application Declined'   # → applicant
     HOST_APPLICATION_APPROVED  = 'host_application_approved',  'Host Application Approved'   # → applicant
+    # Property verification (listing owner/non-owner verification flow)
+    PROPERTY_VERIFICATION_SUBMITTED  = 'property_verification_submitted',  'Property Verification Submitted'  # → reviewers
+    PROPERTY_VERIFICATION_ADVANCED   = 'property_verification_advanced',   'Property Verification Advanced'   # → next reviewers
+    PROPERTY_VERIFICATION_RECEIVED   = 'property_verification_received',   'Property Verification Received'   # → applicant
+    PROPERTY_VERIFICATION_PROGRESS   = 'property_verification_progress',   'Property Verification Progress'   # → applicant
+    PROPERTY_VERIFICATION_CORRECTION = 'property_verification_correction', 'Property Verification Correction' # → applicant
+    PROPERTY_VERIFICATION_REJECTED   = 'property_verification_rejected',   'Property Verification Rejected'   # → applicant
+    PROPERTY_VERIFICATION_PUBLISHED  = 'property_verification_published',  'Property Verification Published'  # → applicant
 
 
 class Notification(models.Model):

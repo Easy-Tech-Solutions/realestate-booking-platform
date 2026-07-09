@@ -20,5 +20,7 @@ export { supportAPI } from './support';
 export type { SupportTicket, TicketMessage, TicketAttachment, ContactInquiry, SearchResult } from './support';
 export { hostApplicationsAPI } from './hostApplications';
 export type { HostApplication } from './hostApplications';
+export { propertyVerificationsAPI } from './propertyVerifications';
+export type { PropertyVerification } from './propertyVerifications';
 export type { Testimonial } from './testimonials';
 export { clearTokens, getAccessToken, setTokens, attemptTokenRefresh } from './shared/client';

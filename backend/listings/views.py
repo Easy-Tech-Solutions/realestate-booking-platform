@@ -137,10 +137,11 @@ def listings_collection(request):
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         serializer = ListingSerializer(data=request.data)
         if serializer.is_valid():
-            # No admin-review step for now: a submitted listing publishes
-            # immediately. Drafts (saved via "Save & exit") stay drafts. Forced
-            # here in the view so it can't fall back to a pending_review default.
-            new_status = 'draft' if request.data.get('status') == 'draft' else 'published'
+            # New listings must pass property verification before going live.
+            # Drafts ("Save & exit") stay drafts; a real submission goes in as
+            # pending_review (hidden from public search) and is published only
+            # when the verification pipeline approves it. See propertyverifications.
+            new_status = 'draft' if request.data.get('status') == 'draft' else 'pending_review'
             listing = serializer.save(owner=request.user, status=new_status)
             return Response(ListingSerializer(listing, context={"request": request}).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
