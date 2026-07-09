@@ -1074,6 +1074,139 @@ def notify_host_application_approved(application):
     )
 
 
+# ---- Property verification helpers -------------------------------------------
+
+def _property_verification_data(verification):
+    return {
+        'verification_id': verification.id,
+        'listing_id':      verification.listing_id,
+        'listing_title':   verification.listing.title,
+        'ownership_type':  verification.ownership_type,
+        'status':          verification.status,
+    }
+
+
+def notify_property_verification_submitted(verification):
+    """A listing was submitted for verification — notify the Product Support Officers."""
+    from propertyverifications.models import GROUP_PRODUCT_SUPPORT
+    _notify_group(
+        GROUP_PRODUCT_SUPPORT,
+        notification_type='property_verification_submitted',
+        title='New Property Verification',
+        message=(
+            f'"{verification.listing.title}" was submitted for verification. '
+            f'Review the property details and documents to approve, reject, or request a correction.'
+        ),
+        data=_property_verification_data(verification),
+    )
+
+
+def notify_property_verification_advanced(verification):
+    """Approved at one stage — notify the next stage's reviewers."""
+    from propertyverifications.models import (
+        PropertyVerification, GROUP_COMPLIANCE, GROUP_SUPERVISOR,
+    )
+    next_group = {
+        PropertyVerification.Status.PS_APPROVED:         GROUP_COMPLIANCE,
+        PropertyVerification.Status.COMPLIANCE_APPROVED: GROUP_SUPERVISOR,
+    }.get(verification.status)
+    if not next_group:
+        return
+    _notify_group(
+        next_group,
+        notification_type='property_verification_advanced',
+        title='Property Verification Awaiting Review',
+        message=(
+            f'The verification for "{verification.listing.title}" has advanced to your stage. '
+            f'Please review it.'
+        ),
+        data=_property_verification_data(verification),
+    )
+
+
+def notify_property_verification_received(verification):
+    """Confirm to the host that their property was submitted for verification."""
+    create_notification(
+        user=verification.applicant,
+        notification_type='property_verification_received',
+        title='Property Submitted for Verification',
+        message=(
+            f'Thanks — "{verification.listing.title}" has been submitted for verification. '
+            f"Our team will review it and we'll email you at each step. It will be published once approved."
+        ),
+        data=_property_verification_data(verification),
+    )
+
+
+def notify_property_verification_progress(verification):
+    """Tell the host their property cleared a review stage."""
+    from propertyverifications.models import PropertyVerification
+    labels = {
+        PropertyVerification.Status.PS_APPROVED:         ('Product Support', 'the Compliance team (site inspection)'),
+        PropertyVerification.Status.COMPLIANCE_APPROVED: ('Compliance', 'a Supervisor for final approval'),
+    }.get(verification.status)
+    if not labels:
+        return
+    passed_stage, next_stage = labels
+    create_notification(
+        user=verification.applicant,
+        notification_type='property_verification_progress',
+        title='Your Property Verification Is Moving Forward',
+        message=(
+            f'"{verification.listing.title}" passed the {passed_stage} review and is now with '
+            f'{next_stage}.'
+        ),
+        data={**_property_verification_data(verification),
+              'passed_stage': passed_stage, 'next_stage': next_stage},
+    )
+
+
+def notify_property_verification_correction(verification):
+    """Ask the host to correct and resubmit their property verification."""
+    create_notification(
+        user=verification.applicant,
+        notification_type='property_verification_correction',
+        title='Correction Needed on Your Property Listing',
+        message=(
+            f'Your listing "{verification.listing.title}" needs a correction before it can be '
+            f'published. {verification.review_notes or "Please review and resubmit."}'
+        ),
+        data={**_property_verification_data(verification),
+              'review_notes': verification.review_notes,
+              'outcome_stage': verification.outcome_stage},
+    )
+
+
+def notify_property_verification_rejected(verification):
+    """Notify the host their property verification was rejected."""
+    create_notification(
+        user=verification.applicant,
+        notification_type='property_verification_rejected',
+        title='Property Verification Declined',
+        message=(
+            f'Your listing "{verification.listing.title}" was not approved. '
+            f'Reason: {verification.review_notes or "No reason provided."}'
+        ),
+        data={**_property_verification_data(verification),
+              'review_notes': verification.review_notes,
+              'outcome_stage': verification.outcome_stage},
+    )
+
+
+def notify_property_verification_published(verification):
+    """Notify the host their property passed verification and is now live."""
+    create_notification(
+        user=verification.applicant,
+        notification_type='property_verification_published',
+        title='Your Property Is Live!',
+        message=(
+            f'Great news — "{verification.listing.title}" passed verification and is now '
+            f'published on Home Konet.'
+        ),
+        data=_property_verification_data(verification),
+    )
+
+
 def notify_phone_number_changed(user, old_number, new_number, network_provider):
     """
     Notify the user that their mobile wallet number was successfully changed.

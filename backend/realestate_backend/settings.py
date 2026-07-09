@@ -111,6 +111,7 @@ INSTALLED_APPS = [
     "testimonials",
     "support",
     "hostapplications",
+    "propertyverifications",
 ]
 
 MIDDLEWARE = [

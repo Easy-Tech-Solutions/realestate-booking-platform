@@ -21,6 +21,7 @@ import {
   XCircle,
   FileText,
 } from 'lucide-react';
+import { ListingVerificationCell } from '../components/ListingVerificationCell';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../hooks/queries/keys';
@@ -968,7 +969,8 @@ export function HostDashboard() {
               </div>
             )}
             {properties.map((property) => (
-              <div key={property.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border border-border rounded-lg">
+              <div key={property.id} className="p-4 border border-border rounded-lg space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                   <img src={property.images[0]} alt={property.title} className="w-20 h-16 rounded object-cover flex-shrink-0" />
                   <div className="min-w-0">
@@ -1022,6 +1024,8 @@ export function HostDashboard() {
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
+                </div>
+                <ListingVerificationCell listingId={property.id} />
               </div>
             ))}
             {properties.length === 0 && <p className="text-sm text-muted-foreground">No properties yet.</p>}

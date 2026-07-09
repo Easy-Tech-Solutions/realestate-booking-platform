@@ -25,6 +25,7 @@ import {
 import { cn } from '../../core/utils';
 import { AMENITIES, PROPERTY_CATEGORIES } from '../../core/constants';
 import { propertiesAPI } from '../../services/api.service';
+import { PropertyVerificationForm } from '../components/PropertyVerificationForm';
 import { toast } from 'sonner';
 
 type WizardStep =
@@ -298,6 +299,9 @@ export function CreateListing() {
   const navigate = useNavigate();
   const [stepIndex, setStepIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // After the listing is created it enters ownership verification before publishing.
+  const [createdListingId, setCreatedListingId] = useState<number | null>(null);
+  const [showVerification, setShowVerification] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [draftListingId, setDraftListingId] = useState<string | null>(null);
   const [draftRestored, setDraftRestored] = useState(false);
@@ -724,9 +728,12 @@ export function CreateListing() {
       payload.append('square_footage', String(form.squareFootage));
       payload.append('check_in_time', form.checkInTime);
       payload.append('check_out_time', form.checkOutTime);
-      payload.append('is_available', 'true');
-      // Listings publish immediately — no admin approval step for now.
-      payload.append('status', 'published');
+      // Created unpublished & unavailable. The listing only enters review
+      // (pending_review) once the ownership verification form is submitted, and
+      // only goes live (published + available) after the pipeline approves it.
+      // Until then it's a resumable draft — abandoning verification is harmless.
+      payload.append('is_available', 'false');
+      payload.append('status', 'draft');
 
       if (form.images[0]) {
         payload.append('main_image', form.images[0]);
@@ -767,8 +774,10 @@ export function CreateListing() {
       }
 
       localStorage.removeItem(DRAFT_KEY);
-      toast.success('Listing published! It\'s now live for guests.');
-      navigate('/host');
+      // Listing is created (unpublished). Now collect ownership verification
+      // before it goes live.
+      setCreatedListingId(Number(created.id));
+      setShowVerification(true);
     } catch (error: any) {
       if (error?.status === 401) {
         toast.error('Your session has expired. Please log in again.');
@@ -825,6 +834,23 @@ export function CreateListing() {
       { label: 'Bathrooms', key: 'bathrooms' as const },
     ];
   }, [propertyGroup]);
+
+  if (showVerification && createdListingId != null) {
+    return (
+      <PropertyVerificationForm
+        listingId={createdListingId}
+        defaultLocation={composedAddress}
+        onSubmitted={() => {
+          toast.success('Submitted for verification — we\'ll email you at each step.');
+          navigate('/host');
+        }}
+        onExit={() => {
+          toast.success('Saved as a draft. Finish verification any time to publish it.');
+          navigate('/host');
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -1785,10 +1811,13 @@ export function CreateListing() {
             )}
 
             <div className="rounded-2xl border p-5 bg-muted/20">
-              <p className="text-base sm:text-2xl text-muted-foreground">Ready to publish</p>
+              <p className="text-base sm:text-2xl text-muted-foreground">Ready to submit</p>
               <p className="text-xl sm:text-3xl mt-2">
                 Your listing has {form.images.length} photos and {form.amenities.length} amenities configured.
                 {propertyGroup === 'hotel' && ` ${form.hotelRooms.length} room type${form.hotelRooms.length !== 1 ? 's' : ''} defined.`}
+              </p>
+              <p className="text-sm sm:text-base text-muted-foreground mt-3">
+                Next, you’ll verify ownership. Your listing goes live once our team approves it.
               </p>
             </div>
           </section>
@@ -1811,7 +1840,7 @@ export function CreateListing() {
 
             {currentStep === 'final_details' ? (
               <Button onClick={publish} disabled={!canContinue || isSubmitting}>
-                {isSubmitting ? 'Publishing...' : 'Create listing'}
+                {isSubmitting ? 'Creating...' : 'Create listing'}
               </Button>
             ) : currentStep === 'weekend_price' ? (
               <div className="flex items-center gap-2">
