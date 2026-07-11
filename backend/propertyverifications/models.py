@@ -71,6 +71,14 @@ class PropertyVerification(models.Model):
         upload_to='property_verifications/mou/', storage=_mou_storage, null=True, blank=True,
     )
 
+    # Compliance-stage site inspection. The Compliance Officer confirms due
+    # diligence and attaches an inspection report (PDF/PowerPoint) before the
+    # property can advance to the Supervisor. null = not yet answered.
+    due_diligence_done = models.BooleanField(null=True, blank=True)
+    inspection_report  = models.FileField(
+        upload_to='property_verifications/inspections/', storage=_mou_storage, null=True, blank=True,
+    )
+
     status = models.CharField(
         max_length=25, choices=Status.choices, default=Status.SUBMITTED, db_index=True,
     )
