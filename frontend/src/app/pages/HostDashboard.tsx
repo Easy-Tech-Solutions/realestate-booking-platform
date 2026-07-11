@@ -822,7 +822,7 @@ export function HostDashboard() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total Earnings', value: formatCurrency(totalEarnings), icon: DollarSign, sub: 'Confirmed bookings only' },
-          { label: 'Active Listings', value: properties.length, icon: Home, sub: 'Live on the platform' },
+          { label: 'Active Listings', value: properties.filter((p: any) => p.status === 'published').length, icon: Home, sub: 'Live on the platform' },
           { label: 'Total Bookings', value: bookings.length, icon: Calendar, sub: 'All requests and stays' },
           { label: 'Average Rating', value: averageRating ? averageRating.toFixed(2) : '—', icon: Star, sub: `${reviews.length} total reviews` },
         ].map(({ label, value, icon: Icon, sub }) => (
