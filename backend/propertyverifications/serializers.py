@@ -1,7 +1,23 @@
+import os
+
 from rest_framework import serializers
 
 from listings.models import Listing
 from .models import PropertyVerification
+
+# The MOU may be a PDF document or a picture (scan/photo).
+ALLOWED_MOU_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'heic', 'heif'}
+
+
+def validate_mou_file(value):
+    if not value:
+        return value
+    ext = os.path.splitext(value.name)[1].lower().lstrip('.')
+    if ext not in ALLOWED_MOU_EXTENSIONS:
+        raise serializers.ValidationError(
+            'The MOU must be a PDF or an image (PNG, JPG, JPEG, WEBP, etc.).'
+        )
+    return value
 
 
 class PropertyVerificationCreateSerializer(serializers.ModelSerializer):
@@ -16,6 +32,9 @@ class PropertyVerificationCreateSerializer(serializers.ModelSerializer):
             'property_location', 'deed_volume_number', 'mou_document',
         ]
         extra_kwargs = {'mou_document': {'required': False}}
+
+    def validate_mou_document(self, value):
+        return validate_mou_file(value)
 
     def validate_listing(self, listing):
         request = self.context.get('request')
@@ -47,6 +66,9 @@ class PropertyVerificationResubmitSerializer(serializers.ModelSerializer):
             'deed_volume_number': {'required': False},
             'mou_document':       {'required': False},
         }
+
+    def validate_mou_document(self, value):
+        return validate_mou_file(value)
 
 
 class PropertyVerificationSerializer(serializers.ModelSerializer):
