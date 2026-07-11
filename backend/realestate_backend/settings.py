@@ -461,6 +461,14 @@ else:
     MEDIA_ROOT = os.path.abspath(media_root or os.path.join(BASE_DIR, "media"))
     os.makedirs(MEDIA_ROOT, exist_ok=True)
 
+# Files/directories written by FileSystemStorage must be readable and
+# traversable by the nginx worker (a different OS user) that serves /media/.
+# Without an explicit directory mode, new upload subdirectories inherit the
+# container umask and can end up non-traversable — nginx then returns 403 for
+# files inside them (e.g. property_verifications/mou/). Harmless with Cloudinary.
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
