@@ -1,3 +1,5 @@
+import os
+
 from django import forms
 from django.contrib import admin, messages
 from django.utils.html import format_html
@@ -37,12 +39,32 @@ class PropertyVerificationAdminForm(forms.ModelForm):
 
     class Meta:
         model = PropertyVerification
-        fields = ['review_notes']
+        fields = ['review_notes', 'due_diligence_done', 'inspection_report']
+
+    def clean_inspection_report(self):
+        f = self.cleaned_data.get('inspection_report')
+        if f and getattr(f, 'name', None):
+            ext = os.path.splitext(f.name)[1].lower().lstrip('.')
+            if ext not in {'pdf', 'ppt', 'pptx'}:
+                raise forms.ValidationError(
+                    'The inspection report must be a PDF or PowerPoint (.pdf, .ppt, .pptx).'
+                )
+        return f
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get('decision') in (REJECT, REQUEST_CORRECTION) and not (cleaned.get('review_notes') or '').strip():
+        decision = cleaned.get('decision')
+        if decision in (REJECT, REQUEST_CORRECTION) and not (cleaned.get('review_notes') or '').strip():
             self.add_error('review_notes', 'A note is required when rejecting or requesting a correction.')
+
+        # Compliance-stage approval gate: due diligence must be done AND the
+        # inspection report attached before the property advances to Supervisor.
+        at_compliance = getattr(self.instance, 'current_stage', None) == PropertyVerification.Stage.COMPLIANCE
+        if decision == APPROVE and at_compliance:
+            if cleaned.get('due_diligence_done') is not True:
+                self.add_error('due_diligence_done', 'Mark due diligence as "Yes" to approve at the Compliance stage.')
+            if not (cleaned.get('inspection_report') or self.instance.inspection_report):
+                self.add_error('inspection_report', 'Attach the PDF/PowerPoint inspection report to approve.')
         return cleaned
 
 
@@ -72,6 +94,14 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
                 ('ps_reviewed_by', 'ps_reviewed_at'),
                 ('compliance_reviewed_by', 'compliance_reviewed_at'),
                 ('supervisor_reviewed_by', 'supervisor_reviewed_at'),
+            ),
+        }),
+        ('Compliance inspection', {
+            'fields': ('due_diligence_done', 'inspection_report'),
+            'description': (
+                'Compliance stage: confirm the on-site inspection (due diligence) and attach the '
+                'PDF/PowerPoint report. Both are required to approve at this stage. You can save '
+                'these without deciding yet and come back to approve.'
             ),
         }),
         ('Decision', {
@@ -117,6 +147,10 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
         if not request.user.has_perm(perm):
             messages.error(request, 'You do not have permission to act on this stage.')
             return
+
+        # Persist the inspection answer/report entered on this save before the
+        # transition (the service handlers save only their own status fields).
+        obj.save(update_fields=['due_diligence_done', 'inspection_report', 'updated_at'])
 
         notes = form.cleaned_data.get('review_notes', '')
         try:
