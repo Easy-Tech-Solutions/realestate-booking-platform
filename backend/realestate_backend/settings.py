@@ -112,6 +112,12 @@ INSTALLED_APPS = [
     "support",
     "hostapplications",
     "propertyverifications",
+    "superadmin",
+    "trustsafety",
+    "inventory",
+    "legalops",
+    "platformops",
+    "rbac",
 ]
 
 MIDDLEWARE = [
@@ -131,6 +137,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "suspensions.middleware.SuspensionMiddleware",
+    "platformops.middleware.MaintenanceModeMiddleware",
+    "rbac.middleware.BreakGlassAuditMiddleware",
     "listings.middleware.ViewTrackingMiddleware",
 ]
 
@@ -282,6 +290,7 @@ REST_FRAMEWORK = {
         "verify_email": "10/hour",
         "phone_change": "5/hour",
         "google_login": "20/min" if DEBUG else "10/min",
+        "mfa_verify_login": "10/hour",
     },
 }
 
@@ -413,25 +422,49 @@ CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '')
 UNFOLD = {
     "SITE_TITLE": "Home Konet Admin",
     "SITE_HEADER": "Home Konet Admin",
-    "SITE_URL": "https://realestate-booking-platform.vercel.app",
+    "SITE_URL": "https://homekonet.com",
     "SITE_ICON": lambda request: static("admin/Home-Konet-Logo2.jpeg"),
+    "SITE_LOGO": lambda request: static("admin/Home-Konet-Logo2.jpeg"),
+    "SITE_FAVICONS": [
+        {"rel": "icon", "type": "image/jpeg", "href": "/favicon.jpg"},
+    ],
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,
     "THEME": None,  #None = follow OS / user toggle. "light" or "dark" forces it.
 
+    # NOTE: Unfold injects these directly as CSS custom properties
+    # (`--color-primary-500: {value};`) with no wrapping function, so each
+    # value must be a complete, valid CSS color — not a bare "R G B" triplet.
     "COLORS": {
+        # Neutral scale used for backgrounds/borders/text throughout the admin
+        # chrome. Unfold's default "base" is a cool blue-gray (oklch hue ~260)
+        # which is why the admin looked navy-tinted instead of matching the
+        # platform's true-neutral grays (frontend theme.css: #fff/#222222/etc).
+        "base": {
+            "50": "rgb(255 255 255)",
+            "100": "rgb(247 247 247)",   # matches --muted (light)
+            "200": "rgb(238 238 238)",
+            "300": "rgb(221 221 221)",   # matches --border (light)
+            "400": "rgb(191 191 191)",
+            "500": "rgb(153 153 153)",
+            "600": "rgb(113 113 113)",   # matches --muted-foreground (light)
+            "700": "rgb(77 77 77)",
+            "800": "rgb(58 58 58)",      # matches --border / --muted (dark)
+            "900": "rgb(43 43 43)",      # matches --card (dark)
+            "950": "rgb(34 34 34)",      # matches --background (dark)
+        },
         "primary": {
-            "50": "240 250 241",
-            "100": "214 241 216",
-            "200": "173 228 179",
-            "300": "121 207 131",
-            "400": "74 178 89",
-            "500": "42 146 57",
-            "600": "29 113 41",
-            "700": "20 89 31",
-            "800": "0 68 6",  #brand color #004406
-            "900": "0 51 10",
-            "950": "0 37 7",
+            "50": "rgb(240 250 241)",
+            "100": "rgb(214 241 216)",
+            "200": "rgb(173 228 179)",
+            "300": "rgb(121 207 131)",
+            "400": "rgb(74 178 89)",
+            "500": "rgb(42 146 57)",
+            "600": "rgb(29 113 41)",
+            "700": "rgb(20 89 31)",
+            "800": "rgb(0 68 6)",  #brand color #004406
+            "900": "rgb(0 51 10)",
+            "950": "rgb(0 37 7)",
         },
     },
 }
@@ -531,6 +564,12 @@ CELERY_BEAT_SCHEDULE = {
     'expire-unpaid-reservations': {
         'task': 'bookings.tasks.expire_unpaid_reservations',
         'schedule': crontab(minute=5),  # five past every hour
+    },
+    # Mark naturally-expired suspensions as EXPIRED and notify the user.
+    # (Previously documented in suspensions/tasks.py but never actually registered.)
+    'expire-suspensions': {
+        'task': 'suspensions.tasks.expire_suspensions',
+        'schedule': crontab(minute=10),  # ten past every hour
     },
 }
 

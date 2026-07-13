@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Payment, Currency, Refund, SavedCard
+from .models import Payment, Currency, Refund, SavedCard, PlatformFee, TaxRate
 from bookings.models import Booking, ViewingAppointment
 
 # Mobile-money / bank gateways routed through PaymentService (Stripe uses its
@@ -172,4 +172,33 @@ class MTNWebhookSerializer(serializers.Serializer):
         valid_statuses = ['PENDING', 'SUCCESSFUL', 'FAILED', 'TIMEOUT']
         if value not in valid_statuses:
             raise serializers.ValidationError(f"Invalid status: {value}")
-        return value  
+        return value
+
+
+class PlatformFeeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlatformFee
+        fields = [
+            'booking_fee', 'viewing_fee', 'service_fee_percent',
+            'transaction_fee_type', 'transaction_fee_value',
+            'transaction_fee_min', 'transaction_fee_max', 'updated_at',
+        ]
+        read_only_fields = ['updated_at']
+
+    def validate(self, attrs):
+        fee_type = attrs.get('transaction_fee_type', getattr(self.instance, 'transaction_fee_type', 'fixed'))
+        if fee_type == 'range':
+            lo = attrs.get('transaction_fee_min', getattr(self.instance, 'transaction_fee_min', None))
+            hi = attrs.get('transaction_fee_max', getattr(self.instance, 'transaction_fee_max', None))
+            if lo is not None and hi is not None and lo > hi:
+                raise serializers.ValidationError({'transaction_fee_min': 'Minimum cannot exceed maximum.'})
+        return attrs
+
+
+class TaxRateSerializer(serializers.ModelSerializer):
+    created_by_username = serializers.CharField(source='created_by.username', default=None, read_only=True)
+
+    class Meta:
+        model = TaxRate
+        fields = ['id', 'jurisdiction', 'rate_percent', 'is_active', 'created_by', 'created_by_username', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'created_by_username', 'created_at', 'updated_at']  

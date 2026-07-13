@@ -10,4 +10,9 @@ urlpatterns = [
 
     # POST /api/property-verifications/<pk>/resubmit/         → resubmit after correction
     path('<int:pk>/resubmit/', views.resubmit_verification, name='verification-resubmit'),
+
+    # GET  /api/property-verifications/review-queue/          → pending verifications for this reviewer
+    path('review-queue/', views.review_queue, name='property-verification-review-queue'),
+    # POST /api/property-verifications/<pk>/review/            → approve/reject/request-correction
+    path('<int:pk>/review/', views.review_decision, name='property-verification-review'),
 ]

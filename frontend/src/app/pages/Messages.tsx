@@ -380,7 +380,7 @@ function ChatPane({
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const editRef = useRef<HTMLInputElement>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -614,7 +614,14 @@ function ChatPane({
   const startEdit = (msg: Message) => {
     setEditingMsg(msg);
     setEditContent(msg.content);
-    setTimeout(() => editRef.current?.focus(), 50);
+    setTimeout(() => {
+      const el = editRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    }, 50);
     setMenuOpen(false);
   };
 
@@ -779,25 +786,41 @@ function ChatPane({
 
       {/* Edit bar */}
       {editingMsg && (
-        <div className="border-t border-border bg-yellow-50 dark:bg-yellow-950/20 px-4 py-2 flex items-center gap-3 flex-shrink-0">
-          <Pencil className="w-4 h-4 text-yellow-600 flex-shrink-0" />
-          <input
-            ref={editRef}
-            type="text"
-            aria-label="Edit message"
-            title="Edit message"
-            placeholder="Edit your message…"
-            value={editContent}
-            onChange={e => setEditContent(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingMsg(null); }}
-            className="flex-1 bg-transparent text-sm focus:outline-none"
-          />
-          <button type="button" onClick={saveEdit} disabled={editSaving || !editContent.trim()} className="text-xs font-semibold text-primary hover:text-primary/80 disabled:opacity-40">
-            {editSaving ? 'Saving…' : 'Save'}
-          </button>
-          <button type="button" onClick={() => setEditingMsg(null)} className="text-xs text-muted-foreground hover:text-foreground">
-            Cancel
-          </button>
+        <div className="border-t border-border bg-yellow-50 dark:bg-yellow-950/20 px-4 py-3 flex-shrink-0">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <Pencil className="w-3.5 h-3.5 text-yellow-600 flex-shrink-0" />
+            <span className="text-xs font-medium text-yellow-700 dark:text-yellow-500">Editing message</span>
+          </div>
+          <div className="flex items-end gap-3">
+            <textarea
+              ref={editRef}
+              aria-label="Edit message"
+              title="Edit message"
+              placeholder="Edit your message…"
+              value={editContent}
+              onChange={e => {
+                setEditContent(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+                if (e.key === 'Escape') setEditingMsg(null);
+              }}
+              rows={1}
+              className="flex-1 resize-none overflow-y-auto rounded-lg border border-border bg-background px-3 py-2 text-sm leading-snug focus:outline-none focus:ring-2 focus:ring-primary/40"
+              style={{ maxHeight: 160 }}
+            />
+            <div className="flex flex-shrink-0 flex-col gap-1.5">
+              <button type="button" onClick={saveEdit} disabled={editSaving || !editContent.trim()} className="text-xs font-semibold text-primary hover:text-primary/80 disabled:opacity-40">
+                {editSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button type="button" onClick={() => setEditingMsg(null)} className="text-xs text-muted-foreground hover:text-foreground">
+                Cancel
+              </button>
+            </div>
+          </div>
+          <p className="mt-1 text-[10px] text-muted-foreground">Enter to save · Shift+Enter for a new line · Esc to cancel</p>
         </div>
       )}
 

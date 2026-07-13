@@ -14,11 +14,13 @@ from realestate_backend.app_logging import log_transaction
 
 logger = logging.getLogger(__name__)
 
-from .models import Payment, PaymentGateway, WebhookLog, SavedCard
+from rbac import dual_auth
+
+from .models import Payment, PaymentGateway, WebhookLog, SavedCard, Refund, PlatformFee
 from .serializers import (
     PaymentInitiateSerializer, PaymentVerifySerializer, RefundSerializer,
     PaymentSerializer, RefundDetailSerializer, SavedCardSerializer,
-    ViewingPaymentInitiateSerializer,
+    ViewingPaymentInitiateSerializer, PlatformFeeSerializer, TaxRateSerializer,
 )
 from .services import PaymentService
 
@@ -298,8 +300,23 @@ def payment_detail(request, payment_id):
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-def _is_admin(user):
-    return user.role == 'admin' or user.is_superuser
+def _is_admin(user, resource=None):
+    """Full admins (superadmin) always pass; is_staff accounts need the
+    finance department (legacy) OR — when `resource` is given — a custom
+    role granting that specific finances/customer_support resource
+    directly."""
+    from rbac.permissions import is_full_admin
+    if is_full_admin(user):
+        return True
+    from superadmin.permissions import is_superadmin_staff, require_department
+    if not (user and user.is_authenticated and is_superadmin_staff(user)):
+        return False
+    if require_department(user, 'finance'):
+        return True
+    if resource:
+        from rbac.permissions import has_any_permission
+        return has_any_permission(user, resource)
+    return False
 
 
 def _serialize_payout(p):
@@ -316,6 +333,8 @@ def _serialize_payout(p):
         'status': p.status,
         'reference': p.reference,
         'paid_at': p.paid_at.isoformat() if p.paid_at else None,
+        'cancelled_at': p.cancelled_at.isoformat() if p.cancelled_at else None,
+        'cancellation_reason': p.cancellation_reason,
         'created_at': p.created_at.isoformat(),
     }
 
@@ -324,7 +343,7 @@ def _serialize_payout(p):
 @permission_classes([IsAuthenticated])
 def admin_payouts(request):
     """Admin: list host payouts, optionally filtered by ?status=pending|paid."""
-    if not _is_admin(request.user):
+    if not _is_admin(request.user, 'finances.payouts'):
         return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
     from .models import Payout
     qs = Payout.objects.select_related('host', 'booking__listing').order_by('-created_at')
@@ -338,7 +357,7 @@ def admin_payouts(request):
 @permission_classes([IsAuthenticated])
 def admin_mark_payout_paid(request, payout_id):
     """Admin: mark a payout as paid (records who/when and an optional reference)."""
-    if not _is_admin(request.user):
+    if not _is_admin(request.user, 'finances.payouts'):
         return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
     from django.utils import timezone as _tz
     from .models import Payout
@@ -357,6 +376,37 @@ def admin_mark_payout_paid(request, payout_id):
             notify_payout_paid(payout)
         except Exception:
             pass
+    return Response(_serialize_payout(payout))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_cancel_payout(request, payout_id):
+    """Admin: cancel a pending payout (e.g. a booking is disputed/refunded
+    before the host has been paid). Only pending payouts can be cancelled —
+    a paid one has already moved real money and must be reversed manually."""
+    if not _is_admin(request.user, 'finances.payouts'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from django.utils import timezone as _tz
+    from .models import Payout
+    try:
+        payout = Payout.objects.select_related('host', 'booking__listing').get(pk=payout_id)
+    except Payout.DoesNotExist:
+        return Response({'error': 'Payout not found'}, status=status.HTTP_404_NOT_FOUND)
+    if payout.status != 'pending':
+        return Response({'error': f'Only pending payouts can be cancelled (this one is {payout.status}).'}, status=status.HTTP_400_BAD_REQUEST)
+    reason = str(request.data.get('reason', '')).strip()
+    if not reason:
+        return Response({'error': 'A reason is required to cancel a payout.'}, status=status.HTTP_400_BAD_REQUEST)
+    payout.status = 'cancelled'
+    payout.cancelled_at = _tz.now()
+    payout.cancelled_by = request.user
+    payout.cancellation_reason = reason
+    payout.save(update_fields=['status', 'cancelled_at', 'cancelled_by', 'cancellation_reason'])
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'payout.cancel', target=payout, reason=reason)
+
     return Response(_serialize_payout(payout))
 
 
@@ -815,3 +865,537 @@ def saved_card_detail(request, card_id):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     card = serializer.save()
     return Response(SavedCardSerializer(card).data)
+
+
+# ---------------------------------------------------------------------------
+# Admin: platform fee configuration (the fake hardcoded "Settings" form this
+# replaces was never wired to any endpoint at all — see PlatformFee model)
+# ---------------------------------------------------------------------------
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def admin_platform_fee(request):
+    if not _is_admin(request.user, 'finances.platform_fee'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    fee = PlatformFee.get_current()
+    if request.method == 'GET':
+        return Response(PlatformFeeSerializer(fee).data)
+
+    serializer = PlatformFeeSerializer(fee, data=request.data, partial=True)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    fee = serializer.save()
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'platform_fee.update', target=fee, metadata_snapshot=PlatformFeeSerializer(fee).data)
+
+    return Response(PlatformFeeSerializer(fee).data)
+
+
+# ---------------------------------------------------------------------------
+# Admin: escrow (finances.escrow — held guest payments awaiting confirmation)
+# ---------------------------------------------------------------------------
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_escrow_list(request):
+    """Every booking whose guest payment has landed in the platform account
+    but hasn't been confirmed (and disbursed to the host) yet — the real
+    'funds currently in escrow' view, plus whether each one is on hold."""
+    from rbac.permissions import has_permission
+    from .models import EscrowHold
+    from bookings.models import Booking
+    if not has_permission(request.user, 'finances.escrow', 'read'):
+        return Response({'error': 'finances.escrow access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    bookings = Booking.objects.filter(status='payment_received').select_related('listing', 'customer').order_by('requested_at')
+    holds_by_booking = {
+        h.booking_id: h for h in EscrowHold.objects.filter(booking__in=bookings, released_at__isnull=True)
+    }
+    results = []
+    for b in bookings:
+        hold = holds_by_booking.get(b.id)
+        results.append({
+            'booking_id': b.id,
+            'listing_title': b.listing.title,
+            'guest_username': b.customer.username,
+            'total_price': str(b.total_price) if b.total_price is not None else None,
+            'requested_at': b.requested_at.isoformat() if b.requested_at else None,
+            'on_hold': hold is not None,
+            'hold_id': hold.id if hold else None,
+            'hold_reason': hold.reason if hold else '',
+        })
+    return Response(results)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_escrow_hold(request, booking_id):
+    from rbac.permissions import has_permission
+    from .models import EscrowHold
+    from bookings.models import Booking
+    if not has_permission(request.user, 'finances.escrow', 'update'):
+        return Response({'error': 'finances.escrow access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    booking = get_object_or_404(Booking, pk=booking_id)
+    reason = str(request.data.get('reason', '')).strip()
+    if not reason:
+        return Response({'error': 'A reason is required to place a hold.'}, status=status.HTTP_400_BAD_REQUEST)
+    if EscrowHold.objects.filter(booking=booking, released_at__isnull=True).exists():
+        return Response({'error': 'This booking already has an active hold.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    hold = EscrowHold.objects.create(booking=booking, reason=reason, held_by=request.user)
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'escrow.hold', target=hold, reason=reason)
+
+    return Response({'id': hold.id, 'booking_id': booking.id, 'reason': hold.reason, 'held_at': hold.held_at.isoformat()}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_escrow_release(request, hold_id):
+    from django.utils import timezone
+    from rbac.permissions import has_permission
+    from .models import EscrowHold
+    if not has_permission(request.user, 'finances.escrow', 'update'):
+        return Response({'error': 'finances.escrow access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    hold = get_object_or_404(EscrowHold, pk=hold_id)
+    if not hold.is_active:
+        return Response({'error': 'This hold has already been released.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    hold.released_at = timezone.now()
+    hold.released_by = request.user
+    hold.save(update_fields=['released_at', 'released_by'])
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'escrow.release', target=hold)
+
+    return Response({'id': hold.id, 'booking_id': hold.booking_id, 'released_at': hold.released_at.isoformat()})
+
+
+# ---------------------------------------------------------------------------
+# Admin: taxes (finances.taxes — jurisdiction rates + computed liability)
+# ---------------------------------------------------------------------------
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def admin_tax_rates(request):
+    from rbac.permissions import has_permission
+    from .models import TaxRate
+    action = 'read' if request.method == 'GET' else 'update'
+    if not has_permission(request.user, 'finances.taxes', action):
+        return Response({'error': 'finances.taxes access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == 'GET':
+        return Response(TaxRateSerializer(TaxRate.objects.all(), many=True).data)
+
+    serializer = TaxRateSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    rate = serializer.save(created_by=request.user)
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'tax_rate.create', target=rate, reason=f'{rate.jurisdiction} {rate.rate_percent}%')
+
+    return Response(TaxRateSerializer(rate).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_tax_rate_detail(request, pk):
+    from rbac.permissions import has_permission
+    from .models import TaxRate
+    if not has_permission(request.user, 'finances.taxes', 'update'):
+        return Response({'error': 'finances.taxes access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    rate = get_object_or_404(TaxRate, pk=pk)
+
+    if request.method == 'DELETE':
+        from superadmin.permissions import log_admin_action
+        log_admin_action(request, 'tax_rate.delete', target=rate)
+        rate.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    serializer = TaxRateSerializer(rate, data=request.data, partial=True)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    rate = serializer.save()
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'tax_rate.update', target=rate, reason=f'{rate.jurisdiction} {rate.rate_percent}%')
+
+    return Response(TaxRateSerializer(rate).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_tax_report(request):
+    """Computed occupancy-tax liability over actual confirmed bookings,
+    grouped by jurisdiction (Listing.city, matched case-insensitively
+    against TaxRate.jurisdiction). No withholding/filing/remittance —
+    this is real arithmetic over real booking totals, the honest scope of
+    'tax' support without a tax-compliance vendor integration."""
+    from decimal import Decimal
+    from rbac.permissions import has_permission
+    from .models import TaxRate
+    from bookings.models import Booking
+    if not has_permission(request.user, 'finances.taxes', 'read'):
+        return Response({'error': 'finances.taxes access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    bookings = Booking.objects.filter(status__in=['confirmed', 'completed']).select_related('listing')
+    since = request.query_params.get('since')
+    until = request.query_params.get('until')
+    if since:
+        bookings = bookings.filter(requested_at__date__gte=since)
+    if until:
+        bookings = bookings.filter(requested_at__date__lte=until)
+
+    rates = {r.jurisdiction.strip().lower(): r for r in TaxRate.objects.filter(is_active=True)}
+
+    totals_by_jurisdiction = {}
+    for b in bookings:
+        city = (b.listing.city or '').strip().lower()
+        rate = rates.get(city)
+        if not rate or not b.total_price:
+            continue
+        bucket = totals_by_jurisdiction.setdefault(rate.jurisdiction, {'gross_total': Decimal('0'), 'tax_liability': Decimal('0'), 'booking_count': 0})
+        bucket['gross_total'] += b.total_price
+        bucket['tax_liability'] += (b.total_price * rate.rate_percent / Decimal('100')).quantize(Decimal('0.01'))
+        bucket['booking_count'] += 1
+
+    return Response({
+        'by_jurisdiction': [
+            {'jurisdiction': j, 'gross_total': str(v['gross_total']), 'tax_liability': str(v['tax_liability']), 'booking_count': v['booking_count']}
+            for j, v in totals_by_jurisdiction.items()
+        ],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Admin: Stripe refunds (rent/property payments only — see docstring below)
+# ---------------------------------------------------------------------------
+
+@dual_auth.register_executor('stripe_refund')
+def _execute_stripe_refund(payload):
+    from decimal import Decimal
+    from django.conf import settings as django_settings
+    from bookings.models import Booking
+    from .models import StripeRefund
+
+    booking = Booking.objects.get(pk=payload['booking_id'])
+    amount = Decimal(payload['amount'])
+    reason = payload['reason']
+
+    stripe_secret = getattr(django_settings, 'STRIPE_SECRET_KEY', '') or ''
+    if not stripe_secret:
+        StripeRefund.objects.create(
+            booking=booking, stripe_payment_intent_id=booking.stripe_payment_intent_id,
+            amount=amount, reason=reason, status='failed', error_message='Stripe is not configured on the server',
+            initiated_by_id=payload['initiated_by_id'],
+        )
+        raise RuntimeError('Stripe is not configured on the server')
+
+    import stripe
+    stripe.api_key = stripe_secret
+    amount_cents = int((amount * 100).to_integral_value())
+
+    try:
+        result = stripe.Refund.create(
+            payment_intent=booking.stripe_payment_intent_id,
+            amount=amount_cents,
+            metadata={'admin_reason': reason[:490], 'booking_id': str(booking.id)},
+        )
+        StripeRefund.objects.create(
+            booking=booking, stripe_payment_intent_id=booking.stripe_payment_intent_id,
+            amount=amount, reason=reason, stripe_refund_id=result.id, status='completed',
+            initiated_by_id=payload['initiated_by_id'],
+        )
+        return {'booking_id': booking.id, 'stripe_refund_id': result.id, 'status': 'completed'}
+    except stripe.error.StripeError as e:
+        StripeRefund.objects.create(
+            booking=booking, stripe_payment_intent_id=booking.stripe_payment_intent_id,
+            amount=amount, reason=reason, status='failed', error_message=str(e),
+            initiated_by_id=payload['initiated_by_id'],
+        )
+        raise RuntimeError(f'Stripe refund failed: {e}')
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_stripe_refund(request):
+    """Admin-triggered refund for a booking paid via Stripe (property_payment
+    PaymentIntents only — see Booking.stripe_payment_intent_id). Every
+    request here is deferred to dual-authorization UNCONDITIONALLY,
+    regardless of amount: unlike the MTN MoMo refund path (which reuses
+    long-exercised code), this is the first Stripe refund code in the
+    codebase, so a second admin always reviews before it ever calls Stripe."""
+    if not _is_admin(request.user, 'finances.payouts'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    from decimal import Decimal, InvalidOperation
+    from bookings.models import Booking
+    from .models import StripeRefund
+
+    booking_id = request.data.get('booking_id')
+    reason = str(request.data.get('reason', '')).strip()
+    if not booking_id or not reason:
+        return Response({'error': 'booking_id and reason are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    booking = get_object_or_404(Booking, pk=booking_id)
+    if not booking.stripe_payment_intent_id:
+        return Response(
+            {'error': 'This booking was not paid via Stripe (no payment intent on record). If it was paid via MTN MoMo, use the MoMo refund tool instead.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if booking.status not in ('confirmed', 'completed'):
+        return Response({'error': f'Only a confirmed or completed booking can be refunded (this one is {booking.status}).'}, status=status.HTTP_400_BAD_REQUEST)
+    if not booking.total_price:
+        return Response({'error': 'This booking has no recorded total price.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        amount = Decimal(str(request.data.get('amount')))
+    except (TypeError, InvalidOperation):
+        return Response({'error': 'A valid amount is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if amount <= 0:
+        return Response({'error': 'Amount must be greater than zero.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from django.db.models import Sum
+    already_refunded = StripeRefund.objects.filter(booking=booking, status='completed').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    remaining = Decimal(str(booking.total_price)) - already_refunded
+    if amount > remaining:
+        return Response({'error': f'Refund amount exceeds the remaining refundable balance ({remaining}).'}, status=status.HTTP_400_BAD_REQUEST)
+
+    payload = {'booking_id': booking.id, 'amount': str(amount), 'reason': reason, 'initiated_by_id': request.user.id}
+    _, approval = dual_auth.submit_or_execute('stripe_refund', payload, request.user, reason, True)
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'stripe_refund.requested', target=booking, reason=reason, amount=str(amount), approval_id=approval.id)
+
+    return Response(
+        {'pending_approval': True, 'approval_id': approval.id, 'message': 'Stripe refunds always require a second admin to approve before they execute.'},
+        status=status.HTTP_202_ACCEPTED,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Admin: refunds
+# ---------------------------------------------------------------------------
+
+# Refunds above this amount require a second admin's sign-off (dual
+# authorization) — see rbac.dual_auth. Chosen relative to this platform's
+# typical booking-fee/rent scale, not an arbitrary round number.
+DUAL_AUTH_REFUND_THRESHOLD = 500.00
+
+
+@dual_auth.register_executor('payment.refund')
+def _execute_refund(payload):
+    payment = Payment.objects.get(pk=payload['payment_id'])
+    result = PaymentService.refund_payment(payment=payment, amount=payload['amount'], reason=payload['reason'])
+    if not result.get('success'):
+        raise RuntimeError(result.get('error', 'Refund processing failed'))
+    payment.refresh_from_db()
+    return {'payment_id': str(payment.id), 'status': payment.status, 'refund_id': result.get('refund_id')}
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_refund_payment(request):
+    """Admin-triggered refund. MTN MoMo only for now — Stripe payments never
+    create a Payment row (they're settled directly against Booking/
+    ViewingAppointment via webhook), so there is no Stripe payment to look up
+    here. Stripe refunds must be issued from the Stripe dashboard until that
+    gap is closed with its own dedicated, carefully-tested integration.
+
+    Refunds over DUAL_AUTH_REFUND_THRESHOLD are deferred as a PendingApproval
+    instead of executing immediately — a different admin must approve them."""
+    if not _is_admin(request.user, 'customer_support.vouchers'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    payment_id = request.data.get('payment_id')
+    reason = str(request.data.get('reason', '')).strip()
+    if not payment_id or not reason:
+        return Response({'error': 'payment_id and reason are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    payment = get_object_or_404(Payment, pk=payment_id)
+
+    if payment.gateway.name != 'mtn_momo':
+        return Response(
+            {'error': f'Refunds from this dashboard only support MTN MoMo payments. This payment used "{payment.gateway.name}" — issue that refund from the gateway\'s own dashboard.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if payment.status not in ('completed', 'partially_refunded'):
+        return Response({'error': f'Only completed or partially-refunded payments can be refunded (this one is {payment.status}).'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        amount = float(request.data.get('amount'))
+    except (TypeError, ValueError):
+        return Response({'error': 'A valid amount is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if amount <= 0:
+        return Response({'error': 'Amount must be greater than zero.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from superadmin.permissions import log_admin_action
+    payload = {'payment_id': str(payment.id), 'amount': amount, 'reason': reason}
+    requires_dual_auth = amount > DUAL_AUTH_REFUND_THRESHOLD
+
+    if requires_dual_auth:
+        _, approval = dual_auth.submit_or_execute('payment.refund', payload, request.user, reason, True)
+        log_admin_action(request, 'payment.refund.requested', target=payment, reason=reason, amount=amount, approval_id=approval.id)
+        return Response(
+            {'pending_approval': True, 'approval_id': approval.id, 'message': f'This refund exceeds ${DUAL_AUTH_REFUND_THRESHOLD:.2f} and requires a second admin to approve it before it executes.'},
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    try:
+        result, _ = dual_auth.submit_or_execute('payment.refund', payload, request.user, reason, False)
+    except RuntimeError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    log_admin_action(request, 'payment.refund', target=payment, reason=reason, amount=amount)
+
+    payment.refresh_from_db()
+    return Response({
+        'payment': PaymentSerializer(payment).data,
+        'refund': RefundDetailSerializer(payment.refunds.last()).data,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Admin: financial reporting
+# ---------------------------------------------------------------------------
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_financial_summary(request):
+    """Revenue/refund/payout rollup for the finance dashboard. Everything is
+    computed directly from existing Payment/Refund/Payout rows — no separate
+    reporting pipeline. Optional ?since=/?until= (YYYY-MM-DD) filter on
+    Payment.created_at."""
+    if not _is_admin(request.user, 'finances'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    from django.db.models import Sum, Count, Q
+    from .models import Payout
+
+    payments = Payment.objects.all()
+    since = request.query_params.get('since')
+    until = request.query_params.get('until')
+    if since:
+        payments = payments.filter(created_at__date__gte=since)
+    if until:
+        payments = payments.filter(created_at__date__lte=until)
+
+    collected = payments.filter(status__in=['completed', 'partially_refunded', 'refunded']).aggregate(
+        total=Sum('amount_in_usd'))['total'] or 0
+    refunded = Refund.objects.filter(status='completed', payment__in=payments).aggregate(
+        total=Sum('amount'))['total'] or 0
+
+    payouts = Payout.objects.all()
+    payout_totals = payouts.aggregate(
+        pending_total=Sum('net_amount', filter=Q(status='pending')),
+        paid_total=Sum('net_amount', filter=Q(status='paid')),
+        commission_total=Sum('service_fee_amount'),
+        pending_count=Count('id', filter=Q(status='pending')),
+        paid_count=Count('id', filter=Q(status='paid')),
+        cancelled_count=Count('id', filter=Q(status='cancelled')),
+    )
+
+    return Response({
+        'gross_collected': collected,
+        'total_refunded': refunded,
+        'net_revenue': collected - refunded,
+        'commission_revenue': payout_totals['commission_total'] or 0,
+        'payouts': {
+            'pending_total': payout_totals['pending_total'] or 0,
+            'pending_count': payout_totals['pending_count'],
+            'paid_total': payout_totals['paid_total'] or 0,
+            'paid_count': payout_totals['paid_count'],
+            'cancelled_count': payout_totals['cancelled_count'],
+        },
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_transactions_list(request):
+    """Paginated, filterable list of every Payment — the closest thing to a
+    'view all transactions' screen; independent of the 10-row recent-payments
+    snippet on the general admin overview."""
+    if not _is_admin(request.user, 'finances'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    qs = Payment.objects.select_related('gateway', 'currency', 'user', 'booking__listing')
+    qs = _filter_transactions(qs, request.query_params)
+
+    try:
+        limit = max(1, min(int(request.query_params.get('limit', 25)), 100))
+        offset = max(0, int(request.query_params.get('offset', 0)))
+    except (ValueError, TypeError):
+        limit, offset = 25, 0
+
+    total = qs.count()
+    page = qs[offset:offset + limit]
+    return Response({
+        'count': total, 'limit': limit, 'offset': offset,
+        'results': PaymentSerializer(page, many=True).data,
+    })
+
+
+def _filter_transactions(qs, params):
+    status_filter = params.get('status')
+    purpose_filter = params.get('purpose')
+    gateway_filter = params.get('gateway')
+    since = params.get('since')
+    until = params.get('until')
+    search = params.get('search', '').strip()
+
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if purpose_filter:
+        qs = qs.filter(purpose=purpose_filter)
+    if gateway_filter:
+        qs = qs.filter(gateway__name=gateway_filter)
+    if since:
+        qs = qs.filter(created_at__date__gte=since)
+    if until:
+        qs = qs.filter(created_at__date__lte=until)
+    if search:
+        from django.db.models import Q as _Q
+        qs = qs.filter(
+            _Q(user__username__icontains=search) | _Q(user__email__icontains=search)
+            | _Q(gateway_transaction_id__icontains=search)
+        )
+    return qs
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_transactions_export(request):
+    """CSV export of transactions matching the same filters as the list
+    endpoint. Capped at 5000 rows so an unfiltered export can't hang the
+    request — narrow with ?since=/?until=/?status= for a full pull."""
+    if not _is_admin(request.user, 'finances'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    import csv
+    from django.http import HttpResponse
+
+    qs = Payment.objects.select_related('gateway', 'currency', 'user').order_by('-created_at')
+    qs = _filter_transactions(qs, request.query_params)
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="transactions.csv"'
+    writer = csv.writer(response)
+    writer.writerow([
+        'id', 'created_at', 'purpose', 'gateway', 'user', 'amount', 'currency',
+        'amount_in_usd', 'status', 'gateway_transaction_id',
+    ])
+    for p in qs[:5000]:
+        writer.writerow([
+            str(p.id), p.created_at.isoformat(), p.purpose, p.gateway.name,
+            p.user.username, p.amount, p.currency.code, p.amount_in_usd,
+            p.status, p.gateway_transaction_id,
+        ])
+    return response

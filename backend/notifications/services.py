@@ -364,7 +364,7 @@ def _notify_admins(notification_type, title, message, data=None):
     """Fan a notification out to every admin user."""
     from django.contrib.auth import get_user_model
     User = get_user_model()
-    for admin in User.objects.filter(role='admin'):
+    for admin in User.objects.filter(role__in=('admin', 'superadmin')):
         create_notification(
             user=admin,
             notification_type=notification_type,
@@ -833,7 +833,7 @@ def notify_report_submitted(report):
     User = get_user_model()
 
     reporter_name = report.reporter.get_full_name() or report.reporter.username
-    admins = User.objects.filter(role='admin')
+    admins = User.objects.filter(role__in=('admin', 'superadmin'))
 
     for admin in admins:
         create_notification(

@@ -10,10 +10,32 @@ from .views import (
     cancel_phone_change,
     admin_stats,
 )
+from .admin_views import (
+    admin_user_list,
+    admin_user_detail,
+    admin_create_user,
+    admin_update_user,
+    admin_change_email,
+    admin_reset_password,
+    admin_toggle_active,
+    admin_soft_delete_user,
+    admin_hard_delete_user,
+    admin_bulk_user_action,
+)
 
 urlpatterns = [
     path('', users_collection, name='users_collection'),
     path('admin/stats/', admin_stats, name='admin_stats'),
+    path('admin/list/', admin_user_list, name='admin_user_list'),
+    path('admin/create/', admin_create_user, name='admin_create_user'),
+    path('admin/bulk/', admin_bulk_user_action, name='admin_bulk_user_action'),
+    path('admin/<int:id>/', admin_user_detail, name='admin_user_detail'),
+    path('admin/<int:id>/update/', admin_update_user, name='admin_update_user'),
+    path('admin/<int:id>/email/', admin_change_email, name='admin_change_email'),
+    path('admin/<int:id>/reset-password/', admin_reset_password, name='admin_reset_password'),
+    path('admin/<int:id>/toggle-active/', admin_toggle_active, name='admin_toggle_active'),
+    path('admin/<int:id>/soft-delete/', admin_soft_delete_user, name='admin_soft_delete_user'),
+    path('admin/<int:id>/hard-delete/', admin_hard_delete_user, name='admin_hard_delete_user'),
     path('<int:id>/', user_detail, name='user_detail'),
     path('me/dashboard/', me_dashboard, name='me_dashboard'),
     path('me/profile/', update_profile, name='update_profile'),

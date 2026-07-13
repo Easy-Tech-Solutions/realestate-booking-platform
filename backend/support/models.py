@@ -100,6 +100,21 @@ class SupportTicket(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # SLA deadline, recomputed from `created_at` whenever priority changes —
+    # see support.sla.sla_deadline_for(). Null only if it predates this field.
+    sla_due_at = models.DateTimeField(null=True, blank=True)
+
+    # Escalation — a support agent flags a dispute for supervisor attention.
+    # This is a flag + audit trail, not a multi-tier routing system: there is
+    # no separate escalation queue/tier hierarchy modeled, just "this needs a
+    # closer look" plus who raised that and why.
+    escalated_at = models.DateTimeField(null=True, blank=True)
+    escalated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='tickets_escalated',
+    )
+    escalation_notes = models.TextField(blank=True)
+
     class Meta:
         ordering = ['-created_at']
 
@@ -155,3 +170,47 @@ class TicketAttachment(models.Model):
 
     def __str__(self):
         return f'Attachment: {self.filename}'
+
+
+class AirCoverClaim(models.Model):
+    """A property-damage / liability claim tied to a booking. Filed by
+    either party (the guest, e.g. for a safety issue, or the host, e.g. for
+    property damage). Approving a claim does NOT auto-disburse money —
+    financial ops still manually issues the payout/refund via the existing
+    tools, cross-referenced by this claim's id, exactly like every other
+    payment action in this codebase requires a human to actually move funds."""
+
+    class ClaimType(models.TextChoices):
+        PROPERTY_DAMAGE = 'property_damage', 'Property Damage'
+        MISSING_ITEMS = 'missing_items', 'Missing Items'
+        CLEANLINESS = 'cleanliness', 'Cleanliness'
+        SAFETY = 'safety', 'Safety Issue'
+        OTHER = 'other', 'Other'
+
+    class Status(models.TextChoices):
+        SUBMITTED = 'submitted', 'Submitted'
+        UNDER_REVIEW = 'under_review', 'Under Review'
+        APPROVED = 'approved', 'Approved'
+        DENIED = 'denied', 'Denied'
+        PAID = 'paid', 'Paid'
+
+    booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='aircover_claims')
+    claimant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='aircover_claims_filed')
+    claim_type = models.CharField(max_length=20, choices=ClaimType.choices)
+    description = models.TextField()
+    requested_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    approved_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    status = models.CharField(max_length=15, choices=Status.choices, default=Status.SUBMITTED)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='aircover_claims_reviewed',
+    )
+    review_notes = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'AirCover claim #{self.pk} on booking #{self.booking_id} ({self.status})'

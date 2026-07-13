@@ -8,7 +8,14 @@ from .serializers import TestimonialSerializer, TestimonialCreateSerializer
 
 
 def _is_admin(user):
-    return user.is_authenticated and (getattr(user, 'role', None) == 'admin' or user.is_staff)
+    """Full admins always pass; is_staff accounts need a custom role
+    granting marketing.testimonials directly. Being merely is_staff (e.g. a
+    finance-only admin) is not enough — that was the previous, overly
+    broad behavior here."""
+    if not user.is_authenticated:
+        return False
+    from rbac.permissions import is_full_admin, has_any_permission
+    return is_full_admin(user) or has_any_permission(user, 'marketing.testimonials')
 
 
 @api_view(['GET', 'POST'])

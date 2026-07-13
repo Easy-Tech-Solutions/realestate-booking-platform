@@ -58,7 +58,8 @@ class _ListingPagination(PageNumberPagination):
 
 
 def _is_admin(user):
-    return bool(user and user.is_authenticated and (getattr(user, 'role', None) == 'admin' or user.is_superuser))
+    from rbac.permissions import is_full_admin
+    return is_full_admin(user)
 
 
 @api_view(["GET", "POST"])
@@ -137,6 +138,16 @@ def listings_collection(request):
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         serializer = ListingSerializer(data=request.data)
         if serializer.is_valid():
+            lat = serializer.validated_data.get('latitude')
+            lng = serializer.validated_data.get('longitude')
+            if lat is not None and lng is not None:
+                from trustsafety.models import BlacklistedLocation
+                if any(loc.contains(lat, lng) for loc in BlacklistedLocation.objects.all()):
+                    return Response(
+                        {"error": "This location is not eligible to be listed on the platform."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
             # New listings must pass property verification before going live.
             # Drafts ("Save & exit") stay drafts; a real submission goes in as
             # pending_review (hidden from public search) and is published only
@@ -166,7 +177,7 @@ def listing_detail(request, id):
     elif request.method == "PUT":
         if not request.user.is_authenticated:
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-        if item.owner != request.user and not request.user.is_superuser:
+        if item.owner != request.user and not _is_admin(request.user):
             return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
         serializer = ListingSerializer(item, data=request.data, partial=True, context={"request": request})
         if serializer.is_valid():
@@ -177,7 +188,7 @@ def listing_detail(request, id):
     elif request.method == "DELETE":
         if not request.user.is_authenticated:
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-        if item.owner != request.user and not request.user.is_superuser:
+        if item.owner != request.user and not _is_admin(request.user):
             return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
         from .deletion import delete_listing
         ok, error = delete_listing(item)
@@ -427,7 +438,7 @@ def agent_analytics(request):
         return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
 
     user = request.user
-    if user.role not in ["agent", "admin"]:
+    if user.role not in ["agent", "admin", "superadmin"]:
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -943,10 +954,22 @@ def my_listings(request):
     return Response(ListingSerializer(items, many=True, context={"request": request}).data)
 
 
+def _require_listing_content(request):
+    """Full admins always pass; is_staff accounts need a custom role
+    granting listings.content directly. Being merely is_staff (e.g. a
+    finance-only admin) is not enough — that was the previous, overly
+    broad behavior here."""
+    from rbac.permissions import is_full_admin, has_any_permission
+    user = request.user
+    if not user.is_authenticated:
+        return False
+    return is_full_admin(user) or has_any_permission(user, 'listings.content')
+
+
 @api_view(["GET"])
 def pending_review_listings(request):
     """Admin-only: listings waiting for review."""
-    if not request.user.is_authenticated or not (request.user.is_staff or getattr(request.user, 'role', '') == 'admin'):
+    if not _require_listing_content(request):
         return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
     items = _optimize_listings(Listing.objects.filter(status='pending_review').order_by('-created_at'))
     return Response(ListingSerializer(items, many=True, context={"request": request}).data)
@@ -955,7 +978,7 @@ def pending_review_listings(request):
 @api_view(["POST"])
 def approve_listing(request, id):
     """Admin approves a pending listing — sets status to published."""
-    if not request.user.is_authenticated or not (request.user.is_staff or getattr(request.user, 'role', '') == 'admin'):
+    if not _require_listing_content(request):
         return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
     try:
         listing = Listing.objects.get(pk=id)
@@ -984,7 +1007,7 @@ def approve_listing(request, id):
 @api_view(["POST"])
 def reject_listing(request, id):
     """Admin rejects a pending listing."""
-    if not request.user.is_authenticated or not (request.user.is_staff or getattr(request.user, 'role', '') == 'admin'):
+    if not _require_listing_content(request):
         return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
     try:
         listing = Listing.objects.get(pk=id)

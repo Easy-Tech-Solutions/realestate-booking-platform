@@ -349,7 +349,7 @@ export function CreateListing() {
     weekendPremiumPercent: 1,
 
     pricingModel: 'monthly' as 'monthly' | 'nightly',
-    monthlyPrice: 500,
+    monthlyPrice: 5,
     paymentSchedule: 'monthly' as 'monthly' | 'quarterly' | 'biannual' | 'annual',
     leaseTermMonths: 12 as 6 | 12 | 24 | 36,
 
@@ -645,7 +645,7 @@ export function CreateListing() {
       case 'title': return form.title.trim().length > 0;
       case 'description': return form.description.trim().length > 0;
       case 'land_details': return form.squareFootage > 0;
-      case 'monthly_price': return form.monthlyPrice >= 50;
+      case 'monthly_price': return form.monthlyPrice >= 5;
       case 'final_details': return Boolean(form.address1 && form.city && form.country);
       default: return true;
     }
@@ -1389,6 +1389,7 @@ export function CreateListing() {
               value={form.title}
               onChange={(e) => update({ title: e.target.value })}
               placeholder={`Enter ${groupLabels.place} title`}
+              className="border-border focus-visible:border-primary"
             />
             <p className="text-sm text-muted-foreground mt-2">{form.title.length}/50</p>
           </section>
@@ -1634,8 +1635,8 @@ export function CreateListing() {
             </div>
             <p className="text-xl sm:text-3xl text-muted-foreground mt-3">per month</p>
             <div className="mt-8 flex justify-center gap-3">
-              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: Math.max(50, form.monthlyPrice - 50) })}>-50</Button>
-              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: Math.max(50, form.monthlyPrice - 10) })}>-10</Button>
+              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: Math.max(5, form.monthlyPrice - 50) })}>-50</Button>
+              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: Math.max(5, form.monthlyPrice - 10) })}>-10</Button>
               <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: form.monthlyPrice + 10 })}>+10</Button>
               <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: form.monthlyPrice + 50 })}>+50</Button>
             </div>
@@ -1644,10 +1645,10 @@ export function CreateListing() {
               <Input
                 id="monthly-price-input"
                 type="number"
-                min={50}
+                min={5}
                 value={form.monthlyPrice || ''}
                 onChange={(e) => update({ monthlyPrice: e.target.value === '' ? 0 : Number(e.target.value) })}
-                onBlur={() => { if (!form.monthlyPrice || form.monthlyPrice < 50) update({ monthlyPrice: 50 }); }}
+                onBlur={() => { if (!form.monthlyPrice || form.monthlyPrice < 5) update({ monthlyPrice: 5 }); }}
                 className="mt-2 text-center text-lg"
               />
             </div>

@@ -2,6 +2,8 @@ export interface AuthLoginResponse {
   user: unknown;
   access: string;
   refresh: string;
+  mfa_required?: boolean;
+  mfa_token?: string;
 }
 
 export interface ListingPricingResponse {

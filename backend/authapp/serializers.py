@@ -13,9 +13,9 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
-            'role', 'email_verified', 'has_password', 'profile',
+            'role', 'is_staff', 'email_verified', 'has_password', 'profile',
         ]
-        read_only_fields = ('id',)
+        read_only_fields = ('id', 'is_staff')
 
     def get_has_password(self, obj):
         # False for accounts created via Google SSO (set_unusable_password()).

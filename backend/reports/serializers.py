@@ -82,6 +82,7 @@ class ReportSerializer(serializers.ModelSerializer):
     content_type_display   = serializers.CharField(source='get_content_type_display', read_only=True)
     resolved_by_username   = serializers.SerializerMethodField()
     screenshot_url         = serializers.SerializerMethodField()
+    escalated_by_username  = serializers.CharField(source='escalated_by.username', default=None, read_only=True)
 
     class Meta:
         model = Report
@@ -105,6 +106,9 @@ class ReportSerializer(serializers.ModelSerializer):
             'status_display',
             'admin_notes',
             'resolved_by_username',
+            'escalated_at',
+            'escalated_by_username',
+            'escalation_notes',
             'resolved_at',
             'created_at',
             'updated_at',

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Dict, Any, Optional
 from django.db import transaction, models
 from django.utils import timezone
@@ -210,6 +211,19 @@ class PaymentService:
         gateway = cls.get_gateway(payment.gateway.name)
         if not gateway:
             return {'success': False, 'error': 'Payment gateway not available'}
+
+        # Failed refund attempts don't consume balance; pending/processing/completed do,
+        # so two concurrent refund requests can't both slip through under the cap.
+        already_refunded = (
+            payment.refunds.exclude(status='failed').aggregate(total=models.Sum('amount'))['total']
+            or Decimal('0')
+        )
+        remaining = payment.amount - already_refunded
+        if Decimal(str(amount)) > remaining:
+            return {
+                'success': False,
+                'error': f'Refund amount exceeds the remaining refundable balance ({remaining} {payment.currency.code}).',
+            }
 
         try:
             with transaction.atomic():

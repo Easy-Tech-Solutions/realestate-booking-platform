@@ -12,4 +12,9 @@ urlpatterns = [
     path('agreement/', views.agreement_status, name='agreement-status'),
     # POST /api/host-applications/agreement/accept/  → record acceptance
     path('agreement/accept/', views.accept_agreement, name='agreement-accept'),
+
+    # GET  /api/host-applications/review-queue/  → pending applications for this reviewer
+    path('review-queue/', views.review_queue, name='host-application-review-queue'),
+    # POST /api/host-applications/<pk>/review/   → approve/decline at the current stage
+    path('<int:pk>/review/', views.review_decision, name='host-application-review'),
 ]

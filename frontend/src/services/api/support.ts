@@ -15,6 +15,11 @@ export interface SupportTicket {
   messages?: TicketMessage[];
   attachments?: TicketAttachment[];
   conversationId?: number | null;
+  slaDueAt: string | null;
+  isBreached: boolean;
+  escalatedAt: string | null;
+  escalatedByUsername: string | null;
+  escalationNotes: string;
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
@@ -83,6 +88,11 @@ function normalizeTicket(d: any): SupportTicket {
       fileSize: a.file_size,
       contentType: a.content_type,
     })),
+    slaDueAt: d.sla_due_at ?? null,
+    isBreached: Boolean(d.is_breached),
+    escalatedAt: d.escalated_at ?? null,
+    escalatedByUsername: d.escalated_by_username ?? null,
+    escalationNotes: d.escalation_notes ?? '',
     createdAt: d.created_at,
     updatedAt: d.updated_at,
     resolvedAt: d.resolved_at,
@@ -213,6 +223,15 @@ export const supportAPI = {
       closed: number;
       total: number;
       unread_contact: number;
+      breached: number;
     }>('/api/support/admin/stats/');
+  },
+
+  adminEscalateTicket: async (id: number, notes = ''): Promise<SupportTicket> => {
+    const data = await fetchWithAuth<any>(`/api/support/admin/tickets/${id}/escalate/`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+    return normalizeTicket(data);
   },
 };

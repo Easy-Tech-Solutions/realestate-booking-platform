@@ -35,26 +35,32 @@ def expire_suspensions():
     Mark all naturally-expired suspensions as EXPIRED and notify users.
     Safe to run multiple times (idempotent).
     """
+    from platformops.models import TaskHeartbeat
     from .models import Suspension
     from notifications.services import notify_account_reinstated
 
-    now = timezone.now()
-    expired = Suspension.objects.filter(
-        status=Suspension.Status.ACTIVE,
-        ends_at__lte=now,
-    ).select_related('user')
+    try:
+        now = timezone.now()
+        expired = Suspension.objects.filter(
+            status=Suspension.Status.ACTIVE,
+            ends_at__lte=now,
+        ).select_related('user')
 
-    count = 0
-    for suspension in expired:
-        suspension.mark_expired()
-        try:
-            notify_account_reinstated(suspension)
-        except Exception as exc:
-            logger.warning(
-                'expire_suspensions: could not notify user %s for suspension %s: %s',
-                suspension.user_id, suspension.pk, exc,
-            )
-        count += 1
+        count = 0
+        for suspension in expired:
+            suspension.mark_expired()
+            try:
+                notify_account_reinstated(suspension)
+            except Exception as exc:
+                logger.warning(
+                    'expire_suspensions: could not notify user %s for suspension %s: %s',
+                    suspension.user_id, suspension.pk, exc,
+                )
+            count += 1
 
-    logger.info('expire_suspensions: marked %d suspension(s) as expired', count)
-    return count
+        logger.info('expire_suspensions: marked %d suspension(s) as expired', count)
+        TaskHeartbeat.record('suspensions.tasks.expire_suspensions', success=True)
+        return count
+    except Exception as exc:
+        TaskHeartbeat.record('suspensions.tasks.expire_suspensions', success=False, error=str(exc))
+        raise

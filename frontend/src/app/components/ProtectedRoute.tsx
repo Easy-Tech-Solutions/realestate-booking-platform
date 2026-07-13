@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { useApp } from '../../hooks/useApp';
+import { AccessDenied } from './AccessDenied';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -23,8 +24,8 @@ export function ProtectedRoute({ children, requireHost, requireAdmin }: Protecte
     return <Navigate to="/" replace />;
   }
 
-  if (requireAdmin && !user?.isAdmin) {
-    return <Navigate to="/" replace />;
+  if (requireAdmin && !user?.isAdmin && !user?.isStaff) {
+    return <AccessDenied />;
   }
 
   return <>{children}</>;

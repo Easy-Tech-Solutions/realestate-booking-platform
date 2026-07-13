@@ -17,6 +17,12 @@ urlpatterns = [
     # GET  /api/reports/admin/stats/     → counts by status
     path('admin/stats/', views.admin_report_stats, name='admin-report-stats'),
 
+    # POST /api/reports/admin/bulk/      → bulk resolve/dismiss/mark-under-review
+    path('admin/bulk/', views.admin_bulk_report_action, name='admin-bulk-report-action'),
+
     # PATCH /api/reports/admin/<pk>/status/  → update status
     path('admin/<int:pk>/status/', views.admin_update_report_status, name='admin-report-status'),
+
+    # POST /api/reports/admin/<pk>/escalate/ → flag for supervisor attention
+    path('admin/<int:pk>/escalate/', views.admin_report_escalate, name='admin-report-escalate'),
 ]

@@ -272,7 +272,7 @@ function ViewingForm() {
                   <label htmlFor="mtn_momo" className="flex items-center gap-4 p-4 border-2 border-border rounded-xl cursor-pointer hover:border-primary transition-colors has-[:checked]:border-primary has-[:checked]:bg-secondary/30">
                     <RadioGroupItem value="mtn_momo" id="mtn_momo" />
                     <Smartphone className="w-5 h-5" />
-                    <div><p className="font-semibold">MTN Mobile Money</p><p className="text-sm text-muted-foreground">Mobile payment</p></div>
+                    <div><p className="font-semibold">MTN Mobile Money</p><p className="text-sm text-muted-foreground">Mobile payment · 2% transaction fee applies</p></div>
                   </label>
                 </div>
               </RadioGroup>
@@ -298,6 +298,7 @@ function ViewingForm() {
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone number</Label>
                   <Input id="phone" placeholder="0880123456" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">MTN Mobile Money charges a 2% transaction fee on top of the amount above.</p>
                 </div>
               )}
 

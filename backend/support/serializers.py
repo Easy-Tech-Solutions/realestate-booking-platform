@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ContactInquiry, SupportTicket, TicketMessage, TicketAttachment
+from .models import ContactInquiry, SupportTicket, TicketMessage, TicketAttachment, AirCoverClaim
 
 
 class ContactInquirySerializer(serializers.ModelSerializer):
@@ -91,13 +91,17 @@ class SupportTicketListSerializer(serializers.ModelSerializer):
     requester_email = serializers.CharField(read_only=True)
     assigned_to_name = serializers.SerializerMethodField()
     message_count = serializers.SerializerMethodField()
+    is_breached = serializers.SerializerMethodField()
+    escalated_by_username = serializers.CharField(source='escalated_by.username', default=None, read_only=True)
 
     class Meta:
         model = SupportTicket
         fields = [
             'id', 'ticket_number', 'category', 'subject', 'status', 'priority',
             'requester_name', 'requester_email', 'assigned_to', 'assigned_to_name',
-            'message_count', 'resolved_at', 'created_at', 'updated_at',
+            'message_count', 'sla_due_at', 'is_breached',
+            'escalated_at', 'escalated_by_username', 'escalation_notes',
+            'resolved_at', 'created_at', 'updated_at',
         ]
         read_only_fields = fields
 
@@ -110,6 +114,10 @@ class SupportTicketListSerializer(serializers.ModelSerializer):
     def get_message_count(self, obj):
         return obj.messages.count()
 
+    def get_is_breached(self, obj):
+        from django.utils import timezone
+        return bool(obj.sla_due_at and obj.status not in ('resolved', 'closed') and obj.sla_due_at < timezone.now())
+
 
 class SupportTicketDetailSerializer(serializers.ModelSerializer):
     requester_name = serializers.CharField(read_only=True)
@@ -118,6 +126,8 @@ class SupportTicketDetailSerializer(serializers.ModelSerializer):
     messages = TicketMessageSerializer(many=True, read_only=True)
     attachments = TicketAttachmentSerializer(many=True, read_only=True)
     conversation_id = serializers.SerializerMethodField()
+    is_breached = serializers.SerializerMethodField()
+    escalated_by_username = serializers.CharField(source='escalated_by.username', default=None, read_only=True)
 
     class Meta:
         model = SupportTicket
@@ -128,14 +138,21 @@ class SupportTicketDetailSerializer(serializers.ModelSerializer):
             'assigned_to', 'assigned_to_name',
             'messages', 'attachments',
             'conversation_id',
+            'sla_due_at', 'is_breached',
+            'escalated_at', 'escalated_by_username', 'escalation_notes',
             'resolved_at', 'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'ticket_number', 'user', 'guest_name', 'guest_email',
             'requester_name', 'requester_email', 'assigned_to_name',
             'messages', 'attachments', 'conversation_id',
+            'sla_due_at', 'is_breached', 'escalated_at', 'escalated_by_username', 'escalation_notes',
             'resolved_at', 'created_at', 'updated_at',
         ]
+
+    def get_is_breached(self, obj):
+        from django.utils import timezone
+        return bool(obj.sla_due_at and obj.status not in ('resolved', 'closed') and obj.sla_due_at < timezone.now())
 
     def get_conversation_id(self, obj):
         if obj.conversation_id:
@@ -194,3 +211,37 @@ class SupportTicketAdminUpdateSerializer(serializers.ModelSerializer):
         if value not in valid:
             raise serializers.ValidationError(f'Invalid priority. Must be one of: {valid}')
         return value
+
+
+class AirCoverClaimSerializer(serializers.ModelSerializer):
+    claimant_username = serializers.CharField(source='claimant.username', read_only=True)
+    reviewed_by_username = serializers.CharField(source='reviewed_by.username', default=None, read_only=True)
+    listing_title = serializers.CharField(source='booking.listing.title', read_only=True)
+    claim_type_display = serializers.CharField(source='get_claim_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = AirCoverClaim
+        fields = [
+            'id', 'booking', 'listing_title', 'claimant', 'claimant_username',
+            'claim_type', 'claim_type_display', 'description', 'requested_amount', 'approved_amount',
+            'status', 'status_display', 'reviewed_by', 'reviewed_by_username', 'review_notes', 'reviewed_at',
+            'created_at',
+        ]
+        read_only_fields = [
+            'id', 'claimant', 'claimant_username', 'listing_title', 'claim_type_display',
+            'approved_amount', 'status', 'status_display', 'reviewed_by', 'reviewed_by_username',
+            'review_notes', 'reviewed_at', 'created_at',
+        ]
+
+    def validate_requested_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('Requested amount must be greater than zero.')
+        return value
+
+    def validate_booking(self, booking):
+        request = self.context.get('request')
+        user = request.user if request else None
+        if user and booking.customer_id != user.id and booking.listing.owner_id != user.id:
+            raise serializers.ValidationError('You were not a party to this booking.')
+        return booking

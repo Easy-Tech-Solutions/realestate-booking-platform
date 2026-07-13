@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { suspensionsAPI } from '../../services/api.service';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -18,15 +19,19 @@ interface SuspensionItem {
   status: 'active' | 'expired' | 'revoked';
   started_at: string;
   ends_at: string | null;
+  related_report_id: number | null;
 }
 
 export function AdminSuspensions() {
+  const [searchParams] = useSearchParams();
+  const prefillReportId = searchParams.get('report');
+
   const [stats, setStats] = useState<any>(null);
   const [items, setItems] = useState<SuspensionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
-  const [userId, setUserId] = useState('');
+  const [userId, setUserId] = useState(searchParams.get('user') || '');
   const [type, setType] = useState<'temporary' | 'indefinite' | 'permanent'>('temporary');
   const [reason, setReason] = useState('');
   const [endsAt, setEndsAt] = useState('');
@@ -70,6 +75,7 @@ export function AdminSuspensions() {
         suspension_type: type,
         reason,
         ends_at: type === 'temporary' ? new Date(endsAt).toISOString() : null,
+        related_report: prefillReportId ? Number(prefillReportId) : undefined,
       });
       setUserId('');
       setReason('');
@@ -115,6 +121,11 @@ export function AdminSuspensions() {
             <CardTitle>Issue New Suspension</CardTitle>
           </CardHeader>
           <CardContent className="grid sm:grid-cols-2 gap-4">
+            {prefillReportId && (
+              <div className="sm:col-span-2">
+                <Badge variant="outline">Linked to report #{prefillReportId}</Badge>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>User ID</Label>
               <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="e.g. 12" />
@@ -166,6 +177,7 @@ export function AdminSuspensions() {
                       <span className="text-sm text-muted-foreground">User: {item.username} (#{item.user})</span>
                       <span className="text-sm text-muted-foreground">Start: {new Date(item.started_at).toLocaleString()}</span>
                       {item.ends_at && <span className="text-sm text-muted-foreground">Ends: {new Date(item.ends_at).toLocaleString()}</span>}
+                      {item.related_report_id && <Badge variant="outline">Report #{item.related_report_id}</Badge>}
                     </div>
 
                     <p className="text-sm">{item.reason}</p>

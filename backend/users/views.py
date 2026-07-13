@@ -27,7 +27,8 @@ User = get_user_model()
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def users_collection(request):
-    if not request.user.role == 'admin':
+    from rbac.permissions import is_full_admin
+    if not is_full_admin(request.user):
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
     items = User.objects.all().order_by("id")
     return Response(PublicUserSerializer(items, many=True).data)
@@ -37,7 +38,7 @@ def users_collection(request):
 @permission_classes([IsAuthenticated])
 def admin_stats(request):
     """Aggregate platform stats for the admin dashboard."""
-    if request.user.role != 'admin' and not request.user.is_staff:
+    if request.user.role not in ('admin', 'superadmin') and not request.user.is_staff:
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
     from django.db.models import Sum, Count
@@ -378,9 +379,11 @@ def update_profile(request):
         user.save(update_fields=changed)
 
     # Role changes — only allow self-promotion between 'user' and 'agent'.
-    # Admin role is intentionally NOT writable here to prevent privilege
-    # escalation; admins are provisioned through Django admin / shell only.
-    if 'role' in data and data['role'] in ('user', 'agent') and user.role != 'admin':
+    # Admin/superadmin roles are intentionally NOT writable here to prevent
+    # privilege escalation (or accidental self-demotion) — those are
+    # provisioned via the Management dashboard (superadmin-only) or the
+    # Django admin / shell.
+    if 'role' in data and data['role'] in ('user', 'agent') and user.role not in ('admin', 'superadmin'):
         if user.role != data['role']:
             user.role = data['role']
             user.save(update_fields=['role'])

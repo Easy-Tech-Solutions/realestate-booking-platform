@@ -33,6 +33,12 @@ urlpatterns = [
     path('api/support/', include('support.urls')),
     path('api/host-applications/', include('hostapplications.urls')),
     path('api/property-verifications/', include('propertyverifications.urls')),
+    path('api/superadmin/', include('superadmin.urls')),
+    path('api/trust-safety/', include('trustsafety.urls')),
+    path('api/inventory/', include('inventory.urls')),
+    path('api/legal/', include('legalops.urls')),
+    path('api/platform-ops/', include('platformops.urls')),
+    path('api/rbac/', include('rbac.urls')),
 ]
 
 if settings.DEBUG:

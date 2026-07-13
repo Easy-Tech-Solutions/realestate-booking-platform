@@ -69,8 +69,20 @@ const PropertyOwnerAgreement = lazyPage(() => import('./pages/PropertyOwnerAgree
 const CreateListing = lazyPage(() => import('./pages/CreateListing').then((module) => ({ default: module.CreateListing })));
 const UserDashboard = lazyPage(() => import('./pages/UserDashboard').then((module) => ({ default: module.UserDashboard })));
 const AdminDashboard = lazyPage(() => import('./pages/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
+const AdminUsers = lazyPage(() => import('./pages/AdminUsers').then((module) => ({ default: module.AdminUsers })));
 const AdminReports = lazyPage(() => import('./pages/AdminReports').then((module) => ({ default: module.AdminReports })));
 const AdminSuspensions = lazyPage(() => import('./pages/AdminSuspensions').then((module) => ({ default: module.AdminSuspensions })));
+const AdminAuditLog = lazyPage(() => import('./pages/AdminAuditLog').then((module) => ({ default: module.AdminAuditLog })));
+const AdminKycQueue = lazyPage(() => import('./pages/AdminKycQueue').then((module) => ({ default: module.AdminKycQueue })));
+const AdminFraudFlags = lazyPage(() => import('./pages/AdminFraudFlags').then((module) => ({ default: module.AdminFraudFlags })));
+const AdminListingModeration = lazyPage(() => import('./pages/AdminListingModeration').then((module) => ({ default: module.AdminListingModeration })));
+const AdminFinance = lazyPage(() => import('./pages/AdminFinance').then((module) => ({ default: module.AdminFinance })));
+const AdminLegalDocuments = lazyPage(() => import('./pages/AdminLegalDocuments').then((module) => ({ default: module.AdminLegalDocuments })));
+const AdminPlatformOps = lazyPage(() => import('./pages/AdminPlatformOps').then((module) => ({ default: module.AdminPlatformOps })));
+const AdminRoles = lazyPage(() => import('./pages/AdminRoles').then((module) => ({ default: module.AdminRoles })));
+const AdminApprovals = lazyPage(() => import('./pages/AdminApprovals').then((module) => ({ default: module.AdminApprovals })));
+const AdminBreakGlass = lazyPage(() => import('./pages/AdminBreakGlass').then((module) => ({ default: module.AdminBreakGlass })));
+const AdminAircoverClaims = lazyPage(() => import('./pages/AdminAircoverClaims').then((module) => ({ default: module.AdminAircoverClaims })));
 const Notifications = lazyPage(() => import('./pages/Notifications').then((module) => ({ default: module.Notifications })));
 const Login = lazyPage(() => import('./pages/Login').then((module) => ({ default: module.Login })));
 const VerifyEmail = lazyPage(() => import('./pages/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
@@ -192,6 +204,126 @@ export const router = createBrowserRouter([
       { path: 'about', Component: About },
       { path: 'support', Component: Support },
       { path: 'support/tickets', Component: MyTickets },
+      {
+        path: 'management',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminDashboard />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/users',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminUsers />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/reports',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminReports />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/suspensions',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminSuspensions />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/audit-log',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminAuditLog />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/kyc-queue',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminKycQueue />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/fraud-flags',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminFraudFlags />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/listing-moderation',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminListingModeration />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/finance',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminFinance />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/legal-documents',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminLegalDocuments />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/platform-ops',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminPlatformOps />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/roles',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminRoles />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/approvals',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminApprovals />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/break-glass',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminBreakGlass />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/aircover-claims',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminAircoverClaims />
+          </ProtectedRoute>
+        ),
+      },
     ],
   },
 ]);

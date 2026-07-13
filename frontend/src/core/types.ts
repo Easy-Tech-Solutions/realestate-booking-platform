@@ -11,6 +11,8 @@ export interface User {
   bio?: string;
   isHost: boolean;
   isAdmin?: boolean;
+  isSuperadmin?: boolean;
+  isStaff?: boolean;
   verified: boolean;
   hasPassword?: boolean;
   lastSeen?: string;
@@ -46,7 +48,8 @@ export interface Property {
   maxNights: number;
   bookedDates: string[];
   createdAt: string;
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'pending_review' | 'published' | 'rejected' | 'suspended';
+  suspensionReason?: string;
   hotelRooms?: HotelRoom[];
   // Pricing model: 'monthly' marks a long-term rental (viewing flow available).
   pricingType?: 'nightly' | 'monthly';
@@ -162,6 +165,8 @@ export interface Payout {
   currency: string;
   status: 'pending' | 'paid' | 'cancelled';
   paidAt?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
   createdAt: string;
 }
 

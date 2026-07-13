@@ -18,4 +18,13 @@ export const payoutsAPI = {
     });
     return normalizePayout(data);
   },
+
+  // Admin: cancel a pending payout (only allowed before it's been paid).
+  adminCancel: async (id: string, reason: string): Promise<Payout> => {
+    const data = await fetchWithAuth(`/api/payments/admin/payouts/${id}/cancel/`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    return normalizePayout(data);
+  },
 };

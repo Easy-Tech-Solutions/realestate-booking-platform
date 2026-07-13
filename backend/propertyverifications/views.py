@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
@@ -11,6 +12,7 @@ from .serializers import (
     PropertyVerificationSerializer,
 )
 from . import services
+from .services import InvalidTransition
 
 
 def _notify(fn_name, verification):
@@ -95,4 +97,88 @@ def resubmit_verification(request, pk):
     serializer.save()
 
     services.resubmit(verification)
+    return Response(PropertyVerificationSerializer(verification, context={'request': request}).data)
+
+
+# ── Reviewer queue (superadmin KYC module) ──────────────────────────────────
+# Same real pipeline Django admin already drives — this is a second front
+# door onto it, not a parallel implementation.
+
+STAGE_PERMISSION = {
+    PropertyVerification.Stage.PRODUCT_SUPPORT: 'propertyverifications.review_property_product_support',
+    PropertyVerification.Stage.COMPLIANCE: 'propertyverifications.review_property_compliance',
+    PropertyVerification.Stage.SUPERVISOR: 'propertyverifications.review_property_supervisor',
+}
+STAGE_STATUS = {
+    PropertyVerification.Stage.PRODUCT_SUPPORT: PropertyVerification.Status.SUBMITTED,
+    PropertyVerification.Stage.COMPLIANCE: PropertyVerification.Status.PS_APPROVED,
+    PropertyVerification.Stage.SUPERVISOR: PropertyVerification.Status.COMPLIANCE_APPROVED,
+}
+STAGE_SERVICE_FN = {
+    PropertyVerification.Stage.PRODUCT_SUPPORT: services.ps_decision,
+    PropertyVerification.Stage.COMPLIANCE: services.compliance_decision,
+    PropertyVerification.Stage.SUPERVISOR: services.supervisor_decision,
+}
+VALID_DECISIONS = {services.APPROVE, services.REJECT, services.REQUEST_CORRECTION}
+
+
+def _has_background_checks_access(user):
+    """The trust_safety.background_checks RBAC resource — additive to the
+    per-stage Django permissions below, not a replacement: a role granting
+    it (e.g. the Trust & Safety Specialist preset) can review every stage,
+    while the fine-grained Product Support / Compliance / Supervisor Officer
+    groups still work exactly as before."""
+    from rbac.permissions import has_permission
+    return has_permission(user, 'trust_safety.background_checks', 'execute')
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def review_queue(request):
+    """GET /api/property-verifications/review-queue/ — verifications awaiting
+    review at any stage the requesting officer has permission for."""
+    if _has_background_checks_access(request.user):
+        stages = list(STAGE_PERMISSION.keys())
+    else:
+        stages = [stage for stage, perm in STAGE_PERMISSION.items() if request.user.has_perm(perm)]
+    if not stages:
+        return Response({'error': 'You are not a reviewer for any stage of this queue.'}, status=status.HTTP_403_FORBIDDEN)
+    statuses = [STAGE_STATUS[s] for s in stages]
+    qs = (
+        PropertyVerification.objects.filter(status__in=statuses)
+        .select_related('listing', 'applicant')
+        .order_by('created_at')
+    )
+    return Response(PropertyVerificationSerializer(qs, many=True, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def review_decision(request, pk):
+    """POST /api/property-verifications/<pk>/review/ — approve, reject, or
+    request correction at whichever stage this verification is awaiting."""
+    verification = get_object_or_404(PropertyVerification, pk=pk)
+    stage = verification.current_stage
+    if stage is None:
+        return Response({'error': 'This verification is not awaiting review.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not (_has_background_checks_access(request.user) or request.user.has_perm(STAGE_PERMISSION[stage])):
+        return Response({'error': 'You are not authorized to review this stage.'}, status=status.HTTP_403_FORBIDDEN)
+
+    decision = request.data.get('decision')
+    notes = request.data.get('notes', '')
+    if decision not in VALID_DECISIONS:
+        return Response({'error': f'decision must be one of {sorted(VALID_DECISIONS)}'}, status=status.HTTP_400_BAD_REQUEST)
+    if decision != services.APPROVE and not str(notes).strip():
+        return Response({'error': 'Notes are required when rejecting or requesting a correction.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        STAGE_SERVICE_FN[stage](verification, decision, request.user, notes)
+    except InvalidTransition as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(
+        request, 'property_verification.review', target=verification, reason=notes,
+        decision=decision, stage=stage,
+    )
     return Response(PropertyVerificationSerializer(verification, context={'request': request}).data)

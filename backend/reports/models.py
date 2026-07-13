@@ -87,6 +87,18 @@ class Report(models.Model):
     )
     resolved_at = models.DateTimeField(null=True, blank=True)
 
+    # Escalation — a support agent flags a report for supervisor attention
+    # (e.g. a scam report that may need a suspension). Flag + audit trail,
+    # not a separate escalation queue.
+    escalated_at = models.DateTimeField(null=True, blank=True)
+    escalated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reports_escalated',
+    )
+    escalation_notes = models.TextField(blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -1,5 +1,8 @@
+from decimal import Decimal, InvalidOperation
+
 from django.core.mail import send_mail
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.db import models
@@ -11,7 +14,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import ContactInquiry, SupportTicket, TicketMessage, TicketAttachment
+from .models import ContactInquiry, SupportTicket, TicketMessage, TicketAttachment, AirCoverClaim
+from .sla import sla_deadline_for
 
 User = get_user_model()
 
@@ -57,13 +61,27 @@ from .serializers import (
     TicketMessageSerializer,
     TicketMessageCreateSerializer,
     TicketAttachmentSerializer,
+    AirCoverClaimSerializer,
 )
 
 SUPPORT_EMAIL = 'support@homekonet.com'
 
 
-def _is_admin(user):
-    return user.is_authenticated and (getattr(user, 'role', None) == 'admin' or user.is_staff)
+def _require_support(request):
+    """Full admins always pass; is_staff accounts need the support
+    department (legacy) OR a custom role granting customer_support.tickets
+    directly. Being merely is_staff (e.g. a KYC reviewer in an unrelated
+    department) is not enough — that was the previous, overly broad
+    behavior of _is_admin."""
+    from superadmin.permissions import is_superadmin_staff, require_department
+    from rbac.permissions import has_any_permission
+    user = request.user
+    if not is_superadmin_staff(user):
+        return False
+    return (
+        require_department(user, 'support')
+        or has_any_permission(user, 'customer_support.tickets')
+    )
 
 
 def _send_support_email(subject, body, fail_silently=True):
@@ -149,7 +167,7 @@ def ticket_list_create(request):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        if _is_admin(request.user):
+        if _require_support(request):
             qs = SupportTicket.objects.all()
         else:
             qs = SupportTicket.objects.filter(user=request.user)
@@ -181,6 +199,8 @@ def ticket_list_create(request):
         subject=d['subject'],
         description=d['description'],
     )
+    ticket.sla_due_at = sla_deadline_for(ticket.priority, ticket.created_at)
+    ticket.save(update_fields=['sla_due_at'])
 
     # First message mirrors the description
     sender_name = ''
@@ -254,7 +274,7 @@ def ticket_detail(request, pk):
 
     user = request.user
     is_owner = user.is_authenticated and ticket.user == user
-    if not is_owner and not _is_admin(user):
+    if not is_owner and not _require_support(request):
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
 
     serializer = SupportTicketDetailSerializer(ticket, context={'request': request})
@@ -272,7 +292,7 @@ def ticket_add_message(request, pk):
 
     user = request.user
     is_owner = user.is_authenticated and ticket.user == user
-    is_admin_user = _is_admin(user)
+    is_admin_user = _require_support(request)
 
     if not is_owner and not is_admin_user:
         return Response({'error': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
@@ -356,7 +376,7 @@ def admin_ticket_list(request):
     Admin only. List all tickets with filters: ?status=, ?category=, ?priority=, ?assigned_to=
     Returns paginated results (page_size=20).
     """
-    if not _is_admin(request.user):
+    if not _require_support(request):
         return Response({'error': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     qs = SupportTicket.objects.select_related('user', 'assigned_to').all()
@@ -407,7 +427,7 @@ def admin_ticket_list(request):
 @permission_classes([IsAuthenticated])
 def admin_ticket_update(request, pk):
     """Admin only. Update status, priority, assigned_to on a ticket."""
-    if not _is_admin(request.user):
+    if not _require_support(request):
         return Response({'error': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -426,6 +446,12 @@ def admin_ticket_update(request, pk):
     elif new_status and new_status != 'resolved':
         ticket.resolved_at = None
 
+    # Recompute the SLA deadline from creation time (not "now") whenever
+    # priority changes, so raising priority doesn't artificially reset the clock.
+    new_priority = serializer.validated_data.get('priority')
+    if new_priority and new_priority != ticket.priority:
+        ticket.sla_due_at = sla_deadline_for(new_priority, ticket.created_at)
+
     serializer.save()
     return Response(
         SupportTicketDetailSerializer(ticket, context={'request': request}).data
@@ -436,7 +462,7 @@ def admin_ticket_update(request, pk):
 @permission_classes([IsAuthenticated])
 def admin_contact_list(request):
     """Admin only. List contact inquiries. Supports ?is_read=true/false filter."""
-    if not _is_admin(request.user):
+    if not _require_support(request):
         return Response({'error': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     qs = ContactInquiry.objects.all()
@@ -454,7 +480,7 @@ def admin_contact_list(request):
 @permission_classes([IsAuthenticated])
 def admin_contact_update(request, pk):
     """Admin only. Update a contact inquiry (e.g. mark as read)."""
-    if not _is_admin(request.user):
+    if not _require_support(request):
         return Response({'error': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -473,7 +499,7 @@ def admin_contact_update(request, pk):
 @permission_classes([IsAuthenticated])
 def admin_stats(request):
     """Admin only. Return counts per ticket status plus unread contact inquiries."""
-    if not _is_admin(request.user):
+    if not _require_support(request):
         return Response({'error': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     tickets = SupportTicket.objects.all()
@@ -485,5 +511,113 @@ def admin_stats(request):
         'closed': tickets.filter(status='closed').count(),
         'total': tickets.count(),
         'unread_contact': ContactInquiry.objects.filter(is_read=False).count(),
+        'breached': sum(1 for t in tickets.exclude(status__in=['resolved', 'closed']) if t.sla_due_at and t.sla_due_at < timezone.now()),
     }
     return Response(stats)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_ticket_escalate(request, pk):
+    """Admin only. Flag a ticket for supervisor attention — bumps priority to
+    urgent (recomputing the SLA deadline) if it wasn't already, and records
+    who escalated it and why."""
+    if not _require_support(request):
+        return Response({'error': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        ticket = SupportTicket.objects.get(pk=pk)
+    except SupportTicket.DoesNotExist:
+        return Response({'error': 'Ticket not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    notes = str(request.data.get('notes', '')).strip()
+    ticket.escalated_at = timezone.now()
+    ticket.escalated_by = request.user
+    ticket.escalation_notes = notes
+    if ticket.priority != 'urgent':
+        ticket.priority = 'urgent'
+        ticket.sla_due_at = sla_deadline_for('urgent', ticket.created_at)
+    ticket.save(update_fields=['escalated_at', 'escalated_by', 'escalation_notes', 'priority', 'sla_due_at', 'updated_at'])
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'support_ticket.escalate', target=ticket, reason=notes)
+
+    return Response(SupportTicketDetailSerializer(ticket, context={'request': request}).data)
+
+
+# ---------------------------------------------------------------------------
+# AirCover claims (customer_support.aircover_claims)
+# ---------------------------------------------------------------------------
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def aircover_claims_collection(request):
+    """GET — the current user's own claims (either as guest or host).
+    POST — file a new claim against a booking they were a party to."""
+    if request.method == 'GET':
+        qs = AirCoverClaim.objects.filter(
+            models.Q(claimant=request.user) | models.Q(booking__customer=request.user) | models.Q(booking__listing__owner=request.user)
+        ).select_related('booking', 'booking__listing', 'reviewed_by').distinct()
+        return Response(AirCoverClaimSerializer(qs, many=True).data)
+
+    serializer = AirCoverClaimSerializer(data=request.data, context={'request': request})
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    claim = serializer.save(claimant=request.user)
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'aircover_claim.file', target=claim, reason=claim.description[:200])
+
+    return Response(AirCoverClaimSerializer(claim).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_aircover_claims_list(request):
+    from rbac.permissions import has_permission
+    if not has_permission(request.user, 'customer_support.aircover_claims', 'read'):
+        return Response({'error': 'customer_support.aircover_claims access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    qs = AirCoverClaim.objects.select_related('booking', 'booking__listing', 'claimant', 'reviewed_by').all()
+    status_filter = request.query_params.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    return Response(AirCoverClaimSerializer(qs, many=True).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_aircover_claim_decide(request, pk):
+    """Approve or deny a claim. Approving records an approved_amount but does
+    NOT move any money — see AirCoverClaim's docstring. Finance still issues
+    the actual disbursement via the existing refund/payout tools."""
+    from rbac.permissions import has_permission
+    if not has_permission(request.user, 'customer_support.aircover_claims', 'update'):
+        return Response({'error': 'customer_support.aircover_claims access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    claim = get_object_or_404(AirCoverClaim, pk=pk)
+    decision = request.data.get('status')
+    if decision not in (AirCoverClaim.Status.APPROVED, AirCoverClaim.Status.DENIED):
+        return Response({'error': 'status must be "approved" or "denied"'}, status=status.HTTP_400_BAD_REQUEST)
+
+    notes = request.data.get('notes', '')
+    claim.status = decision
+    claim.review_notes = notes
+    claim.reviewed_by = request.user
+    claim.reviewed_at = timezone.now()
+
+    if decision == AirCoverClaim.Status.APPROVED:
+        try:
+            approved_amount = Decimal(str(request.data.get('approved_amount', claim.requested_amount)))
+        except (InvalidOperation, TypeError):
+            return Response({'error': 'approved_amount must be a valid number.'}, status=status.HTTP_400_BAD_REQUEST)
+        if approved_amount <= 0 or approved_amount > claim.requested_amount:
+            return Response({'error': f'approved_amount must be between 0 and the requested {claim.requested_amount}.'}, status=status.HTTP_400_BAD_REQUEST)
+        claim.approved_amount = approved_amount
+
+    claim.save(update_fields=['status', 'review_notes', 'reviewed_by', 'reviewed_at', 'approved_amount'])
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'aircover_claim.decide', target=claim, reason=notes, decision=decision, approved_amount=str(claim.approved_amount) if claim.approved_amount else None)
+
+    return Response(AirCoverClaimSerializer(claim).data)

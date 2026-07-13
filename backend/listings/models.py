@@ -47,6 +47,7 @@ class Listing(models.Model):
         ('pending_review', 'Pending Review'),
         ('published', 'Published'),
         ('rejected', 'Rejected'),
+        ('suspended', 'Suspended by admin'),
     ]
 
     title = models.CharField(max_length=200)
@@ -121,6 +122,28 @@ class Listing(models.Model):
     main_image = models.ImageField(upload_to='listings/main/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Set when Trust & Safety / Inventory staff take a published listing down
+    # for a policy violation. Distinct from the host's own soft-delete
+    # (deleted_at) — a suspension is reversible and host-visible as a status,
+    # not a disappearance.
+    suspended_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='listings_suspended',
+    )
+    suspended_at = models.DateTimeField(null=True, blank=True)
+    suspension_reason = models.TextField(blank=True)
+
+    # Local compliance metadata — set by Inventory/Compliance staff, not the
+    # host. occupancy_cap (if set) is a legal ceiling imposed by the local
+    # jurisdiction, independent of the host's own max_guests preference: a
+    # host cannot raise max_guests above it (enforced in ListingSerializer).
+    local_registration_number = models.CharField(
+        max_length=100, blank=True, help_text='Local business/short-term-rental registration or license number.',
+    )
+    occupancy_cap = models.PositiveIntegerField(
+        null=True, blank=True, help_text='Legal maximum occupancy for this address. max_guests may not exceed this once set.',
+    )
 
     def __str__(self):
         return self.title

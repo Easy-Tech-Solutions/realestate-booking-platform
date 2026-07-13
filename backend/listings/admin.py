@@ -17,8 +17,8 @@ class ListingImageInline(admin.TabularInline):
 
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
-    list_display = ['title', 'price', 'property_type', 'bedrooms', 'owner_full_name', 'is_available', 'created_at']
-    list_filter = ['property_type', 'is_available', 'created_at', 'owner']
+    list_display = ['title', 'price', 'property_type', 'bedrooms', 'owner_full_name', 'status', 'is_available', 'created_at']
+    list_filter = ['property_type', 'status', 'is_available', 'created_at', 'owner']
     search_fields = [
         'title',
         'description',

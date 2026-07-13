@@ -974,11 +974,19 @@ export function HostDashboard() {
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                   <img src={property.images[0]} alt={property.title} className="w-20 h-16 rounded object-cover flex-shrink-0" />
                   <div className="min-w-0">
-                    <h3 className="font-semibold truncate">{property.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold truncate">{property.title}</h3>
+                      {property.status === 'suspended' && (
+                        <Badge variant="destructive" className="text-xs shrink-0">Suspended</Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground truncate">
                       {property.location.city}, {property.location.state} · {property.rating.toFixed(1)}★ · {property.reviewCount} reviews
                     </p>
                     <p className="text-sm font-semibold mt-1">{formatCurrency(property.price)}/{property.pricingType === 'monthly' ? 'month' : 'night'}</p>
+                    {property.status === 'suspended' && property.suspensionReason && (
+                      <p className="text-xs text-destructive mt-1">Taken down by our team: {property.suspensionReason}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 flex-shrink-0">

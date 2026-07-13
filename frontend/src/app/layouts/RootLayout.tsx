@@ -4,6 +4,7 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { MobileNav } from '../components/MobileNav';
 import { Toaster } from '../components/ui/sonner';
+import { ImpersonationBanner } from '../components/ImpersonationBanner';
 
 function RouteLoadingFallback() {
   return (
@@ -29,6 +30,7 @@ export function RootLayout() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <ImpersonationBanner />
       {showHeader && <Header />}
       <main className="flex-1 main-mobile-pb md:pb-0">
         <Suspense fallback={<RouteLoadingFallback />}>

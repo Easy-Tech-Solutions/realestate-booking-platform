@@ -9,8 +9,21 @@ from .models import Report
 from .serializers import ReportCreateSerializer, ReportSerializer, ReportAdminUpdateSerializer
 
 
-def _is_admin(user):
-    return user.is_authenticated and (user.role == 'admin' or user.is_staff)
+def _require_support(request):
+    """Full admins always pass; is_staff accounts need the support
+    department (legacy) OR a custom role granting customer_support.disputes
+    directly (Report is the "disputes" resource). Being merely is_staff
+    (e.g. a KYC reviewer in an unrelated department) is not enough — that
+    was the previous, overly broad behavior of _is_admin."""
+    from superadmin.permissions import is_superadmin_staff, require_department
+    from rbac.permissions import has_any_permission
+    user = request.user
+    if not is_superadmin_staff(user):
+        return False
+    return (
+        require_department(user, 'support')
+        or has_any_permission(user, 'customer_support.disputes')
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +83,7 @@ def report_detail(request, pk):
     except Report.DoesNotExist:
         return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    if report.reporter != request.user and not _is_admin(request.user):
+    if report.reporter != request.user and not _require_support(request):
         return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     serializer = ReportSerializer(report, context={'request': request})
@@ -88,7 +101,7 @@ def admin_reports_list(request):
     GET — paginated list of all reports with optional filters.
     Admin only.
     """
-    if not _is_admin(request.user):
+    if not _require_support(request):
         return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     qs = Report.objects.select_related(
@@ -127,6 +140,54 @@ def admin_reports_list(request):
     })
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_bulk_report_action(request):
+    """Apply resolve/dismiss/mark-under-review across many reports at once."""
+    if not _require_support(request):
+        return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+    report_ids = request.data.get('report_ids') or []
+    new_status = request.data.get('status')
+    notes = str(request.data.get('admin_notes', '')).strip()
+
+    valid_statuses = (Report.Status.RESOLVED, Report.Status.DISMISSED, Report.Status.UNDER_REVIEW)
+    if new_status not in valid_statuses:
+        return Response({'detail': 'status must be "resolved", "dismissed", or "under_review".'}, status=status.HTTP_400_BAD_REQUEST)
+    if not isinstance(report_ids, list) or not report_ids:
+        return Response({'detail': 'report_ids (non-empty list) is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if len(report_ids) > 200:
+        return Response({'detail': 'Bulk actions are capped at 200 reports per request.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    results = {'succeeded': [], 'failed': []}
+    reports = Report.objects.filter(pk__in=report_ids)
+    found_ids = {r.pk for r in reports}
+    for missing in set(report_ids) - found_ids:
+        results['failed'].append({'report_id': missing, 'error': 'Not found'})
+
+    for report in reports:
+        try:
+            if new_status == Report.Status.RESOLVED:
+                report.resolve(request.user, notes)
+            elif new_status == Report.Status.DISMISSED:
+                report.dismiss(request.user, notes)
+            else:
+                report.mark_under_review(request.user)
+                if notes:
+                    report.admin_notes = notes
+                    report.save(update_fields=['admin_notes'])
+            results['succeeded'].append(report.pk)
+        except Exception as e:
+            results['failed'].append({'report_id': report.pk, 'error': str(e)})
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(
+        request, f'report.bulk_{new_status}', reason=notes, report_ids=report_ids,
+        succeeded=results['succeeded'], failed=[f['report_id'] for f in results['failed']],
+    )
+    return Response(results)
+
+
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def admin_update_report_status(request, pk):
@@ -136,7 +197,7 @@ def admin_update_report_status(request, pk):
 
     Body: { "status": "resolved" | "dismissed" | "under_review", "admin_notes": "..." }
     """
-    if not _is_admin(request.user):
+    if not _require_support(request):
         return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -184,7 +245,7 @@ def admin_report_stats(request):
     GET — summary counts by status for the admin dashboard.
     Admin only.
     """
-    if not _is_admin(request.user):
+    if not _require_support(request):
         return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     from django.db.models import Count
@@ -199,3 +260,29 @@ def admin_report_stats(request):
         'resolved':     stats.get(Report.Status.RESOLVED, 0),
         'dismissed':    stats.get(Report.Status.DISMISSED, 0),
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_report_escalate(request, pk):
+    """Admin only. Flag a report for supervisor attention — records who
+    escalated it and why. Doesn't change status; escalation and workflow
+    status are independent axes."""
+    if not _require_support(request):
+        return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        report = Report.objects.get(pk=pk)
+    except Report.DoesNotExist:
+        return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    notes = str(request.data.get('notes', '')).strip()
+    report.escalated_at = timezone.now()
+    report.escalated_by = request.user
+    report.escalation_notes = notes
+    report.save(update_fields=['escalated_at', 'escalated_by', 'escalation_notes', 'updated_at'])
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'report.escalate', target=report, reason=notes)
+
+    return Response(ReportSerializer(report, context={'request': request}).data)

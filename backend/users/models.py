@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db.models import Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 
@@ -7,7 +9,8 @@ class User(AbstractUser):
     ROLE_CHOICES = [
         ('user', 'Regular User'),
         ('agent', 'Agent'),
-        ('admin', 'Admin')
+        ('admin', 'Admin'),
+        ('superadmin', 'Superadmin'),
     ]
     email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=200, blank=True, null=True)
@@ -26,21 +29,43 @@ class User(AbstractUser):
     # intact.
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
+    class Meta:
+        constraints = [
+            # Case-insensitive, since every lookup in this codebase (login,
+            # password reset, Google sign-up dedup) already matches on
+            # email__iexact. A plain unique=True wouldn't catch "Foo@x.com"
+            # vs "foo@x.com" as the same address. Blank emails are excluded
+            # since a handful of legacy/incomplete accounts have none.
+            models.UniqueConstraint(Lower('email'), name='unique_lower_email', condition=~Q(email='')),
+        ]
+
     def save(self, *args, **kwargs):
-        # A superuser, or anyone with the app-level 'admin' role, is always a
-        # full admin: staff + superuser. This keeps existing admins unchanged.
+        # A superuser, or anyone with the app-level 'superadmin' role, is
+        # always a full admin: staff + superuser, bypassing every permission
+        # check (see rbac.permissions.is_full_admin). This is the top tier —
+        # unrestricted, not governed by the RBAC engine.
         #
-        # NOTE: is_staff is deliberately NOT a trigger here. That lets us create
-        # limited-privilege staff (e.g. the Product Support / Compliance /
-        # Supervisor officers) as is_staff=True, is_superuser=False, role='user'
-        # — they reach the admin panel but only get the abilities granted by
-        # their Django Group, instead of bypassing every permission check as a
-        # superuser would. Officers also keep role='user' so they get no
-        # host/admin powers on the React frontend (which keys off role only).
-        if self.is_superuser or self.role == 'admin':
-            self.role = 'admin'
+        # 'admin' is a lesser, second tier: still staff (dashboard access),
+        # but NOT superuser — their actual abilities come entirely from the
+        # RBAC engine's "Admin" preset role (broad, but excludes rbac_engine
+        # and infrastructure.break_glass so an admin can't self-escalate).
+        #
+        # NOTE: is_staff is deliberately NOT a trigger here on its own. That
+        # lets us create limited-privilege staff (e.g. the Product Support /
+        # Compliance / Supervisor officers) as is_staff=True, is_superuser=False,
+        # role='user' — they reach the admin panel but only get the abilities
+        # granted by their RBAC role, instead of bypassing every permission
+        # check. Officers also keep role='user' so they get no host/admin
+        # powers on the React frontend (which keys off role only).
+        if self.is_superuser or self.role == 'superadmin':
+            self.role = 'superadmin'
             self.is_staff = True
             self.is_superuser = True
+        elif self.role == 'admin':
+            self.is_staff = True
+
+        if self.email:
+            self.email = self.email.strip().lower()
 
         super().save(*args, **kwargs)
 

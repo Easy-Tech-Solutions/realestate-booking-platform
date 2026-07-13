@@ -1,33 +1,45 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { reportsAPI } from '../../services/api.service';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
+import { Checkbox } from '../components/ui/checkbox';
+import { BulkActionBar } from '../components/BulkActionBar';
 import { toast } from 'sonner';
+import { getErrorMessage } from '../../services/api/shared/errors';
 
 interface AdminReport {
   id: number;
   reporter_username: string;
   content_type: string;
+  reported_user?: number | null;
+  reported_user_name?: string | null;
   report_type: string;
   description: string;
   owner_name?: string;
   screenshot_url?: string | null;
   status: 'pending' | 'under_review' | 'resolved' | 'dismissed';
+  escalated_at?: string | null;
+  escalated_by_username?: string | null;
+  escalation_notes?: string;
   created_at: string;
 }
 
 const STATUS_OPTIONS = ['pending', 'under_review', 'resolved', 'dismissed'] as const;
 
 export function AdminReports() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [stats, setStats] = useState<Record<string, number> | null>(null);
   const [draftStatus, setDraftStatus] = useState<Record<number, string>>({});
   const [draftNotes, setDraftNotes] = useState<Record<number, string>>({});
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -68,9 +80,45 @@ export function AdminReports() {
     }
   };
 
+  const escalateReport = async (report: AdminReport) => {
+    try {
+      await reportsAPI.adminEscalate(String(report.id), draftNotes[report.id] || '');
+      toast.success(`Report #${report.id} escalated`);
+      await loadData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to escalate report');
+    }
+  };
+
   const visibleReports = statusFilter === 'all'
     ? reports
     : reports.filter(r => r.status === statusFilter);
+
+  const toggleOne = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelected((prev) => (prev.size === visibleReports.length ? new Set() : new Set(visibleReports.map((r) => r.id))));
+  };
+
+  const bulkUpdateStatus = async (status: 'resolved' | 'dismissed' | 'under_review') => {
+    setBulkBusy(true);
+    try {
+      const result = await reportsAPI.adminBulkAction({ report_ids: [...selected], status });
+      toast.success(`${result.succeeded.length} succeeded, ${result.failed.length} failed.`);
+      setSelected(new Set());
+      loadData();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Bulk action failed'));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -88,9 +136,21 @@ export function AdminReports() {
           <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Dismissed</p><p className="text-xl font-semibold">{stats?.dismissed ?? '-'}</p></CardContent></Card>
         </div>
 
+        <BulkActionBar selectedCount={selected.size} onClear={() => setSelected(new Set())}>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkUpdateStatus('under_review')}>Mark under review</Button>
+          <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkUpdateStatus('resolved')}>Resolve</Button>
+          <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={() => bulkUpdateStatus('dismissed')}>Dismiss</Button>
+        </BulkActionBar>
+
         <Card>
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle>All Reports</CardTitle>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={visibleReports.length > 0 && selected.size === visibleReports.length}
+                onCheckedChange={toggleAll}
+              />
+              <CardTitle>All Reports</CardTitle>
+            </div>
             <div className="w-full sm:w-52">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
@@ -115,13 +175,24 @@ export function AdminReports() {
                 {visibleReports.map(report => (
                   <div key={report.id} className="border rounded-xl p-4 space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
+                      <Checkbox checked={selected.has(report.id)} onCheckedChange={() => toggleOne(report.id)} />
                       <Badge variant="secondary">#{report.id}</Badge>
                       <Badge>{report.status}</Badge>
                       <Badge variant="outline">{report.content_type}</Badge>
                       <Badge variant="outline">{report.report_type}</Badge>
+                      {report.escalated_at && <Badge variant="destructive">Escalated</Badge>}
                       <span className="text-sm text-muted-foreground">Reporter: {report.reporter_username}</span>
                       <span className="text-sm text-muted-foreground">Created: {new Date(report.created_at).toLocaleString()}</span>
                     </div>
+
+                    {report.reported_user_name && (
+                      <p className="text-sm text-muted-foreground">Reported user: {report.reported_user_name}</p>
+                    )}
+                    {report.escalated_at && (
+                      <p className="text-xs text-destructive">
+                        Escalated by {report.escalated_by_username} — {report.escalation_notes}
+                      </p>
+                    )}
 
                     <p className="text-sm">{report.description}</p>
 
@@ -170,6 +241,22 @@ export function AdminReports() {
                       />
 
                       <Button onClick={() => updateStatus(report)}>Update</Button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => escalateReport(report)}>
+                        Escalate
+                      </Button>
+                      {report.reported_user && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive"
+                          onClick={() => navigate(`/management/suspensions?user=${report.reported_user}&report=${report.id}`)}
+                        >
+                          Suspend this user
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
 from django.contrib import messages
-from .models import PaymentGateway, Currency, Payment, Refund, WebhookLog, PlatformFee, Payout
+from .models import PaymentGateway, Currency, Payment, Refund, WebhookLog, PlatformFee, Payout, EscrowHold, TaxRate, StripeRefund
 
 
 @admin.register(PaymentGateway)
@@ -199,3 +199,26 @@ class WebhookLogAdmin(admin.ModelAdmin):
     list_display = ['gateway', 'event_type', 'processed', 'created_at']
     list_filter = ['gateway', 'processed', 'event_type']
     readonly_fields = ['gateway', 'event_type', 'payload', 'processed', 'error_message', 'created_at']
+
+
+@admin.register(EscrowHold)
+class EscrowHoldAdmin(admin.ModelAdmin):
+    list_display = ['booking', 'held_by', 'held_at', 'released_at']
+    readonly_fields = ['booking', 'reason', 'held_by', 'held_at', 'released_by', 'released_at']
+
+
+@admin.register(TaxRate)
+class TaxRateAdmin(admin.ModelAdmin):
+    list_display = ['jurisdiction', 'rate_percent', 'is_active', 'created_by', 'updated_at']
+    list_filter = ['is_active']
+    search_fields = ['jurisdiction']
+
+
+@admin.register(StripeRefund)
+class StripeRefundAdmin(admin.ModelAdmin):
+    list_display = ['booking', 'amount', 'status', 'initiated_by', 'created_at']
+    list_filter = ['status']
+    readonly_fields = ['booking', 'stripe_payment_intent_id', 'amount', 'reason', 'stripe_refund_id', 'status', 'error_message', 'initiated_by', 'created_at']
+
+    def has_add_permission(self, request):
+        return False

@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
@@ -7,6 +8,7 @@ from rest_framework import status
 from .models import HostApplication
 from .serializers import HostApplicationCreateSerializer, HostApplicationSerializer
 from . import agreements
+from .services import ps_decision, compliance_decision, supervisor_decision, InvalidTransition
 
 
 def _client_ip(request):
@@ -108,4 +110,89 @@ def my_host_application(request):
     if application is None:
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    return Response(HostApplicationSerializer(application, context={'request': request}).data)
+
+
+# ── Reviewer queue (superadmin KYC module) ──────────────────────────────────
+# Reuses the exact same service functions / Django permissions Django admin
+# already uses for this workflow — this is a second front door onto the same
+# real review pipeline, not a parallel implementation of it.
+
+STAGE_PERMISSION = {
+    HostApplication.Stage.PRODUCT_SUPPORT: 'hostapplications.review_product_support',
+    HostApplication.Stage.COMPLIANCE: 'hostapplications.review_compliance',
+    HostApplication.Stage.SUPERVISOR: 'hostapplications.review_supervisor',
+}
+STAGE_STATUS = {
+    HostApplication.Stage.PRODUCT_SUPPORT: HostApplication.Status.SUBMITTED,
+    HostApplication.Stage.COMPLIANCE: HostApplication.Status.PS_APPROVED,
+    HostApplication.Stage.SUPERVISOR: HostApplication.Status.COMPLIANCE_APPROVED,
+}
+STAGE_SERVICE_FN = {
+    HostApplication.Stage.PRODUCT_SUPPORT: ps_decision,
+    HostApplication.Stage.COMPLIANCE: compliance_decision,
+    HostApplication.Stage.SUPERVISOR: supervisor_decision,
+}
+
+
+def _has_background_checks_access(user):
+    """The trust_safety.background_checks RBAC resource — additive to the
+    per-stage Django permissions below, not a replacement: a role granting
+    it (e.g. the Trust & Safety Specialist preset) can review every stage,
+    while the fine-grained Product Support / Compliance / Supervisor Officer
+    groups still work exactly as before."""
+    from rbac.permissions import has_permission
+    return has_permission(user, 'trust_safety.background_checks', 'execute')
+
+
+def reviewable_stages(user):
+    if _has_background_checks_access(user):
+        return list(STAGE_PERMISSION.keys())
+    return [stage for stage, perm in STAGE_PERMISSION.items() if user.has_perm(perm)]
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def review_queue(request):
+    """GET /api/host-applications/review-queue/ — applications awaiting review
+    at any stage the requesting officer has permission for."""
+    stages = reviewable_stages(request.user)
+    if not stages:
+        return Response({'error': 'You are not a reviewer for any stage of this queue.'}, status=status.HTTP_403_FORBIDDEN)
+    statuses = [STAGE_STATUS[s] for s in stages]
+    qs = (
+        HostApplication.objects.filter(status__in=statuses)
+        .select_related('applicant')
+        .order_by('created_at')
+    )
+    return Response(HostApplicationSerializer(qs, many=True, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def review_decision(request, pk):
+    """POST /api/host-applications/<pk>/review/ — approve or decline at
+    whichever stage this application is currently awaiting."""
+    application = get_object_or_404(HostApplication, pk=pk)
+    stage = application.current_stage
+    if stage is None:
+        return Response({'error': 'This application is not awaiting review.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not (_has_background_checks_access(request.user) or request.user.has_perm(STAGE_PERMISSION[stage])):
+        return Response({'error': 'You are not authorized to review this stage.'}, status=status.HTTP_403_FORBIDDEN)
+
+    approve = bool(request.data.get('approve'))
+    reason = request.data.get('reason', '')
+    if not approve and not str(reason).strip():
+        return Response({'error': 'A reason is required when declining.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        STAGE_SERVICE_FN[stage](application, approve, request.user, reason)
+    except InvalidTransition as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(
+        request, 'host_application.review', target=application, reason=reason,
+        approved=approve, stage=stage,
+    )
     return Response(HostApplicationSerializer(application, context={'request': request}).data)

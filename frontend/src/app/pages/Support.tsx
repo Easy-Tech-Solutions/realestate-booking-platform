@@ -196,8 +196,8 @@ export function Support() {
       fd.append('subject', subject.trim());
       fd.append('description', description.trim());
       if (!isAuthenticated) {
-        fd.append('requester_name', guestName.trim());
-        fd.append('requester_email', guestEmail.trim());
+        fd.append('guest_name', guestName.trim());
+        fd.append('guest_email', guestEmail.trim());
       }
       files.forEach((f) => fd.append('attachments', f));
 

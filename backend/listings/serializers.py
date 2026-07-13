@@ -99,8 +99,16 @@ class ListingSerializer(serializers.ModelSerializer):
             "owner_username", "owner_id", "owner_first_name", "owner_last_name",
             "owner_avatar", "owner_is_superhost",
             "average_rating", "review_count",
+            "suspension_reason", "suspended_at",
+            "local_registration_number", "occupancy_cap",
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'owner_username', 'owner_id']
+        read_only_fields = [
+            'id', 'created_at', 'updated_at', 'owner_username', 'owner_id',
+            'suspension_reason', 'suspended_at',
+            # Compliance fields are visible to the host but only settable by
+            # Inventory/Compliance staff — see inventory.views.listing_compliance.
+            'local_registration_number', 'occupancy_cap',
+        ]
         extra_kwargs = {
             'title': {'required': False, 'allow_blank': True},
             'address': {'required': False, 'allow_blank': True},
@@ -114,6 +122,14 @@ class ListingSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'title': 'Title is required'})
             if not str(attrs.get('address', '')).strip():
                 raise serializers.ValidationError({'address': 'Address is required'})
+
+        # A local occupancy cap (set by Compliance staff, not the host) is a
+        # hard ceiling — the host can still lower max_guests, just never
+        # raise it past what the jurisdiction allows.
+        cap = self.instance.occupancy_cap if self.instance is not None else None
+        if cap is not None and 'max_guests' in attrs and attrs['max_guests'] > cap:
+            raise serializers.ValidationError({'max_guests': f'This property is capped at {cap} guests by local compliance requirements.'})
+
         return attrs
 
     def get_main_image_url(self, obj):

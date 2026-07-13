@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { toast } from 'sonner';
 import type { User, SearchFilters } from '../core/types';
-import { authAPI, propertiesAPI, clearTokens, attemptTokenRefresh } from '../services/api.service';
+import { authAPI, propertiesAPI, clearTokens, attemptTokenRefresh, superadminAPI, getAccessToken, setTokens } from '../services/api.service';
 import type { GoogleLoginResult } from '../services/api/auth';
 import { queryClient } from '../providers/QueryProvider';
 import { queryKeys } from '../hooks/queries/keys';
@@ -12,6 +12,7 @@ export interface AppStoreState {
   setUser: (user: User | null) => void;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
+  completeMfaLogin: (mfaToken: string, code: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<GoogleLoginResult>;
   register: (data: {
     username: string;
@@ -28,6 +29,9 @@ export interface AppStoreState {
   toggleWishlist: (propertyId: string) => void;
   isLoading: boolean;
   initialize: () => Promise<void>;
+  impersonation: { sessionId: number; adminAccess: string; adminUser: User } | null;
+  startImpersonation: (targetUserId: string, reason: string) => Promise<void>;
+  stopImpersonation: () => Promise<void>;
 }
 
 export const useAppStore = create<AppStoreState>()(
@@ -38,11 +42,42 @@ export const useAppStore = create<AppStoreState>()(
       isLoading: true,
       searchFilters: {},
       wishlistIds: [],
+      impersonation: null,
 
       setUser: (user) => set({ user, isAuthenticated: Boolean(user) }),
 
+      startImpersonation: async (targetUserId, reason) => {
+        const adminUser = get().user;
+        const adminAccess = getAccessToken();
+        if (!adminUser || !adminAccess) throw new Error('You must be logged in.');
+        const { access, user, session_id } = await superadminAPI.impersonateStart(targetUserId, reason);
+        setTokens(access);
+        set({
+          user,
+          isAuthenticated: true,
+          impersonation: { sessionId: session_id, adminAccess, adminUser },
+        });
+      },
+
+      stopImpersonation: async () => {
+        const session = get().impersonation;
+        if (!session) return;
+        try {
+          await superadminAPI.impersonateStop(session.sessionId);
+        } finally {
+          setTokens(session.adminAccess);
+          set({ user: session.adminUser, isAuthenticated: true, impersonation: null });
+        }
+      },
+
       login: async (email, password) => {
         const { user } = await authAPI.login(email, password);
+        set({ user, isAuthenticated: true });
+        loadFavoritesIntoStore();
+      },
+
+      completeMfaLogin: async (mfaToken, code) => {
+        const { user } = await authAPI.verifyMfaLogin(mfaToken, code);
         set({ user, isAuthenticated: true });
         loadFavoritesIntoStore();
       },

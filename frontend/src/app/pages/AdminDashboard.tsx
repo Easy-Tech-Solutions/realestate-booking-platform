@@ -1,40 +1,99 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import {
-  Ban, Building2, CheckCircle, DollarSign, Home, TrendingUp, Users,
+  Building2, CheckCircle, DollarSign, Home, TrendingUp, Users,
   Search, Eye, X, Shield, Settings, BarChart3, Calendar,
-  CreditCard, RefreshCw, Headphones, Mail, ChevronDown, ChevronUp, UserCheck,
+  CreditCard, RefreshCw, Headphones, Mail, ChevronDown, ChevronUp, ChevronRight, UserCheck,
+  ScrollText, KeyRound, ShieldCheck, Cpu, KeySquare,
 } from 'lucide-react';
 import { supportAPI, SupportTicket, ContactInquiry } from '../../services/api/support';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Skeleton } from '../components/ui/skeleton';
 import { formatCurrency } from '../../core/utils';
 import { toast } from 'sonner';
-import { usersAPI, propertiesAPI, bookingsAPI, payoutsAPI } from '../../services/api';
+import { usersAPI, propertiesAPI, bookingsAPI, payoutsAPI, paymentAPI } from '../../services/api';
+import type { PlatformFee, EscrowBooking } from '../../services/api/payments';
+import { useApp } from '../../hooks/useApp';
+import { MfaSetupCard } from '../components/MfaSetupCard';
+import { CommunicationsDialog } from '../components/CommunicationsDialog';
 import type { Booking, Payout } from '../../core/types';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton,
   SidebarProvider, SidebarTrigger,
 } from '../components/ui/sidebar';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../components/ui/collapsible';
 
-const menuItems = [
-  { id: 'overview',    label: 'Overview',            icon: BarChart3 },
-  { id: 'users',       label: 'User Management',     icon: Users },
-  { id: 'properties',  label: 'Property Management', icon: Building2 },
-  { id: 'bookings',    label: 'Bookings',             icon: Calendar },
-  { id: 'payments',    label: 'Payments',             icon: CreditCard },
-  { id: 'payouts',     label: 'Host Payouts',         icon: DollarSign },
-  { id: 'support',     label: 'Support Tickets',      icon: Headphones },
-  { id: 'security',    label: 'Security',             icon: Shield },
-  { id: 'settings',    label: 'Settings',             icon: Settings },
+type NavLeaf =
+  | { type: 'section'; id: string; label: string }
+  | { type: 'route'; path: string; label: string };
+
+interface NavGroup {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  items: NavLeaf[];
+}
+
+const navGroups: NavGroup[] = [
+  { id: 'overview', label: 'Overview', icon: BarChart3, items: [
+    { type: 'section', id: 'overview', label: 'Overview' },
+  ] },
+  { id: 'users', label: 'User Management', icon: Users, items: [
+    { type: 'route', path: '/management/users', label: 'All Users' },
+  ] },
+  { id: 'inventory', label: 'Property & Inventory', icon: Building2, items: [
+    { type: 'section', id: 'properties', label: 'Property Management' },
+    { type: 'route', path: '/management/listing-moderation', label: 'Listing Moderation' },
+  ] },
+  { id: 'bookings', label: 'Bookings', icon: Calendar, items: [
+    { type: 'section', id: 'bookings', label: 'All Bookings' },
+  ] },
+  { id: 'finance', label: 'Financial Management', icon: DollarSign, items: [
+    { type: 'section', id: 'payments', label: 'Payments' },
+    { type: 'section', id: 'payouts', label: 'Host Payouts' },
+    { type: 'route', path: '/management/finance', label: 'Finance & Legal Center' },
+    { type: 'route', path: '/management/legal-documents', label: 'Legal Documents' },
+  ] },
+  { id: 'trust_safety', label: 'Trust & Safety', icon: ShieldCheck, items: [
+    { type: 'section', id: 'trust_safety', label: 'Overview' },
+    { type: 'route', path: '/management/kyc-queue', label: 'KYC Review Queue' },
+    { type: 'route', path: '/management/fraud-flags', label: 'Fraud & AML' },
+    { type: 'route', path: '/management/suspensions', label: 'Suspensions Center' },
+  ] },
+  { id: 'support', label: 'Support', icon: Headphones, items: [
+    { type: 'section', id: 'support', label: 'Support Tickets' },
+    { type: 'route', path: '/management/reports', label: 'Reports Center' },
+    { type: 'route', path: '/management/aircover-claims', label: 'AirCover Claims' },
+  ] },
+  { id: 'rbac', label: 'Roles & Permissions', icon: KeySquare, items: [
+    { type: 'route', path: '/management/roles', label: 'Roles & Custom Roles' },
+    { type: 'route', path: '/management/approvals', label: 'Pending Approvals' },
+    { type: 'route', path: '/management/break-glass', label: 'Break-Glass Access' },
+  ] },
+  { id: 'security', label: 'Security', icon: Shield, items: [
+    { type: 'section', id: 'security', label: 'Overview & MFA' },
+    { type: 'route', path: '/management/audit-log', label: 'Audit Log' },
+  ] },
+  { id: 'platform', label: 'Platform & Engineering', icon: Cpu, items: [
+    { type: 'route', path: '/management/platform-ops', label: 'Feature Flags & Health' },
+  ] },
+  { id: 'settings', label: 'Settings', icon: Settings, items: [
+    { type: 'section', id: 'settings', label: 'Platform Settings' },
+  ] },
 ];
+
+const sectionLabels: Record<string, string> = navGroups
+  .flatMap((g) => g.items)
+  .filter((i): i is Extract<NavLeaf, { type: 'section' }> => i.type === 'section')
+  .reduce((acc, i) => ({ ...acc, [i.id]: i.label }), {});
 
 const statusColor: Record<string, string> = {
   confirmed:  'bg-primary/10 text-primary',
@@ -67,17 +126,32 @@ function StatCard({ label, value, icon: Icon, sub }: { label: string; value: str
 
 export function AdminDashboard() {
   const navigate = useNavigate();
+  const { user: currentAdmin } = useApp();
   const [activeSection, setActiveSection] = useState('overview');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    () => new Set(navGroups.map((g) => g.id))
+  );
+  const toggleGroup = (id: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   // Data state
   const [stats, setStats]           = useState<any>(null);
-  const [users, setUsers]           = useState<any[]>([]);
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [userSearch, setUserSearch] = useState('');
   const [propSearch, setPropSearch] = useState('');
   const [pendingListings, setPendingListings] = useState<any[]>([]);
   const [propTab, setPropTab] = useState<'published' | 'pending'>('published');
+
+  // Settings state
+  const [platformFee, setPlatformFee] = useState<PlatformFee | null>(null);
+  const [platformFeeDraft, setPlatformFeeDraft] = useState<Partial<PlatformFee>>({});
+  const [platformFeeLoading, setPlatformFeeLoading] = useState(false);
+  const [platformFeeSaving, setPlatformFeeSaving] = useState(false);
 
   // Support state
   const [supportTickets, setSupportTickets]     = useState<SupportTicket[]>([]);
@@ -88,20 +162,27 @@ export function AdminDashboard() {
   const [expandedTicket, setExpandedTicket]     = useState<number | null>(null);
   const [assignInput, setAssignInput]           = useState('');
   const [supportTab, setSupportTab]             = useState<'tickets' | 'contact'>('tickets');
+  const [ticketDetails, setTicketDetails]       = useState<Record<number, SupportTicket>>({});
+  const [ticketDetailLoading, setTicketDetailLoading] = useState<number | null>(null);
+  const [replyDraft, setReplyDraft]             = useState<Record<number, string>>({});
+  const [escalateDraft, setEscalateDraft]       = useState<Record<number, string>>({});
 
   // Payments awaiting confirmation + host payouts
   const [paymentReceived, setPaymentReceived] = useState<Booking[]>([]);
   const [payouts, setPayouts] = useState<Payout[]>([]);
-  const [payoutTab, setPayoutTab] = useState<'pending' | 'paid'>('pending');
+  const [payoutTab, setPayoutTab] = useState<'pending' | 'paid' | 'cancelled'>('pending');
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
+  const [escrowByBooking, setEscrowByBooking] = useState<Record<string, EscrowBooking>>({});
 
   const loadPaymentsAndPayouts = useCallback(async () => {
-    const [pr, po] = await Promise.all([
+    const [pr, po, escrow] = await Promise.all([
       bookingsAPI.getPaymentReceived().catch(() => [] as Booking[]),
       payoutsAPI.adminList().catch(() => [] as Payout[]),
+      paymentAPI.adminListEscrow().catch(() => [] as EscrowBooking[]),
     ]);
     setPaymentReceived(pr);
     setPayouts(po);
+    setEscrowByBooking(Object.fromEntries(escrow.map((e) => [String(e.booking_id), e])));
   }, []);
 
   const handleConfirmPayment = async (id: string) => {
@@ -130,17 +211,30 @@ export function AdminDashboard() {
     }
   };
 
+  const handleCancelPayout = async (id: string) => {
+    const reason = window.prompt('Reason for cancelling this payout:');
+    if (!reason || !reason.trim()) return;
+    setActionBusyId(id);
+    try {
+      await payoutsAPI.adminCancel(id, reason.trim());
+      toast.success('Payout cancelled.');
+      await loadPaymentsAndPayouts();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to cancel payout');
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, usersRes, propsRes, pendingRes] = await Promise.all([
+      const [statsRes, propsRes, pendingRes] = await Promise.all([
         usersAPI.adminStats(),
-        usersAPI.listAll(),
         propertiesAPI.getAll(),
         propertiesAPI.getPendingReview().catch(() => []),
       ]);
       setStats(statsRes);
-      setUsers(usersRes);
       setProperties(propsRes);
       setPendingListings(pendingRes);
     } catch (err: any) {
@@ -152,20 +246,6 @@ export function AdminDashboard() {
 
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { loadPaymentsAndPayouts(); }, [loadPaymentsAndPayouts]);
-
-  const handleSuspendUser = async (userId: string, username: string) => {
-    try {
-      await usersAPI.suspendUser(userId, {
-        suspension_type: 'indefinite',
-        reason: 'Suspended by admin',
-        ends_at: null,
-      });
-      toast.success(`${username} suspended`);
-      await loadData();
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to suspend user');
-    }
-  };
 
   const handleRemoveListing = async (listingId: string, title: string) => {
     try {
@@ -199,12 +279,6 @@ export function AdminDashboard() {
       toast.error(err?.message || 'Failed to reject listing');
     }
   };
-
-  const filteredUsers = users.filter(u => {
-    const q = userSearch.toLowerCase();
-    return !q || u.username?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) ||
-      u.first_name?.toLowerCase().includes(q) || u.last_name?.toLowerCase().includes(q);
-  });
 
   const filteredProperties = properties.filter(p => {
     const q = propSearch.toLowerCase();
@@ -286,105 +360,24 @@ export function AdminDashboard() {
     </div>
   );
 
-  // ── User Management ───────────────────────────────────────────────────────
-  const renderUserManagement = () => (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h2 className="text-2xl font-semibold">User Management</h2>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search users..."
-            className="pl-10 w-full sm:w-64"
-            value={userSearch}
-            onChange={e => setUserSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading
-                  ? [...Array(5)].map((_, i) => (
-                      <TableRow key={i}>
-                        {[...Array(5)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
-                      </TableRow>
-                    ))
-                  : filteredUsers.map((user: any) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar>
-                              <AvatarImage src={user.profile?.image} />
-                              <AvatarFallback>{user.first_name?.[0]}{user.last_name?.[0]}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium">{user.first_name} {user.last_name}</p>
-                              <p className="text-sm text-muted-foreground">{user.email || user.username}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={user.role === 'agent' ? 'default' : 'secondary'}>
-                            {user.role ?? 'guest'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {user.email_verified && <CheckCircle className="h-4 w-4 text-green-500" />}
-                            <span className="text-sm">{user.email_verified ? 'Verified' : 'Unverified'}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{new Date(user.member_since).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => navigate(`/users/${user.id}`)}>
-                              <Eye className="h-3 w-3 mr-1" /> View
-                            </Button>
-                            <Button
-                              variant="outline" size="sm" className="text-orange-600"
-                              onClick={() => handleSuspendUser(String(user.id), user.username)}
-                            >
-                              <Ban className="h-3 w-3 mr-1" /> Suspend
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                }
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
   // ── Property Management ───────────────────────────────────────────────────
   const renderPropertyManagement = () => (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">Property Management</h2>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search properties..."
-            className="pl-10 w-full sm:w-64"
-            value={propSearch}
-            onChange={e => setPropSearch(e.target.value)}
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search properties..."
+              className="pl-10 w-full sm:w-64"
+              value={propSearch}
+              onChange={e => setPropSearch(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" onClick={() => navigate('/management/listing-moderation')}>
+            Inventory & Moderation
+          </Button>
         </div>
       </div>
 
@@ -559,13 +552,14 @@ export function AdminDashboard() {
                   <TableHead>Dates</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading
                   ? [...Array(5)].map((_, i) => (
                       <TableRow key={i}>
-                        {[...Array(6)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                        {[...Array(7)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
                       </TableRow>
                     ))
                   : (stats?.recent_bookings ?? []).map((b: any) => (
@@ -581,6 +575,9 @@ export function AdminDashboard() {
                         <TableCell>
                           <Badge className={statusColor[b.status] ?? ''}>{b.status}</Badge>
                         </TableCell>
+                        <TableCell className="text-right">
+                          <CommunicationsDialog bookingId={b.id} />
+                        </TableCell>
                       </TableRow>
                     ))
                 }
@@ -595,12 +592,17 @@ export function AdminDashboard() {
   // ── Payments ──────────────────────────────────────────────────────────────
   const renderPayments = () => (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold mb-1">Payments awaiting confirmation</h2>
-        <p className="text-sm text-muted-foreground">
-          All guest payments land in the Home Konet account. Confirm each one to share the host's
-          contact with the guest and create the host payout.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-semibold mb-1">Payments awaiting confirmation</h2>
+          <p className="text-sm text-muted-foreground">
+            All guest payments land in the Home Konet account. Confirm each one to share the host's
+            contact with the guest and create the host payout.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => navigate('/management/finance')}>
+          Finance & Legal Center
+        </Button>
       </div>
       <Card>
         <CardContent className="p-0">
@@ -625,12 +627,18 @@ export function AdminDashboard() {
                 ) : (
                   paymentReceived.map((b) => (
                     <TableRow key={b.id}>
-                      <TableCell className="font-medium">{b.user?.firstName || b.userId}</TableCell>
+                      <TableCell className="font-medium">
+                        {b.user?.firstName || b.userId}
+                        {escrowByBooking[b.id]?.on_hold && (
+                          <Badge variant="destructive" className="ml-2 text-[10px]" title={escrowByBooking[b.id].hold_reason}>on hold</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="max-w-[180px] truncate">{b.property?.title}</TableCell>
                       <TableCell className="text-sm">{b.checkIn} → {b.checkOut}</TableCell>
                       <TableCell>{formatCurrency(b.totalPrice)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" disabled={actionBusyId === b.id} onClick={() => handleConfirmPayment(b.id)}>
+                      <TableCell className="text-right space-x-2">
+                        <CommunicationsDialog bookingId={b.id} />
+                        <Button size="sm" disabled={actionBusyId === b.id || escrowByBooking[b.id]?.on_hold} onClick={() => handleConfirmPayment(b.id)}>
                           {actionBusyId === b.id ? 'Confirming…' : 'Confirm payment'}
                         </Button>
                       </TableCell>
@@ -708,9 +716,9 @@ export function AdminDashboard() {
         </div>
 
         <div className="flex gap-2">
-          {(['pending', 'paid'] as const).map((tab) => (
+          {(['pending', 'paid', 'cancelled'] as const).map((tab) => (
             <Button key={tab} variant={payoutTab === tab ? 'default' : 'outline'} size="sm" onClick={() => setPayoutTab(tab)}>
-              {tab === 'pending' ? 'Pending' : 'Paid'}
+              {tab === 'pending' ? 'Pending' : tab === 'paid' ? 'Paid' : 'Cancelled'}
             </Button>
           ))}
         </div>
@@ -726,7 +734,7 @@ export function AdminDashboard() {
                     <TableHead>Gross</TableHead>
                     <TableHead>Commission</TableHead>
                     <TableHead>Net payout</TableHead>
-                    {payoutTab === 'pending' ? <TableHead className="text-right">Action</TableHead> : <TableHead>Paid on</TableHead>}
+                    {payoutTab === 'pending' ? <TableHead className="text-right">Action</TableHead> : payoutTab === 'paid' ? <TableHead>Paid on</TableHead> : <TableHead>Reason</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -747,13 +755,18 @@ export function AdminDashboard() {
                         <TableCell className="text-muted-foreground">-{formatCurrency(p.serviceFeeAmount)}</TableCell>
                         <TableCell className="font-semibold">{formatCurrency(p.netAmount)}</TableCell>
                         {payoutTab === 'pending' ? (
-                          <TableCell className="text-right">
+                          <TableCell className="text-right space-x-2">
                             <Button size="sm" disabled={actionBusyId === p.id} onClick={() => handleMarkPayoutPaid(p.id)}>
                               {actionBusyId === p.id ? 'Saving…' : 'Mark paid'}
                             </Button>
+                            <Button size="sm" variant="outline" className="text-destructive" disabled={actionBusyId === p.id} onClick={() => handleCancelPayout(p.id)}>
+                              Cancel
+                            </Button>
                           </TableCell>
-                        ) : (
+                        ) : payoutTab === 'paid' ? (
                           <TableCell className="text-sm">{p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '—'}</TableCell>
+                        ) : (
+                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate" title={p.cancellationReason}>{p.cancellationReason || '—'}</TableCell>
                         )}
                       </TableRow>
                     ))
@@ -767,6 +780,38 @@ export function AdminDashboard() {
     );
   };
 
+  // ── Trust & Safety ───────────────────────────────────────────────────────
+  const renderTrustSafety = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-semibold">Trust & Safety</h2>
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader><CardTitle>KYC & Verification Review</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Host identity applications and property-ownership verifications awaiting manual review.
+            </p>
+            <Button onClick={() => navigate('/management/kyc-queue')}>
+              Open Review Queue
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Fraud & AML</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Rule-based fraud flags (rapid signups, shared cards), plus device fingerprint and
+              location banning.
+            </p>
+            <Button onClick={() => navigate('/management/fraud-flags')}>
+              Open Fraud & AML
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+
   // ── Security ──────────────────────────────────────────────────────────────
   const renderSecurity = () => (
     <div className="space-y-6">
@@ -775,7 +820,7 @@ export function AdminDashboard() {
         <Card>
           <CardHeader><CardTitle>Active Suspensions</CardTitle></CardHeader>
           <CardContent>
-            <Button onClick={() => navigate('/admin/suspensions')}>
+            <Button onClick={() => navigate('/management/suspensions')}>
               Open Suspensions Center
             </Button>
           </CardContent>
@@ -783,11 +828,23 @@ export function AdminDashboard() {
         <Card>
           <CardHeader><CardTitle>Reports Queue</CardTitle></CardHeader>
           <CardContent>
-            <Button onClick={() => navigate('/admin/reports')}>
+            <Button onClick={() => navigate('/management/reports')}>
               Open Reports Center
             </Button>
           </CardContent>
         </Card>
+        {currentAdmin?.isAdmin && (
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><ScrollText className="h-4 w-4" /> Audit Log</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-3">Every sensitive action taken from this dashboard — who, what, when, and why.</p>
+              <Button onClick={() => navigate('/management/audit-log')}>
+                Open Audit Log
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+        <MfaSetupCard />
       </div>
     </div>
   );
@@ -795,41 +852,98 @@ export function AdminDashboard() {
   // ── Settings ──────────────────────────────────────────────────────────────
   const renderSettings = () => (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold">Platform Settings</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h2 className="text-2xl font-semibold">Platform Settings</h2>
+        <Button variant="outline" onClick={() => navigate('/management/platform-ops')}>
+          Platform & Engineering
+        </Button>
+      </div>
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader><CardTitle>Fees & Policies</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Fees</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Service Fee (%)</label>
-              <div className="flex items-center gap-2 mt-1">
-                <Input type="number" defaultValue="14" className="w-20" />
-                <span className="text-sm text-muted-foreground">%</span>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Tax Rate (%)</label>
-              <div className="flex items-center gap-2 mt-1">
-                <Input type="number" defaultValue="5" className="w-20" />
-                <span className="text-sm text-muted-foreground">%</span>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Default Cancellation Policy</label>
-              <Select>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select policy" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="flexible">Flexible</SelectItem>
-                  <SelectItem value="moderate">Moderate</SelectItem>
-                  <SelectItem value="strict">Strict</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Fee changes require a backend deployment to take effect.
-            </p>
+            {platformFeeLoading || !platformFee ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : (
+              <>
+                <div>
+                  <label className="text-sm font-medium">Booking fee (USD, flat)</label>
+                  <Input
+                    type="number" step="0.01" className="w-32 mt-1"
+                    value={platformFeeDraft.booking_fee ?? ''}
+                    onChange={(e) => setPlatformFeeDraft((d) => ({ ...d, booking_fee: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Viewing fee (USD, flat)</label>
+                  <Input
+                    type="number" step="0.01" className="w-32 mt-1"
+                    value={platformFeeDraft.viewing_fee ?? ''}
+                    onChange={(e) => setPlatformFeeDraft((d) => ({ ...d, viewing_fee: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Service fee (%, applied to both guest and host sides)</label>
+                  <Input
+                    type="number" step="0.01" className="w-32 mt-1"
+                    value={platformFeeDraft.service_fee_percent ?? ''}
+                    onChange={(e) => setPlatformFeeDraft((d) => ({ ...d, service_fee_percent: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Transaction fee type</label>
+                  <Select
+                    value={platformFeeDraft.transaction_fee_type}
+                    onValueChange={(v) => setPlatformFeeDraft((d) => ({ ...d, transaction_fee_type: v as PlatformFee['transaction_fee_type'] }))}
+                  >
+                    <SelectTrigger className="mt-1 w-48">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">Fixed amount (USD)</SelectItem>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="range">Range (min–max USD)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">
+                    Transaction fee value {platformFeeDraft.transaction_fee_type === 'percentage' ? '(%)' : '(USD)'}
+                  </label>
+                  <Input
+                    type="number" step="0.0001" className="w-32 mt-1"
+                    value={platformFeeDraft.transaction_fee_value ?? ''}
+                    onChange={(e) => setPlatformFeeDraft((d) => ({ ...d, transaction_fee_value: e.target.value }))}
+                  />
+                </div>
+                {platformFeeDraft.transaction_fee_type === 'range' && (
+                  <div className="flex gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Min (USD)</label>
+                      <Input
+                        type="number" step="0.01" className="w-28 mt-1"
+                        value={platformFeeDraft.transaction_fee_min ?? ''}
+                        onChange={(e) => setPlatformFeeDraft((d) => ({ ...d, transaction_fee_min: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Max (USD)</label>
+                      <Input
+                        type="number" step="0.01" className="w-28 mt-1"
+                        value={platformFeeDraft.transaction_fee_max ?? ''}
+                        onChange={(e) => setPlatformFeeDraft((d) => ({ ...d, transaction_fee_max: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                )}
+                <Button disabled={platformFeeSaving} onClick={handleSavePlatformFee}>
+                  {platformFeeSaving ? 'Saving…' : 'Save changes'}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Takes effect immediately — no deployment needed.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -858,6 +972,37 @@ export function AdminDashboard() {
     if (activeSection === 'support') loadSupport();
   }, [activeSection, loadSupport]);
 
+  const loadPlatformFee = useCallback(async () => {
+    setPlatformFeeLoading(true);
+    try {
+      const fee = await paymentAPI.adminGetPlatformFee();
+      setPlatformFee(fee);
+      setPlatformFeeDraft(fee);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to load platform fee settings');
+    } finally {
+      setPlatformFeeLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'settings') loadPlatformFee();
+  }, [activeSection, loadPlatformFee]);
+
+  const handleSavePlatformFee = async () => {
+    setPlatformFeeSaving(true);
+    try {
+      const updated = await paymentAPI.adminUpdatePlatformFee(platformFeeDraft);
+      setPlatformFee(updated);
+      setPlatformFeeDraft(updated);
+      toast.success('Platform fees updated.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to save platform fees');
+    } finally {
+      setPlatformFeeSaving(false);
+    }
+  };
+
   const ticketStatusColor: Record<string, string> = {
     open:         'bg-blue-100 text-blue-700',
     in_progress:  'bg-yellow-100 text-yellow-700',
@@ -876,9 +1021,55 @@ export function AdminDashboard() {
     try {
       const updated = await supportAPI.adminUpdateTicket(id, payload);
       setSupportTickets(prev => prev.map(t => t.id === id ? updated : t));
+      setTicketDetails(prev => prev[id] ? { ...prev, [id]: { ...prev[id], ...updated } } : prev);
       toast.success('Ticket updated');
     } catch {
       toast.error('Failed to update ticket');
+    }
+  };
+
+  const loadTicketDetail = async (id: number) => {
+    setTicketDetailLoading(id);
+    try {
+      const detail = await supportAPI.getTicket(id);
+      setTicketDetails(prev => ({ ...prev, [id]: detail }));
+    } catch {
+      toast.error('Failed to load ticket conversation');
+    } finally {
+      setTicketDetailLoading(null);
+    }
+  };
+
+  const toggleTicket = (id: number) => {
+    if (expandedTicket === id) {
+      setExpandedTicket(null);
+      return;
+    }
+    setExpandedTicket(id);
+    if (!ticketDetails[id]) loadTicketDetail(id);
+  };
+
+  const handleSendReply = async (id: number) => {
+    const content = (replyDraft[id] || '').trim();
+    if (!content) return;
+    try {
+      await supportAPI.addMessage(id, content);
+      setReplyDraft(prev => ({ ...prev, [id]: '' }));
+      await loadTicketDetail(id);
+      await loadSupport();
+    } catch {
+      toast.error('Failed to send reply');
+    }
+  };
+
+  const handleEscalateTicket = async (id: number) => {
+    try {
+      const updated = await supportAPI.adminEscalateTicket(id, escalateDraft[id] || '');
+      setSupportTickets(prev => prev.map(t => t.id === id ? updated : t));
+      setTicketDetails(prev => ({ ...prev, [id]: updated }));
+      toast.success('Ticket escalated to urgent priority.');
+    } catch {
+      toast.error('Failed to escalate ticket');
     }
   };
 
@@ -902,13 +1093,14 @@ export function AdminDashboard() {
 
       {/* Stats row */}
       {supportStats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
           {[
             { label: 'Open',           value: supportStats.open,         color: 'text-blue-600' },
             { label: 'In Progress',    value: supportStats.in_progress,  color: 'text-yellow-600' },
             { label: 'Pending User',   value: supportStats.pending_user, color: 'text-orange-600' },
             { label: 'Resolved',       value: supportStats.resolved,     color: 'text-green-600' },
             { label: 'Closed',         value: supportStats.closed,       color: 'text-gray-500' },
+            { label: 'SLA Breached',   value: supportStats.breached,     color: 'text-destructive' },
             { label: 'Unread Contact', value: supportStats.unread_contact, color: 'text-destructive' },
           ].map(s => (
             <Card key={s.label}>
@@ -973,19 +1165,22 @@ export function AdminDashboard() {
                     <button
                       type="button"
                       className="w-full flex items-start justify-between gap-4 p-4 text-left hover:bg-muted/30 transition-colors"
-                      onClick={() => setExpandedTicket(expandedTicket === ticket.id ? null : ticket.id)}
+                      onClick={() => toggleTicket(ticket.id)}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-mono text-xs text-muted-foreground">{ticket.ticketNumber}</span>
                           <Badge className={ticketStatusColor[ticket.status] ?? ''}>{ticket.status.replace('_', ' ')}</Badge>
                           <Badge className={priorityColor[ticket.priority] ?? ''}>{ticket.priority}</Badge>
+                          {ticket.isBreached && <Badge variant="destructive">SLA breached</Badge>}
+                          {ticket.escalatedAt && <Badge className="bg-red-100 text-red-700">Escalated</Badge>}
                           <span className="text-xs text-muted-foreground capitalize">{ticket.category.replace('_', ' ')}</span>
                         </div>
                         <p className="font-medium text-sm truncate">{ticket.subject}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {ticket.requesterName} · {ticket.requesterEmail} · {new Date(ticket.createdAt).toLocaleDateString()}
                           {ticket.assignedToName && <span className="ml-2 text-primary">Assigned: {ticket.assignedToName}</span>}
+                          {ticket.slaDueAt && !ticket.isBreached && <span className="ml-2">SLA due: {new Date(ticket.slaDueAt).toLocaleString()}</span>}
                         </p>
                       </div>
                       {expandedTicket === ticket.id ? <ChevronUp className="w-4 h-4 shrink-0 mt-1" /> : <ChevronDown className="w-4 h-4 shrink-0 mt-1" />}
@@ -1053,27 +1248,82 @@ export function AdminDashboard() {
                               </Button>
                             </div>
                           </div>
-                        </div>
-
-                        {/* Attachments */}
-                        {ticket.attachments && ticket.attachments.length > 0 && (
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-2">Attachments</p>
-                            <div className="flex flex-wrap gap-2">
-                              {ticket.attachments.map(a => (
-                                <a
-                                  key={a.id}
-                                  href={a.fileUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted transition-colors"
-                                >
-                                  📎 {a.filename}
-                                </a>
-                              ))}
+                          {/* Escalate */}
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-muted-foreground">Escalate</label>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Escalation notes"
+                                className="w-48 h-9 text-sm"
+                                value={escalateDraft[ticket.id] || ''}
+                                onChange={e => setEscalateDraft(prev => ({ ...prev, [ticket.id]: e.target.value }))}
+                              />
+                              <Button size="sm" variant="destructive" onClick={() => handleEscalateTicket(ticket.id)}>
+                                Escalate
+                              </Button>
                             </div>
                           </div>
-                        )}
+                        </div>
+
+                        {(() => {
+                          const detail = ticketDetails[ticket.id];
+                          const attachments = detail?.attachments || ticket.attachments;
+                          return (
+                            <>
+                              {/* Attachments */}
+                              {attachments && attachments.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-2">Attachments</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {attachments.map(a => (
+                                      <a
+                                        key={a.id}
+                                        href={a.fileUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted transition-colors"
+                                      >
+                                        📎 {a.filename}
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Conversation */}
+                              <div className="space-y-3 border-t border-border pt-4">
+                                <p className="text-xs font-medium text-muted-foreground">Conversation</p>
+                                {ticketDetailLoading === ticket.id ? (
+                                  <Skeleton className="h-16 rounded-lg" />
+                                ) : (
+                                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                                    {(detail?.messages || []).map(m => (
+                                      <div
+                                        key={m.id}
+                                        className={`p-2.5 rounded-lg text-sm max-w-[85%] ${m.isStaffReply ? 'bg-primary/10 ml-auto' : 'bg-muted'}`}
+                                      >
+                                        <p className="text-xs font-medium text-muted-foreground mb-0.5">
+                                          {m.senderName} · {new Date(m.createdAt).toLocaleString()}
+                                        </p>
+                                        <p className="whitespace-pre-wrap">{m.content}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <div className="flex gap-2">
+                                  <Textarea
+                                    placeholder="Reply to this ticket…"
+                                    className="flex-1"
+                                    rows={2}
+                                    value={replyDraft[ticket.id] || ''}
+                                    onChange={e => setReplyDraft(prev => ({ ...prev, [ticket.id]: e.target.value }))}
+                                  />
+                                  <Button size="sm" onClick={() => handleSendReply(ticket.id)}>Send</Button>
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                   </CardContent>
@@ -1131,12 +1381,12 @@ export function AdminDashboard() {
   const renderContent = () => {
     switch (activeSection) {
       case 'overview':   return renderOverview();
-      case 'users':      return renderUserManagement();
       case 'properties': return renderPropertyManagement();
       case 'bookings':   return renderBookings();
       case 'payments':   return renderPayments();
       case 'payouts':    return renderPayouts();
       case 'support':    return renderSupport();
+      case 'trust_safety': return renderTrustSafety();
       case 'security':   return renderSecurity();
       case 'settings':   return renderSettings();
       default:           return renderOverview();
@@ -1152,17 +1402,38 @@ export function AdminDashboard() {
               <SidebarGroupLabel>Admin Dashboard</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {menuItems.map((item) => (
-                    <SidebarMenuItem key={item.id}>
-                      <SidebarMenuButton
-                        onClick={() => setActiveSection(item.id)}
-                        isActive={activeSection === item.id}
-                      >
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {navGroups.map((group) => {
+                    const isGroupActive = group.items.some((item) => item.type === 'section' && item.id === activeSection);
+                    return (
+                      <Collapsible key={group.id} open={expandedGroups.has(group.id)} onOpenChange={() => toggleGroup(group.id)}>
+                        <SidebarMenuItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton isActive={isGroupActive}>
+                              <group.icon className="h-4 w-4" />
+                              <span>{group.label}</span>
+                              {expandedGroups.has(group.id)
+                                ? <ChevronDown className="h-3.5 w-3.5 ml-auto" />
+                                : <ChevronRight className="h-3.5 w-3.5 ml-auto" />}
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {group.items.map((item) => (
+                                <SidebarMenuSubItem key={item.type === 'section' ? item.id : item.path}>
+                                  <SidebarMenuSubButton
+                                    isActive={item.type === 'section' && activeSection === item.id}
+                                    onClick={() => item.type === 'section' ? setActiveSection(item.id) : navigate(item.path)}
+                                  >
+                                    <span>{item.label}</span>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              ))}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </SidebarMenuItem>
+                      </Collapsible>
+                    );
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -1174,15 +1445,13 @@ export function AdminDashboard() {
             <div className="flex flex-wrap items-center gap-3 mb-6">
               <SidebarTrigger />
               <h1 className="text-2xl font-semibold">
-                {menuItems.find(item => item.id === activeSection)?.label}
+                {sectionLabels[activeSection] || 'Overview'}
               </h1>
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
                   <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
-                <Button variant="outline" onClick={() => navigate('/admin/reports')}>Reports Center</Button>
-                <Button variant="outline" onClick={() => navigate('/admin/suspensions')}>Suspensions Center</Button>
               </div>
             </div>
             {renderContent()}

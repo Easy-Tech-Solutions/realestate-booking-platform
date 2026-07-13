@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
+import { MfaRequiredError } from '../../services/api/auth';
 
 type Mode = 'login' | 'signup';
 
@@ -17,8 +18,10 @@ export function Login() {
   const next = searchParams.get('next') || '/';
   const initialMode: Mode = searchParams.get('mode') === 'signup' ? 'signup' : 'login';
 
-  const { login, loginWithGoogle, register } = useApp();
+  const { login, completeMfaLogin, loginWithGoogle, register } = useApp();
   const [mode, setMode] = React.useState<Mode>(initialMode);
+  const [mfaToken, setMfaToken] = React.useState<string | null>(null);
+  const [mfaCode, setMfaCode] = React.useState('');
   const [firstName, setFirstName] = React.useState('');
   const [lastName, setLastName] = React.useState('');
   const [email, setEmail] = React.useState('');
@@ -57,7 +60,26 @@ export function Login() {
       toast.success('Welcome back!');
       navigate(next, { replace: true });
     } catch (error: any) {
-      toast.error(error?.message || 'Login failed');
+      if (error instanceof MfaRequiredError) {
+        setMfaToken(error.mfaToken);
+      } else {
+        toast.error(error?.message || 'Login failed');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMfaVerify = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!mfaToken || mfaCode.trim().length < 6) return;
+    setIsLoading(true);
+    try {
+      await completeMfaLogin(mfaToken, mfaCode.trim());
+      toast.success('Welcome back!');
+      navigate(next, { replace: true });
+    } catch (error: any) {
+      toast.error(error?.message || 'Invalid or expired code');
     } finally {
       setIsLoading(false);
     }
@@ -128,6 +150,43 @@ export function Login() {
   };
 
   const isSignup = mode === 'signup';
+
+  if (mfaToken) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
+          <h1 className="text-3xl font-semibold mb-2">Enter your code</h1>
+          <p className="text-muted-foreground mb-8">
+            This account requires a verification code from your authenticator app (or one of your backup codes).
+          </p>
+          <form onSubmit={handleMfaVerify} className="space-y-5">
+            <div>
+              <Label htmlFor="mfa-code">Verification code</Label>
+              <Input
+                id="mfa-code"
+                inputMode="numeric"
+                autoFocus
+                placeholder="123456"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+                className="mt-1 text-center text-lg tracking-widest"
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading || mfaCode.trim().length < 6}>
+              {isLoading ? 'Verifying…' : 'Verify'}
+            </Button>
+            <button
+              type="button"
+              onClick={() => { setMfaToken(null); setMfaCode(''); }}
+              className="w-full text-sm text-muted-foreground hover:text-foreground"
+            >
+              Back to login
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">

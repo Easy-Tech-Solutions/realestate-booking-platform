@@ -48,4 +48,17 @@ export const propertyVerificationsAPI = {
       body: formData,
     });
   },
+
+  /** Verifications awaiting review at any stage the caller is a reviewer for. */
+  reviewQueue: async (): Promise<PropertyVerification[]> => {
+    return fetchWithAuth<PropertyVerification[]>('/api/property-verifications/review-queue/');
+  },
+
+  /** approve | reject | request_correction at whichever stage this verification is awaiting. */
+  review: async (id: number, decision: 'approve' | 'reject' | 'request_correction', notes = ''): Promise<PropertyVerification> => {
+    return fetchWithAuth<PropertyVerification>(`/api/property-verifications/${id}/review/`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, notes }),
+    });
+  },
 };

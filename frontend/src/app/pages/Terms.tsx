@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { legalDocumentsAPI } from '../../services/api/legalDocuments';
+import type { LegalDocumentSection as Section } from '../../services/api/legalDocuments';
 
-type Section = { title: string; intro?: string; content: string | string[] };
-
-const sections: Section[] = [
+// Fallback only — shown if the legal-documents API is unreachable so the
+// page never renders blank. The DB-backed version (editable via
+// Management > Roles & Permissions... > Legal Documents) is the source of
+// truth; this array is not kept in sync with it going forward.
+const fallbackSections: Section[] = [
   {
     title: '1. Introduction',
     content:
@@ -16,69 +20,24 @@ const sections: Section[] = [
       'All transactions occur directly between Users. We just provide the platform.',
     ],
   },
-  {
-    title: '3. User Eligibility',
-    content: [
-      'Users must be at least 18 years old.',
-      'Users must provide accurate and truthful information. By using our platform, the user confirms that he/she is 18 years or older.',
-    ],
-  },
-  {
-    title: '4. Property Owner Obligations',
-    content: [
-      'Owners must provide valid proof of ownership.',
-      'Owners warrant that all information provided is accurate.',
-      'Owners indemnify Home Konet against losses arising from misrepresentation.',
-    ],
-  },
-  {
-    title: '5. Platform Rights',
-    content: [
-      'Home Konet may approve, reject, or remove listings.',
-      'Home Konet may suspend or terminate accounts for violations.',
-    ],
-  },
-  {
-    title: '6. Fees and Payments',
-    content: [
-      'Users agree to pay all applicable fees as required by Home Konet.',
-      'Fees are non-refundable unless expressly stated.',
-    ],
-  },
-  {
-    title: '7. Limitation of Liability',
-    intro: 'Home Konet is not liable for:',
-    content: [
-      'Fraud by Users',
-      'Failed transactions',
-      'Ownership disputes',
-      'Loss of funds',
-      'Misrepresentation',
-    ],
-  },
-  {
-    title: '7.2 Maximum Liability',
-    content:
-      'By using our platform, users and heirs, executors, assigns, etc. agree that liability against Home Konet is limited to the amount paid to Home Konet in the preceding 12 months.',
-  },
-  {
-    title: '8. Dispute Resolution',
-    content: [
-      'User-to-User disputes must be resolved between the parties.',
-      'Disputes involving Home Konet shall be resolved through arbitration based upon the arbitration laws as provided for in Chapter 64 of the Civil Procedure Law of Liberia.',
-    ],
-  },
-  {
-    title: '9. Governing Law',
-    content: 'This Agreement is governed by the laws of the Republic of Liberia.',
-  },
-  {
-    title: '10. Acceptance',
-    content: 'By using the Platform, Users acknowledge acceptance of these Terms.',
-  },
 ];
 
 export function Terms() {
+  const [sections, setSections] = useState<Section[]>(fallbackSections);
+  const [meta, setMeta] = useState<{ version: string; effective_date: string } | null>(null);
+
+  useEffect(() => {
+    legalDocumentsAPI.current()
+      .then((docs) => {
+        const doc = docs.find((d) => d.document_key === 'terms_of_service');
+        if (doc && Array.isArray(doc.body_sections) && doc.body_sections.length > 0) {
+          setSections(doc.body_sections);
+          setMeta({ version: doc.version, effective_date: doc.effective_date });
+        }
+      })
+      .catch(() => { /* keep the fallback */ });
+  }, []);
+
   return (
     <div className="min-h-screen bg-background py-12">
       <div className="container mx-auto px-4 sm:px-6 lg:px-20 max-w-3xl">
@@ -86,7 +45,9 @@ export function Terms() {
           Republic of Liberia, Montserrado County
         </p>
         <h1 className="text-4xl font-semibold mb-2">Terms and Agreement</h1>
-        <p className="text-muted-foreground mb-10">Home Konet — Terms of Service</p>
+        <p className="text-muted-foreground mb-10">
+          Home Konet — Terms of Service{meta && ` · last updated ${meta.effective_date}`}
+        </p>
         <div className="space-y-8">
           {sections.map((s) => (
             <div key={s.title}>
@@ -99,8 +60,9 @@ export function Terms() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-muted-foreground leading-relaxed">{s.content}</p>
+                s.content && <p className="text-muted-foreground leading-relaxed">{s.content}</p>
               )}
+              {s.outro && <p className="text-muted-foreground leading-relaxed mt-2">{s.outro}</p>}
             </div>
           ))}
         </div>

@@ -61,4 +61,12 @@ export const bookingsAPI = {
     const data = await fetchWithAuth<unknown[]>('/api/bookings/payouts/');
     return data.map(normalizePayout);
   },
+
+  // Admin: the guest<->host message thread(s) tied to a booking's listing.
+  adminGetCommunications: async (id: string | number): Promise<{
+    booking_id: number; guest_username: string; host_username: string; conversation_count: number;
+    messages: { id: number; conversation_id: number; sender_id: number; sender_username: string; content: string; message_type: string; created_at: string }[];
+  }> => {
+    return fetchWithAuth(`/api/bookings/admin/${id}/communications/`);
+  },
 };

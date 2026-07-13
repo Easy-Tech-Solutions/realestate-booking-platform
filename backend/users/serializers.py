@@ -41,9 +41,34 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
-            'role', 'email_verified', 'has_password', 'profile'
+            'role', 'is_staff', 'email_verified', 'has_password', 'profile'
         ]
-        read_only_fields = ['id', 'email_verified']
+        read_only_fields = ['id', 'is_staff', 'email_verified']
+
+    def get_has_password(self, obj):
+        return obj.has_usable_password()
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Full account view for the staff-facing User Management dashboard —
+    includes fields (email, is_active, deleted_at, is_superuser) that the
+    public-facing serializers deliberately omit."""
+    momo_number = serializers.SerializerMethodField()
+    has_password = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'first_name', 'last_name', 'role',
+            'is_staff', 'is_superuser', 'is_active', 'email_verified',
+            'is_archived', 'deleted_at', 'date_joined', 'momo_number', 'has_password',
+        ]
+
+    def get_momo_number(self, obj):
+        try:
+            return obj.profile.momo_number
+        except Exception:
+            return ''
 
     def get_has_password(self, obj):
         return obj.has_usable_password()

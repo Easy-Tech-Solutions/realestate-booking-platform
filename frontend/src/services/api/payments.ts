@@ -1,4 +1,5 @@
-import { fetchWithAuth } from './shared/client';
+import { fetchWithAuth, getAccessToken } from './shared/client';
+import { API_BASE_URL } from '../../core/constants';
 import type { PaymentEnvelope } from './shared/contracts';
 
 const initiatePayment = async (payload: {
@@ -24,6 +25,46 @@ const initiatePayment = async (payload: {
 interface StripeIntentResponse {
   client_secret: string;
   amount_cents: number;
+}
+
+export interface PlatformFee {
+  booking_fee: string;
+  viewing_fee: string;
+  service_fee_percent: string;
+  transaction_fee_type: 'fixed' | 'percentage' | 'range';
+  transaction_fee_value: string;
+  transaction_fee_min: string | null;
+  transaction_fee_max: string | null;
+  updated_at: string;
+}
+
+export interface EscrowBooking {
+  booking_id: number;
+  listing_title: string;
+  guest_username: string;
+  total_price: string | null;
+  requested_at: string | null;
+  on_hold: boolean;
+  hold_id: number | null;
+  hold_reason: string;
+}
+
+export interface TaxRate {
+  id: number;
+  jurisdiction: string;
+  rate_percent: string;
+  is_active: boolean;
+  created_by: number | null;
+  created_by_username: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaxReportBucket {
+  jurisdiction: string;
+  gross_total: string;
+  tax_liability: string;
+  booking_count: number;
 }
 
 export const paymentAPI = {
@@ -92,6 +133,109 @@ export const paymentAPI = {
 
   getMyPayments: async (): Promise<any> => {
     return fetchWithAuth('/api/payments/user/');
+  },
+
+  // ── Admin: finance ops ────────────────────────────────────────────────────
+  adminFinancialSummary: async (params: { since?: string; until?: string } = {}): Promise<any> => {
+    const qs = new URLSearchParams();
+    if (params.since) qs.set('since', params.since);
+    if (params.until) qs.set('until', params.until);
+    return fetchWithAuth(`/api/payments/admin/reports/summary/?${qs.toString()}`);
+  },
+
+  adminTransactions: async (params: Record<string, string> = {}): Promise<any> => {
+    const qs = new URLSearchParams(params);
+    return fetchWithAuth(`/api/payments/admin/transactions/?${qs.toString()}`);
+  },
+
+  adminExportTransactionsCsv: async (params: Record<string, string> = {}): Promise<void> => {
+    const qs = new URLSearchParams(params);
+    const response = await fetch(`${API_BASE_URL}/api/payments/admin/transactions/export/?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${getAccessToken() || ''}` },
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Failed to export transactions');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'transactions.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  adminRefund: async (paymentId: string, amount: number, reason: string): Promise<any> => {
+    return fetchWithAuth('/api/payments/admin/refund/', {
+      method: 'POST',
+      body: JSON.stringify({ payment_id: paymentId, amount, reason }),
+    });
+  },
+
+  adminGetPlatformFee: async (): Promise<PlatformFee> => {
+    return fetchWithAuth<PlatformFee>('/api/payments/admin/platform-fee/');
+  },
+
+  adminUpdatePlatformFee: async (payload: Partial<PlatformFee>): Promise<PlatformFee> => {
+    return fetchWithAuth<PlatformFee>('/api/payments/admin/platform-fee/', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // ── Escrow ────────────────────────────────────────────────────────────────
+  adminListEscrow: async (): Promise<EscrowBooking[]> => {
+    return fetchWithAuth<EscrowBooking[]>('/api/payments/admin/escrow/');
+  },
+
+  adminHoldEscrow: async (bookingId: number, reason: string): Promise<{ id: number }> => {
+    return fetchWithAuth(`/api/payments/admin/escrow/${bookingId}/hold/`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  adminReleaseEscrow: async (holdId: number): Promise<{ id: number }> => {
+    return fetchWithAuth(`/api/payments/admin/escrow/${holdId}/release/`, { method: 'POST' });
+  },
+
+  // ── Tax rates ─────────────────────────────────────────────────────────────
+  adminListTaxRates: async (): Promise<TaxRate[]> => {
+    return fetchWithAuth<TaxRate[]>('/api/payments/admin/tax-rates/');
+  },
+
+  adminCreateTaxRate: async (payload: { jurisdiction: string; rate_percent: string }): Promise<TaxRate> => {
+    return fetchWithAuth<TaxRate>('/api/payments/admin/tax-rates/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  adminUpdateTaxRate: async (id: number, payload: Partial<{ rate_percent: string; is_active: boolean }>): Promise<TaxRate> => {
+    return fetchWithAuth<TaxRate>(`/api/payments/admin/tax-rates/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  adminDeleteTaxRate: async (id: number): Promise<void> => {
+    await fetchWithAuth<void>(`/api/payments/admin/tax-rates/${id}/`, { method: 'DELETE' });
+  },
+
+  adminTaxReport: async (since?: string, until?: string): Promise<{ by_jurisdiction: TaxReportBucket[] }> => {
+    const qs = new URLSearchParams();
+    if (since) qs.set('since', since);
+    if (until) qs.set('until', until);
+    return fetchWithAuth(`/api/payments/admin/tax-report/?${qs.toString()}`);
+  },
+
+  // ── Stripe refunds ────────────────────────────────────────────────────────
+  adminStripeRefund: async (bookingId: number, amount: number, reason: string): Promise<{ pending_approval: boolean; approval_id: number; message: string }> => {
+    return fetchWithAuth('/api/payments/admin/stripe-refund/', {
+      method: 'POST',
+      body: JSON.stringify({ booking_id: bookingId, amount, reason }),
+    });
   },
 };
 

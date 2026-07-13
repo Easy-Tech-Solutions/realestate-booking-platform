@@ -15,6 +15,7 @@ export {
   reportsAPI,
   reviewsAPI,
   setTokens,
+  superadminAPI,
   suspensionsAPI,
   usersAPI,
   viewingsAPI,

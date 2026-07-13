@@ -188,6 +188,12 @@ class Payout(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='payouts_processed',
     )
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='payouts_cancelled',
+    )
+    cancellation_reason = models.TextField(blank=True)
     notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -198,6 +204,97 @@ class Payout(models.Model):
 
     def __str__(self):
         return f'Payout to {self.host.username} — {self.net_amount} {self.currency} ({self.status})'
+
+
+class EscrowHold(models.Model):
+    """A temporary freeze on releasing a booking's held guest payment — the
+    real analog of 'finances.escrow' in the RBAC resource tree. Guest
+    payments land in the platform account and sit there (booking status
+    'payment_received') until an admin confirms and a Payout is created;
+    an active hold on a booking blocks that confirmation, e.g. while a
+    fraud flag or legal dispute on the booking is under investigation."""
+
+    booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='escrow_holds')
+    reason = models.TextField()
+    held_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='escrow_holds_placed',
+    )
+    held_at = models.DateTimeField(auto_now_add=True)
+    released_at = models.DateTimeField(null=True, blank=True)
+    released_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='escrow_holds_released',
+    )
+
+    class Meta:
+        ordering = ['-held_at']
+
+    def __str__(self):
+        return f'Hold on booking #{self.booking_id} ({"active" if self.is_active else "released"})'
+
+    @property
+    def is_active(self):
+        return self.released_at is None
+
+
+class StripeRefund(models.Model):
+    """Admin-triggered Stripe refund against a booking's rent payment.
+
+    Separate from `Refund` (which is tied to the MTN-only `Payment` model)
+    because Stripe payments never create a local Payment row — they're
+    settled directly against Booking.stripe_payment_intent_id via webhook.
+    This is the local ledger for Stripe refunds specifically, so repeated
+    refund attempts can be clamped against what's already been refunded."""
+
+    STATUS_CHOICES = [
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+
+    booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, related_name='stripe_refunds')
+    stripe_payment_intent_id = models.CharField(max_length=255)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    reason = models.TextField()
+    stripe_refund_id = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    error_message = models.TextField(blank=True)
+    initiated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='stripe_refunds_initiated',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Stripe refund of {self.amount} on booking #{self.booking_id} ({self.status})'
+
+
+class TaxRate(models.Model):
+    """A local occupancy/lodging tax rate for a jurisdiction. There's no
+    withholding, filing, or remittance automation here — matched against
+    Listing.city (case-insensitive) to produce a real, computed tax
+    liability report over actual booking totals, which is the honest scope
+    a self-hosted platform this size can support without a tax-compliance
+    vendor integration."""
+
+    jurisdiction = models.CharField(max_length=100, unique=True, help_text='City/locality name, matched case-insensitively against Listing.city.')
+    rate_percent = models.DecimalField(max_digits=5, decimal_places=2, help_text='Occupancy tax rate, e.g. 5.00 for 5%.')
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='tax_rates_created',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['jurisdiction']
+
+    def __str__(self):
+        return f'{self.jurisdiction} — {self.rate_percent}%'
 
 
 class SavedCard(models.Model):

@@ -5,6 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
+from rbac import dual_auth
+
 from .models import Suspension
 from .serializers import (
     SuspensionCreateSerializer,
@@ -12,9 +14,69 @@ from .serializers import (
     SuspensionRevokeSerializer,
 )
 
+# Suspending a host with more than this many live listings requires a second
+# admin's sign-off (dual authorization) — scaled to this platform's actual
+# size, not the ">100 listings" figure from a marketplace at Airbnb's scale.
+DUAL_AUTH_SUSPENSION_LISTING_THRESHOLD = 3
 
-def _is_admin(user):
-    return user.is_authenticated and (getattr(user, 'role', None) == 'admin' or user.is_staff)
+
+@dual_auth.register_executor('user.suspend')
+def _execute_user_suspend(payload):
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    target_user = User.objects.get(pk=payload['user_id'])
+    issued_by = User.objects.get(pk=payload['issued_by_id'])
+
+    already_active = (
+        Suspension.objects.filter(user=target_user, status=Suspension.Status.ACTIVE)
+        .filter(Q(ends_at__isnull=True) | Q(ends_at__gt=timezone.now()))
+        .exists()
+    )
+    if already_active:
+        raise RuntimeError(f'{target_user.username} already has an active suspension — refresh and check before re-approving.')
+
+    ends_at = payload.get('ends_at')
+    if ends_at:
+        from django.utils.dateparse import parse_datetime
+        ends_at = parse_datetime(ends_at)
+
+    related_report = None
+    if payload.get('related_report_id'):
+        from reports.models import Report
+        related_report = Report.objects.filter(pk=payload['related_report_id']).first()
+
+    suspension = Suspension.objects.create(
+        user=target_user, issued_by=issued_by, suspension_type=payload['suspension_type'],
+        reason=payload['reason'], ends_at=ends_at, related_report=related_report,
+    )
+    try:
+        from notifications.services import notify_account_suspended
+        notify_account_suspended(suspension)
+        suspension.user_notified = True
+        suspension.save(update_fields=['user_notified'])
+    except Exception:
+        pass
+
+    return {'suspension_id': suspension.id, 'user': target_user.username}
+
+
+def _is_admin(request):
+    """Full admins always pass; is_staff accounts need the support or
+    trust_safety department (legacy) OR a custom role granting
+    trust_safety.bans directly (Suspension is that resource) — suspensions
+    can originate from either a resolved dispute or a confirmed fraud flag.
+    Being merely is_staff (e.g. a KYC reviewer in an unrelated department)
+    is not enough."""
+    from superadmin.permissions import is_superadmin_staff, require_department
+    from rbac.permissions import has_any_permission
+    user = request.user
+    if not is_superadmin_staff(user):
+        return False
+    return (
+        require_department(user, 'support') or require_department(user, 'trust_safety')
+        or has_any_permission(user, 'trust_safety.bans')
+    )
 
 
 
@@ -23,7 +85,7 @@ def _is_admin(user):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def suspensions_collection(request):
-    if not _is_admin(request.user):
+    if not _is_admin(request):
         return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == 'GET':
@@ -60,6 +122,38 @@ def suspensions_collection(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    target_user = serializer.validated_data['user']
+    from listings.models import Listing
+    published_listing_count = Listing.objects.filter(
+        owner=target_user, status='published', deleted_at__isnull=True,
+    ).count()
+    requires_dual_auth = published_listing_count > DUAL_AUTH_SUSPENSION_LISTING_THRESHOLD
+
+    if requires_dual_auth:
+        related_report = serializer.validated_data.get('related_report')
+        ends_at = serializer.validated_data.get('ends_at')
+        reason = serializer.validated_data['reason']
+        payload = {
+            'user_id': target_user.id,
+            'suspension_type': serializer.validated_data['suspension_type'],
+            'reason': reason,
+            'ends_at': ends_at.isoformat() if ends_at else None,
+            'related_report_id': related_report.id if related_report else None,
+            'issued_by_id': request.user.id,
+        }
+        _, approval = dual_auth.submit_or_execute('user.suspend', payload, request.user, reason, True)
+
+        from superadmin.permissions import log_admin_action
+        log_admin_action(request, 'suspension.requested', target=target_user, reason=reason, approval_id=approval.id, listing_count=published_listing_count)
+
+        return Response(
+            {
+                'pending_approval': True, 'approval_id': approval.id,
+                'message': f'{target_user.username} owns {published_listing_count} published listings (above the {DUAL_AUTH_SUSPENSION_LISTING_THRESHOLD} threshold) — this suspension requires a second admin to approve it before it takes effect.',
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
     suspension = serializer.save(issued_by=request.user)
 
     # Trigger notification (signal handles this, but we fire it here as well as a
@@ -84,7 +178,7 @@ def suspensions_collection(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def suspension_detail(request, pk):
-    if not _is_admin(request.user):
+    if not _is_admin(request):
         return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -103,7 +197,7 @@ def suspension_detail(request, pk):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def revoke_suspension(request, pk):
-    if not _is_admin(request.user):
+    if not _is_admin(request):
         return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -142,7 +236,7 @@ def revoke_suspension(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_suspension_history(request, user_id):
-    if not _is_admin(request.user):
+    if not _is_admin(request):
         return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     qs = Suspension.objects.filter(user_id=user_id).select_related(
@@ -172,7 +266,7 @@ def user_suspension_history(request, user_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def suspension_stats(request):
-    if not _is_admin(request.user):
+    if not _is_admin(request):
         return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
 
     counts = Suspension.objects.values('status').annotate(count=Count('id'))

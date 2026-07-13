@@ -80,10 +80,44 @@ def _suspension_response(suspension):
         "ends_at": suspension.ends_at.isoformat() if suspension.ends_at else None,
     }
 
+
+def _client_ip(request):
+    """Best-effort client IP, honouring the proxy's X-Forwarded-For (first hop)."""
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
+
+
+def _blocked_fingerprint_response(request):
+    """If the client sent a device fingerprint that Trust & Safety has
+    blocked, return an error Response — else None."""
+    fingerprint = request.META.get("HTTP_X_DEVICE_FINGERPRINT", "").strip()
+    if not fingerprint:
+        return None
+    from trustsafety.models import BlockedFingerprint
+    if BlockedFingerprint.objects.filter(fingerprint=fingerprint).exists():
+        return Response(
+            {"error": "This device is not permitted to create or access an account."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([RegisterRateThrottle])
 def register(request):
+    from platformops.utils import is_feature_enabled
+    if not is_feature_enabled('new_registrations_enabled', default=True):
+        return Response(
+            {"error": "New account registration is temporarily disabled. Please try again later."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    blocked = _blocked_fingerprint_response(request)
+    if blocked:
+        return blocked
+
     email = request.data.get("email")
     password = request.data.get("password")
     password2 = request.data.get("password2")
@@ -129,6 +163,9 @@ def register(request):
             if settings.AUTH_REQUIRE_EMAIL_VERIFICATION:
                 from .utils import send_verification_email
                 send_verification_email(user)
+
+            from trustsafety.models import AccountSignupEvent
+            AccountSignupEvent.objects.create(user=user, ip_address=_client_ip(request))
         message = "User registered successfully. Please check your email to verify your account."
         if not settings.AUTH_REQUIRE_EMAIL_VERIFICATION:
             message = "User registered successfully. You can now log in."
@@ -199,12 +236,20 @@ def login_view(request):
     if not email or not password:
         return Response({"error": "email and password required"}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        user_obj = User.objects.get(email__iexact=email)
-    except User.DoesNotExist:
+    # Email is not a unique column (see users.models.User), so more than one
+    # account can share the same address — try each until one authenticates
+    # rather than assuming .get() returns exactly one row.
+    candidates = list(User.objects.filter(email__iexact=email))
+    if not candidates:
         return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    user = authenticate(request, username=user_obj.username, password=password)
+    user = None
+    for candidate in candidates:
+        authenticated = authenticate(request, username=candidate.username, password=password)
+        if authenticated is not None:
+            user = authenticated
+            break
+
     if user is None:
         log_activity(request, 'user_login_failed', user_email=email)
         return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -219,6 +264,18 @@ def login_view(request):
     suspension = _get_active_suspension(user)
     if suspension:
         return Response(_suspension_response(suspension), status=status.HTTP_403_FORBIDDEN)
+
+    # Superadmin accounts with a confirmed MFA device must complete a TOTP
+    # step-up before real tokens are issued — see superadmin.views.mfa_verify_login.
+    from superadmin.models import MFADevice
+    if MFADevice.objects.filter(user=user, confirmed=True).exists():
+        from django.core.signing import TimestampSigner
+        from superadmin.views import MFA_LOGIN_SALT
+        signer = TimestampSigner(salt=MFA_LOGIN_SALT)
+        return Response({
+            "mfa_required": True,
+            "mfa_token": signer.sign(str(user.pk)),
+        })
 
     #Geneate JWT tokens
     refresh = RefreshToken.for_user(user)
@@ -313,20 +370,23 @@ def password_reset_request(request):
     if not email:
         return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        user = User.objects.get(email=email)
-    except User.DoesNotExist:
+    # Email is not a unique column (see users.models.User), so more than one
+    # account can share the same address — send a separate reset link for
+    # each rather than assuming there's exactly one.
+    users = User.objects.filter(email=email)
+    if not users:
         # Return success regardless to avoid exposing whether an email exists
         return Response({"message": "If an account with that email exists, a password reset link has been sent."}, status=status.HTTP_200_OK)
 
     from .utils import send_password_reset_email
-    try:
-        send_password_reset_email(user)
-    except Exception:
-        # Don't 500, and don't let a send failure distinguish this response
-        # from the "no such account" branch above (that would leak account
-        # existence to an attacker probing for valid emails).
-        logger.exception("password_reset_request: failed to send reset email")
+    for user in users:
+        try:
+            send_password_reset_email(user)
+        except Exception:
+            # Don't 500, and don't let a send failure distinguish this response
+            # from the "no such account" branch above (that would leak account
+            # existence to an attacker probing for valid emails).
+            logger.exception("password_reset_request: failed to send reset email for user %s", user.pk)
     return Response({"message": "If an account with that email exists, a password reset link has been sent."}, status=status.HTTP_200_OK)
 
 
@@ -465,6 +525,10 @@ def google_login(request):
       401 { error: "Invalid Google token" }            — verification failed
       400 { error: "..." }                             — missing/invalid input
     """
+    blocked = _blocked_fingerprint_response(request)
+    if blocked:
+        return blocked
+
     id_token_str = request.data.get("id_token")
     if not id_token_str:
         return Response({"error": "id_token is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -521,6 +585,13 @@ def google_login(request):
 
     # Case 3: new user. Create with the default role ('user') — they can
     # upgrade to 'agent' later via the "Become a host" button.
+    from platformops.utils import is_feature_enabled
+    if not is_feature_enabled('new_registrations_enabled', default=True):
+        return Response(
+            {"error": "New account registration is temporarily disabled. Please try again later."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     try:
         with transaction.atomic():
             # Re-check inside the transaction to close any race window.
@@ -553,6 +624,9 @@ def google_login(request):
                 email_at_link=email,
                 last_login_at=timezone.now(),
             )
+
+            from trustsafety.models import AccountSignupEvent
+            AccountSignupEvent.objects.create(user=user, ip_address=_client_ip(request))
     except Exception:
         return Response(
             {"error": "Could not complete Google sign-up. Please try again."},

@@ -35,4 +35,15 @@ export const reportsAPI = {
       body: JSON.stringify(payload),
     });
   },
+
+  adminEscalate: async (id: string, notes = ''): Promise<any> => {
+    return fetchWithAuth(`/api/reports/admin/${id}/escalate/`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  },
+
+  adminBulkAction: async (payload: { report_ids: number[]; status: 'resolved' | 'dismissed' | 'under_review'; admin_notes?: string }): Promise<{ succeeded: number[]; failed: { report_id: number; error: string }[] }> => {
+    return fetchWithAuth('/api/reports/admin/bulk/', { method: 'POST', body: JSON.stringify(payload) });
+  },
 };

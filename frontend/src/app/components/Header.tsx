@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard, Info, HelpCircle, Mail, CalendarCheck } from 'lucide-react';
+import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard, Info, HelpCircle, Mail, CalendarCheck, ShieldCheck } from 'lucide-react';
 import logo from '../../assets/logo2.jpg';
 import { Button } from './ui/button';
 import {
@@ -184,6 +184,15 @@ export function Header() {
                           <DropdownMenuItem onClick={() => navigate('/host')}>
                             <Settings className="w-4 h-4 mr-2" />
                             Host Dashboard
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {(user?.isAdmin || user?.isStaff) && (
+                        <>
+                          <DropdownMenuItem onClick={() => navigate('/management')}>
+                            <ShieldCheck className="w-4 h-4 mr-2" />
+                            Management
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                         </>

@@ -221,7 +221,7 @@ def booking_detail(request, id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def pending_bookings(request):
-    if request.user.role not in ['agent', 'admin']:
+    if request.user.role not in ['agent', 'admin', 'superadmin']:
         return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
     bookings = Booking.objects.filter(
         listing__owner=request.user,
@@ -301,6 +301,19 @@ def decline_booking(request, id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _require_finance_payouts(request):
+    """Full admins (superadmin) always pass; is_staff accounts need a
+    custom role granting finances.payouts directly. Previously this was
+    hardcoded to role=='admin'/is_superuser only, with no department-shim
+    or custom-role path at all."""
+    from rbac.permissions import is_full_admin, has_any_permission
+    from superadmin.permissions import is_superadmin_staff
+    user = request.user
+    if is_full_admin(user):
+        return True
+    return is_superadmin_staff(user) and has_any_permission(user, 'finances.payouts')
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def admin_confirm_payment(request, id):
@@ -309,7 +322,7 @@ def admin_confirm_payment(request, id):
     account, so an admin verifies each one — this finalizes the booking
     ('confirmed'), shares host contact, and creates the host Payout record.
     """
-    if request.user.role != 'admin' and not request.user.is_superuser:
+    if not _require_finance_payouts(request):
         return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -323,6 +336,14 @@ def admin_confirm_payment(request, id):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    from payments.models import EscrowHold
+    active_hold = EscrowHold.objects.filter(booking=booking, released_at__isnull=True).first()
+    if active_hold:
+        return Response(
+            {'error': f'This booking\'s funds are on hold ("{active_hold.reason}") and cannot be confirmed until the hold is released.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     from .services import admin_confirm_payment as _confirm
     _confirm(booking, admin_user=request.user)
     return Response(BookingSerializer(booking, context={'request': request}).data)
@@ -332,7 +353,7 @@ def admin_confirm_payment(request, id):
 @permission_classes([IsAuthenticated])
 def admin_payment_received_bookings(request):
     """Admin: bookings whose payment is awaiting confirmation."""
-    if request.user.role != 'admin' and not request.user.is_superuser:
+    if not _require_finance_payouts(request):
         return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
     bookings = Booking.objects.filter(status='payment_received').select_related(
         'listing', 'customer'
@@ -765,6 +786,55 @@ def reserve_from_viewing(request, viewing_id):
     from .services import reserve_property_from_viewing
     booking = reserve_property_from_viewing(viewing, start, end, total_price, service_fee)
     return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+
+# ===== Admin: reservation communications (Trust & Safety / Support) =========
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_booking_communications(request, id):
+    """GET /api/bookings/admin/<id>/communications/ — every message between
+    the guest and host tied to this reservation, for dispute investigation.
+
+    There's no direct Booking->Conversation link in the data model —
+    messaging threads are scoped to a listing + its participants, not a
+    single booking — so this finds every Conversation for the booking's
+    listing that includes both the guest and the host, and returns their
+    combined message history. A guest with several bookings on the same
+    listing shares one thread across all of them; that's the real shape of
+    the data, not something this endpoint invents."""
+    from rbac.permissions import has_permission
+    if not has_permission(request.user, 'reservations.communications', 'read'):
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    booking = get_object_or_404(Booking, pk=id)
+    from messaging.models import Conversation
+    conversations = Conversation.objects.filter(
+        listing=booking.listing,
+        participants=booking.customer,
+    ).filter(participants=booking.listing.owner).distinct()
+
+    messages = []
+    for conv in conversations:
+        for m in conv.messages.select_related('sender').order_by('created_at'):
+            messages.append({
+                'id': m.id,
+                'conversation_id': conv.id,
+                'sender_id': m.sender_id,
+                'sender_username': m.sender.username,
+                'content': m.content,
+                'message_type': m.message_type,
+                'created_at': m.created_at.isoformat(),
+            })
+    messages.sort(key=lambda m: m['created_at'])
+
+    return Response({
+        'booking_id': booking.id,
+        'guest_username': booking.customer.username,
+        'host_username': booking.listing.owner.username,
+        'conversation_count': conversations.count(),
+        'messages': messages,
+    })
 
 
 # ===== Payouts ===============================================================

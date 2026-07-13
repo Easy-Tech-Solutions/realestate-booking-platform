@@ -54,4 +54,17 @@ export const hostApplicationsAPI = {
       method: 'POST',
     });
   },
+
+  /** Applications awaiting review at any stage the caller is a reviewer for. */
+  reviewQueue: async (): Promise<HostApplication[]> => {
+    return fetchWithAuth<HostApplication[]>('/api/host-applications/review-queue/');
+  },
+
+  /** Approve or decline at whichever stage this application is currently awaiting. */
+  review: async (id: number, approve: boolean, reason = ''): Promise<HostApplication> => {
+    return fetchWithAuth<HostApplication>(`/api/host-applications/${id}/review/`, {
+      method: 'POST',
+      body: JSON.stringify({ approve, reason }),
+    });
+  },
 };
