@@ -1,4 +1,5 @@
 import { fetchWithAuth } from './shared/client';
+import type { MfaSetupResponse } from './superadmin';
 
 export const usersAPI = {
   getById: async (id: string): Promise<any> => {
@@ -74,7 +75,21 @@ export const usersAPI = {
     });
   },
 
-  deleteAccount: async (): Promise<{ message: string; scheduled_deletion_at: string }> => {
-    return fetchWithAuth('/api/users/me/delete/', { method: 'POST' });
-  },
+  // Self-service two-factor authentication (any authenticated user)
+  mfaStatus: (): Promise<{ mfa_enabled: boolean }> => fetchWithAuth('/api/users/mfa/status/'),
+
+  mfaSetup: (): Promise<MfaSetupResponse> =>
+    fetchWithAuth('/api/users/mfa/setup/', { method: 'POST' }),
+
+  mfaConfirm: (code: string): Promise<{ backup_codes: string[] }> =>
+    fetchWithAuth('/api/users/mfa/confirm/', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+
+  mfaDisable: (code: string): Promise<{ message: string }> =>
+    fetchWithAuth('/api/users/mfa/disable/', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
 };

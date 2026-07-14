@@ -55,3 +55,24 @@ class TaskHeartbeat(models.Model):
         obj.last_error = error if not success else ''
         obj.run_count = models.F('run_count') + 1
         obj.save(update_fields=['last_run_at', 'last_success', 'last_error', 'run_count'])
+
+
+class ServerMetricSnapshot(models.Model):
+    """Point-in-time server resource snapshot collected every 5 minutes by
+    the collect_server_metrics Celery task. Kept for 7 days (2016 rows max)."""
+
+    recorded_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    cpu_percent = models.FloatField()
+    memory_percent = models.FloatField()
+    memory_used_mb = models.FloatField()
+    memory_total_mb = models.FloatField()
+    disk_used_percent = models.FloatField()
+    disk_free_gb = models.FloatField()
+    net_bytes_sent_mb = models.FloatField()
+    net_bytes_recv_mb = models.FloatField()
+
+    class Meta:
+        ordering = ['-recorded_at']
+
+    def __str__(self):
+        return f'Snapshot {self.recorded_at} cpu={self.cpu_percent}%'

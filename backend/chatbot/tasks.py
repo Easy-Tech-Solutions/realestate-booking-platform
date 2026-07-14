@@ -7,8 +7,6 @@ Runs on the existing `ai_scoring` queue (concurrency=1 / solo pool) so the
 import logging
 
 from celery import shared_task
-
-from platformops.utils import is_feature_enabled
 from aiscoring.model_service import ModelUnavailable
 
 logger = logging.getLogger(__name__)
@@ -38,16 +36,6 @@ def get_chatbot_reply_task(session_id: str, user_message: str) -> dict:
     user_msg = ChatMessage.objects.create(
         session=session, role=ChatMessage.ROLE_USER, content=user_message
     )
-
-    if not is_feature_enabled('ai_scoring_enabled', default=False):
-        # AI is off — go straight to handoff
-        bot_msg = ChatMessage.objects.create(
-            session=session,
-            role=ChatMessage.ROLE_BOT,
-            content=FALLBACK_REPLY,
-            suggested_handoff=True,
-        )
-        return {'reply': FALLBACK_REPLY, 'needs_agent': True, 'message_id': bot_msg.id}
 
     # Build conversation history (exclude the message we just saved so it
     # doesn't appear twice — it's passed separately as user_message)

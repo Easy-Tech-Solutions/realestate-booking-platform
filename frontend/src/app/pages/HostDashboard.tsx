@@ -1180,8 +1180,12 @@ export function HostDashboard() {
 
   const renderPricing = () => (
     <Card>
-      <CardHeader><CardTitle>Pricing Management</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Pricing Calculator</CardTitle></CardHeader>
       <CardContent className="space-y-6">
+        <p className="text-sm text-muted-foreground">
+          This is a what-if calculator only — it doesn't change any listing. To actually update a
+          listing's price, discounts, or booking settings, edit it directly from Properties.
+        </p>
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-4">
             {[
@@ -1205,28 +1209,22 @@ export function HostDashboard() {
             ))}
           </div>
           <div className="space-y-4">
-            {[
-              { id: 'minimumStay', label: 'Minimum Stay (nights)', key: 'minimumStay' },
-              { id: 'maximumStay', label: 'Maximum Stay (nights)', key: 'maximumStay' },
-            ].map(({ id, label, key }) => (
-              <div key={id}>
-                <Label htmlFor={id}>{label}</Label>
-                <Input
-                  id={id}
-                  type="number"
-                  value={String((pricingSettings as Record<string, number>)[key])}
-                  onChange={(e) => setPricingSettings((current) => ({
-                    ...current,
-                    [key]: Number(e.target.value),
-                  }))}
-                />
-              </div>
-            ))}
-            <div className="pt-2">
-              <Button className="w-full" disabled>
-                <Settings className="w-4 h-4 mr-2" /> Pricing is driven by listing settings
-              </Button>
-            </div>
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <p className="text-sm text-muted-foreground">Want to change a listing's real price, weekend premium, or discounts?</p>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => {
+                    setActiveSection('properties');
+                    if (properties[0]) setEditingProperty(properties[0]);
+                  }}
+                  disabled={properties.length === 0}
+                >
+                  <Settings className="w-4 h-4 mr-2" /> Edit a listing's pricing
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
 

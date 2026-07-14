@@ -638,7 +638,9 @@ export function AdminUsers() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [bulkDialog, setBulkDialog] = useState<'assign' | 'remove' | null>(null);
   const [bulkSoftDeleteOpen, setBulkSoftDeleteOpen] = useState(false);
+  const [bulkHardDeleteOpen, setBulkHardDeleteOpen] = useState(false);
   const [bulkReason, setBulkReason] = useState('');
+  const [bulkConfirm, setBulkConfirm] = useState('');
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = async () => {
@@ -716,6 +718,25 @@ export function AdminUsers() {
     }
   };
 
+  const bulkHardDelete = async () => {
+    if (!bulkReason.trim()) { toast.error('A reason is required.'); return; }
+    if (bulkConfirm.trim() !== 'DELETE') { toast.error('Type DELETE to confirm.'); return; }
+    setBulkBusy(true);
+    try {
+      const result = await adminUsersAPI.bulkAction({ action: 'hard_delete', user_ids: [...selected], reason: bulkReason.trim() });
+      toast.success(`${result.succeeded.length} permanently deleted, ${result.failed.length} failed.`);
+      setBulkHardDeleteOpen(false);
+      setBulkReason('');
+      setBulkConfirm('');
+      clearSelection();
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Bulk hard delete failed'));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
 
   return (
@@ -768,6 +789,7 @@ export function AdminUsers() {
         <Button size="sm" variant="outline" onClick={() => setBulkDialog('assign')}>Assign role…</Button>
         <Button size="sm" variant="outline" onClick={() => setBulkDialog('remove')}>Remove role…</Button>
         <Button size="sm" variant="destructive" onClick={() => setBulkSoftDeleteOpen(true)}>Delete (soft)…</Button>
+        <Button size="sm" variant="destructive" onClick={() => setBulkHardDeleteOpen(true)}><Skull className="h-3.5 w-3.5 mr-1" />Delete permanently…</Button>
       </BulkActionBar>
 
       <Card>
@@ -864,6 +886,24 @@ export function AdminUsers() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkSoftDeleteOpen(false)}>Cancel</Button>
             <Button variant="destructive" disabled={bulkBusy} onClick={bulkSoftDelete}>Delete selected</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkHardDeleteOpen} onOpenChange={(v) => { setBulkHardDeleteOpen(v); if (!v) { setBulkReason(''); setBulkConfirm(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2"><Skull className="h-4 w-4" /> Permanently delete {selected.size} user(s)?</DialogTitle>
+            <DialogDescription>
+              Irreversible database delete. Superadmin accounts are skipped. Accounts with booking/payment history
+              will fail — use soft delete for those instead.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea placeholder="Reason (required)" value={bulkReason} onChange={(e) => setBulkReason(e.target.value)} rows={2} />
+          <Input placeholder='Type DELETE to confirm' value={bulkConfirm} onChange={(e) => setBulkConfirm(e.target.value)} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkHardDeleteOpen(false)}>Cancel</Button>
+            <Button variant="destructive" disabled={bulkBusy || bulkConfirm.trim() !== 'DELETE'} onClick={bulkHardDelete}>Permanently delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

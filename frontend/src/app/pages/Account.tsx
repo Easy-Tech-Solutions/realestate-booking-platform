@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { Switch } from '../components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { MfaSetupCard, USER_MFA_API } from '../components/MfaSetupCard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -744,14 +745,12 @@ export function Account() {
                   Update 
                 </Button>
               </div>
-              <Separator />
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="font-medium">Two-factor authentication</p>
-                  <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
-                </div>
-                <Switch onCheckedChange={v => toast.success(v ? '2FA enabled' : '2FA disabled')} />
-              </div>
+            </div>
+            <div className="mt-4">
+              <MfaSetupCard
+                api={USER_MFA_API}
+                description="Add an extra layer of security to your account with an authenticator app."
+              />
             </div>
           </div>
 

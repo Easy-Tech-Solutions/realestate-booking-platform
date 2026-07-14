@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HomeKonet — User Guide</title>
+<style>
+    :root {
+      --bg: #ffffff;
+      --fg: #222222;
+      --card: #ffffff;
+      --card-border: #dddddd;
+      --primary: #004406;
+      --primary-fg: #ffffff;
+      --secondary: #e6f0e6;
+      --secondary-fg: #004406;
+      --muted: #f7f7f7;
+      --muted-fg: #6b6b6b;
+      --accent: #004406;
+      --destructive: #C13515;
+      --border: #e2e2e2;
+      --radius: 0.75rem;
+      --code-bg: #0f1a10;
+      --code-fg: #e9f5ea;
+      --sidebar-w: 280px;
+      --header-h: 64px;
+      --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1b1b1b; --fg: #f2f2f2; --card: #242424; --card-border: #3a3a3a;
+        --primary: #4caf50; --primary-fg: #06210a; --secondary: #1a2e1a; --secondary-fg: #9be29e;
+        --muted: #2a2a2a; --muted-fg: #b0b0b0; --accent: #4caf50; --destructive: #e0573a;
+        --border: #3a3a3a; --code-bg: #0c130d; --code-fg: #d7ecd9;
+        --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.35);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; font-size: 16px; }
+    a { color: var(--accent); }
+    code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .topbar { position: sticky; top: 0; z-index: 30; height: var(--header-h); display: flex; align-items: center; gap: .75rem; padding: 0 1.25rem; background: var(--card); border-bottom: 1px solid var(--border); }
+    .topbar .brand { display:flex; align-items:center; gap:.6rem; font-weight:700; font-size: 1.05rem; color: var(--fg); text-decoration:none; }
+    .topbar .brand .mark { width: 34px; height: 34px; border-radius: 9px; background: var(--primary); color: var(--primary-fg); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1rem; }
+    .topbar .doc-title { color: var(--muted-fg); font-size: .9rem; padding-left: .75rem; border-left: 1px solid var(--border); }
+    .topbar .spacer { flex: 1; }
+    .topbar .doc-switch { display:flex; gap:.4rem; }
+    .topbar .doc-switch a { font-size: .82rem; text-decoration:none; padding: .4rem .7rem; border-radius: 999px; color: var(--muted-fg); border: 1px solid var(--border); }
+    .topbar .doc-switch a.active { background: var(--secondary); color: var(--secondary-fg); border-color: transparent; font-weight:600; }
+    .menu-toggle { display:none; background:none; border:1px solid var(--border); border-radius:8px; padding:.4rem .6rem; color:var(--fg); cursor:pointer; }
+    .layout { display:flex; align-items:flex-start; }
+    .sidebar { width: var(--sidebar-w); flex-shrink:0; position: sticky; top: var(--header-h); height: calc(100vh - var(--header-h)); overflow-y: auto; border-right: 1px solid var(--border); padding: 1.25rem 1rem 3rem; background: var(--card); }
+    .sidebar h4 { font-size: .72rem; text-transform: uppercase; letter-spacing:.06em; color: var(--muted-fg); margin: 1.25rem 0 .4rem; }
+    .sidebar h4:first-child { margin-top: 0; }
+    .sidebar a { display:block; padding: .35rem .6rem; border-radius: 8px; text-decoration:none; color: var(--fg); font-size: .88rem; opacity: .85; }
+    .sidebar a:hover { background: var(--muted); opacity: 1; }
+    .content { flex: 1; min-width: 0; padding: 2rem 2.5rem 6rem; max-width: 900px; }
+    .content > header.hero { margin-bottom: 2.5rem; }
+    .content > header.hero .eyebrow { display:inline-block; font-size:.75rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color: var(--secondary-fg); background: var(--secondary); padding:.25rem .6rem; border-radius:999px; margin-bottom:.75rem; }
+    .content > header.hero h1 { font-size: 2rem; margin: 0 0 .5rem; }
+    .content > header.hero p.lead { font-size: 1.05rem; color: var(--muted-fg); max-width: 60ch; margin:0; }
+    section.doc-section { margin: 3rem 0; scroll-margin-top: calc(var(--header-h) + 1rem); }
+    section.doc-section h2 { font-size: 1.4rem; margin: 0 0 .25rem; padding-bottom: .6rem; border-bottom: 2px solid var(--secondary); display:flex; align-items:center; gap:.5rem; }
+    section.doc-section > p.section-intro { color: var(--muted-fg); margin-top: .75rem; }
+    section.doc-section h3 { font-size: 1.1rem; margin: 1.75rem 0 .5rem; }
+    section.doc-section h4 { font-size: .95rem; margin: 1.25rem 0 .4rem; color: var(--fg); }
+    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 1.1rem 1.3rem; margin: 1rem 0; box-shadow: var(--shadow); }
+    .card h4 { margin-top: 0; }
+    .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .grid-3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .callout { border-radius: var(--radius); padding: 1rem 1.2rem; margin: 1.25rem 0; border: 1px solid var(--border); background: var(--muted); }
+    .callout.tip { border-left: 4px solid var(--primary); }
+    .callout.warn { border-left: 4px solid #c98a1a; }
+    .callout.danger { border-left: 4px solid var(--destructive); }
+    .callout .callout-label { font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.35rem; display:block; }
+    .callout.tip .callout-label { color: var(--primary); }
+    .callout.warn .callout-label { color: #c98a1a; }
+    .callout.danger .callout-label { color: var(--destructive); }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }
+    th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted-fg); font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; }
+    tr:last-child td { border-bottom: none; }
+    .badge { display:inline-block; padding: .15rem .55rem; border-radius:999px; font-size:.72rem; font-weight:700; background: var(--secondary); color: var(--secondary-fg); white-space: nowrap; }
+    .badge.host { background: var(--muted); color: var(--fg); border: 1px solid var(--border); }
+    .steps { counter-reset: step; list-style:none; padding:0; margin: 1rem 0; }
+    .steps li { counter-increment: step; position: relative; padding: .3rem 0 .3rem 2.4rem; margin-bottom: .6rem; }
+    .steps li::before { content: counter(step); position:absolute; left:0; top: .15rem; width: 1.7rem; height: 1.7rem; border-radius:50%; background: var(--primary); color: var(--primary-fg); display:flex; align-items:center; justify-content:center; font-size:.82rem; font-weight:700; }
+    code.inline { background: var(--muted); padding: .1rem .4rem; border-radius: 5px; font-size: .87em; }
+    footer.doc-footer { border-top:1px solid var(--border); margin-top:4rem; padding: 2rem 2.5rem; color: var(--muted-fg); font-size:.85rem; }
+    @media (max-width: 900px) {
+      .sidebar { position: fixed; left: 0; top: var(--header-h); z-index:20; transform: translateX(-100%); transition: transform .2s ease; box-shadow: var(--shadow); }
+      .sidebar.open { transform: translateX(0); }
+      .menu-toggle { display:inline-flex; }
+      .content { padding: 1.5rem 1.25rem 4rem; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <button class="menu-toggle" aria-label="Toggle navigation">☰</button>
+    <a class="brand" href="#top"><span class="mark">HK</span> HomeKonet</a>
+    <span class="doc-title">User Guide</span>
+    <span class="spacer"></span>
+    <nav class="doc-switch">
+      <a class="active" href="user-guide.html">Users</a>
+      <a href="management-portal-guide.html">Management Portal</a>
+      <a href="developer-guide.html">Developers</a>
+    </nav>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h4>Get Started</h4>
+      <a href="#welcome">Welcome to HomeKonet</a>
+      <a href="#account">Your Account</a>
+
+      <h4>Finding a Stay</h4>
+      <a href="#browsing">Browsing &amp; Search</a>
+      <a href="#booking">Booking a Stay</a>
+      <a href="#trips">Managing Your Trips</a>
+      <a href="#reviews">Reviews</a>
+
+      <h4>Hosting</h4>
+      <a href="#become-a-host">Becoming a Host</a>
+      <a href="#hosting">Hosting on HomeKonet</a>
+      <a href="#listings">Creating &amp; Managing Listings</a>
+      <a href="#verification">Property Verification</a>
+
+      <h4>Support</h4>
+      <a href="#help">Getting Help</a>
+      <a href="#payments">Payments &amp; Fees</a>
+      <a href="#faq">FAQ</a>
+    </aside>
+
+    <main class="content" id="top">
+      <header class="hero">
+        <span class="eyebrow">User Guide</span>
+        <h1>Using HomeKonet — for Guests &amp; Hosts</h1>
+        <p class="lead">A complete walkthrough of every part of the HomeKonet app: finding and booking a place to stay, managing your trips, and — if you list a property — running your host account.</p>
+      </header>
+
+      <section class="doc-section" id="welcome">
+        <h2>👋 Welcome to HomeKonet</h2>
+        <p class="section-intro">HomeKonet is a real-estate booking platform connecting property owners ("hosts") with guests looking for short-term nightly stays or long-term monthly rentals across Liberia. You can browse listings without an account, but you'll need one to book, message, or list a property.</p>
+        <div class="callout tip">
+          <span class="callout-label">Two roles, one account</span>
+          Every account starts as a guest. Applying to become a host and getting approved adds hosting tools to the <em>same</em> account — you don't need a separate login to switch between booking trips and managing your own listings.
+        </div>
+      </section>
+
+      <section class="doc-section" id="account">
+        <h2>👤 Your Account</h2>
+
+        <h3>Creating an account</h3>
+        <p>Sign up from the header "Sign up" button or the full-page <code class="inline">/login</code> screen. You'll need a first name, last name, email, and a password (at least 8 characters). You can also sign up with Google in one click.</p>
+        <p>After registering, check your email for a verification link — you won't be able to log in until your email is verified.</p>
+
+        <h3>Logging in</h3>
+        <p>Log in with your email/password or with Google. If your account has two-factor authentication turned on, you'll be asked for a 6-digit code from your authenticator app after your password is accepted.</p>
+        <div class="callout warn">
+          <span class="callout-label">Forgot your password?</span>
+          Use the "Forgot password?" link on the sign-in popup (click "Log in" from the header). Enter your email and you'll receive a reset link — follow it to set a new password.
+        </div>
+
+        <h3>Your profile</h3>
+        <p>From <strong>Account</strong>, you can update your first/last name, email, a short bio, and your profile photo.</p>
+
+        <h3>Two-factor authentication (2FA)</h3>
+        <p>Under Account → Login &amp; security, turn on two-factor authentication for extra protection:</p>
+        <ol class="steps">
+          <li>Click "Enable MFA" and scan the QR code with an authenticator app (Google Authenticator, Authy, etc.), or enter the shown key manually.</li>
+          <li>Enter the 6-digit code the app generates to confirm.</li>
+          <li>Save the 8 backup codes you're shown — each works once if you ever lose access to your authenticator app. They're shown only this one time.</li>
+        </ol>
+        <p>Once enabled, every login asks for a fresh code after your password. You can turn it off anytime from the same section (you'll need a current code to confirm).</p>
+
+        <h3>Changing your Mobile Money number</h3>
+        <p>Also from the Account page, under "Change Mobile Money Number":</p>
+        <ol class="steps">
+          <li>Enter your current password (skip this if you signed up with Google only), your new number, and your network (MTN or Orange).</li>
+          <li>We send a 6-digit code to your email and the new number.</li>
+          <li>Enter the code to confirm the change.</li>
+        </ol>
+        <p>You can cancel a pending change before you confirm it if you entered the wrong number.</p>
+
+        <h3>Deleting your account</h3>
+        <p>The Account page has a "Danger zone" with a delete option. If you have upcoming bookings — as a guest, or on a listing you host — resolve or wait for them first; otherwise deletion is immediate: your account is deactivated, your personal details are anonymized, and any listings you own are unpublished. This can't be undone from within the app, so contact support first if you're not sure.</p>
+      </section>
+
+      <section class="doc-section" id="browsing">
+        <h2>🔍 Browsing &amp; Search</h2>
+        <p class="section-intro">The home page and search page are how you find a place to stay.</p>
+
+        <h3>Home page</h3>
+        <p>Browse by category (Apartment, Hotels, Lodge, Beaches, Office Space, Land, and more), see listings near you (using your browser location), and read guest testimonials.</p>
+
+        <h3>Searching</h3>
+        <p>Open the search box from the header to set a location, check-in/check-out dates, property type, budget range, and guest count (adults, children, infants, pets). This takes you to the results page.</p>
+
+        <h3>Filtering results</h3>
+        <p>On the results page, use <strong>Filters</strong> to narrow further by price range, bedrooms/beds/bathrooms, amenities, and toggles for <span class="badge">Instant Book</span> and <span class="badge">Superhost</span> listings. Switch to <strong>map view</strong> to see listings plotted with their nightly/monthly price.</p>
+
+        <h3>The listing page</h3>
+        <p>Each listing shows a photo gallery, amenities, the host's profile (with a Superhost badge if they qualify), a live price breakdown, and guest reviews with ratings for cleanliness, accuracy, check-in, communication, location, and value. Hotel-type listings let you pick a specific room type with its own price and availability.</p>
+
+        <h3>Saving favorites</h3>
+        <p>Tap the heart icon on any listing to save it — view everything you've saved under <strong>Wishlists</strong>.</p>
+
+        <h3>Saving a search &amp; getting alerts</h3>
+        <p>Found a search worth repeating? Click <strong>Save search</strong> in the results toolbar, give it a name, and choose how often you want to hear about new matches (instantly, daily, or weekly). Your saved searches — and any new listings that matched one — live under your <strong>Dashboard → Saved Searches</strong> tab, where you can re-run a search or remove it anytime.</p>
+
+        <h3>Comparing properties</h3>
+        <p>Click <strong>Compare</strong> in the results toolbar, then check up to 4 listings you're deciding between. When you've picked at least 2, tap the floating "Compare" button, name your comparison, and view it anytime under <strong>Dashboard → Comparisons</strong> — each property is scored with call-outs on what stands out (price, size, etc.) relative to the others in that comparison.</p>
+      </section>
+
+      <section class="doc-section" id="booking">
+        <h2>📅 Booking a Stay</h2>
+
+        <h3>How a booking works</h3>
+        <ol class="steps">
+          <li><strong>Request.</strong> Submit a booking request from the listing page — this step is free, nothing is charged yet.</li>
+          <li><strong>Confirmation.</strong> Some listings are <span class="badge">Instant Book</span> and confirm right away; others need the host to approve — hosts have up to <strong>7 days</strong> to confirm a request.</li>
+          <li><strong>Payment.</strong> Once confirmed, you have <strong>10 days</strong> to complete payment, or the reservation expires and the dates are released.</li>
+          <li><strong>Contact shared.</strong> After an admin confirms your payment, your host's contact details are shared so you can coordinate check-in.</li>
+        </ol>
+        <div class="callout tip">
+          <span class="callout-label">Tip</span>
+          If a host doesn't confirm within 7 days, or you don't pay within 10 days of confirmation, the request simply expires automatically — you won't be charged for a booking that never completes.
+        </div>
+
+        <h3>Paying for your stay</h3>
+        <p>From your booking's payment page, choose:</p>
+        <ul>
+          <li><strong>Card (Stripe)</strong> — enter your card details directly.</li>
+          <li><strong>MTN Mobile Money</strong> — enter your MoMo phone number; you'll approve the charge on your phone, and the page checks for confirmation automatically. MTN charges its own 2% transaction fee on top of the total.</li>
+        </ul>
+
+        <h3>Viewing appointments (long-term rentals)</h3>
+        <p>Monthly/long-term listings require a short in-person viewing before you can reserve. Pick an available Saturday and a 2-hour time block, then pay the (non-refundable) viewing fee to lock in the slot. Track your scheduled viewings under <strong>Viewings</strong>. Once a viewing is marked complete, you can reserve the property directly from that page and choose your lease start date.</p>
+      </section>
+
+      <section class="doc-section" id="trips">
+        <h2>🧳 Managing Your Trips</h2>
+        <p class="section-intro">Your bookings — upcoming and past — live under <strong>Trips</strong>, with a summary also shown on your Dashboard.</p>
+
+        <h3>Booking status</h3>
+        <p>Each booking shows its current stage — awaiting host confirmation, awaiting your payment (with days remaining), payment received and awaiting admin confirmation, or fully confirmed.</p>
+
+        <h3>Cancelling a booking</h3>
+        <p>Use the Cancel button on a trip and confirm. Every listing has a cancellation policy set by its host (Flexible, Moderate, Strict, or Super Strict, shown on the listing page) — <strong>refund eligibility depends on that policy</strong>. If you're owed a refund, our team reviews and processes it; for the fastest resolution, message your host or open a support ticket referencing your booking.</p>
+
+        <h3>Messaging your host</h3>
+        <p>Use <strong>Messages</strong> to chat with your host (or a guest, if you're hosting). You can send file attachments once you have a confirmed booking together. For your safety, sharing contact details directly in chat is discouraged — going through official channels keeps you covered by our support and dispute process.</p>
+
+        <h3>Filing an AirCover claim</h3>
+        <p>If something goes wrong during or after a confirmed stay — property damage, missing items, a cleanliness issue, or a safety concern — click <strong>File a claim</strong> on that booking in Trips. Pick a category, describe what happened, and enter the amount you're requesting. Our team reviews every claim and follows up with next steps; an approved claim is paid out separately, not automatically at the moment it's approved.</p>
+
+        <h3>Notifications</h3>
+        <p>Check the notification bell for updates on every stage of your booking, new messages, price/availability changes on listings you're watching, and — if you're applying to host or verifying a property — updates on your application status. You can adjust which emails you receive from your Account page.</p>
+      </section>
+
+      <section class="doc-section" id="reviews">
+        <h2>⭐ Reviews</h2>
+        <p>Once your stay is complete, you can leave a review from the listing page or your Trips list. Give an overall rating plus optional scores for cleanliness, accuracy, check-in, communication, location, and value, and a written comment. You can leave one review per stay. Browse every review site-wide on the <strong>Reviews</strong> page, and see host replies published alongside guest reviews.</p>
+      </section>
+
+      <section class="doc-section" id="become-a-host">
+        <h2>🏠 Becoming a Host</h2>
+        <p class="section-intro">Apply from <strong>Become a Host</strong> (you'll need to be logged in).</p>
+
+        <h3>What you'll submit</h3>
+        <ul>
+          <li>Your full legal name, address, and phone number</li>
+          <li>A headshot photo</li>
+          <li>A photo of a government-issued ID or passport</li>
+          <li>Agreement to the Property Owner Agreement</li>
+        </ul>
+
+        <h3>The review process</h3>
+        <p>Every application goes through three sequential review stages, and you can track your progress on the application page:</p>
+        <ol class="steps">
+          <li><strong>Product Support</strong> review</li>
+          <li><strong>Compliance</strong> review</li>
+          <li><strong>Supervisor</strong> review — final approval</li>
+        </ol>
+        <p>You'll get a notification at each step. If your application is declined at any stage, you'll see the reason (if one was provided) and can apply again.</p>
+        <div class="callout warn">
+          <span class="callout-label">Agreement updates</span>
+          If we publish a new version of the Property Owner Agreement after you're approved, you'll need to accept it again before creating a new listing.
+        </div>
+      </section>
+
+      <section class="doc-section" id="hosting">
+        <h2>🗂️ Hosting on HomeKonet <span class="badge host">Host feature</span></h2>
+        <p class="section-intro">Once approved, your <strong>Host Dashboard</strong> is your hosting control center.</p>
+
+        <h3>Overview</h3>
+        <p>See stat cards for your earnings, listings, bookings, and rating, plus earnings and bookings charts.</p>
+
+        <h3>Properties</h3>
+        <p>See your draft listings (continue editing or discard) and published listings. For each published listing you can <strong>Edit</strong> (title, description, photos, amenities, pricing, discounts, booking mode, cancellation policy, and safety details), manage hotel rooms if applicable, view the public listing page, or delete it (blocked while there are active bookings).</p>
+
+        <h3>Bookings</h3>
+        <p>Separate tabs for Upcoming, Accepted, Declined, and Past bookings. On a pending request you can <strong>Confirm</strong> or <strong>Decline</strong> (with an optional note to the guest).</p>
+
+        <h3>Earnings</h3>
+        <p>See your payouts split into "Awaiting payout" and "Paid," each showing the gross booking amount, HomeKonet's commission, and your net payout. Payouts are disbursed by the HomeKonet team once a guest's payment is confirmed — they're not instant.</p>
+
+        <h3>Messages &amp; Reviews</h3>
+        <p>Reply to guest messages directly from the dashboard, and respond publicly to reviews on your listings from the Recent Reviews section.</p>
+
+        <div class="callout tip">
+          <span class="callout-label">Where to actually change your price</span>
+          The dashboard's Pricing section is a quick estimator to preview numbers — to make a real pricing change, open the listing itself under <strong>Properties → Edit</strong> and update it there.
+        </div>
+      </section>
+
+      <section class="doc-section" id="listings">
+        <h2>➕ Creating &amp; Managing Listings <span class="badge host">Host feature</span></h2>
+        <p class="section-intro">Start a new listing from Host Dashboard → Properties → "Add listing." The wizard adapts to what you're listing:</p>
+        <div class="grid-2">
+          <div class="card">
+            <h4>Nightly / short-term stays</h4>
+            <p>Property type, location, bedrooms/beds/bathrooms/guests, amenities, photos, title &amp; description, highlights, nightly weekday/weekend pricing, discounts (last-minute, weekly, monthly), booking mode (Instant vs. Approve First), and cancellation policy.</p>
+          </div>
+          <div class="card">
+            <h4>Monthly / long-term rentals</h4>
+            <p>Same basics, plus monthly rent, payment schedule (monthly/quarterly/biannual/annual), and lease term (6, 12, 24, or 36 months — long enough to cover your chosen payment schedule).</p>
+          </div>
+        </div>
+        <p>Your progress is saved automatically as a draft, so you can pick up a listing later without starting over.</p>
+
+        <h3>Hotel listings</h3>
+        <p>For hotel-type properties, define one or more room types during creation (name, type, price per night, occupancy, beds, bathrooms, per-room amenities, photos, and inventory count). Manage room types anytime from the listing's "Manage Rooms" screen — add, edit, deactivate, or remove a room type.</p>
+      </section>
+
+      <section class="doc-section" id="verification">
+        <h2>✅ Property Verification <span class="badge host">Host feature</span></h2>
+        <p>Before a new listing goes live, you'll submit a quick ownership verification: your name as owner (or the actual owner's name, if you're not the owner), the property's location, and a deed/volume number. If you're not the owner, you'll also upload a notarized MOU document.</p>
+        <p>This goes through the same three-stage review as host applications (Product Support → Compliance, which may include a site inspection → Supervisor). You can track its status right on the Properties tab; if corrections are requested, you'll see the reviewer's notes and a button to resubmit. A listing can't be published or booked until verification is approved.</p>
+      </section>
+
+      <section class="doc-section" id="help">
+        <h2>💬 Getting Help</h2>
+
+        <h3>Chat with our assistant</h3>
+        <p>The chat bubble in the bottom corner of every page can answer common questions about bookings, payments, becoming a host, and more, using our current listings and help content. If it can't answer, or you ask to speak to a person, it hands off to our support team and opens a support ticket for you automatically.</p>
+
+        <h3>Support tickets</h3>
+        <p>For anything the chat can't resolve, open <strong>Support</strong>: pick a category (Account, Booking, Payment &amp; Refunds, Listing, Safety, Technical, Host Support, Other), describe your issue, and attach files if helpful. You don't need an account to submit one, but logging in lets you track it under <strong>My Tickets</strong>, where you can see status (Open, In Progress, Awaiting You, Resolved, Closed) and reply to our team.</p>
+
+        <h3>Reporting a listing, host, or review</h3>
+        <p>Use the Report button on any listing, host profile, or review to flag scams, fake listings, inappropriate content, harassment, or incorrect information. Our Trust &amp; Safety team reviews every report.</p>
+      </section>
+
+      <section class="doc-section" id="payments">
+        <h2>💳 Payments &amp; Fees</h2>
+        <table>
+          <thead><tr><th>Fee</th><th>What it's for</th></tr></thead>
+          <tbody>
+            <tr><td>Service fee</td><td>A percentage of your stay's subtotal, shown as its own line at checkout.</td></tr>
+            <tr><td>Booking fee</td><td>A small flat fee applied to bookings.</td></tr>
+            <tr><td>Viewing fee</td><td>A small flat, <strong>non-refundable</strong> fee to schedule a viewing on a long-term rental.</td></tr>
+            <tr><td>MoMo transaction fee</td><td>A separate ~2% fee charged by MTN on Mobile Money payments (not a HomeKonet fee).</td></tr>
+          </tbody>
+        </table>
+        <p>You can save a card for faster checkout from your Account page — we only ever store the card's last 4 digits, expiry, and cardholder name, never the full card number.</p>
+        <p>Need a refund? Refunds are reviewed and processed by our team based on the listing's cancellation policy — reach out via Support or message your host to start that conversation.</p>
+      </section>
+
+      <section class="doc-section" id="faq">
+        <h2>❓ Frequently Asked Questions</h2>
+        <div class="card">
+          <h4>How long does a host have to confirm my request?</h4>
+          <p>Up to 7 days, unless the listing is Instant Book, in which case it confirms immediately.</p>
+        </div>
+        <div class="card">
+          <h4>When am I actually charged?</h4>
+          <p>Never at the moment you request a booking. You pay only after the booking is confirmed, within a 10-day window.</p>
+        </div>
+        <div class="card">
+          <h4>What payment methods are accepted?</h4>
+          <p>Cards via Stripe, and MTN Mobile Money.</p>
+        </div>
+        <div class="card">
+          <h4>How do I become a host?</h4>
+          <p>Apply from "Become a Host" while logged in, and complete the three-stage review.</p>
+        </div>
+        <div class="card">
+          <h4>Can I message a host before booking?</h4>
+          <p>Yes — use the "Message host" button on any listing page.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="doc-footer">
+    HomeKonet User Guide — for guests and hosts. For account-specific issues, contact Support from within the app.
+  </footer>
+
+  <script>
+    document.querySelectorAll('.menu-toggle').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelector('.sidebar').classList.toggle('open');
+      });
+    });
+    document.querySelectorAll('.sidebar a').forEach(function(a){
+      a.addEventListener('click', function(){
+        document.querySelector('.sidebar').classList.remove('open');
+      });
+    });
+  </script>
+</body>
+</html>

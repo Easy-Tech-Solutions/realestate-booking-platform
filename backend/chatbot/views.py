@@ -6,7 +6,6 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
-from platformops.utils import is_feature_enabled
 from .throttles import ChatRateThrottle
 
 User = get_user_model()
@@ -72,24 +71,8 @@ def chat(request):
 
     from .tasks import get_chatbot_reply_task
 
-    if is_feature_enabled('ai_scoring_enabled', default=False):
-        task = get_chatbot_reply_task.apply_async(args=[str(session.id), message])
-        return Response({'task_id': task.id, 'session_id': str(session.id)})
-    else:
-        # AI off — persist messages inline and return immediately (no queue)
-        from .models import ChatMessage
-        ChatMessage.objects.create(session=session, role='user', content=message)
-        bot_msg = ChatMessage.objects.create(
-            session=session, role='bot',
-            content=FALLBACK_REPLY, suggested_handoff=True,
-        )
-        return Response({
-            'task_id': None,
-            'session_id': str(session.id),
-            'status': 'SUCCESS',
-            'reply': FALLBACK_REPLY,
-            'needs_agent': True,
-        })
+    task = get_chatbot_reply_task.apply_async(args=[str(session.id), message])
+    return Response({'task_id': task.id, 'session_id': str(session.id)})
 
 
 # ---------------------------------------------------------------------------

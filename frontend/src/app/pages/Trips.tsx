@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, Star, AlertCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, Star, AlertCircle, ShieldAlert } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { useNavigate } from 'react-router';
 import { useApp } from '../../hooks/useApp';
@@ -11,6 +14,15 @@ import { toast } from 'sonner';
 import { Booking } from '../../core/types';
 import { bookingStatusMeta } from '../../core/bookingStatus';
 import { useUserTrips } from '../../hooks/queries/useTrips';
+import { aircoverClaimsAPI } from '../../services/api/aircoverClaims';
+
+const CLAIM_TYPES: { value: string; label: string }[] = [
+  { value: 'property_damage', label: 'Property damage' },
+  { value: 'missing_items', label: 'Missing items' },
+  { value: 'cleanliness', label: 'Cleanliness' },
+  { value: 'safety', label: 'Safety issue' },
+  { value: 'other', label: 'Other' },
+];
 
 export function Trips() {
   const navigate = useNavigate();
@@ -21,6 +33,12 @@ export function Trips() {
   const [reviewTarget, setReviewTarget] = useState<Booking | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
+
+  const [claimTarget, setClaimTarget] = useState<Booking | null>(null);
+  const [claimType, setClaimType] = useState('property_damage');
+  const [claimDescription, setClaimDescription] = useState('');
+  const [claimAmount, setClaimAmount] = useState('');
+  const [claimSubmitting, setClaimSubmitting] = useState(false);
 
   useEffect(() => {
     if (isError) {
@@ -53,6 +71,41 @@ export function Trips() {
     setReviewTarget(null);
     setReviewText('');
     setReviewRating(5);
+  };
+
+  const closeClaimDialog = () => {
+    setClaimTarget(null);
+    setClaimType('property_damage');
+    setClaimDescription('');
+    setClaimAmount('');
+  };
+
+  const handleSubmitClaim = async () => {
+    if (!claimTarget) return;
+    if (!claimDescription.trim()) {
+      toast.error('Please describe what happened');
+      return;
+    }
+    const amount = Number(claimAmount);
+    if (!claimAmount || Number.isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid requested amount');
+      return;
+    }
+    setClaimSubmitting(true);
+    try {
+      await aircoverClaimsAPI.file({
+        booking: Number(claimTarget.id),
+        claim_type: claimType,
+        description: claimDescription.trim(),
+        requested_amount: claimAmount,
+      });
+      toast.success('Claim submitted — our team will review it and follow up.');
+      closeClaimDialog();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to submit claim');
+    } finally {
+      setClaimSubmitting(false);
+    }
   };
 
   const TripCard = ({ trip, isPast }: { trip: (typeof upcomingTrips)[number]; isPast?: boolean }) => (
@@ -135,6 +188,11 @@ export function Trips() {
               {isPast && trip.booking.status === 'completed' && (
                 <Button variant="outline" onClick={() => setReviewTarget(trip.booking)}>
                   <Star className="w-4 h-4 mr-1" /> Review
+                </Button>
+              )}
+              {(trip.booking.status === 'completed' || trip.booking.status === 'confirmed') && (
+                <Button variant="outline" onClick={() => setClaimTarget(trip.booking)}>
+                  <ShieldAlert className="w-4 h-4 mr-1" /> File a claim
                 </Button>
               )}
               <Button variant={trip.booking.status === 'awaiting_payment' ? 'outline' : 'default'} onClick={() => navigate(`/rooms/${trip.property.id}`)}>
@@ -256,6 +314,63 @@ export function Trips() {
             <div className="flex gap-2">
               <Button onClick={handleSubmitReview}>Submit review</Button>
               <Button variant="outline" onClick={() => setReviewTarget(null)}>Cancel</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AirCover claim dialog */}
+      <Dialog open={!!claimTarget} onOpenChange={(open) => !open && closeClaimDialog()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-primary" />
+              File an AirCover claim
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {claimTarget?.property.title} — our team reviews every claim and follows up; approving a claim
+              doesn't issue payment automatically, so expect to hear from us with next steps.
+            </p>
+            <div className="space-y-1.5">
+              <Label>What happened?</Label>
+              <Select value={claimType} onValueChange={setClaimType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CLAIM_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="claim-description">Description</Label>
+              <Textarea
+                id="claim-description"
+                placeholder="Describe what happened in as much detail as you can..."
+                value={claimDescription}
+                onChange={(e) => setClaimDescription(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="claim-amount">Requested amount (USD)</Label>
+              <Input
+                id="claim-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={claimAmount}
+                onChange={(e) => setClaimAmount(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleSubmitClaim} disabled={claimSubmitting}>
+                {claimSubmitting ? 'Submitting…' : 'Submit claim'}
+              </Button>
+              <Button variant="outline" onClick={closeClaimDialog}>Cancel</Button>
             </div>
           </div>
         </DialogContent>

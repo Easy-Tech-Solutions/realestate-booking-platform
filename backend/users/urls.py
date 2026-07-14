@@ -10,6 +10,7 @@ from .views import (
     cancel_phone_change,
     admin_stats,
 )
+from .mfa_views import mfa_status, mfa_setup, mfa_confirm, mfa_disable
 from .admin_views import (
     admin_user_list,
     admin_user_detail,
@@ -45,4 +46,10 @@ urlpatterns = [
     path('phone-change/initiate/', initiate_phone_change, name='phone_change_initiate'),
     path('phone-change/verify/',   verify_phone_change,   name='phone_change_verify'),
     path('phone-change/cancel/',   cancel_phone_change,   name='phone_change_cancel'),
+
+    # Self-service two-factor authentication (any authenticated user)
+    path('mfa/status/',  mfa_status,  name='mfa_status'),
+    path('mfa/setup/',   mfa_setup,   name='mfa_setup'),
+    path('mfa/confirm/', mfa_confirm, name='mfa_confirm'),
+    path('mfa/disable/', mfa_disable, name='mfa_disable'),
 ]

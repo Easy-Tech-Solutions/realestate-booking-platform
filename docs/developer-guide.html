@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HomeKonet — Developer Guide</title>
+<style>
+    :root {
+      --bg: #ffffff; --fg: #222222; --card: #ffffff; --card-border: #dddddd;
+      --primary: #004406; --primary-fg: #ffffff; --secondary: #e6f0e6; --secondary-fg: #004406;
+      --muted: #f7f7f7; --muted-fg: #6b6b6b; --accent: #004406; --destructive: #C13515;
+      --border: #e2e2e2; --radius: 0.75rem; --code-bg: #0f1a10; --code-fg: #e9f5ea;
+      --sidebar-w: 280px; --header-h: 64px;
+      --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1b1b1b; --fg: #f2f2f2; --card: #242424; --card-border: #3a3a3a;
+        --primary: #4caf50; --primary-fg: #06210a; --secondary: #1a2e1a; --secondary-fg: #9be29e;
+        --muted: #2a2a2a; --muted-fg: #b0b0b0; --accent: #4caf50; --destructive: #e0573a;
+        --border: #3a3a3a; --code-bg: #0c130d; --code-fg: #d7ecd9;
+        --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.35);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; font-size: 16px; }
+    a { color: var(--accent); }
+    code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .topbar { position: sticky; top: 0; z-index: 30; height: var(--header-h); display: flex; align-items: center; gap: .75rem; padding: 0 1.25rem; background: var(--card); border-bottom: 1px solid var(--border); }
+    .topbar .brand { display:flex; align-items:center; gap:.6rem; font-weight:700; font-size: 1.05rem; color: var(--fg); text-decoration:none; }
+    .topbar .brand .mark { width: 34px; height: 34px; border-radius: 9px; background: var(--primary); color: var(--primary-fg); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1rem; }
+    .topbar .doc-title { color: var(--muted-fg); font-size: .9rem; padding-left: .75rem; border-left: 1px solid var(--border); }
+    .topbar .spacer { flex: 1; }
+    .topbar .doc-switch { display:flex; gap:.4rem; }
+    .topbar .doc-switch a { font-size: .82rem; text-decoration:none; padding: .4rem .7rem; border-radius: 999px; color: var(--muted-fg); border: 1px solid var(--border); }
+    .topbar .doc-switch a.active { background: var(--secondary); color: var(--secondary-fg); border-color: transparent; font-weight:600; }
+    .menu-toggle { display:none; background:none; border:1px solid var(--border); border-radius:8px; padding:.4rem .6rem; color:var(--fg); cursor:pointer; }
+    .layout { display:flex; align-items:flex-start; }
+    .sidebar { width: var(--sidebar-w); flex-shrink:0; position: sticky; top: var(--header-h); height: calc(100vh - var(--header-h)); overflow-y: auto; border-right: 1px solid var(--border); padding: 1.25rem 1rem 3rem; background: var(--card); }
+    .sidebar h4 { font-size: .72rem; text-transform: uppercase; letter-spacing:.06em; color: var(--muted-fg); margin: 1.25rem 0 .4rem; }
+    .sidebar h4:first-child { margin-top: 0; }
+    .sidebar a { display:block; padding: .35rem .6rem; border-radius: 8px; text-decoration:none; color: var(--fg); font-size: .88rem; opacity: .85; }
+    .sidebar a:hover { background: var(--muted); opacity: 1; }
+    .content { flex: 1; min-width: 0; padding: 2rem 2.5rem 6rem; max-width: 960px; }
+    .content > header.hero { margin-bottom: 2.5rem; }
+    .content > header.hero .eyebrow { display:inline-block; font-size:.75rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color: var(--secondary-fg); background: var(--secondary); padding:.25rem .6rem; border-radius:999px; margin-bottom:.75rem; }
+    .content > header.hero h1 { font-size: 2rem; margin: 0 0 .5rem; }
+    .content > header.hero p.lead { font-size: 1.05rem; color: var(--muted-fg); max-width: 68ch; margin:0; }
+    section.doc-section { margin: 3rem 0; scroll-margin-top: calc(var(--header-h) + 1rem); }
+    section.doc-section h2 { font-size: 1.4rem; margin: 0 0 .25rem; padding-bottom: .6rem; border-bottom: 2px solid var(--secondary); display:flex; align-items:center; gap:.5rem; }
+    section.doc-section > p.section-intro { color: var(--muted-fg); margin-top: .75rem; }
+    section.doc-section h3 { font-size: 1.1rem; margin: 1.75rem 0 .5rem; }
+    section.doc-section h4 { font-size: .95rem; margin: 1.25rem 0 .4rem; color: var(--fg); }
+    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 1.1rem 1.3rem; margin: 1rem 0; box-shadow: var(--shadow); }
+    .card h4 { margin-top: 0; }
+    .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .grid-3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .callout { border-radius: var(--radius); padding: 1rem 1.2rem; margin: 1.25rem 0; border: 1px solid var(--border); background: var(--muted); }
+    .callout.tip { border-left: 4px solid var(--primary); }
+    .callout.warn { border-left: 4px solid #c98a1a; }
+    .callout.danger { border-left: 4px solid var(--destructive); }
+    .callout .callout-label { font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.35rem; display:block; }
+    .callout.tip .callout-label { color: var(--primary); }
+    .callout.warn .callout-label { color: #c98a1a; }
+    .callout.danger .callout-label { color: var(--destructive); }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .86rem; }
+    th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted-fg); font-weight:600; font-size:.74rem; text-transform:uppercase; letter-spacing:.03em; }
+    tr:last-child td { border-bottom: none; }
+    .badge { display:inline-block; padding: .15rem .55rem; border-radius:999px; font-size:.72rem; font-weight:700; background: var(--secondary); color: var(--secondary-fg); white-space: nowrap; }
+    .badge.danger { background: rgba(193,53,21,.12); color: var(--destructive); }
+    .badge.warn { background: rgba(201,138,26,.14); color: #a66c14; }
+    .steps { counter-reset: step; list-style:none; padding:0; margin: 1rem 0; }
+    .steps li { counter-increment: step; position: relative; padding: .3rem 0 .3rem 2.4rem; margin-bottom: .6rem; }
+    .steps li::before { content: counter(step); position:absolute; left:0; top: .15rem; width: 1.7rem; height: 1.7rem; border-radius:50%; background: var(--primary); color: var(--primary-fg); display:flex; align-items:center; justify-content:center; font-size:.82rem; font-weight:700; }
+    pre { background: var(--code-bg); color: var(--code-fg); padding: 1rem 1.1rem; border-radius: var(--radius); overflow-x: auto; font-size: .83rem; line-height:1.55; margin: 1rem 0; }
+    code.inline { background: var(--muted); padding: .1rem .4rem; border-radius: 5px; font-size: .87em; }
+    pre code { background:none; padding:0; }
+    .diagram { border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; background: var(--muted); font-size: .85rem; overflow-x:auto; }
+    .diagram .row { display:flex; gap: .75rem; margin-bottom: .75rem; flex-wrap: wrap; }
+    .diagram .box { border: 1px solid var(--card-border); background: var(--card); border-radius: 10px; padding: .6rem .9rem; flex:1; min-width: 140px; text-align:center; box-shadow: var(--shadow); }
+    .diagram .box.primary { border-color: var(--primary); }
+    .diagram .box small { display:block; color: var(--muted-fg); font-size:.72rem; margin-top:.2rem; }
+    .diagram .arrow { text-align:center; color: var(--muted-fg); font-size:1.1rem; margin: -.4rem 0; }
+    footer.doc-footer { border-top:1px solid var(--border); margin-top:4rem; padding: 2rem 2.5rem; color: var(--muted-fg); font-size:.85rem; }
+    @media (max-width: 900px) {
+      .sidebar { position: fixed; left: 0; top: var(--header-h); z-index:20; transform: translateX(-100%); transition: transform .2s ease; box-shadow: var(--shadow); }
+      .sidebar.open { transform: translateX(0); }
+      .menu-toggle { display:inline-flex; }
+      .content { padding: 1.5rem 1.25rem 4rem; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .diagram .row { flex-direction: column; }
+    }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <button class="menu-toggle" aria-label="Toggle navigation">☰</button>
+    <a class="brand" href="#top"><span class="mark">HK</span> HomeKonet</a>
+    <span class="doc-title">Developer Guide</span>
+    <span class="spacer"></span>
+    <nav class="doc-switch">
+      <a href="user-guide.html">Users</a>
+      <a href="management-portal-guide.html">Management Portal</a>
+      <a class="active" href="developer-guide.html">Developers</a>
+    </nav>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h4>Orientation</h4>
+      <a href="#architecture">Architecture Overview</a>
+      <a href="#patterns">Request Flow &amp; Patterns</a>
+      <a href="#async">Async &amp; Background Work</a>
+      <a href="#llm">Local LLM Subsystem</a>
+
+      <h4>Data &amp; Ops</h4>
+      <a href="#database">Database &amp; Migrations</a>
+      <a href="#deployment">Deployment &amp; Infrastructure</a>
+      <a href="#cli">CLI Reference</a>
+      <a href="#monitoring">Monitoring &amp; Logging</a>
+      <a href="#testing">Testing &amp; Release Gate</a>
+
+      <h4>Working in the Code</h4>
+      <a href="#tasks">Common Dev Tasks</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+      <a href="#common-errors">Common Errors — Real Incidents</a>
+      <a href="#rbac">RBAC Model</a>
+    </aside>
+
+    <main class="content" id="top">
+      <header class="hero">
+        <span class="eyebrow">Developer Guide</span>
+        <h1>HomeKonet Engineering Handbook</h1>
+        <p class="lead">Architecture, conventions, background jobs, the local AI subsystem, deployment, monitoring, and troubleshooting — everything an engineer needs to work confidently in this codebase.</p>
+      </header>
+
+      <section class="doc-section" id="architecture">
+        <h2>🏗️ Architecture Overview</h2>
+        <p class="section-intro">Django 5 + DRF + Channels + Celery backend, React + TypeScript + Vite frontend, deployed as six Docker Compose services behind a single Nginx container. No Kubernetes, no separate load balancer, no CDN — everything in this diagram runs on one host.</p>
+
+        <div class="diagram">
+          <div class="row">
+            <div class="box">Browser<small>React SPA (Vite) — REST via fetch, real-time via native WebSocket hooks</small></div>
+          </div>
+          <div class="arrow">↓ HTTPS :443 / WSS — TLS terminated here, HTTP :80 redirects up</div>
+          <div class="row">
+            <div class="box primary">nginx — <code class="inline">frontend</code> container<small>Serves the built SPA + <code class="inline">/static/</code> <code class="inline">/media/</code> directly, reverse-proxies <code class="inline">/api/</code> <code class="inline">/ws/</code> <code class="inline">/admin/</code>. Only container with published host ports (80/443).</small></div>
+          </div>
+          <div class="arrow">↓ proxy_pass http://backend:8000 (internal Docker network only)</div>
+          <div class="row">
+            <div class="box primary">backend<small>Daphne ASGI — one process serves both HTTP (DRF views + Django admin) and WebSocket (Channels) on port 8000, never exposed to the host directly</small></div>
+          </div>
+          <div class="arrow">↓ reads/writes</div>
+          <div class="row">
+            <div class="box">Postgres<small>External / managed (Neon) — no local db container or volume; reached over <code class="inline">DATABASE_URL</code></small></div>
+            <div class="box">Redis<small>One instance, three jobs: Celery broker+result backend, Django cache, Channels layer</small></div>
+          </div>
+          <div class="arrow">↓ tasks dispatched via the Redis broker</div>
+          <div class="row">
+            <div class="box">celery<small>Default queue worker, concurrency=2 — booking expiry, suspension expiry, notifications</small></div>
+            <div class="box">celery-beat<small>Scheduler only, runs no tasks itself — ticks 4 periodic jobs into the broker on a crontab</small></div>
+            <div class="box primary">celery-ai<small><code class="inline">ai_scoring</code> queue only, concurrency=1 / solo pool — the sole process that ever loads the local LLM</small></div>
+          </div>
+          <div class="arrow">↓ outbound integrations (backend + celery only — never called from the browser)</div>
+          <div class="row">
+            <div class="box">Stripe<small>Card payments/refunds</small></div>
+            <div class="box">MTN MoMo<small>Mobile money collect + disburse</small></div>
+            <div class="box">Cloudinary<small>Media storage (optional)</small></div>
+            <div class="box">Brevo<small>Transactional email</small></div>
+            <div class="box">Google OAuth<small>Social login</small></div>
+          </div>
+        </div>
+
+        <div class="callout warn">
+          <span class="callout-label">No Postgres container in the real compose file</span>
+          <code class="inline">docker-compose.yml</code> at the repo root has no <code class="inline">db</code> service — Postgres is expected to be an external managed database (e.g. Neon), configured via <code class="inline">DATABASE_URL</code>. The example compose file embedded in <code class="inline">docs/DEPLOYMENT.md</code> does include a local <code class="inline">db</code> service and omits <code class="inline">celery-ai</code>/<code class="inline">ai_models</code> — that doc describes an alternate/earlier topology. Don't copy it verbatim; treat the root <code class="inline">docker-compose.yml</code> as the source of truth.
+        </div>
+
+        <h3>Request path — a browser hitting <code class="inline">/api/...</code></h3>
+        <ol class="steps">
+          <li>Browser resolves <code class="inline">homekonet.com</code> and opens a TLS connection on 443. Anything on port 80 gets a 301 to https, except <code class="inline">/.well-known/acme-challenge/</code> (Let's Encrypt HTTP-01).</li>
+          <li>The <code class="inline">frontend</code> container's Nginx terminates TLS (cert/key bind-mounted read-only from <code class="inline">nginx/ssl/</code>), attaches security headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) to every response, and matches the request path against its <code class="inline">location</code> blocks.</li>
+          <li>For <code class="inline">/api/*</code> or <code class="inline">/ws/*</code>, Nginx proxies to <code class="inline">http://backend:8000</code> over the internal Compose network (service-name DNS — <code class="inline">backend</code> is never reachable from outside the Docker host). <code class="inline">/api/</code> gets a 60s read timeout; <code class="inline">/ws/</code> gets 86400s (24h) plus <code class="inline">Upgrade</code>/<code class="inline">Connection</code> headers for the WebSocket handshake.</li>
+          <li>Daphne (the ASGI server) routes HTTP requests into Django/DRF as normal. CORS, security-headers, session, auth, request-logging, suspension-check, maintenance-mode, break-glass-audit, and view-tracking middleware all run in a fixed order (see <a href="#patterns">Request Flow &amp; Patterns</a>) before the view function executes.</li>
+          <li>The view authenticates via JWT (short-lived access token in the <code class="inline">Authorization</code> header), checks RBAC/department permissions, does its work against Postgres (and Redis cache, if applicable), and returns JSON. Everything sensitive is captured to <code class="inline">AdminAuditLog</code> and/or the rotating log files along the way.</li>
+          <li>For anything that isn't <code class="inline">/api/</code>, <code class="inline">/ws/</code>, <code class="inline">/admin/</code>, <code class="inline">/static/</code>, or <code class="inline">/media/</code>, Nginx's catch-all serves the SPA's <code class="inline">index.html</code> (<code class="inline">try_files $uri $uri/ /index.html</code>) — client-side routing (React Router) takes over from there. <code class="inline">index.html</code> itself is served with <code class="inline">Cache-Control: no-cache</code> so a new deploy is picked up on next load, while hashed <code class="inline">/assets/*</code> chunks are cached for a year.</li>
+        </ol>
+
+        <h3>Container / service breakdown</h3>
+        <table>
+          <thead><tr><th>Service</th><th>Runs</th><th>Depends on</th><th>Notable config</th></tr></thead>
+          <tbody>
+            <tr><td><code class="inline">redis</code></td><td><code class="inline">redis:7-alpine</code>, <code class="inline">--save 60 1</code> (RDB snapshot if ≥1 key changed in 60s)</td><td>—</td><td>Healthcheck: <code class="inline">redis-cli ping</code>. No published port — internal only.</td></tr>
+            <tr><td><code class="inline">backend</code></td><td><code class="inline">daphne -b 0.0.0.0 -p 8000 realestate_backend.asgi:application</code> (the Dockerfile's default <code class="inline">CMD</code>)</td><td><code class="inline">redis</code> (must be healthy first)</td><td>Healthcheck hits its own <code class="inline">/api/health/</code> with an explicit <code class="inline">Host: homekonet.com</code> header (needed since <code class="inline">localhost</code> isn't in prod <code class="inline">ALLOWED_HOSTS</code>). Port 8000 is <code class="inline">expose</code>d, not published — only reachable from other containers.</td></tr>
+            <tr><td><code class="inline">celery</code></td><td><code class="inline">celery -A realestate_backend worker --concurrency=2</code> (default queue)</td><td><code class="inline">redis</code> healthy, <code class="inline">backend</code> started</td><td>No healthcheck, no published port. Same image as <code class="inline">backend</code>, different <code class="inline">command</code>.</td></tr>
+            <tr><td><code class="inline">celery-beat</code></td><td><code class="inline">celery -A realestate_backend beat</code></td><td>same as <code class="inline">celery</code></td><td>Scheduler only — ticks jobs onto the broker, never executes them itself.</td></tr>
+            <tr><td><code class="inline">celery-ai</code></td><td><code class="inline">download_ai_model &amp;&amp; celery ... --concurrency=1 --pool=solo -Q ai_scoring</code></td><td>same as <code class="inline">celery</code></td><td>Own <code class="inline">ai_models</code> volume (persists the ~3GB GGUF file across restarts). Pinned to one process/one pool so exactly one copy of the model is ever resident in memory.</td></tr>
+            <tr><td><code class="inline">frontend</code></td><td><code class="inline">nginx -g "daemon off;"</code></td><td><code class="inline">backend</code> (start order only, no health condition)</td><td>Only service with published ports (<code class="inline">80:80</code>, <code class="inline">443:443</code>). Mounts <code class="inline">nginx.conf</code> and TLS certs read-only, plus the shared <code class="inline">static_files</code> volume and the same <code class="inline">./backend/media</code> bind mount as <code class="inline">backend</code> (read-only here).</td></tr>
+          </tbody>
+        </table>
+        <p>Every container built from <code class="inline">Dockerfile.backend</code> (<code class="inline">backend</code>, <code class="inline">celery</code>, <code class="inline">celery-beat</code>, <code class="inline">celery-ai</code>) shares <code class="inline">docker-entrypoint.sh</code> as its <code class="inline">ENTRYPOINT</code>: it runs <code class="inline">migrate --no-input</code>, then <code class="inline">collectstatic --no-input</code>, then <code class="inline">exec</code>s whatever <code class="inline">CMD</code>/<code class="inline">command</code> was set. That means migrations and static collection happen redundantly on all four container starts — harmless, since both commands are idempotent, but worth knowing so a slow redeploy of, say, <code class="inline">celery-beat</code> alone isn't surprising.</p>
+
+        <h3>Data &amp; caching layer</h3>
+        <p><strong>Postgres</strong> resolves in three tiers, first one configured wins: a single <code class="inline">DATABASE_URL</code> (the managed-Neon path used in production) → discrete <code class="inline">POSTGRES_*</code> vars with <code class="inline">DB_ENGINE=postgres</code> (local dev against a real Postgres, <code class="inline">sslmode=require</code> by default) → SQLite at <code class="inline">db.sqlite3</code> as a last-resort fallback for a bare checkout with no DB config at all.</p>
+        <p><strong>Redis does three unrelated jobs</strong> in this deployment, all off one instance:</p>
+        <ul>
+          <li><strong>Celery broker + result backend</strong> — always, whenever <code class="inline">REDIS_URL</code> is set.</li>
+          <li><strong>Django cache</strong> — only if <code class="inline">REDIS_URL</code> is set; otherwise falls back to a <strong>database-backed cache table</strong> (not <code class="inline">LocMemCache</code>), deliberately, because per-process in-memory cache can't be shared across multiple Daphne/Gunicorn workers — and this cache is what backs API rate limiting, which only works correctly if every worker sees the same counters.</li>
+          <li><strong>Channels layer</strong> — Redis-backed (<code class="inline">channels_redis</code>) when configured, else <code class="inline">InMemoryChannelLayer</code>, which only fans out WebSocket messages within a single process — fine for one-off local dev, not representative of production WS behavior.</li>
+        </ul>
+        <div class="callout tip">
+          <span class="callout-label">A <code class="inline">rediss://</code> URL from a managed provider</span>
+          If <code class="inline">REDIS_URL</code> uses <code class="inline">rediss://</code> (TLS) without an explicit <code class="inline">ssl_cert_reqs</code> query param, settings.py appends <code class="inline">ssl_cert_reqs=none</code> automatically — many managed Redis providers hand out certificates that don't chain to a publicly-trusted CA, and Python's default strict verification would otherwise refuse to connect.
+        </div>
+
+        <h3>Django configuration highlights</h3>
+        <p><strong>Middleware order</strong> (top to bottom, and order matters): CORS → custom security headers → Django's own <code class="inline">SecurityMiddleware</code> → WhiteNoise (must come right after <code class="inline">SecurityMiddleware</code> per its own docs) → sessions → common → CSRF → auth → request-logging (deliberately <em>after</em> auth, so <code class="inline">request.user</code> is populated when a request gets logged) → messages → clickjacking → suspension-check → maintenance-mode → break-glass audit → listing view-tracking.</p>
+        <p><strong>Auth model:</strong> stateless JWT access tokens (15 min lifetime) carried in the <code class="inline">Authorization</code> header; the refresh token (14 days, rotates on every use, old one blacklisted) lives <em>only</em> in an httpOnly, <code class="inline">SameSite</code>, secure cookie scoped to <code class="inline">/api/auth/</code> — JavaScript can never read it, which is the actual XSS-token-theft mitigation, not an incidental detail.</p>
+        <p><strong>ASGI, not WSGI, in production:</strong> both <code class="inline">wsgi.py</code> and <code class="inline">asgi.py</code> exist, but only the ASGI app is actually served (via Daphne) — WSGI is there for compatibility/management-command contexts only. <code class="inline">asgi.py</code> builds a <code class="inline">ProtocolTypeRouter</code> with a plain Django app for <code class="inline">http</code> and a Channels <code class="inline">URLRouter</code> (over <code class="inline">messaging</code> + <code class="inline">notifications</code> routing) for <code class="inline">websocket</code> — wrapped in <code class="inline">AllowedHostsOriginValidator</code> in production only, so a WS handshake with a forged <code class="inline">Origin</code> header is rejected before it ever reaches a consumer.</p>
+        <p><strong>CORS</strong> is allow-listed by exact origin only (no regex origins), always including the production Vercel preview domains plus whatever <code class="inline">CORS_ALLOWED_ORIGINS</code>/<code class="inline">FRONTEND_ORIGIN</code> env vars supply, with credentials enabled — meaning cookies/auth headers are only ever sent to origins explicitly on that list, never to an arbitrary subdomain.</p>
+        <p><strong>No error-tracking SaaS</strong> (no Sentry or equivalent) — production error visibility is entirely the custom rotating JSON log files plus the <code class="inline">platformops</code> log-viewer/recent-errors/system-health endpoints (see <a href="#monitoring">Monitoring &amp; Logging</a>).</p>
+
+        <h3>Backend apps</h3>
+        <table>
+          <thead><tr><th>App</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code class="inline">authapp</code></td><td>Registration, login, JWT lifecycle, email verification, password reset, Google OAuth</td></tr>
+            <tr><td><code class="inline">listings</code></td><td>Properties, categories, images, favorites, reviews, hotel rooms, pricing, analytics</td></tr>
+            <tr><td><code class="inline">bookings</code></td><td>Reservation state machine, viewings, saved searches, comparisons, host payouts</td></tr>
+            <tr><td><code class="inline">users</code></td><td>Custom <code class="inline">User</code>/profile model, dashboards, phone-change OTP, account deletion</td></tr>
+            <tr><td><code class="inline">payments</code></td><td>MTN MoMo + Stripe payment/refund/payout/webhook processing</td></tr>
+            <tr><td><code class="inline">messaging</code></td><td>Real-time chat over Channels WebSocket + REST</td></tr>
+            <tr><td><code class="inline">notifications</code></td><td>In-app/email/push notifications, WebSocket delivery</td></tr>
+            <tr><td><code class="inline">reports</code></td><td>User-submitted moderation reports on listings/users/reviews/messages</td></tr>
+            <tr><td><code class="inline">suspensions</code></td><td>Account suspension enforcement + admin tooling</td></tr>
+            <tr><td><code class="inline">newsletter</code>, <code class="inline">testimonials</code></td><td>Mailing list, marketing testimonials (Django-admin only today)</td></tr>
+            <tr><td><code class="inline">support</code></td><td>Contact form + SLA-aware support ticket system</td></tr>
+            <tr><td><code class="inline">hostapplications</code></td><td>3-stage host application review pipeline</td></tr>
+            <tr><td><code class="inline">propertyverifications</code></td><td>Property-ownership document (MOU/deed) verification workflow</td></tr>
+            <tr><td><code class="inline">superadmin</code></td><td><code class="inline">AdminAuditLog</code>, MFA (TOTP), impersonation, department gating</td></tr>
+            <tr><td><code class="inline">trustsafety</code></td><td>Fraud/AML flags, device/location bans, rule-based detectors</td></tr>
+            <tr><td><code class="inline">inventory</code></td><td>Listing moderation queue + rule-based content detectors</td></tr>
+            <tr><td><code class="inline">legalops</code></td><td>Terms of Service / Privacy Policy version registry</td></tr>
+            <tr><td><code class="inline">platformops</code></td><td>Feature flags, task heartbeats, maintenance mode, system health, and a 7-day rolling history of CPU/memory/disk/network snapshots (<code class="inline">ServerMetricSnapshot</code>, collected every 5 minutes)</td></tr>
+            <tr><td><code class="inline">aiscoring</code></td><td>Local LLM singleton loader + scorer for review queues (see <a href="#llm">Local LLM Subsystem</a>)</td></tr>
+            <tr><td><code class="inline">rbac</code></td><td>Fine-grained Role/Permission engine, break-glass, dual-authorization</td></tr>
+            <tr><td><code class="inline">chatbot</code></td><td>Customer-support chatbot reusing the aiscoring LLM, with human handoff</td></tr>
+          </tbody>
+        </table>
+        <p style="color:var(--muted-fg); font-size:.85rem;">Several of these apps (<code class="inline">propertyverifications</code>, <code class="inline">superadmin</code>, <code class="inline">trustsafety</code>, <code class="inline">inventory</code>, <code class="inline">legalops</code>, <code class="inline">platformops</code>, <code class="inline">aiscoring</code>, <code class="inline">rbac</code>, <code class="inline">chatbot</code>) postdate <code class="inline">PROJECT_FILE_GUIDE.md</code> — that file is a useful map but is no longer fully current; the <code class="inline">INSTALLED_APPS</code> list in <code class="inline">settings.py</code> is the authoritative source.</p>
+
+        <h3>Third-party integrations</h3>
+        <table>
+          <thead><tr><th>Service</th><th>Used for</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Stripe</td><td>Card payments, refunds, webhooks</td><td>Frontend loads <code class="inline">@stripe/react-stripe-js</code> with a public <code class="inline">VITE_STRIPE_PUBLISHABLE_KEY</code> baked in at image build time; backend holds <code class="inline">STRIPE_SECRET_KEY</code>/<code class="inline">STRIPE_WEBHOOK_SECRET</code>.</td></tr>
+            <tr><td>MTN Mobile Money</td><td>Guest → platform collection (Request-to-Pay) and platform → host disbursement (Transfer)</td><td><code class="inline">payments/gateways/mtn_momo.py</code>. OAuth2 bearer tokens are cached ~50 minutes (MTN's own tokens expire at 60) via the Django cache, so most calls skip a fresh token round-trip.</td></tr>
+            <tr><td>Cloudinary</td><td>Media storage (listing photos, uploaded documents)</td><td>Optional — only active if <code class="inline">CLOUDINARY_URL</code> is set; otherwise media falls back to local <code class="inline">FileSystemStorage</code> under the bind-mounted <code class="inline">./backend/media</code> volume.</td></tr>
+            <tr><td>Brevo (Sendinblue)</td><td>Transactional email (verification, password reset, notifications)</td><td>Via <code class="inline">django-anymail</code>. Defaults to a <code class="inline">console</code> backend (prints to stdout) when <code class="inline">DJANGO_DEBUG=true</code>; <code class="inline">EMAIL_BACKEND_MODE=smtp</code> is also available as a fallback.</td></tr>
+            <tr><td>Google OAuth</td><td>"Sign in with Google"</td><td>Server-side ID token verification (<code class="inline">google-auth</code>), not a client-only integration — the backend independently checks issuer/audience/email-verified claims before trusting it.</td></tr>
+            <tr><td>Web Push (VAPID)</td><td>Browser push notifications</td><td>Self-hosted protocol (<code class="inline">pywebpush</code> + a VAPID keypair we own), not a third-party SaaS — no external account/dashboard involved.</td></tr>
+            <tr><td>Neon</td><td>Managed Postgres</td><td>Reached purely via <code class="inline">DATABASE_URL</code> — no Neon-specific SDK or code path; any Postgres provider that hands out a connection string would work identically.</td></tr>
+          </tbody>
+        </table>
+        <div class="callout tip">
+          <span class="callout-label">Flutterwave / Orange Money env vars exist but aren't wired up</span>
+          <code class="inline">.env.example</code> has placeholders for both, but no code anywhere references them — they're vestigial from an earlier plan, not a second live mobile-money gateway. MTN MoMo is the only mobile money integration that actually runs.
+        </div>
+
+        <h3>Frontend build &amp; runtime</h3>
+        <p>Vite + <code class="inline">@vitejs/plugin-react</code> + Tailwind. <code class="inline">vite.config.ts</code> manually splits vendor chunks by dependency (<code class="inline">map-vendor</code> for Leaflet, <code class="inline">charts-vendor</code> for Recharts/d3, <code class="inline">query-vendor</code> for React Query, <code class="inline">calendar-vendor</code>, <code class="inline">motion-vendor</code>, <code class="inline">ui-vendor</code>, <code class="inline">router-vendor</code>) so a change to one area doesn't invalidate the browser cache for everything else.</p>
+        <p>State/data: <strong>Zustand</strong> (<code class="inline">src/store/appStore.ts</code>) for auth/app state, <strong>TanStack Query</strong> for server-state caching, <strong>react-hook-form</strong> for forms. UI is a mix of hand-rolled Radix/shadcn components (most of the app) and MUI (present in <code class="inline">package.json</code>, used in a minority of older screens) — prefer the existing Radix/shadcn primitives in <code class="inline">components/ui/</code> for anything new. Routing is <strong>React Router v7</strong>.</p>
+        <p>Real-time: no Socket.IO — <code class="inline">useChatSocket</code>/<code class="inline">useNotificationSocket</code> hooks open native browser <code class="inline">WebSocket</code> connections directly against <code class="inline">VITE_WS_URL</code> + <code class="inline">/ws/chat/&lt;id&gt;/</code> / <code class="inline">/ws/notifications/</code>, matching Channels' routing on the backend exactly — no client library translation layer in between.</p>
+        <p>The built output (<code class="inline">dist/</code>) is copied into the <code class="inline">frontend</code> Nginx image at build time — there's no separate static-hosting service (no Vercel/Netlify/S3+CloudFront in this deployment); the single Nginx container is both the CDN-equivalent and the API gateway.</p>
+      </section>
+
+      <section class="doc-section" id="patterns">
+        <h2>🧩 Request Flow &amp; Patterns</h2>
+
+        <h3>Standard endpoint shape</h3>
+        <p>Almost every endpoint is a DRF function-based view, not a viewset:</p>
+        <pre><code>@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def bookings_collection(request):
+    ...</code></pre>
+        <p>Business logic that doesn't belong in a view lives in a per-app <code class="inline">services.py</code> — e.g. <code class="inline">bookings/services.py</code> is the single place booking-lifecycle transitions happen (confirm, decline, expire), called identically from views, Django admin actions, and Celery beat tasks. <code class="inline">payments/services.py</code> and <code class="inline">propertyverifications/services.py</code> follow the same convention. Serializers validate/shape input; models stay thin.</p>
+
+        <h3>Booking state machine</h3>
+        <p><code class="inline">pending_host</code> → (host confirms within 7 days) → <code class="inline">awaiting_payment</code> → (guest pays within 10 days) → <code class="inline">payment_received</code> → (admin confirms) → <code class="inline">confirmed</code> (+ Payout created). Missed deadlines transition to <code class="inline">expired_unconfirmed</code>/<code class="inline">expired_unpaid</code> via Celery beat. Confirming a reservation auto-declines other overlapping <code class="inline">pending_host</code> requests on the same listing.</p>
+
+        <h3>Permission checks</h3>
+        <p>Two systems, both still live: the legacy department gate (<code class="inline">superadmin.permissions.require_department</code>/<code class="inline">is_superadmin_staff</code>) and the newer fine-grained RBAC engine (<code class="inline">rbac.permissions.has_permission</code>/<code class="inline">has_any_permission</code>/<code class="inline">has_role</code>). The legacy department helpers now delegate internally to the RBAC engine — see <a href="#rbac">RBAC Model</a>.</p>
+        <pre><code>from rbac.permissions import is_full_admin, has_any_permission
+if not (is_full_admin(user) or has_any_permission(user, 'listings.content')):
+    return Response({'error': '...'}, status=403)</code></pre>
+
+        <h3>Admin audit logging</h3>
+        <p>Any sensitive admin action calls <code class="inline">superadmin.permissions.log_admin_action(request, action, target=obj, reason=..., **metadata)</code>, appending an immutable <code class="inline">AdminAuditLog</code> row. <code class="inline">rbac.middleware.BreakGlassAuditMiddleware</code> additionally logs every request made during an active break-glass session.</p>
+
+        <h3>JWT auth flow</h3>
+        <ul>
+          <li><code class="inline">POST /api/auth/register/</code> — gated by the <code class="inline">new_registrations_enabled</code> flag and blocked device fingerprints; sends a verification email.</li>
+          <li><code class="inline">POST /api/auth/login/</code> — if the account has a confirmed MFA device, returns <code class="inline">{"mfa_required": true, "mfa_token": ...}</code> instead of tokens; otherwise issues tokens.</li>
+          <li><strong>The access token is returned in the JSON body. The refresh token is set ONLY as an httpOnly cookie</strong> (<code class="inline">AUTH_REFRESH_COOKIE_NAME="refresh_token"</code>, path <code class="inline">/api/auth/</code>, 14-day max age) — an explicit XSS-hardening measure, never returned in the body.</li>
+          <li><code class="inline">POST /api/auth/refresh-token/</code> — rotates the refresh token (<code class="inline">ROTATE_REFRESH_TOKENS=True</code>, <code class="inline">BLACKLIST_AFTER_ROTATION=True</code>); a replayed, already-rotated token raises <code class="inline">TokenError</code> → 401, giving reuse detection "for free."</li>
+          <li><code class="inline">POST /api/auth/google/</code> — verifies the Google ID token's issuer/audience/email_verified; blocks admin/staff accounts from Google sign-in (password only); no auto-linking if the email is already registered locally.</li>
+        </ul>
+        <p><code class="inline">ACCESS_TOKEN_LIFETIME=15min</code>, <code class="inline">REFRESH_TOKEN_LIFETIME=14 days</code> (settings.py).</p>
+      </section>
+
+      <section class="doc-section" id="async">
+        <h2>⚙️ Async &amp; Background Work</h2>
+
+        <h3>Celery setup</h3>
+        <p><code class="inline">realestate_backend/celery.py</code> pulls every <code class="inline">CELERY_*</code> setting from Django settings and auto-discovers <code class="inline">tasks.py</code> in every installed app. Broker/result backend is Redis. <code class="inline">CELERY_TASK_ALWAYS_EAGER</code> defaults to <code class="inline">DEBUG</code> — in a fresh dev checkout with no broker configured, tasks just run synchronously in-process.</p>
+
+        <h3>Beat schedule</h3>
+        <pre><code>CELERY_BEAT_SCHEDULE = {
+    'expire-unconfirmed-reservations': {  # hourly :00
+        'task': 'bookings.tasks.expire_unconfirmed_reservations',
+    },
+    'expire-unpaid-reservations': {       # hourly :05
+        'task': 'bookings.tasks.expire_unpaid_reservations',
+    },
+    'expire-suspensions': {               # hourly :10
+        'task': 'suspensions.tasks.expire_suspensions',
+    },
+    'collect-server-metrics': {           # every 5 minutes
+        'task': 'platformops.tasks.collect_server_metrics',
+    },
+}</code></pre>
+        <p>The last one writes a <code class="inline">ServerMetricSnapshot</code> row (CPU/memory/disk/network, via <code class="inline">psutil</code>) and prunes anything older than 7 days — it's the write side of the history graph behind <code class="inline">GET /api/platform-ops/server-metrics/</code> (see <a href="#architecture">Architecture Overview</a> and <a href="#monitoring">Monitoring &amp; Logging</a>).</p>
+
+        <h3>The dedicated <code class="inline">ai_scoring</code> queue</h3>
+        <p>Every <code class="inline">aiscoring</code> and <code class="inline">chatbot</code> task is declared <code class="inline">@shared_task(queue='ai_scoring')</code> and is consumed <strong>only</strong> by the <code class="inline">celery-ai</code> service (<code class="inline">--concurrency=1 --pool=solo -Q ai_scoring</code>) — deliberately, so only one process ever loads the ~3 GB local model. The default <code class="inline">celery</code>/<code class="inline">celery-beat</code> services don't listen on this queue; if <code class="inline">celery-ai</code> isn't running, those tasks just sit unconsumed.</p>
+
+        <h3>Channels / WebSocket</h3>
+        <p><code class="inline">realestate_backend/asgi.py</code> splits HTTP (normal Django) from WebSocket (Channels <code class="inline">URLRouter</code> over <code class="inline">messaging</code> + <code class="inline">notifications</code> routing). Channel layer is Redis-backed when <code class="inline">REDIS_URL</code> is set, else in-memory (only works within a single process — Redis is required for realistic multi-worker behavior). Chat clients authenticate <em>after</em> connecting by sending <code class="inline">{"type": "authenticate", "token": "..."}</code>, not via the connection handshake.</p>
+      </section>
+
+      <section class="doc-section" id="llm">
+        <h2>🤖 Local LLM Subsystem</h2>
+        <p class="section-intro">Qwen2.5-3B-Instruct, GGUF-quantized, CPU inference via <code class="inline">llama-cpp-python</code>. Powers KYC pre-screen, fraud/listing scoring, and the support chatbot — all gated by one feature flag.</p>
+
+        <h3><code class="inline">aiscoring/model_service.py</code> — lazy singleton</h3>
+        <pre><code>def get_model():
+    global _model
+    if _model is not None:
+        return _model
+    with _lock:
+        if _model is not None:
+            return _model
+        if not os.path.exists(model_path):
+            raise ModelUnavailable(...)
+        from llama_cpp import Llama
+        _model = Llama(model_path=model_path, n_ctx=settings.AI_MODEL_CONTEXT_SIZE,
+                        n_threads=os.cpu_count() or 4, verbose=False)
+        return _model</code></pre>
+        <div class="callout tip">
+          <span class="callout-label">Never call this from a view</span>
+          <code class="inline">get_model()</code> is only ever called from Celery tasks (<code class="inline">aiscoring.tasks</code> / <code class="inline">chatbot.tasks</code>), never at Django startup or in the HTTP request path — so the model loads once per Celery worker process, never per web worker.
+        </div>
+
+        <h3>Scoring &amp; the JSON contract</h3>
+        <p><code class="inline">aiscoring/scorer.py</code> prompts the model to reply with <strong>only</strong> a JSON object (<code class="inline">{"score": 0-100, "rationale": "..."}</code>), using <code class="inline">create_chat_completion(..., response_format={"type": "json_object"})</code> for constrained decoding, with a regex fallback (<code class="inline">\{.*\}</code>) if strict parsing fails. Four scoring entry points — fraud flags, listing flags, host applications, property verifications — each build a domain prompt from real structured fields only; <strong>none of them do vision/OCR on uploaded documents or photos.</strong></p>
+
+        <h3>Task gating &amp; observability</h3>
+        <p>Each of the four <code class="inline">aiscoring.tasks</code> functions: checks <code class="inline">platformops.utils.is_feature_enabled('ai_scoring_enabled', default=False)</code> and short-circuits if off → loads the row → scores it → writes <code class="inline">ai_score</code>/<code class="inline">ai_rationale</code> back → records a <code class="inline">TaskHeartbeat</code> (success/failure) → on <code class="inline">ModelUnavailable</code> (model not downloaded), logs a warning and swallows; on any other exception, logs and re-raises.</p>
+
+        <h3>Downloading the model</h3>
+        <pre><code>python manage.py download_ai_model         # skip if already present + checksum matches
+python manage.py download_ai_model --force # force re-download</code></pre>
+        <p>Streams to a <code class="inline">.part</code> temp file, verifies SHA-256 against <code class="inline">AI_MODEL_SHA256</code>, and only then atomically <code class="inline">os.replace()</code>s it into place — never leaves a corrupt file at the real path. This command runs automatically as the first step of the <code class="inline">celery-ai</code> container's start command, so the very first boot downloads the ~3 GB file before the worker becomes ready.</p>
+
+        <h3>Chatbot reuse</h3>
+        <p><code class="inline">chatbot/responder.py</code> imports <code class="inline">get_model</code> directly from <code class="inline">aiscoring.model_service</code> — same process-wide singleton, so as long as one <code class="inline">celery-ai</code> process handles both, the model loads once and is shared. The chatbot builds a system prompt from a knowledge base (<code class="inline">chatbot/knowledge_base.py</code> — static FAQ/product copy plus a 60-second-cached query of published listings) and a token-budgeted conversation history, constraining output to <code class="inline">{"reply": str, "needs_agent": bool}</code>. <code class="inline">POST /api/chatbot/handoff/</code> converts a transcript into a real <code class="inline">support.SupportTicket</code>.</p>
+
+        <div class="callout warn">
+          <span class="callout-label">Feature-flag default is off</span>
+          <code class="inline">ai_scoring_enabled</code> defaults to <code class="inline">False</code> so a fresh deploy never loads the model until an admin opts in from Management Portal → Settings. Both <code class="inline">aiscoring</code> and <code class="inline">chatbot</code> check this flag independently before doing any inference.
+        </div>
+      </section>
+
+      <section class="doc-section" id="database">
+        <h2>🗄️ Database &amp; Migrations</h2>
+        <p>Engine selection priority in <code class="inline">settings.py</code>: <code class="inline">DATABASE_URL</code> (managed Postgres, e.g. Neon) → discrete <code class="inline">DB_ENGINE=postgres</code>/<code class="inline">POSTGRES_*</code> vars → local SQLite fallback for a bare checkout with no DB config.</p>
+
+        <h3>Running migrations</h3>
+        <pre><code># Local dev
+cd backend
+python manage.py migrate
+python manage.py createcachetable   # only needed if not using Redis cache
+
+# Docker — automatic
+# docker-entrypoint.sh runs `migrate --no-input` then `collectstatic --no-input`
+# before exec'ing the real process, on every container start
+# (backend, celery, celery-beat, celery-ai all do this redundantly — harmless, idempotent)</code></pre>
+        <p>Some migrations are <strong>data migrations</strong>, not just schema — e.g. <code class="inline">hostapplications/migrations/0002_create_reviewer_groups.py</code> seeds reviewer Django Groups; <code class="inline">listings/migrations/0011_...</code> and <code class="inline">0018_...</code> seed/rename property categories. Be careful squashing or deleting these.</p>
+        <p>Before considering a deploy release-ready, confirm zero pending migrations: <code class="inline">python manage.py showmigrations</code> (the release-check script enforces this automatically — see <a href="#testing">Testing &amp; Release Gate</a>).</p>
+      </section>
+
+      <section class="doc-section" id="deployment">
+        <h2>🚀 Deployment &amp; Infrastructure</h2>
+
+        <h3>Images</h3>
+        <p><code class="inline">Dockerfile.backend</code> is a two-stage build. The builder stage installs <code class="inline">gcc g++ cmake libpq-dev libjpeg-dev zlib1g-dev</code> and runs <code class="inline">pip install -r requirements.txt</code>.</p>
+        <div class="callout warn">
+          <span class="callout-label">llama-cpp-python compiles from source</span>
+          There's no prebuilt wheel path assumed here — <code class="inline">llama-cpp-python</code> compiles its C++ backend at install time, making backend image builds noticeably slower whenever that dependency or the base image cache is invalidated. Budget extra time for a clean <code class="inline">docker compose build backend</code>.
+        </div>
+        <p><code class="inline">Dockerfile.frontend</code> uses <code class="inline">node:20-alpine</code> to build the Vite app, then <code class="inline">nginx:1.27-alpine</code> to serve <code class="inline">dist/</code>.</p>
+        <div class="callout tip">
+          <span class="callout-label">VITE_* vars are baked at build time</span>
+          Changing <code class="inline">VITE_API_URL</code>/<code class="inline">VITE_WS_URL</code>/etc. always requires rebuilding the frontend image — restarting the container alone won't pick up new values.
+        </div>
+
+        <h3>Volumes</h3>
+        <table>
+          <thead><tr><th>Volume</th><th>Mounted on</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code class="inline">redis_data</code></td><td>redis</td><td>Persistence (<code class="inline">--save 60 1</code>)</td></tr>
+            <tr><td><code class="inline">backend_logs</code></td><td>backend, celery, celery-beat, celery-ai</td><td><code class="inline">/app/logs</code> — shared JSON log files</td></tr>
+            <tr><td><code class="inline">static_files</code></td><td>backend, frontend</td><td>Collected static, shared between Django and Nginx</td></tr>
+            <tr><td><code class="inline">ai_models</code></td><td>celery-ai only</td><td>The downloaded GGUF model file</td></tr>
+            <tr><td><code class="inline">./backend/media</code> (bind mount)</td><td>backend (rw), frontend (ro)</td><td>User uploads, when Cloudinary isn't configured</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Deploying an update</h3>
+        <pre><code>cd /opt/homekonet
+git pull origin main
+docker compose build
+docker compose up -d --force-recreate
+docker compose ps
+docker compose logs --tail=50 backend</code></pre>
+        <p>Migrations and <code class="inline">collectstatic</code> happen automatically via the entrypoint on every recreated container — no separate manual migrate step for a Compose deploy. To update a single service: <code class="inline">docker compose build backend && docker compose up -d --no-deps --force-recreate backend</code>.</p>
+
+        <h3>Nginx</h3>
+        <p><code class="inline">nginx/nginx.conf</code> terminates TLS, sets security headers (HSTS, X-Frame-Options, etc.), and proxies: <code class="inline">/api/</code> (60s read timeout) and <code class="inline">/ws/</code> (86400s read timeout, for long-lived WebSockets) to <code class="inline">backend:8000</code>; serves <code class="inline">/static/</code>, <code class="inline">/media/</code>, and <code class="inline">/assets/</code> with long cache lifetimes; falls back to the SPA's <code class="inline">index.html</code> for everything else.</p>
+      </section>
+
+      <section class="doc-section" id="cli">
+        <h2>⌨️ CLI Reference</h2>
+        <p class="section-intro">Every command actually needed to run, deploy, debug, and maintain this app on the server (<code class="inline">/opt/homekonet</code>), grouped by task. All six services (<code class="inline">redis</code>, <code class="inline">backend</code>, <code class="inline">celery</code>, <code class="inline">celery-beat</code>, <code class="inline">celery-ai</code>, <code class="inline">frontend</code>) run under Docker Compose — there is no separate systemd unit for the app itself, only for the <code class="inline">docker</code> daemon.</p>
+
+        <h3>Container lifecycle</h3>
+        <pre><code># Build one service (rebuild after any code change before deploying it)
+docker compose build backend
+docker compose build frontend
+docker compose build                        # every service
+
+# Deploy: recreate container(s) from the freshly built image
+docker compose up -d --force-recreate backend celery celery-beat
+docker compose up -d --force-recreate frontend
+docker compose up -d --force-recreate       # everything
+
+# Update a single service without touching the others
+docker compose build backend &amp;&amp; docker compose up -d --no-deps --force-recreate backend
+
+# Status of every service (state, health, ports)
+docker compose ps
+
+# Stop / start without rebuilding or recreating
+docker compose stop backend
+docker compose start backend
+docker compose restart backend              # stop+start, keeps the existing image
+
+# Tear everything down (containers only — named volumes survive by default)
+docker compose down
+# Add --volumes only if you explicitly intend to wipe redis_data/static_files/ai_models — this is destructive.</code></pre>
+        <div class="callout warn">
+          <span class="callout-label">The entrypoint always runs migrate + collectstatic first</span>
+          Every container start (<code class="inline">up</code>, <code class="inline">restart</code>, or a fresh <code class="inline">run</code>) executes <code class="inline">docker-entrypoint.sh</code>, which runs <code class="inline">migrate --no-input</code> and <code class="inline">collectstatic --no-input</code> <em>before</em> the real process starts — including before a one-off <code class="inline">docker compose run</code> command you pass on the same line. This is why a migration file created via <code class="inline">makemigrations</code> inside a <code class="inline">run</code> never applies in that same invocation — see <a href="#common-errors">Common Errors #5</a>.
+        </div>
+
+        <h3>Health checks</h3>
+        <pre><code># Is the site actually serving?
+curl -sk https://homekonet.com/api/health/
+
+# Container-level health status (backend/celery/celery-beat define HEALTHCHECK)
+docker inspect --format='{{.State.Health.Status}}' homekonet-backend-1
+
+# Wait for a container to become healthy after a redeploy (poll, don't guess-sleep)
+until [ "$(docker inspect --format='{{.State.Health.Status}}' homekonet-backend-1)" = "healthy" ]; do sleep 2; done
+
+# Full platform diagnostics (DB, Redis, Celery workers, disk, recent error count) — requires engineering RBAC
+curl -sk https://homekonet.com/api/platform-ops/system-health/ -H "Authorization: Bearer &lt;token&gt;"</code></pre>
+
+        <h3>Logs</h3>
+        <pre><code>docker compose logs backend                 # everything captured so far
+docker compose logs -f backend              # follow / tail -f style
+docker compose logs --tail=50 backend
+docker compose logs -f backend celery celery-beat   # multiple services interleaved, by timestamp
+docker compose logs --since=10m backend     # only the last 10 minutes
+
+# The structured JSON app logs (see Monitoring &amp; Logging below) live on a shared volume —
+# readable directly without going through Docker's own log driver:
+docker compose exec backend tail -f /app/logs/errors.log
+docker compose exec backend tail -n 200 /app/logs/application.log</code></pre>
+
+        <h3>Django management commands</h3>
+        <p>Two ways to run one: <code class="inline">exec</code> (inside an already-running container) or <code class="inline">run --rm</code> (spins up a fresh, throwaway container). Prefer <code class="inline">exec</code> for anything read-only or quick; <code class="inline">run --rm</code> when the target container isn't up yet or you want full isolation.</p>
+        <pre><code># Interactive Django shell against the real database
+docker compose exec backend python manage.py shell
+docker compose exec -T backend python manage.py shell &lt; script.py   # -T: pipe a script in non-interactively
+
+# Check for pending migrations / config problems without changing anything
+docker compose run --rm backend python manage.py check
+docker compose exec backend python manage.py showmigrations
+
+# Apply migrations by hand (normally automatic via the entrypoint — see the callout above)
+docker compose exec backend python manage.py migrate
+
+# Create a new migration — the container is ephemeral, so bind-mount the migrations
+# folder back to the host or the generated file vanishes when the container exits:
+docker compose run --rm \
+  -v $(pwd)/backend/&lt;app&gt;/migrations:/app/&lt;app&gt;/migrations \
+  backend python manage.py makemigrations &lt;app&gt;
+
+# Provision a full admin/superuser account directly (the only supported way to grant
+# role='superadmin' — there is intentionally no dashboard control for this)
+docker compose exec backend python manage.py createsuperuser
+
+# Raw SQL shell against the real (Neon/Postgres) database
+docker compose exec backend python manage.py dbshell
+
+# Any other one-off management command follows the same pattern:
+docker compose exec backend python manage.py &lt;command&gt; [args]</code></pre>
+
+        <h3>Shell access inside a container</h3>
+        <pre><code>docker compose exec backend bash            # or sh, if bash isn't installed in that image
+docker compose exec celery bash
+docker compose exec frontend sh             # nginx:alpine — sh only, no bash
+
+# One-off Python (not manage.py shell — no Django app registry loaded)
+docker compose exec backend python3 -c "print('quick check')"</code></pre>
+
+        <h3>Database &amp; disk housekeeping</h3>
+        <pre><code># Disk usage on the host
+df -h /
+
+# Docker's own disk footprint (images, containers, volumes, build cache)
+docker system df
+
+# Reclaim space — safe: only removes stopped/dangling resources, never named volumes in use
+docker image prune -f
+docker builder prune -f --filter "until=168h"   # build cache older than 7 days
+
+# NEVER run without checking first — this deletes containers/networks/images not in use,
+# and --volumes would take named volumes (redis_data, ai_models, static_files) with them
+docker system prune            # asks for confirmation; read the summary before confirming
+docker system prune -a --volumes   # destructive — do not run on this host without explicit sign-off</code></pre>
+        <div class="callout danger">
+          <span class="callout-label">Never docker system prune -a --volumes casually</span>
+          This host has no separate <code class="inline">db</code> container — the real data lives in managed Postgres (Neon), so the risk here is narrower than on a self-hosted DB box, but <code class="inline">redis_data</code> (cache/session state) and <code class="inline">ai_models</code> (the ~3&nbsp;GB downloaded GGUF file, expensive to re-fetch) are still real losses. Always run a bare <code class="inline">docker system df</code> first and reclaim narrowly (image/builder prune) before ever reaching for the volume-destroying flags.
+        </div>
+
+        <h3>General Linux commands used operating this box</h3>
+        <pre><code># What's running, and how much CPU/memory it's using
+docker compose ps
+docker stats --no-stream                    # live resource usage per container, one-shot
+
+# Find a specific process (e.g. a stuck build or a leftover script)
+ps aux | grep "[d]ocker compose build"      # bracket trick avoids matching the grep command itself
+
+# What's listening on a port (useful if 80/443 seem unreachable)
+ss -tlnp | grep -E ':80|:443'
+
+# Kill a hung process by PID (last resort — prefer docker compose stop/restart for containers)
+kill &lt;pid&gt;
+kill -9 &lt;pid&gt;                              # only if a plain kill doesn't work
+
+# Certificates (static files on this host, no certbot auto-renew hook configured)
+ls -la nginx/ssl/
+openssl x509 -in nginx/ssl/fullchain.pem -noout -enddate   # check expiry
+
+# Pull the latest code before rebuilding
+git pull origin main
+git log --oneline -10
+git status</code></pre>
+      </section>
+
+      <section class="doc-section" id="monitoring">
+        <h2>📈 Monitoring &amp; Logging</h2>
+
+        <h3>Log files</h3>
+        <p>All written as single-line JSON, rotating at 10 MB × 10 backups, in <code class="inline">backend/logs/</code> (the <code class="inline">backend_logs</code> volume in Docker):</p>
+        <table>
+          <thead><tr><th>File</th><th>Contents</th></tr></thead>
+          <tbody>
+            <tr><td><code class="inline">application.log</code></td><td>Every HTTP request (via <code class="inline">RequestLogMiddleware</code>) + everything from <code class="inline">homekonet.activity</code>/<code class="inline">homekonet.transactions</code></td></tr>
+            <tr><td><code class="inline">activity.log</code></td><td>User-level audit trail, via <code class="inline">log_activity()</code></td></tr>
+            <tr><td><code class="inline">transactions.log</code></td><td>Payment/financial events, via <code class="inline">log_transaction()</code> — never logs passwords/tokens/card data</td></tr>
+            <tr><td><code class="inline">errors.log</code></td><td>WARNING+ from <code class="inline">django.request</code>, <code class="inline">django.security</code>, and app-level loggers</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Health &amp; error endpoints (<code class="inline">platformops</code>)</h3>
+        <ul>
+          <li><code class="inline">GET /api/platform-ops/system-health/</code> — DB connectivity (raw <code class="inline">SELECT 1</code>), Redis ping, Celery worker count (<code class="inline">celery_app.control.inspect().ping()</code>), disk usage via <code class="inline">psutil</code> (flags unhealthy over 90% used), error count in the last hour, and the full <code class="inline">TaskHeartbeat</code> table.</li>
+          <li><code class="inline">GET /api/platform-ops/server-metrics/</code> — a live <code class="inline">psutil</code> snapshot (CPU/memory/disk/network) plus up to 288 stored <code class="inline">ServerMetricSnapshot</code> rows (24h of history at 5-minute granularity) for graphing trends rather than just an instantaneous read.</li>
+          <li><code class="inline">GET /api/platform-ops/recent-errors/?limit=N</code> (max 500) — tails <code class="inline">errors.log</code>, newest first.</li>
+          <li><code class="inline">GET /api/platform-ops/log-viewer/?level=&amp;search=&amp;limit=N</code> (max 500) — generic tail-and-filter over any of the four log files listed above, not just <code class="inline">errors.log</code>.</li>
+          <li><code class="inline">POST /api/platform-ops/flush-cache/</code> — clears the cache backend, audit-logged.</li>
+        </ul>
+        <p>All of these require engineering-level RBAC access (<code class="inline">infrastructure.feature_flags</code>/<code class="inline">infrastructure.system_caches</code>, or the legacy <code class="inline">engineering</code> department). In Docker, raw logs are also just <code class="inline">docker compose logs -f backend|celery|celery-beat|celery-ai</code> away.</p>
+      </section>
+
+      <section class="doc-section" id="testing">
+        <h2>✅ Testing &amp; Release Gate</h2>
+        <div class="callout warn">
+          <span class="callout-label">Test coverage is sparse</span>
+          Only <code class="inline">backend/test_booking_django.py</code> and <code class="inline">backend/test_permissions_proper.py</code> are real <code class="inline">APITestCase</code> suites. <code class="inline">test_booking.py</code>/<code class="inline">test_permissions.py</code> are ad-hoc scripts, not wired into <code class="inline">manage.py test</code>. Most apps have no tests at all, and there is currently no frontend test suite. Verify changes manually (or via the <code class="inline">verify</code> skill) rather than assuming test coverage will catch a regression.
+        </div>
+        <pre><code>cd backend &amp;&amp; python manage.py test   # Django tests
+cd frontend &amp;&amp; npm run build          # closest thing to a frontend check today</code></pre>
+
+        <h3>Release gate</h3>
+        <pre><code>bash scripts/release-check.sh              # full gate
+bash scripts/release-check.sh --allow-dev  # local dry-run, downgrades most checks to warnings</code></pre>
+        <p>Runs, in order: Django <code class="inline">check</code> → <code class="inline">prelaunch_check.py</code> (DEBUG off, real <code class="inline">SECRET_KEY</code>, non-wildcard <code class="inline">ALLOWED_HOSTS</code>, email verification required, Postgres engine, <strong>zero pending migrations</strong>, Redis cache reachable, real email backend, <code class="inline">CELERY_ALWAYS_EAGER=false</code>, production-only CORS origins, an active MTN MoMo gateway configured, secure cookies) → frontend <code class="inline">lint</code> → <code class="inline">typecheck</code> → <code class="inline">build</code>. <strong>Deploy only when this reports zero failures.</strong></p>
+
+        <h3>Pre-commit hooks</h3>
+        <p>Bandit (HIGH severity/confidence, scoped to <code class="inline">backend/</code>), detect-secrets (against <code class="inline">.secrets.baseline</code>), Gitleaks (git-history secret scan), plus standard hygiene hooks including <strong>no direct commits to <code class="inline">main</code></strong>.</p>
+      </section>
+
+      <section class="doc-section" id="tasks">
+        <h2>🛠️ Common Dev Tasks</h2>
+
+        <h3>Add a new Django app/endpoint</h3>
+        <ol class="steps">
+          <li><code class="inline">python manage.py startapp &lt;name&gt;</code>, add it to <code class="inline">INSTALLED_APPS</code>.</li>
+          <li>Follow the convention: <code class="inline">models.py</code> → <code class="inline">serializers.py</code> → <code class="inline">services.py</code> (business logic) → <code class="inline">views.py</code> (thin <code class="inline">@api_view</code> functions) → <code class="inline">urls.py</code> → register under <code class="inline">api/&lt;name&gt;/</code> in <code class="inline">realestate_backend/urls.py</code>.</li>
+          <li>For admin-gated endpoints, check against an existing or new node in <code class="inline">rbac/resources.py</code>'s resource tree, and call <code class="inline">log_admin_action</code> for anything sensitive.</li>
+          <li><code class="inline">python manage.py makemigrations &lt;name&gt; &amp;&amp; python manage.py migrate</code>.</li>
+        </ol>
+
+        <h3>Add a new Celery task</h3>
+        <p>Regular job → <code class="inline">@shared_task</code> in the app's <code class="inline">tasks.py</code> (auto-discovered, runs on the default queue); register a schedule in <code class="inline">CELERY_BEAT_SCHEDULE</code> if it's periodic. LLM-backed job → put it in (or alongside) <code class="inline">aiscoring/tasks.py</code>, decorate <code class="inline">@shared_task(queue='ai_scoring')</code>, gate it behind <code class="inline">is_feature_enabled('ai_scoring_enabled', default=False)</code>, and call <code class="inline">TaskHeartbeat.record(...)</code> at the end.</p>
+
+        <h3>Add a new feature flag</h3>
+        <p>Creating a <code class="inline">FeatureFlag</code> row alone does nothing — it's just a registered switch. You must also add an <code class="inline">is_feature_enabled('your_key', default=...)</code> check at the actual enforcement point in code.</p>
+
+        <h3>Run locally vs. Docker</h3>
+        <pre><code># Backend, local
+cd backend
+python -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+python manage.py migrate
+python manage.py createcachetable
+python manage.py runserver
+
+# Frontend, local
+cd frontend &amp;&amp; npm install &amp;&amp; npm run dev   # http://localhost:5173
+
+# Everything, Docker
+docker compose up -d --build   # requires backend/.env to exist</code></pre>
+        <p>With no <code class="inline">REDIS_URL</code>, Celery runs eagerly in-process and Channels uses an in-memory layer — fine for basic dev, but WebSocket/multi-process behavior won't be realistic. Expect the <strong>first</strong> <code class="inline">celery-ai</code> boot to take a while — it downloads the ~3 GB model before the worker is ready.</p>
+      </section>
+
+      <section class="doc-section" id="troubleshooting">
+        <h2>🔧 Troubleshooting</h2>
+
+        <h3>A Celery task is failing</h3>
+        <ol class="steps">
+          <li>Check <code class="inline">docker compose logs celery|celery-beat|celery-ai</code> for the traceback.</li>
+          <li>Check the <code class="inline">TaskHeartbeat</code> row for that task name via <code class="inline">/api/platform-ops/system-health/</code> — <code class="inline">last_error</code> holds the last failure message.</li>
+          <li>Check <code class="inline">/api/platform-ops/recent-errors/</code> for the <code class="inline">errors.log</code> tail.</li>
+          <li>For the <code class="inline">ai_scoring</code> queue specifically: confirm <code class="inline">ai_scoring_enabled</code> is on, and that the GGUF file actually exists at <code class="inline">AI_MODEL_PATH</code> (re-run <code class="inline">download_ai_model</code>, or <code class="inline">--force</code> if the checksum is bad).</li>
+        </ol>
+
+        <h3>Rebuilding after a dependency change</h3>
+        <p>Python deps (<code class="inline">backend/requirements.txt</code>): <code class="inline">docker compose build backend celery celery-beat celery-ai</code> (they all share <code class="inline">Dockerfile.backend</code>) — expect this to be slow if <code class="inline">llama-cpp-python</code> or the base image cache was invalidated. Node deps (<code class="inline">frontend/package.json</code>): <code class="inline">docker compose build frontend</code>.</p>
+
+        <h3>Migrations out of sync</h3>
+        <p>Standard Django approach: <code class="inline">python manage.py migrate &lt;app&gt; zero</code> to unapply, remove migration files, <code class="inline">makemigrations</code> again — but watch for the data migrations called out in <a href="#database">Database &amp; Migrations</a>; squashing/deleting them needs care since they seed real data, not just schema.</p>
+
+        <h3>Connecting to the database</h3>
+        <p>Since there's no local <code class="inline">db</code> container, connect directly to whatever <code class="inline">DATABASE_URL</code>/<code class="inline">POSTGRES_*</code> point to — <code class="inline">python manage.py dbshell</code>, or <code class="inline">psql</code> directly with the credentials in <code class="inline">backend/.env</code>.</p>
+      </section>
+
+      <section class="doc-section" id="common-errors">
+        <h2>🐞 Common Errors — Real Incidents</h2>
+        <p class="section-intro">Actual bugs hit and fixed in this codebase, kept here so the same class of mistake is faster to recognize next time. Each entry is symptom → root cause → fix → how to avoid it again.</p>
+
+        <div class="card">
+          <h4>1. "Failed to fetch" on login/register, no server-side error at all</h4>
+          <p><strong>Symptom:</strong> the browser shows a generic "Failed to fetch" toast; DevTools console shows something like:</p>
+          <pre><code>Access to fetch at 'https://homekonet.com/api/auth/login/' from origin 'https://www.homekonet.com'
+has been blocked by CORS policy: Request header field x-device-fingerprint is not allowed
+by Access-Control-Allow-Headers in preflight response.</code></pre>
+          <p><strong>Cause:</strong> <code class="inline">django-cors-headers</code> only allows a small default header set unless <code class="inline">CORS_ALLOW_HEADERS</code> is set explicitly. The frontend had started sending a custom <code class="inline">X-Device-Fingerprint</code> header on login, but the backend's CORS config was never updated to allow it — the browser blocked the request in its preflight check before it ever reached Django. This only shows up when the frontend and backend are on different origins (here, <code class="inline">www.homekonet.com</code> calling <code class="inline">homekonet.com</code>); same-origin requests never preflight, so this can look fine in a dev setup where both are served from one origin.</p>
+          <p><strong>Fix</strong> (<code class="inline">realestate_backend/settings.py</code>):</p>
+          <pre><code>from corsheaders.defaults import default_headers as _cors_default_headers
+CORS_ALLOW_HEADERS = [*_cors_default_headers, "x-device-fingerprint"]</code></pre>
+          <p><strong>Avoid it again:</strong> whenever you add a new custom request header anywhere in the frontend, immediately check/update <code class="inline">CORS_ALLOW_HEADERS</code>. Verify with a real preflight, not a same-origin curl call:</p>
+          <pre><code>curl -X OPTIONS https://homekonet.com/api/auth/login/ \
+  -H "Origin: https://www.homekonet.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type,x-device-fingerprint" -D -</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>2. A duplicate function/property name silently shadows the correct implementation</h4>
+          <p><strong>Symptom:</strong> a feature (account deletion) calls the wrong implementation with no obvious error at the call site — a 405 or 500 despite the "right" code looking correct wherever you look for it.</p>
+          <p><strong>Cause</strong> — found twice, one in each language:</p>
+          <ul>
+            <li><code class="inline">frontend/src/services/api/users.ts</code> defined <code class="inline">deleteAccount</code> <strong>twice</strong> in the same object literal (once <code class="inline">DELETE</code>, once <code class="inline">POST</code>). JS object literals keep only the <em>last</em> duplicate key — the correct <code class="inline">DELETE</code> version was silently discarded at runtime.</li>
+            <li><code class="inline">backend/users/views.py</code> had <code class="inline">from .deletion import delete_account</code> at the top, then defined its own unrelated, never-wired-to-any-URL view function also named <code class="inline">delete_account(request)</code> later in the same file. The later <code class="inline">def</code> rebinds the module-level name — every caller after that point silently got the wrong function (which expected an <code class="inline">HttpRequest</code>, not a <code class="inline">User</code>, and crashed with a 500).</li>
+          </ul>
+          <p><strong>Fix:</strong> delete the incorrect/dead duplicate in each case; keep the one that's actually wired up.</p>
+          <p><strong>Avoid it again:</strong> <code class="inline">npm run typecheck</code> <em>does</em> catch the JS case — <code class="inline">TS1117: An object literal cannot have multiple properties with the same name</code> — make typecheck part of your pre-merge checklist rather than eyeballing diffs. Python has no built-in check for this; a linter rule like Ruff's/Pyflakes' <code class="inline">F811</code> ("redefinition of unused name") catches it and is worth adding to <a href="#testing">the pre-commit hooks</a> (only Bandit runs today). Until then, grep before adding a new definition of an existing name: <code class="inline">grep -rn "def delete_account\|delete_account =" backend/</code>.</p>
+        </div>
+
+        <div class="card">
+          <h4>3. NameError after refactoring out a shared helper function</h4>
+          <p><strong>Symptom:</strong> an endpoint that previously worked (MFA login step-up) suddenly 500s with <code class="inline">NameError: name '_verify_code_or_backup' is not defined</code> — even though <code class="inline">manage.py check</code> reported zero issues right before deploying.</p>
+          <p><strong>Cause:</strong> a private module-level helper was moved onto a model method (<code class="inline">MFADevice.verify_code_or_backup()</code>), and one of its <strong>two</strong> call sites was updated while the other (<code class="inline">mfa_verify_login</code>) was missed. <code class="inline">manage.py check</code> only validates configuration/imports at load time — it never executes view function bodies, so a stale reference inside a function is invisible until that exact code path actually runs.</p>
+          <p><strong>Fix:</strong> grepped for the old name, found the missed call site, updated it to <code class="inline">device.verify_code_or_backup(code)</code>.</p>
+          <p><strong>Avoid it again:</strong> after renaming/moving/removing any function, <code class="inline">grep -rn &lt;old_name&gt; backend/</code> across the <em>whole</em> repo — don't rely on <code class="inline">manage.py check</code> or a partial read of one file. Then actually exercise the code path (or write a test) rather than trusting a clean-looking diff.</p>
+        </div>
+
+        <div class="card">
+          <h4>4. Docker build fails immediately with a BuildKit RPC error</h4>
+          <p><strong>Symptom:</strong> <code class="inline">docker compose build</code> fails before any real build step runs:</p>
+          <pre><code>target backend: failed to receive status: rpc error: code = Unavailable desc = error reading from server: EOF</code></pre>
+          <p><strong>Cause:</strong> a transient BuildKit daemon connection hiccup — not a real problem with the Dockerfile, cache, or dependencies.</p>
+          <p><strong>Fix:</strong> just retry <code class="inline">docker compose build</code>. It succeeded immediately on the next attempt with the same warm cache.</p>
+        </div>
+
+        <div class="card">
+          <h4>5. A migration you just wrote doesn't apply on the same <code class="inline">docker compose run</code></h4>
+          <p><strong>Symptom:</strong> you run <code class="inline">docker compose run --rm backend python manage.py makemigrations</code>, the new migration file is created — but the database still doesn't have the new column/table.</p>
+          <p><strong>Cause:</strong> <code class="inline">docker-entrypoint.sh</code> (the container's <code class="inline">ENTRYPOINT</code>) runs <code class="inline">migrate --no-input</code> automatically <em>before</em> execing your command. On that run, <code class="inline">migrate</code> finds nothing pending (the migration file doesn't exist yet) — only afterward does your <code class="inline">makemigrations</code> command create it, one step too late for that same container start to apply it.</p>
+          <p><strong>Fix:</strong> run <code class="inline">makemigrations</code>, then a separate <code class="inline">docker compose run --rm backend python manage.py migrate</code> (or restart any service normally — the next entrypoint run picks up the new file automatically).</p>
+        </div>
+
+        <div class="card">
+          <h4>6. Testing a DRF view directly in a script silently gets <code class="inline">AnonymousUser</code></h4>
+          <p><strong>Symptom:</strong> calling a view function from a Django-shell script with <code class="inline">django.test.RequestFactory</code> and manually setting <code class="inline">request.user = some_user</code> still returns 403, as if the user were anonymous.</p>
+          <p><strong>Cause:</strong> <code class="inline">@api_view</code>-decorated views re-wrap the raw request into a DRF <code class="inline">Request</code> during <code class="inline">dispatch()</code>, which resolves <code class="inline">.user</code> through DRF's own authentication classes — it ignores whatever you set on the raw Django request beforehand.</p>
+          <p><strong>Fix:</strong> use <code class="inline">rest_framework.test.APIRequestFactory</code> + <code class="inline">force_authenticate(request, user=...)</code> instead of <code class="inline">django.test.RequestFactory</code>:</p>
+          <pre><code>from rest_framework.test import APIRequestFactory, force_authenticate
+
+rf = APIRequestFactory()
+req = rf.post('/api/some/endpoint/', {...}, format='json')
+force_authenticate(req, user=some_user)
+response = some_view(req)</code></pre>
+        </div>
+
+        <div class="card">
+          <h4>7. Two independent "make this account an Admin" code paths drifted apart</h4>
+          <p><strong>Symptom:</strong> a staff member assigns the <code class="inline">admin</code> preset Role to a user via <code class="inline">POST /api/rbac/user-roles/</code> (the Manage Roles UI). The permission grant works immediately — but the account's <code class="inline">User.role</code> field (what the Role badge in the Users list reads, and what <code class="inline">is_full_admin</code>-adjacent checks key off) stays at its old value. It looks like the assignment silently did nothing.</p>
+          <p><strong>Cause:</strong> <code class="inline">users.admin_views.admin_update_user</code> (Edit Profile's role dropdown) and <code class="inline">rbac.views.user_roles_collection</code> (Manage Roles' role picker) are two separate endpoints that both affect "is this account Admin-tier" — but only the first one was ever taught to flip <code class="inline">User.role</code>. The RBAC engine and the account's tier field are related concepts (a preset Role backs a tier) but are stored independently; nothing kept them in sync when the *other* endpoint was used.</p>
+          <p><strong>Fix</strong> (<code class="inline">rbac/views.py</code>, both the assign and revoke handlers):</p>
+          <pre><code># On assign: promote the role field when the 'admin' preset Role is granted
+if role.slug == 'admin' and target_user.role not in ('admin', 'superadmin'):
+    target_user.role = 'admin'
+    update_fields.append('role')
+
+# On revoke: demote it back when that same Role is removed
+if assignment.role.slug == 'admin' and target_user.role == 'admin':
+    target_user.role = 'user'
+    target_user.save(update_fields=['role'])</code></pre>
+          <p>The same two-branch logic was duplicated into <code class="inline">users.admin_views.admin_bulk_user_action</code>'s <code class="inline">assign_role</code>/<code class="inline">remove_role</code> cases, since that endpoint reimplements role assignment directly against the ORM rather than calling the RBAC view.</p>
+          <p><strong>Avoid it again:</strong> whenever a concept is representable through more than one endpoint/table (here: "Admin-tier" via both a plain model field <em>and</em> an RBAC Role), grep for every write path to that concept before shipping either one — <code class="inline">grep -rn "UserRoleAssignment.objects.create\|UserRoleAssignment.objects.get_or_create" backend/</code> — and keep them in sync at the same layer (the view), not by hoping callers remember to do both.</p>
+        </div>
+
+        <div class="card">
+          <h4>8. A "documentation-only" preset Role was fully assignable through the normal UI</h4>
+          <p><strong>Symptom:</strong> a staff member assigns the <code class="inline">superadmin</code> preset Role to another account via the normal role picker. The request returns 200/201 (a <code class="inline">UserRoleAssignment</code> row really is created) — but the target account gains no actual capability, since real superadmin status comes from <code class="inline">User.role == 'superadmin'</code> / <code class="inline">is_superuser</code>, which <code class="inline">rbac.permissions.is_full_admin</code> checks directly and which bypasses the RBAC engine before any <code class="inline">RolePermission</code> row is ever consulted (<code class="inline">has_permission</code>/<code class="inline">has_any_permission</code> both short-circuit on <code class="inline">is_full_admin(user)</code> first). A visible "success" response with zero effect is worse than an error — nothing told the caller their action was a no-op.</p>
+          <p><strong>Cause:</strong> the <code class="inline">superadmin</code> Role was seeded into <code class="inline">rbac.preset_roles.PRESET_ROLE_DEFINITIONS</code> purely so its full permission set would be visible/documented in the Roles &amp; Permissions screen (see <a href="#rbac">RBAC Model for Developers</a>) — but nothing on the assignment endpoint distinguished "a role that documents a bypass tier" from "a role that actually grants access."</p>
+          <p><strong>Fix</strong> — reject the assignment outright, in every code path that creates a <code class="inline">UserRoleAssignment</code> (<code class="inline">rbac.views.user_roles_collection</code> and <code class="inline">users.admin_views.admin_bulk_user_action</code>'s <code class="inline">assign_role</code> branch):</p>
+          <pre><code>if role.slug == 'superadmin':
+    return Response({'error': (
+        'The Superadmin role exists here for reference only — assigning it grants no '
+        'extra access ... can only be granted via shell/Django admin access.'
+    )}, status=status.HTTP_400_BAD_REQUEST)</code></pre>
+          <p>Also filtered out of every frontend assignable-role picker (<code class="inline">AdminUsers.tsx</code>, <code class="inline">AdminRoles.tsx</code>) so it can't be selected in the first place — defense in depth, since the backend block is the actual guarantee.</p>
+          <p><strong>Avoid it again:</strong> if a database row exists purely for display/documentation (not to be acted on), make the code that would act on it refuse explicitly rather than relying on it "just doing nothing harmful" — a silent no-op that returns 200 is indistinguishable from success to both the caller and whoever's debugging their report later.</p>
+        </div>
+      </section>
+
+      <section class="doc-section" id="rbac">
+        <h2>🔐 RBAC Model for Developers</h2>
+
+        <h3>Data model</h3>
+        <ul>
+          <li><strong><code class="inline">Role</code></strong> — a named bundle of permissions. <code class="inline">is_preset=True</code> marks the five auto-created roles backing the legacy department system (<code class="inline">trust_safety</code>, <code class="inline">inventory</code>, <code class="inline">support</code>, <code class="inline">finance</code>, <code class="inline">engineering</code>) plus <code class="inline">admin</code>/<code class="inline">superadmin</code>.</li>
+          <li><strong><code class="inline">RolePermission</code></strong> — one <code class="inline">(resource, action)</code> grant on a role; a grant on a parent resource path implies every descendant.</li>
+          <li><strong><code class="inline">UserRoleAssignment</code></strong> — user↔role link; a user's effective permissions are the union of every assigned role's grants.</li>
+          <li><strong><code class="inline">BreakGlassSession</code></strong> — temporary full-admin elevation; while active, permission checks treat the user as a full admin, and every request is captured as an audit-log entry.</li>
+          <li><strong><code class="inline">PendingApproval</code></strong> — the record backing dual-authorization.</li>
+        </ul>
+
+        <h3>Helper functions (<code class="inline">rbac/permissions.py</code>)</h3>
+        <table>
+          <thead><tr><th>Function</th><th>What it checks</th></tr></thead>
+          <tbody>
+            <tr><td><code class="inline">is_full_admin(user)</code></td><td>Only <code class="inline">role='superadmin'</code> or Django <code class="inline">is_superuser</code> — the lesser <code class="inline">'admin'</code> role does NOT get an automatic bypass.</td></tr>
+            <tr><td><code class="inline">has_active_break_glass(user)</code></td><td>Any non-revoked, non-expired break-glass session.</td></tr>
+            <tr><td><code class="inline">has_role(user, slug)</code></td><td>Full-admin/break-glass short-circuit, else checks <code class="inline">UserRoleAssignment</code>.</td></tr>
+            <tr><td><code class="inline">has_permission(user, resource, action)</code></td><td>Does any assigned role grant this action on this resource or an ancestor?</td></tr>
+            <tr><td><code class="inline">has_any_permission(user, resource)</code></td><td>Coarser — any action at all on this resource/ancestors.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Dual-authorization (<code class="inline">rbac/dual_auth.py</code>)</h3>
+        <p>A generic four-eyes mechanism. A view registers an executor under an action key via <code class="inline">@register_executor('some.action')</code>, then calls <code class="inline">submit_or_execute(action_key, payload, requested_by, reason, requires_dual_auth)</code> — the caller computes <code class="inline">requires_dual_auth</code> from its own business rule (e.g. a refund-amount threshold). If true, a <code class="inline">PendingApproval</code> is created instead of running immediately; a <strong>different</strong> admin must call <code class="inline">approve()</code> (raises if the same user tries to approve their own request).</p>
+
+        <h3>Legacy integration</h3>
+        <p><code class="inline">superadmin.permissions</code> still exposes the old department-based API (<code class="inline">is_full_admin</code>, <code class="inline">is_superadmin_staff</code>, <code class="inline">user_departments</code>, <code class="inline">require_department</code>) for backward compatibility, but internally it now delegates to <code class="inline">rbac.permissions.has_role()</code> against the matching preset-role slug.</p>
+      </section>
+    </main>
+  </div>
+
+  <footer class="doc-footer">
+    HomeKonet Developer Guide — internal engineering documentation. Keep this in sync as the architecture evolves; several sections here already correct drift against older docs (PROJECT_FILE_GUIDE.md, docs/DEPLOYMENT.md) — check code first when in doubt.
+  </footer>
+
+  <script>
+    document.querySelectorAll('.menu-toggle').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelector('.sidebar').classList.toggle('open');
+      });
+    });
+    document.querySelectorAll('.sidebar a').forEach(function(a){
+      a.addEventListener('click', function(){
+        document.querySelector('.sidebar').classList.remove('open');
+      });
+    });
+  </script>
+</body>
+</html>

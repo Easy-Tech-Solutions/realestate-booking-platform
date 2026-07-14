@@ -31,8 +31,11 @@ class AdminAuditLog(models.Model):
 
 
 class MFADevice(models.Model):
-    """One TOTP authenticator per user. Required for admin/staff accounts
-    before they can access the superadmin dashboard."""
+    """One TOTP authenticator per user. Originally built for admin/staff
+    accounts (see superadmin.views.mfa_setup/mfa_confirm) but usable by any
+    account — the login step-up in authapp.views.login_view checks for a
+    confirmed device on any user, not just staff. users.views exposes a
+    parallel self-service setup/confirm/disable flow for regular accounts."""
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mfa_device')
     secret = models.CharField(max_length=64)
     confirmed = models.BooleanField(default=False)
@@ -42,6 +45,22 @@ class MFADevice(models.Model):
 
     def __str__(self):
         return f'MFA device for {self.user.username} ({"confirmed" if self.confirmed else "pending"})'
+
+    def verify_code_or_backup(self, code: str) -> bool:
+        """Check a TOTP code, falling back to (and consuming) a one-time
+        backup code. Shared by both the superadmin and regular-user MFA
+        endpoints so the verification logic lives in exactly one place."""
+        import pyotp
+        from django.contrib.auth.hashers import check_password
+
+        if pyotp.TOTP(self.secret).verify(code, valid_window=1):
+            return True
+        for hashed in self.backup_codes:
+            if check_password(code, hashed):
+                self.backup_codes = [h for h in self.backup_codes if h != hashed]
+                self.save(update_fields=['backup_codes'])
+                return True
+        return False
 
 
 class ImpersonationSession(models.Model):

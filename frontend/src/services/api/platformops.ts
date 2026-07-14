@@ -39,6 +39,26 @@ export interface LogEntry {
   [key: string]: unknown;
 }
 
+export interface MetricSnapshot {
+  recorded_at: string;
+  cpu_percent: number;
+  memory_percent: number;
+  memory_used_mb: number;
+  disk_used_percent: number;
+  disk_free_gb: number;
+  net_bytes_sent_mb: number;
+  net_bytes_recv_mb: number;
+}
+
+export interface LiveMetrics extends Omit<MetricSnapshot, 'recorded_at'> {
+  memory_total_mb: number;
+}
+
+export interface ServerMetrics {
+  live: LiveMetrics;
+  history: MetricSnapshot[];
+}
+
 export const platformOpsAPI = {
   listFeatureFlags: async (): Promise<FeatureFlag[]> => {
     return fetchWithAuth<FeatureFlag[]>('/api/platform-ops/feature-flags/');
@@ -68,5 +88,23 @@ export const platformOpsAPI = {
 
   recentErrors: async (limit = 100): Promise<LogEntry[]> => {
     return fetchWithAuth<LogEntry[]>(`/api/platform-ops/recent-errors/?limit=${limit}`);
+  },
+
+  serverMetrics: async (): Promise<ServerMetrics> => {
+    return fetchWithAuth<ServerMetrics>('/api/platform-ops/server-metrics/');
+  },
+
+  logViewer: async (params: {
+    file?: 'errors' | 'application' | 'activity' | 'transactions';
+    limit?: number;
+    level?: string;
+    search?: string;
+  } = {}): Promise<LogEntry[]> => {
+    const qs = new URLSearchParams();
+    if (params.file) qs.set('file', params.file);
+    if (params.limit) qs.set('limit', String(params.limit));
+    if (params.level) qs.set('level', params.level);
+    if (params.search) qs.set('search', params.search);
+    return fetchWithAuth<LogEntry[]>(`/api/platform-ops/log-viewer/?${qs.toString()}`);
   },
 };

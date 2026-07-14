@@ -322,6 +322,16 @@ if _fe_origin and _fe_origin not in CORS_ALLOWED_ORIGINS:
 
 CORS_ALLOWED_ORIGIN_REGEXES: list[str] = []  # no regex patterns — exact origins only
 CORS_ALLOW_CREDENTIALS = True
+
+# django-cors-headers' default allow-list doesn't include our custom
+# X-Device-Fingerprint header (sent on register/Google login/login — see
+# authapp views and core/deviceFingerprint.ts) — without this, the browser's
+# CORS preflight rejects the request before it ever reaches Django whenever
+# the frontend and backend are on different origins (e.g. www.homekonet.com
+# calling homekonet.com).
+from corsheaders.defaults import default_headers as _cors_default_headers  # noqa: E402
+CORS_ALLOW_HEADERS = [*_cors_default_headers, "x-device-fingerprint"]
+
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 
 # CSRF trusted origins (required by Django 4+ for cross-origin POSTs to the
@@ -573,6 +583,11 @@ CELERY_BEAT_SCHEDULE = {
     'expire-suspensions': {
         'task': 'suspensions.tasks.expire_suspensions',
         'schedule': crontab(minute=10),  # ten past every hour
+    },
+    # Collect server resource metrics (CPU, memory, disk, network) every 5 min.
+    'collect-server-metrics': {
+        'task': 'platformops.tasks.collect_server_metrics',
+        'schedule': crontab(minute='*/5'),
     },
 }
 

@@ -1,12 +1,42 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { superadminAPI, type MfaSetupResponse } from '../../services/api';
+import { usersAPI } from '../../services/api/users';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { KeyRound } from 'lucide-react';
 
-export function MfaSetupCard() {
+interface MfaApi {
+  status: () => Promise<{ mfa_enabled: boolean }>;
+  setup: () => Promise<MfaSetupResponse>;
+  confirm: (code: string) => Promise<{ backup_codes: string[] }>;
+  disable: (code: string) => Promise<{ message: string }>;
+}
+
+// Defaults to the superadmin-facing endpoints (existing dashboard usage);
+// pass `api={USER_MFA_API}` to use the self-service endpoints for a regular
+// account's own Account page instead.
+const SUPERADMIN_MFA_API: MfaApi = {
+  status: () => superadminAPI.getMe().then((me) => ({ mfa_enabled: me.mfa_enabled })),
+  setup: () => superadminAPI.mfaSetup(),
+  confirm: (code) => superadminAPI.mfaConfirm(code),
+  disable: (code) => superadminAPI.mfaDisable(code),
+};
+
+export const USER_MFA_API: MfaApi = {
+  status: () => usersAPI.mfaStatus(),
+  setup: () => usersAPI.mfaSetup(),
+  confirm: (code) => usersAPI.mfaConfirm(code),
+  disable: (code) => usersAPI.mfaDisable(code),
+};
+
+interface MfaSetupCardProps {
+  api?: MfaApi;
+  description?: string;
+}
+
+export function MfaSetupCard({ api = SUPERADMIN_MFA_API, description }: MfaSetupCardProps) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [setupData, setSetupData] = useState<MfaSetupResponse | null>(null);
   const [code, setCode] = useState('');
@@ -16,7 +46,7 @@ export function MfaSetupCard() {
   const [busy, setBusy] = useState(false);
 
   const loadStatus = () => {
-    superadminAPI.getMe().then((me) => setEnabled(me.mfa_enabled)).catch(() => setEnabled(false));
+    api.status().then((res) => setEnabled(res.mfa_enabled)).catch(() => setEnabled(false));
   };
 
   useEffect(() => { loadStatus(); }, []);
@@ -24,7 +54,7 @@ export function MfaSetupCard() {
   const handleSetup = async () => {
     setBusy(true);
     try {
-      const data = await superadminAPI.mfaSetup();
+      const data = await api.setup();
       setSetupData(data);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to start MFA setup');
@@ -37,7 +67,7 @@ export function MfaSetupCard() {
     if (code.trim().length < 6) return;
     setBusy(true);
     try {
-      const { backup_codes } = await superadminAPI.mfaConfirm(code.trim());
+      const { backup_codes } = await api.confirm(code.trim());
       setBackupCodes(backup_codes);
       setSetupData(null);
       setCode('');
@@ -54,7 +84,7 @@ export function MfaSetupCard() {
     if (disableCode.trim().length < 6) return;
     setBusy(true);
     try {
-      await superadminAPI.mfaDisable(disableCode.trim());
+      await api.disable(disableCode.trim());
       toast.success('MFA disabled.');
       setEnabled(false);
       setShowDisable(false);
@@ -113,7 +143,7 @@ export function MfaSetupCard() {
         ) : (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Management accounts should enable two-factor authentication with an authenticator app.
+              {description || 'Management accounts should enable two-factor authentication with an authenticator app.'}
             </p>
             <Button size="sm" disabled={busy} onClick={handleSetup}>Enable MFA</Button>
           </div>

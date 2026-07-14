@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HomeKonet — Management Portal Guide</title>
+<style>
+    :root {
+      --bg: #ffffff; --fg: #222222; --card: #ffffff; --card-border: #dddddd;
+      --primary: #004406; --primary-fg: #ffffff; --secondary: #e6f0e6; --secondary-fg: #004406;
+      --muted: #f7f7f7; --muted-fg: #6b6b6b; --accent: #004406; --destructive: #C13515;
+      --border: #e2e2e2; --radius: 0.75rem; --code-bg: #0f1a10; --code-fg: #e9f5ea;
+      --sidebar-w: 280px; --header-h: 64px;
+      --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1b1b1b; --fg: #f2f2f2; --card: #242424; --card-border: #3a3a3a;
+        --primary: #4caf50; --primary-fg: #06210a; --secondary: #1a2e1a; --secondary-fg: #9be29e;
+        --muted: #2a2a2a; --muted-fg: #b0b0b0; --accent: #4caf50; --destructive: #e0573a;
+        --border: #3a3a3a; --code-bg: #0c130d; --code-fg: #d7ecd9;
+        --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.35);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; font-size: 16px; }
+    a { color: var(--accent); }
+    code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .topbar { position: sticky; top: 0; z-index: 30; height: var(--header-h); display: flex; align-items: center; gap: .75rem; padding: 0 1.25rem; background: var(--card); border-bottom: 1px solid var(--border); }
+    .topbar .brand { display:flex; align-items:center; gap:.6rem; font-weight:700; font-size: 1.05rem; color: var(--fg); text-decoration:none; }
+    .topbar .brand .mark { width: 34px; height: 34px; border-radius: 9px; background: var(--primary); color: var(--primary-fg); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1rem; }
+    .topbar .doc-title { color: var(--muted-fg); font-size: .9rem; padding-left: .75rem; border-left: 1px solid var(--border); }
+    .topbar .spacer { flex: 1; }
+    .topbar .doc-switch { display:flex; gap:.4rem; }
+    .topbar .doc-switch a { font-size: .82rem; text-decoration:none; padding: .4rem .7rem; border-radius: 999px; color: var(--muted-fg); border: 1px solid var(--border); }
+    .topbar .doc-switch a.active { background: var(--secondary); color: var(--secondary-fg); border-color: transparent; font-weight:600; }
+    .menu-toggle { display:none; background:none; border:1px solid var(--border); border-radius:8px; padding:.4rem .6rem; color:var(--fg); cursor:pointer; }
+    .layout { display:flex; align-items:flex-start; }
+    .sidebar { width: var(--sidebar-w); flex-shrink:0; position: sticky; top: var(--header-h); height: calc(100vh - var(--header-h)); overflow-y: auto; border-right: 1px solid var(--border); padding: 1.25rem 1rem 3rem; background: var(--card); }
+    .sidebar h4 { font-size: .72rem; text-transform: uppercase; letter-spacing:.06em; color: var(--muted-fg); margin: 1.25rem 0 .4rem; }
+    .sidebar h4:first-child { margin-top: 0; }
+    .sidebar a { display:block; padding: .35rem .6rem; border-radius: 8px; text-decoration:none; color: var(--fg); font-size: .88rem; opacity: .85; }
+    .sidebar a:hover { background: var(--muted); opacity: 1; }
+    .content { flex: 1; min-width: 0; padding: 2rem 2.5rem 6rem; max-width: 940px; }
+    .content > header.hero { margin-bottom: 2.5rem; }
+    .content > header.hero .eyebrow { display:inline-block; font-size:.75rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color: var(--secondary-fg); background: var(--secondary); padding:.25rem .6rem; border-radius:999px; margin-bottom:.75rem; }
+    .content > header.hero h1 { font-size: 2rem; margin: 0 0 .5rem; }
+    .content > header.hero p.lead { font-size: 1.05rem; color: var(--muted-fg); max-width: 65ch; margin:0; }
+    section.doc-section { margin: 3rem 0; scroll-margin-top: calc(var(--header-h) + 1rem); }
+    section.doc-section h2 { font-size: 1.4rem; margin: 0 0 .25rem; padding-bottom: .6rem; border-bottom: 2px solid var(--secondary); display:flex; align-items:center; gap:.5rem; }
+    section.doc-section > p.section-intro { color: var(--muted-fg); margin-top: .75rem; }
+    section.doc-section h3 { font-size: 1.1rem; margin: 1.75rem 0 .5rem; }
+    section.doc-section h4 { font-size: .95rem; margin: 1.25rem 0 .4rem; color: var(--fg); }
+    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 1.1rem 1.3rem; margin: 1rem 0; box-shadow: var(--shadow); }
+    .card h4 { margin-top: 0; }
+    .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .grid-3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .callout { border-radius: var(--radius); padding: 1rem 1.2rem; margin: 1.25rem 0; border: 1px solid var(--border); background: var(--muted); }
+    .callout.tip { border-left: 4px solid var(--primary); }
+    .callout.warn { border-left: 4px solid #c98a1a; }
+    .callout.danger { border-left: 4px solid var(--destructive); }
+    .callout .callout-label { font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; margin-bottom:.35rem; display:block; }
+    .callout.tip .callout-label { color: var(--primary); }
+    .callout.warn .callout-label { color: #c98a1a; }
+    .callout.danger .callout-label { color: var(--destructive); }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .88rem; }
+    th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted-fg); font-weight:600; font-size:.76rem; text-transform:uppercase; letter-spacing:.03em; }
+    tr:last-child td { border-bottom: none; }
+    .badge { display:inline-block; padding: .15rem .55rem; border-radius:999px; font-size:.72rem; font-weight:700; background: var(--secondary); color: var(--secondary-fg); white-space: nowrap; }
+    .badge.role { background: var(--muted); color: var(--fg); border: 1px solid var(--border); }
+    .badge.danger { background: rgba(193,53,21,.12); color: var(--destructive); }
+    .badge.warn { background: rgba(201,138,26,.14); color: #a66c14; }
+    .steps { counter-reset: step; list-style:none; padding:0; margin: 1rem 0; }
+    .steps li { counter-increment: step; position: relative; padding: .3rem 0 .3rem 2.4rem; margin-bottom: .6rem; }
+    .steps li::before { content: counter(step); position:absolute; left:0; top: .15rem; width: 1.7rem; height: 1.7rem; border-radius:50%; background: var(--primary); color: var(--primary-fg); display:flex; align-items:center; justify-content:center; font-size:.82rem; font-weight:700; }
+    code.inline { background: var(--muted); padding: .1rem .4rem; border-radius: 5px; font-size: .87em; }
+    footer.doc-footer { border-top:1px solid var(--border); margin-top:4rem; padding: 2rem 2.5rem; color: var(--muted-fg); font-size:.85rem; }
+    @media (max-width: 900px) {
+      .sidebar { position: fixed; left: 0; top: var(--header-h); z-index:20; transform: translateX(-100%); transition: transform .2s ease; box-shadow: var(--shadow); }
+      .sidebar.open { transform: translateX(0); }
+      .menu-toggle { display:inline-flex; }
+      .content { padding: 1.5rem 1.25rem 4rem; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <button class="menu-toggle" aria-label="Toggle navigation">☰</button>
+    <a class="brand" href="#top"><span class="mark">HK</span> HomeKonet</a>
+    <span class="doc-title">Management Portal Guide</span>
+    <span class="spacer"></span>
+    <nav class="doc-switch">
+      <a href="user-guide.html">Users</a>
+      <a class="active" href="management-portal-guide.html">Management Portal</a>
+      <a href="developer-guide.html">Developers</a>
+    </nav>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h4>Getting In</h4>
+      <a href="#access">Access Model</a>
+      <a href="#overview">Overview</a>
+
+      <h4>People &amp; Access</h4>
+      <a href="#users">Users</a>
+      <a href="#roles">Roles &amp; Permissions</a>
+      <a href="#security">Security &amp; Audit Log</a>
+
+      <h4>Trust &amp; Safety</h4>
+      <a href="#kyc">KYC &amp; Verification Review</a>
+      <a href="#fraud">Fraud &amp; AML</a>
+      <a href="#moderation">Inventory &amp; Listing Moderation</a>
+      <a href="#suspensions">Suspensions</a>
+
+      <h4>Operations</h4>
+      <a href="#finance">Finance &amp; Legal Center</a>
+      <a href="#support">Support</a>
+      <a href="#aircover">AirCover Claims</a>
+      <a href="#reports">Reports</a>
+
+      <h4>Platform</h4>
+      <a href="#settings">Platform Settings</a>
+      <a href="#platform-ops">Platform &amp; Engineering</a>
+      <a href="#legal">Legal Documents</a>
+      <a href="#gaps">Known Gaps</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+    </aside>
+
+    <main class="content" id="top">
+      <header class="hero">
+        <span class="eyebrow">Management Portal Guide</span>
+        <h1>Running the HomeKonet Management Portal</h1>
+        <p class="lead">A section-by-section manual for staff and administrators using <code class="inline">/management</code> — what each screen does, who can see it, and how the underlying access model works.</p>
+      </header>
+
+      <section class="doc-section" id="access">
+        <h2>🔑 Access Model</h2>
+        <p class="section-intro">Three tiers can reach the Management Portal, and each gets a different scope of access.</p>
+        <table>
+          <thead><tr><th>Tier</th><th>How it's granted</th><th>What it can do</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge">Superadmin</span></td><td>Account <code class="inline">role = superadmin</code>, set via shell access only — never through the dashboard.</td><td>Unconditional access to everything. Bypasses every permission check.</td></tr>
+            <tr><td><span class="badge role">Admin</span></td><td>Account <code class="inline">role = admin</code>, granted via the Users screen by a superadmin.</td><td>Broad access from the "Admin" preset role — but not the RBAC engine itself or Break-Glass elevation.</td></tr>
+            <tr><td><span class="badge role">Staff officer</span></td><td><code class="inline">is_staff</code> plus one or more assigned Roles (e.g. Product Support Officer, Compliance Officer).</td><td>Only what their assigned role(s) explicitly grant — enforced independently on every single page/action.</td></tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <span class="callout-label">Every admin sees every nav item</span>
+          The sidebar does not hide sections you lack permission for. If a staff officer opens a page they can't use, it loads and shows an inline message like "You do not have Trust &amp; Safety access" rather than being hidden from the menu. This is expected — don't read it as a bug when onboarding a new officer.
+        </div>
+        <p>Under the hood, access is governed by a fine-grained <strong>RBAC (Role-Based Access Control)</strong> engine: named Roles hold grants on a tree of resources (e.g. <code class="inline">listings.content</code>, <code class="inline">finances.escrow</code>, <code class="inline">trust_safety.flags</code>) × actions (create/read/update/delete/execute). A grant on a parent resource automatically covers everything beneath it. Manage this from <a href="#roles">Roles &amp; Permissions</a>.</p>
+      </section>
+
+      <section class="doc-section" id="overview">
+        <h2>📊 Overview</h2>
+        <p>The dashboard landing page shows top-line stats (total revenue, users, active listings, bookings), a breakdown of bookings by status, and a recent-bookings table. Each booking row has a <strong>Messages</strong> button that opens a read-only view of the guest/host conversation for that booking — useful when investigating a dispute.</p>
+        <p>The Properties tab here offers a quick approve/reject flow for listings pending review; for full search, suspension, and compliance tools, use <a href="#moderation">Inventory &amp; Listing Moderation</a> instead.</p>
+      </section>
+
+      <section class="doc-section" id="users">
+        <h2>👥 Users</h2>
+        <p class="section-intro">The Users screen is the full user-management console: search, filter by role/active status, and act on individual or multiple accounts.</p>
+
+        <h3>Creating a user</h3>
+        <p>Set username, email, name, and role (<code class="inline">user</code> or <code class="inline">agent</code> only) with a password you set or one generated for you. Admin accounts can't be created here — those are provisioned via shell access.</p>
+
+        <h3>Per-account actions</h3>
+        <table>
+          <thead><tr><th>Action</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td>View as (impersonate)</td><td>Log in as the user to reproduce an issue. Requires a reason, and is fully audit-logged. Blocked for superadmin accounts.</td></tr>
+            <tr><td>Edit profile / email / password</td><td>Three independent sections — changing the password force-logs the user out everywhere.</td></tr>
+            <tr><td>Manage roles</td><td>Assign or revoke RBAC roles. Assigning any role marks the account as staff.</td></tr>
+            <tr><td>Deactivate / Reactivate</td><td>Toggles account access without deleting data.</td></tr>
+            <tr><td>Delete (soft)</td><td>Requires a reason. Deactivates and anonymizes the name/email/username while preserving booking/payment/review history.</td></tr>
+            <tr><td>Delete permanently</td><td>Requires a reason and typing the username to confirm. If the account has bookings/payments/listings attached, this requires a <strong>second admin's approval</strong> (see Pending Approvals).</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Bulk actions</strong> apply the same operations (reactivate, deactivate, assign/remove role, soft-delete) across a multi-selected set of accounts.</p>
+        <div class="callout warn">
+          <span class="callout-label">Granting the Admin role</span>
+          Only a superadmin can grant the <code class="inline">admin</code> role to another account. Superadmin accounts themselves are fully protected from edits/deletion in this UI.
+        </div>
+      </section>
+
+      <section class="doc-section" id="roles">
+        <h2>🛡️ Roles &amp; Permissions</h2>
+
+        <h3>Custom roles</h3>
+        <p>Create a role with a name, slug, and description, then use the permission grid to grant create/read/update/delete/execute on each resource. Preset roles (the five legacy departments plus Admin/Superadmin) are marked with a lock icon and can't be deleted — they back long-standing behavior elsewhere in the system.</p>
+
+        <h3>Assigning a role to a user</h3>
+        <p>Look up a user by ID, view their current role assignments, and assign or revoke a role. The Superadmin role itself is filtered out of every assignable-role list everywhere in the dashboard — it's granted only via shell access.</p>
+
+        <h3>Pending Approvals (dual-authorization)</h3>
+        <p>Certain high-impact actions require a <strong>second, different admin</strong> to approve before they execute:</p>
+        <ul>
+          <li>Refunds over $500 (and <em>every</em> Stripe refund, regardless of amount)</li>
+          <li>Suspending a host with more than 3 published listings</li>
+          <li>Permanently deleting a user with protected records (bookings/payments/listings)</li>
+        </ul>
+        <p>Each pending item shows the requester, their reason, and the underlying payload. <strong>Approve &amp; execute</strong> or <strong>Reject</strong> (with an optional reason). The system enforces that the approver cannot be the same admin who made the request.</p>
+
+        <h3>Break-Glass Access</h3>
+        <p>For incidents where an officer needs temporary full-admin power outside their normal role, request break-glass elevation (reason required, 1–8 hours). While active, every single request the account makes is logged for audit — not just the sensitive actions. Any admin with visibility can revoke an active session early.</p>
+      </section>
+
+      <section class="doc-section" id="security">
+        <h2>🔒 Security &amp; Audit Log</h2>
+
+        <h3>Two-factor authentication (MFA)</h3>
+        <p>From the Security section, enable TOTP-based 2FA: scan a QR code, confirm a 6-digit code, and save the eight one-time backup codes you're shown (they won't be shown again). Once enabled, logging in requires that code as a second step.</p>
+        <div class="callout warn">
+          <span class="callout-label">MFA is opt-in, not enforced</span>
+          Turning on MFA is currently a personal choice for each admin/staff account — the system does not block dashboard access for accounts that haven't enabled it. Treat this as a strong recommendation to every admin/staff member, not an automatic guarantee.
+        </div>
+
+        <h3>Audit Log</h3>
+        <p>Every sensitive action across the portal — user changes, listing approvals, suspensions, refunds, role changes, feature flag edits, and more — is recorded here with the actor, action, target, reason, and IP address. Filter by action text or target type. This is your primary tool for reconstructing "who did what, when."</p>
+      </section>
+
+      <section class="doc-section" id="kyc">
+        <h2>🪪 KYC &amp; Verification Review</h2>
+        <p class="section-intro">Two independent review queues live on this page, each following the same three-stage pipeline: <strong>Product Support → Compliance → Supervisor</strong>.</p>
+
+        <h3>Host applications</h3>
+        <p>Review the applicant's name/email/phone/address alongside their headshot and ID document, then Approve (advances to the next stage) or Decline (a reason is required).</p>
+
+        <h3>Property verifications</h3>
+        <p>Review the ownership details, deed/volume number, and MOU document (if the applicant isn't the property's owner). Decide Approve, Request Correction, or Reject (notes required except on approval).</p>
+
+        <h3>AI pre-screen score</h3>
+        <p>Each item shows an AI-generated pre-screen score with a short rationale, to help you prioritize review — hover the badge for the reasoning. This score reads only the <strong>submitted text</strong> (name, address, ownership details, etc.); it does <strong>not</strong> inspect the uploaded ID, headshot, or MOU images. Treat it as a triage aid, not a substitute for actually reviewing the documents. It shows "pending / disabled" if scoring hasn't run yet or is turned off — see <a href="#settings">Platform Settings</a>.</p>
+      </section>
+
+      <section class="doc-section" id="fraud">
+        <h2>🚨 Fraud &amp; AML</h2>
+
+        <h3>Fraud flags</h3>
+        <p>Flags are created automatically by rule-based detectors (rapid account creation from one IP, the same card used across multiple accounts) — click <strong>Run detectors</strong> to scan on demand. Each flag shows its type, severity, the linked account (if any), and an AI risk-score badge with a rationale. Confirm as real fraud or dismiss it, with notes.</p>
+
+        <h3>Blocked device fingerprints</h3>
+        <p>Block a specific device fingerprint (with a reason) to prevent it from registering, signing in with Google, or logging in with a password on any account.</p>
+
+        <h3>Blacklisted locations</h3>
+        <p>Ban a coordinate + radius (e.g. a known problem address) from being listed again, regardless of which account tries.</p>
+      </section>
+
+      <section class="doc-section" id="moderation">
+        <h2>🏘️ Inventory &amp; Listing Moderation</h2>
+
+        <h3>Listing flags</h3>
+        <p>Same pattern as fraud flags: rule-based detectors catch likely duplicate listings and prices far outside the norm for a city/property type. Each flag carries an AI content-score badge based on the listing's title, description, price, and amenities (not its photos).</p>
+
+        <h3>Global inventory search</h3>
+        <p>Search every listing regardless of status (draft, pending review, published, rejected, suspended), filter to flagged-only, and see each listing's open-flag count.</p>
+
+        <h3>Suspend / restore &amp; compliance</h3>
+        <p>Suspend a listing with a required reason, or restore a suspended one. The Compliance dialog sets a local registration number and an occupancy cap (which can't be set below the listing's current max-guest count). Bulk suspend/restore is available for multi-selected listings.</p>
+      </section>
+
+      <section class="doc-section" id="suspensions">
+        <h2>⛔ Suspensions</h2>
+        <p>Issue a new suspension by user ID, type (temporary/indefinite/permanent), and reason — temporary suspensions require an end date. See stats (Total, Active Now, Revoked, Expired) and revoke an active suspension at any time with an optional note.</p>
+        <div class="callout warn">
+          <span class="callout-label">Dual-authorization threshold</span>
+          Suspending a user who owns more than 3 published listings routes through Pending Approvals instead of taking effect immediately — a second admin must approve it.
+        </div>
+      </section>
+
+      <section class="doc-section" id="finance">
+        <h2>💰 Finance &amp; Legal Center</h2>
+
+        <h3>Summary &amp; transactions</h3>
+        <p>See gross collected, total refunded, net revenue, commission revenue, and payout counts. Search/filter transactions and export to CSV.</p>
+
+        <h3>Refunds</h3>
+        <p>Mobile Money refunds are available directly on completed/partially-refunded transactions (amount + required reason). Stripe refunds have their own section — <strong>every Stripe refund requires a second admin's approval</strong>, regardless of amount; Mobile Money refunds only require it above $500.</p>
+
+        <h3>Escrow</h3>
+        <p>Hold a booking's payment (with a reason) to pause disbursement while investigating a dispute or fraud flag, and release it once resolved.</p>
+
+        <h3>Occupancy tax</h3>
+        <p>Manage per-city tax rates and view a computed liability report by jurisdiction. This is a records tool only — it does not file or remit taxes automatically.</p>
+      </section>
+
+      <section class="doc-section" id="support">
+        <h2>🎧 Support</h2>
+        <p>See ticket stats (Open, In Progress, Pending User, Resolved, Closed, SLA Breached) and work tickets: change status/priority, assign to a teammate, reply in the thread, or escalate with notes. A separate tab handles contact-form inquiries — reply by email or mark as read.</p>
+      </section>
+
+      <section class="doc-section" id="aircover">
+        <h2>🛟 AirCover Claims</h2>
+        <p>Review claims filed for property damage, missing items, cleanliness, or safety issues. Set an approved amount and notes, then Approve or Deny.</p>
+        <div class="callout warn">
+          <span class="callout-label">Approving doesn't pay out</span>
+          Approving a claim only records the approved amount — it does not move money. Issue the actual payment from the <a href="#finance">Finance &amp; Legal Center's</a> refund tools, referencing the claim.
+        </div>
+      </section>
+
+      <section class="doc-section" id="reports">
+        <h2>🚩 Reports</h2>
+        <p>User-submitted reports on listings, users, or reviews land here (distinct from Support tickets). Set status (Under Review, Resolved, Dismissed) with notes, escalate a report, or — if it names a specific user — jump straight to Suspensions with that user and report pre-filled. Bulk status changes are available for multi-selected reports.</p>
+      </section>
+
+      <section class="doc-section" id="settings">
+        <h2>⚙️ Platform Settings</h2>
+
+        <h3>Fees</h3>
+        <p>Set the booking fee, viewing fee, service fee percentage, and transaction fee (fixed, percentage, or range) — changes apply immediately, no deployment needed.</p>
+
+        <h3>Feature flags</h3>
+        <p>Create, toggle, or delete platform-wide switches. Three keys are actually wired to real behavior today:</p>
+        <table>
+          <thead><tr><th>Key</th><th>Effect when on</th></tr></thead>
+          <tbody>
+            <tr><td><code class="inline">maintenance_mode</code></td><td>Makes the API read-only for non-staff users.</td></tr>
+            <tr><td><code class="inline">new_registrations_enabled</code></td><td>When turned <em>off</em>, blocks new signups.</td></tr>
+            <tr><td><code class="inline">ai_scoring_enabled</code></td><td>Turns on the local AI scoring used by KYC pre-screen, fraud flags, and listing moderation (and the support chatbot). <strong>Off by default</strong> — enabling it is the only way those AI scores start populating.</td></tr>
+          </tbody>
+        </table>
+        <p>Any other flag you create just records an on/off switch — it won't affect behavior until a developer wires a check for it into the code.</p>
+      </section>
+
+      <section class="doc-section" id="platform-ops">
+        <h2>🩺 Platform &amp; Engineering</h2>
+        <p>This page is diagnostics-only (feature flags live in Settings, above). It shows live system health — database, Redis, Celery worker, and disk status — plus a table of scheduled background tasks with their last run time and success/failure state, and a feed of the most recent application errors, so engineering staff can spot problems without needing server/SSH access.</p>
+      </section>
+
+      <section class="doc-section" id="legal">
+        <h2>📜 Legal Documents</h2>
+        <p>Publish new versions of the Terms of Service or Privacy Policy: set a version string, effective date, a summary of changes, and the document body (structured as sections). Publishing goes live immediately on the public site and is kept as permanent version history you can review at any time.</p>
+      </section>
+
+      <section class="doc-section" id="gaps">
+        <h2>📝 Known Gaps</h2>
+        <p class="section-intro">A few things worth knowing so you don't go looking for them:</p>
+        <ul>
+          <li><strong>Newsletter and testimonials</strong> have no dedicated screen in the Management Portal today — manage them via Django's built-in admin site if needed.</li>
+          <li><strong>MFA is opt-in</strong> for admin/staff accounts, not enforced (see <a href="#security">Security</a>).</li>
+          <li>The Management Portal <strong>sidebar shows every section to every admin/staff account</strong> regardless of their actual permissions — a "you don't have access" message on a page means exactly that, not a bug.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="troubleshooting">
+        <h2>🔧 Troubleshooting</h2>
+        <p class="section-intro">Symptom → cause → fix, for issues staff have actually hit while using this portal.</p>
+
+        <div class="card">
+          <h4>I assigned the "Admin" role to someone, but their Role badge in the Users list still shows the old value (e.g. "agent")</h4>
+          <p><strong>Cause:</strong> There are two related-but-different things: the account's underlying <code class="inline">role</code> field (what the Role badge shows) and RBAC role assignments (what "Manage roles" grants). Assigning "Admin" through <strong>Manage roles</strong> now automatically promotes the account's role field too, so the badge updates immediately — but if you're on a build from before this was fixed, the permission grant would silently take effect while the badge stayed stale, making it look like nothing happened.</p>
+          <p><strong>Fix:</strong> Re-open the Users list (a hard refresh clears any stale cached page) and confirm the badge now reads "admin". If it still doesn't, promote directly instead: open the account's <strong>Edit profile / email / password</strong> dialog and set Role to Admin from there — this always keeps the badge and the underlying permissions in sync, both ways (demoting away from Admin removes the grant too).</p>
+        </div>
+
+        <div class="card">
+          <h4>I assigned the "Superadmin" role from Roles &amp; Permissions (or Manage roles), got a success message, but the account still isn't a superadmin</h4>
+          <p><strong>Cause:</strong> The <strong>Superadmin</strong> entry under Roles &amp; Permissions is reference-only — it exists so you can see the full permission set a superadmin has, not so it can be handed out. Real superadmin status bypasses the RBAC engine entirely (see <a href="#access">Access Model</a>), so assigning that entry as a role grants nothing.</p>
+          <p><strong>Fix:</strong> The Superadmin role can no longer be selected in any assignment picker (single or bulk) — attempting it now returns a clear error instead of a false "success". There is no dashboard control for granting real superadmin status by design; it requires direct shell/Django admin access to the account's <code class="inline">role</code> field.</p>
+        </div>
+
+        <div class="card">
+          <h4>As an admin, I can't change another user's email or reset their password</h4>
+          <p><strong>Cause:</strong> Changing another account's email/password requires either superadmin, or a role granting <code class="inline">users.pii</code> (update) specifically — the built-in <strong>Admin</strong> preset role includes this, but a narrowly-scoped custom role might not.</p>
+          <p><strong>Fix:</strong> Check the acting account's grants under <strong>Roles &amp; Permissions</strong>. If they hold the "Admin" role this already works — if you saw this fail before promoting them, that was very likely the "Role badge didn't update" issue above (the promotion hadn't actually gone through yet), not a separate bug. For a custom role, add <code class="inline">users.pii</code> → update explicitly.</p>
+        </div>
+
+        <div class="card">
+          <h4>Trying to edit, deactivate, or delete an account does nothing / returns an error</h4>
+          <p><strong>Cause:</strong> Superadmin accounts are deliberately protected — they can't be edited, deactivated, soft-deleted, or permanently deleted from this dashboard at all, even by another superadmin.</p>
+          <p><strong>Fix:</strong> This is expected, not a bug. Those changes have to be made via shell/Django admin access to that account directly.</p>
+        </div>
+
+        <div class="card">
+          <h4>Bulk-assigning a role to several users shows some as "failed"</h4>
+          <p><strong>Cause:</strong> Bulk actions report per-account results rather than failing the whole batch. Common reasons a single account fails: it's a superadmin account (protected), the role being assigned is Superadmin (never assignable), or the account no longer exists.</p>
+          <p><strong>Fix:</strong> Check the per-account error in the result toast/response — the succeeded accounts are already done, so you only need to address the failed ones individually.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="doc-footer">
+    HomeKonet Management Portal Guide — for internal staff and administrators. Access is need-to-know; request additional roles through your team lead.
+  </footer>
+
+  <script>
+    document.querySelectorAll('.menu-toggle').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelector('.sidebar').classList.toggle('open');
+      });
+    });
+    document.querySelectorAll('.sidebar a').forEach(function(a){
+      a.addEventListener('click', function(){
+        document.querySelector('.sidebar').classList.remove('open');
+      });
+    });
+  </script>
+</body>
+</html>

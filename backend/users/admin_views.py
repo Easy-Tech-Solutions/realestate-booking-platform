@@ -432,6 +432,7 @@ _BULK_ACTION_RESOURCE = {
     'deactivate': ('users.profiles', 'delete'),
     'reactivate': ('users.profiles', 'delete'),
     'soft_delete': ('users.profiles', 'delete'),
+    'hard_delete': ('users.profiles', 'execute'),
     'assign_role': ('rbac_engine', 'execute'),
     'remove_role': ('rbac_engine', 'execute'),
 }
@@ -485,6 +486,10 @@ def admin_bulk_user_action(request):
                 ok, error = delete_account(target)
                 if not ok:
                     raise ValueError(error)
+            elif action == 'hard_delete':
+                if is_full_admin(target):
+                    raise ValueError('Cannot delete a superadmin account.')
+                target.delete()
             elif action == 'assign_role':
                 from rbac.models import Role, UserRoleAssignment
                 role = Role.objects.get(pk=role_id)

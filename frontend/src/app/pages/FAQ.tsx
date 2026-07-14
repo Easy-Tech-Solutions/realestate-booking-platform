@@ -27,7 +27,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'What is the difference between Instant Book and Request to Book?',
         answer:
-          'Instant Book properties are confirmed immediately once you complete payment — no waiting required. Request to Book properties require the host to manually review and approve your reservation within 24 hours. If the host declines or doesn\'t respond, no charge is made.',
+          'Instant Book properties confirm your reservation right away. Request to Book properties require the host to manually review and approve your reservation — hosts have up to 7 days to respond. Either way, nothing is charged until the reservation is confirmed and you complete the separate payment step; if a host doesn\'t respond in time, the request simply expires with no charge.',
       },
       {
         question: 'Can I modify my booking after it\'s confirmed?',
@@ -53,12 +53,12 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'What payment methods does HomeKonet accept?',
         answer:
-          'We accept MTN Mobile Money (MoMo), credit/debit cards (Visa, Mastercard), and PayPal. All transactions are processed through secure, licensed financial institutions.',
+          'We accept credit/debit cards (via Stripe) and MTN Mobile Money (MoMo). All transactions are processed through secure, licensed financial institutions.',
       },
       {
         question: 'When am I charged for a booking?',
         answer:
-          'For Instant Book properties, your card or MoMo account is charged immediately upon confirmation. For Request to Book properties, a hold may be placed on your account, but you are only charged once the host approves.',
+          'Never at the moment you request a booking — that step is free. Once your reservation is confirmed (instantly for Instant Book, or after host approval for Request to Book), you have 10 days to complete payment before the reservation expires.',
       },
       {
         question: 'Is my payment information safe?',
@@ -89,12 +89,12 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I cancel a booking?',
         answer:
-          'Go to My Bookings, find the booking you want to cancel, and click "Cancel booking." You\'ll see the refund amount based on the host\'s cancellation policy before you confirm the cancellation.',
+          'Go to My Bookings (Trips), find the booking you want to cancel, and click "Cancel." Refund eligibility depends on the host\'s cancellation policy shown on the listing — our team reviews and processes any refund you\'re owed rather than an amount being calculated automatically at cancellation time.',
       },
       {
         question: 'How long does a refund take?',
         answer:
-          'Refunds are processed within 1–3 business days. The time it takes to appear in your account depends on your bank or mobile money provider — typically 3–10 business days for cards and 24–48 hours for MoMo.',
+          'Refund requests are reviewed by our team; once approved, how long it takes to appear in your account depends on your bank or mobile money provider. Contact Support if you\'d like a status update on a specific refund.',
       },
       {
         question: 'What if the host cancels my booking?',
@@ -130,7 +130,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I delete my account?',
         answer:
-          'To delete your account, please contact us at homekonnet@gmail.com with your registered email address. Account deletion is permanent and cannot be reversed. Any active bookings must be resolved before deletion.',
+          'Go to Account and scroll to the "Danger zone" section, where you can delete your account directly. If you have upcoming bookings (as a guest, or on a listing you host) resolve them first — otherwise deletion is immediate and can\'t be undone from within the app, so contact support first if you\'re not sure.',
       },
     ],
   },
@@ -146,7 +146,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I get paid as a host?',
         answer:
-          'Payouts are sent to your registered payment method (bank account or MoMo) after each guest checks in. The payout schedule and method can be configured in your Host Dashboard under Payout Settings.',
+          'Once a guest\'s payment is confirmed, our team disburses your payout (gross amount minus HomeKonet\'s commission). Track pending and paid payouts under Host Dashboard → Earnings.',
       },
       {
         question: 'Can I set my own house rules?',

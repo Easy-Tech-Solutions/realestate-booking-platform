@@ -6,7 +6,7 @@ import pyotp
 import qrcode
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.auth.hashers import make_password
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.utils import timezone
 from rest_framework import status
@@ -115,23 +115,12 @@ def mfa_disable(request):
         return Response({'error': 'MFA is not enabled.'}, status=status.HTTP_400_BAD_REQUEST)
 
     code = str(request.data.get('code', '')).strip()
-    if not _verify_code_or_backup(device, code):
+    if not device.verify_code_or_backup(code):
         return Response({'error': 'Invalid code.'}, status=status.HTTP_400_BAD_REQUEST)
 
     device.delete()
     log_admin_action(request, 'mfa.disable', target=request.user)
     return Response({'message': 'MFA disabled.'})
-
-
-def _verify_code_or_backup(device: MFADevice, code: str) -> bool:
-    if pyotp.TOTP(device.secret).verify(code, valid_window=1):
-        return True
-    for hashed in device.backup_codes:
-        if check_password(code, hashed):
-            device.backup_codes = [h for h in device.backup_codes if h != hashed]
-            device.save(update_fields=['backup_codes'])
-            return True
-    return False
 
 
 # ── MFA step-up during login ─────────────────────────────────────────────────
@@ -165,7 +154,7 @@ def mfa_verify_login(request):
     if not device:
         return Response({'error': 'MFA is not enabled on this account.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if not _verify_code_or_backup(device, code):
+    if not device.verify_code_or_backup(code):
         return Response({'error': 'Invalid code.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Same token-issuing shape as authapp.views.login_view

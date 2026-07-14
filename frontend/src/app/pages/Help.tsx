@@ -16,9 +16,9 @@ const categories = [
   {
     title: 'Payments & Pricing',
     faqs: [
-      { q: 'What payment methods are accepted?', a: 'We accept credit/debit cards (Visa, Mastercard, Amex), PayPal, and MTN Mobile Money.' },
-      { q: 'When am I charged?', a: 'Your payment is processed immediately upon booking confirmation.' },
-      { q: 'What is the service fee?', a: 'A service fee of 14% is added to cover platform costs. This is shown before you confirm your booking.' },
+      { q: 'What payment methods are accepted?', a: 'We accept credit/debit cards (via Stripe) and MTN Mobile Money.' },
+      { q: 'When am I charged?', a: 'Not when you request a booking — that step is free. You\'re charged once the reservation is confirmed, during a separate payment step (within a 10-day window).' },
+      { q: 'What is the service fee?', a: 'A service fee (a percentage of the stay\'s subtotal) is added to cover platform costs. The exact percentage is shown transparently before you confirm your booking.' },
       { q: 'Are there any hidden fees?', a: 'No hidden fees. The total price shown at checkout includes the nightly rate, cleaning fee, service fee, and taxes.' },
     ],
   },
@@ -27,21 +27,21 @@ const categories = [
     faqs: [
       { q: 'What is the cancellation policy?', a: 'Each listing has its own cancellation policy (Flexible, Moderate, or Strict). Check the listing details before booking.' },
       { q: 'How do I cancel a booking?', a: 'Go to My Bookings, find your booking, and click Manage booking > Cancel. Refunds depend on the host\'s cancellation policy.' },
-      { q: 'How long do refunds take?', a: 'Refunds are processed within 5–10 business days depending on your payment method.' },
+      { q: 'How long do refunds take?', a: 'Our team reviews refund requests based on the listing\'s cancellation policy; once approved, arrival time depends on your bank or mobile money provider. Contact Support for a status update.' },
     ],
   },
   {
     title: 'Hosting',
     faqs: [
       { q: 'How do I become a host?', a: 'Click "Switch to hosting" in the menu, then follow the listing creation wizard to publish your first property.' },
-      { q: 'How do I get paid as a host?', a: 'Payouts are sent 24 hours after guest check-in via your preferred payout method set in your host account.' },
+      { q: 'How do I get paid as a host?', a: 'Once a guest\'s payment is confirmed, our team disburses your payout (gross amount minus HomeKonet\'s commission). Track pending and paid payouts under Host Dashboard > Earnings.' },
       { q: 'What is a Superhost?', a: 'Superhosts are experienced hosts with a 4.8+ rating, 10+ stays, 90%+ response rate, and less than 1% cancellation rate.' },
     ],
   },
   {
     title: 'Account & Safety',
     faqs: [
-      { q: 'How do I verify my identity?', a: 'Go to Account > Login & Security > Identity verification. You\'ll need a government-issued ID.' },
+      { q: 'How do I secure my account?', a: 'Go to Account > Login & security to update your password or turn on two-factor authentication with an authenticator app.' },
       { q: 'Is my personal information safe?', a: 'Yes. We use industry-standard encryption and never share your personal details without consent.' },
       { q: 'What should I do if I feel unsafe?', a: 'Contact our 24/7 safety team immediately through the Help Center or call our emergency line.' },
     ],

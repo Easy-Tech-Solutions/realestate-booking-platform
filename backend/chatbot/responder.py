@@ -32,7 +32,7 @@ If the user asks about something you cannot answer from the provided knowledge,
 or if they explicitly ask to speak to a human agent, set "needs_agent" to true.
 
 Always reply with ONLY a JSON object in this exact format:
-{"reply": "<your answer>", "needs_agent": false}
+{{"reply": "<your answer>", "needs_agent": false}}
 
 Keep replies concise and friendly. Do not include any text outside the JSON.
 
