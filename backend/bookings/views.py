@@ -96,6 +96,25 @@ def bookings_collection(request):
                 serializer.validated_data.pop('payment_method', None)
                 serializer.validated_data.pop('stripe_payment_intent_id', None)
 
+                # QA (viewing) inspection is mandatory before reserving a
+                # long-term rental — Business Policy §7.3. Hotel-room bookings
+                # are exempt (ViewingAppointment models the long-term-rental
+                # viewing flow only, not instant-book hotel stays). Guests who
+                # complete a viewing normally reserve via reserve_from_viewing
+                # directly; this only blocks skipping straight here instead.
+                if not hotel_room:
+                    has_completed_viewing = ViewingAppointment.objects.filter(
+                        listing=listing, guest=request.user, status='completed',
+                    ).exists()
+                    if not has_completed_viewing:
+                        return Response({
+                            'error': (
+                                'A completed property viewing (QA inspection) is required before you can '
+                                'reserve this property. Please schedule a viewing first.'
+                            ),
+                            'code': 'viewing_required',
+                        }, status=status.HTTP_400_BAD_REQUEST)
+
                 # A guest can't hold two active reservations for the same dates.
                 existing_booking = Booking.objects.filter(
                     customer=request.user,
@@ -834,6 +853,57 @@ def admin_booking_communications(request, id):
         'host_username': booking.listing.owner.username,
         'conversation_count': conversations.count(),
         'messages': messages,
+    })
+
+
+# ===== Admin: reservation extension (Business Policy §8.2) =================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_extend_reservation(request, id):
+    """POST /api/bookings/admin/<id>/extend-reservation/ — push the currently
+    active reservation deadline (host-confirm or payment) out to a new date,
+    up to RESERVATION_HOLD_MAX_DAYS (20) total from the original request.
+    Requires a reason; staff-approved only, matching the Business Policy's
+    "up to 20 days (if agreed)" extension allowance."""
+    from rbac.permissions import has_permission
+    if not has_permission(request.user, 'reservations.transactional_data', 'update'):
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    booking = get_object_or_404(Booking, pk=id)
+    reason = str(request.data.get('reason', '')).strip()
+    if not reason:
+        return Response({'error': 'A reason is required to extend a reservation.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    new_deadline_raw = request.data.get('new_deadline')
+    if not new_deadline_raw:
+        return Response({'error': 'new_deadline is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    from django.utils.dateparse import parse_datetime
+    new_deadline = parse_datetime(new_deadline_raw)
+    if new_deadline is None:
+        return Response({'error': 'new_deadline must be a valid ISO datetime.'}, status=status.HTTP_400_BAD_REQUEST)
+    if timezone.is_naive(new_deadline):
+        new_deadline = timezone.make_aware(new_deadline)
+
+    try:
+        applied_deadline = booking.extend_reservation(new_deadline, request.user, reason)
+    except ValueError as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(
+        request, 'booking.extend_reservation', target=booking, reason=reason,
+        requested_deadline=new_deadline_raw, applied_deadline=applied_deadline.isoformat(),
+    )
+    capped = applied_deadline < new_deadline
+    return Response({
+        'booking_id': booking.id,
+        'new_deadline': applied_deadline.isoformat(),
+        'capped_at_policy_ceiling': capped,
+        'message': (
+            'Extended, but capped at 20 days from the original reservation request.' if capped
+            else 'Reservation extended.'
+        ),
     })
 
 

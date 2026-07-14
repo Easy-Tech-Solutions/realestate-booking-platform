@@ -93,6 +93,7 @@ class RefundSerializer(serializers.Serializer):
     payment_id = serializers.UUIDField()
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     reason = serializers.CharField(max_length=500)
+    reason_code = serializers.ChoiceField(choices=Refund.ReasonCode.choices)
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -124,7 +125,7 @@ class RefundDetailSerializer(serializers.ModelSerializer):
         model = Refund
         fields = [
             'id', 'payment', 'payment_gateway', 'payment_amount', 'payment_currency',
-            'amount', 'reason', 'status', 'gateway_refund_id', 
+            'amount', 'reason', 'reason_code', 'status', 'gateway_refund_id',
             'created_at', 'processed_at'
         ]
         read_only_fields = ['id', 'created_at', 'processed_at']

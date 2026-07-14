@@ -105,12 +105,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send_error("Message content cannot be empty.")
             return
 
-        # Strip phone/email before persisting so the WS path can't bypass the
-        # redaction the HTTP path enforces.
-        from .redaction import redact_contact_info
-        content, _ = redact_contact_info(content)
+        # Strip phone/email and flag restricted phrases before persisting, so
+        # the WS path can't bypass the anti-bypass checks the HTTP path enforces.
+        from .redaction import scan_message
+        content, violation_codes = scan_message(content)
 
         message = await self.save_message(self.conversation_id, self.user, content)
+
+        if violation_codes:
+            await self.record_violations(self.conversation_id, self.user, violation_codes)
 
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -232,6 +235,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'sender_email': user.email,
             'created_at': msg.created_at.isoformat(),
         }
+
+    @database_sync_to_async
+    def record_violations(self, conversation_id, user, violation_codes):
+        from .models import Conversation
+        from .violations import record_violations_and_escalate
+        from notifications.services import notify_message_violation_recipient
+        conversation = Conversation.objects.get(id=conversation_id)
+        others = list(conversation.participants.exclude(id=user.id))
+        record_violations_and_escalate(user, others[0] if others else None, conversation, violation_codes)
+        for extra in others[1:]:
+            try:
+                notify_message_violation_recipient(extra, user)
+            except Exception:
+                pass
 
     @database_sync_to_async
     def mark_messages_read(self, conversation_id, user):

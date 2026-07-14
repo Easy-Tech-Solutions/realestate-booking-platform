@@ -40,7 +40,22 @@ def get_model():
         _model = Llama(
             model_path=model_path,
             n_ctx=settings.AI_MODEL_CONTEXT_SIZE,
-            n_threads=os.cpu_count() or 4,
+            n_threads=max(1, (os.cpu_count() or 4) - 1),  # reserve 1 core for other services
             verbose=False,
         )
         return _model
+
+
+def warmup():
+    """Run a minimal inference pass so the model is hot before the first real
+    task. Called once from the Celery worker_ready signal."""
+    try:
+        model = get_model()
+        model.create_chat_completion(
+            messages=[{'role': 'user', 'content': 'hi'}],
+            max_tokens=1,
+            temperature=0.0,
+        )
+        logger.info('AI model warmup complete.')
+    except Exception as exc:
+        logger.warning('AI model warmup failed: %s', exc)

@@ -12,7 +12,8 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from .models import Conversation, Message, MessageAttachment
-from .redaction import redact_contact_info
+from .redaction import scan_message
+from .violations import record_violations_and_escalate
 
 
 def _attachments_allowed(conversation, user):
@@ -210,9 +211,11 @@ class SendMessageView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Strip phone numbers / emails before persisting; the frontend uses
-        # `was_redacted` to show the sender a one-time educational nudge.
-        content, was_redacted = redact_contact_info(content)
+        # Strip phone numbers / emails before persisting, and flag restricted
+        # phrases (Business Policy §11); the frontend uses `was_redacted` to
+        # show the sender a one-time educational nudge.
+        content, violation_codes = scan_message(content)
+        was_redacted = bool(violation_codes)
 
         if content and uploaded_files:
             msg_type = 'text_file'
@@ -236,6 +239,21 @@ class SendMessageView(APIView):
             message_type=msg_type,
             reply_to=reply_to,
         )
+
+        if violation_codes:
+            # Record once per message (not once per recipient, which would
+            # inflate the sender's violation count in a group thread) — the
+            # primary "other party" is used for the recipient-side warning;
+            # any additional participants are notified too, without creating
+            # extra MessageViolation rows.
+            others = list(conversation.participants.exclude(id=request.user.id))
+            record_violations_and_escalate(request.user, others[0] if others else None, conversation, violation_codes)
+            for extra in others[1:]:
+                try:
+                    from notifications.services import notify_message_violation_recipient
+                    notify_message_violation_recipient(extra, request.user)
+                except Exception:
+                    pass
 
         attachments = []
         for f in uploaded_files:

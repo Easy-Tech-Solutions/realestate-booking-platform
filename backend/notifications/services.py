@@ -773,6 +773,40 @@ def notify_new_message(message):
         )
 
 
+def notify_message_violation_sender(sender):
+    """The sender gets a one-time educational nudge — same message shown as
+    the in-chat toast, kept consistent as a permanent notification-center
+    record too (Business Policy §11.3 — "warning sent to both parties")."""
+    create_notification(
+        user=sender,
+        notification_type='message_violation_sender',
+        title='Message content removed',
+        message=(
+            "We removed contact details or a restricted phrase from your message. "
+            "Sharing contact info or arranging deals outside Home Konet means you lose "
+            "refund and dispute protection, and repeated attempts can lead to suspension."
+        ),
+        send_email=False,
+    )
+
+
+def notify_message_violation_recipient(recipient, sender):
+    """The other party is also warned — the previous version of this system
+    only nudged the sender, which didn't match the "warn both parties" policy."""
+    sender_name = sender.get_full_name() or sender.username
+    create_notification(
+        user=recipient,
+        notification_type='message_violation_recipient',
+        title='Contact-sharing attempt flagged',
+        message=(
+            f'{sender_name} attempted to share contact details or move this conversation '
+            f'off-platform. For your protection, please keep all communication and payments '
+            f'within Home Konet.'
+        ),
+        send_email=False,
+    )
+
+
 # ---- Listing helpers ---------------------------------------------------------
 
 def notify_price_changed(listing, old_price):

@@ -207,7 +207,7 @@ class PaymentService:
         )
 
     @classmethod
-    def refund_payment(cls, payment: Payment, amount: float, reason: str) -> Dict[str, Any]:
+    def refund_payment(cls, payment: Payment, amount: float, reason: str, reason_code: str = '') -> Dict[str, Any]:
         gateway = cls.get_gateway(payment.gateway.name)
         if not gateway:
             return {'success': False, 'error': 'Payment gateway not available'}
@@ -231,6 +231,7 @@ class PaymentService:
                     payment=payment,
                     amount=amount,
                     reason=reason,
+                    reason_code=reason_code or Refund.ReasonCode.OTHER,
                 )
 
                 result = gateway.refund_payment(payment, amount, reason)

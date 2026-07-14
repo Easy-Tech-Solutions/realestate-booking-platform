@@ -211,6 +211,43 @@ def verify_payment(request):
                     status=status.HTTP_400_BAD_REQUEST)
 
 
+# Home Konnect Business Policy §10 — refund eligibility window and reason
+# codes. 20 days is the outer bound the policy allows ("7 to 20 days
+# depending on agreement"); staff can still be more conservative case-by-case
+# via the admin refund tools, but the system enforces this as the hard ceiling.
+REFUND_ELIGIBILITY_WINDOW_DAYS = 20
+
+
+def _check_refund_eligibility(payment, reason_code, allow_staff_override=False):
+    """Returns (ok, error_message). error_message is None when ok=True.
+    `allow_staff_override` lets the admin-discretion refund tools bypass the
+    date window (never the viewing-fee block or the change-of-mind block —
+    those are absolute per policy)."""
+    if payment.purpose == 'viewing_fee':
+        return False, 'QA/viewing inspection fees are non-refundable.'
+
+    if reason_code not in dict(Refund.ReasonCode.choices):
+        return False, f'reason_code must be one of {[c[0] for c in Refund.ReasonCode.choices]}.'
+
+    if reason_code == Refund.ReasonCode.CHANGE_OF_MIND:
+        return False, 'Refunds are not available for a change of mind.'
+
+    if not allow_staff_override and reason_code not in Refund.ELIGIBLE_REASON_CODES:
+        return False, (
+            'This reason is not eligible for a refund. Eligible reasons: '
+            'property misrepresentation, a legal issue, or a safety concern.'
+        )
+
+    anchor = payment.completed_at or payment.created_at
+    if not allow_staff_override and anchor:
+        from django.utils import timezone as _tz
+        days_elapsed = (_tz.now() - anchor).days
+        if days_elapsed > REFUND_ELIGIBILITY_WINDOW_DAYS:
+            return False, f'This payment is {days_elapsed} days old — refund requests must be made within {REFUND_ELIGIBILITY_WINDOW_DAYS} days.'
+
+    return True, None
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def process_refund(request):
@@ -227,10 +264,16 @@ def process_refund(request):
                 return Response({'success': False, 'error': 'Only completed payments can be refunded'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
+            reason_code = request.data.get('reason_code', '')
+            eligible, error = _check_refund_eligibility(payment, reason_code, allow_staff_override=False)
+            if not eligible:
+                return Response({'success': False, 'error': error}, status=status.HTTP_400_BAD_REQUEST)
+
             result = PaymentService.refund_payment(
                 payment=payment,
                 amount=serializer.validated_data['amount'],
                 reason=serializer.validated_data['reason'],
+                reason_code=reason_code,
             )
 
             if result.get('success'):
@@ -1088,12 +1131,14 @@ def _execute_stripe_refund(payload):
     booking = Booking.objects.get(pk=payload['booking_id'])
     amount = Decimal(payload['amount'])
     reason = payload['reason']
+    reason_code = payload.get('reason_code') or Refund.ReasonCode.OTHER
 
     stripe_secret = getattr(django_settings, 'STRIPE_SECRET_KEY', '') or ''
     if not stripe_secret:
         StripeRefund.objects.create(
             booking=booking, stripe_payment_intent_id=booking.stripe_payment_intent_id,
-            amount=amount, reason=reason, status='failed', error_message='Stripe is not configured on the server',
+            amount=amount, reason=reason, reason_code=reason_code, status='failed',
+            error_message='Stripe is not configured on the server',
             initiated_by_id=payload['initiated_by_id'],
         )
         raise RuntimeError('Stripe is not configured on the server')
@@ -1110,14 +1155,14 @@ def _execute_stripe_refund(payload):
         )
         StripeRefund.objects.create(
             booking=booking, stripe_payment_intent_id=booking.stripe_payment_intent_id,
-            amount=amount, reason=reason, stripe_refund_id=result.id, status='completed',
+            amount=amount, reason=reason, reason_code=reason_code, stripe_refund_id=result.id, status='completed',
             initiated_by_id=payload['initiated_by_id'],
         )
         return {'booking_id': booking.id, 'stripe_refund_id': result.id, 'status': 'completed'}
     except stripe.error.StripeError as e:
         StripeRefund.objects.create(
             booking=booking, stripe_payment_intent_id=booking.stripe_payment_intent_id,
-            amount=amount, reason=reason, status='failed', error_message=str(e),
+            amount=amount, reason=reason, reason_code=reason_code, status='failed', error_message=str(e),
             initiated_by_id=payload['initiated_by_id'],
         )
         raise RuntimeError(f'Stripe refund failed: {e}')
@@ -1141,8 +1186,13 @@ def admin_stripe_refund(request):
 
     booking_id = request.data.get('booking_id')
     reason = str(request.data.get('reason', '')).strip()
+    reason_code = request.data.get('reason_code', Refund.ReasonCode.OTHER)
     if not booking_id or not reason:
         return Response({'error': 'booking_id and reason are required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if reason_code not in dict(Refund.ReasonCode.choices):
+        return Response({'error': f'reason_code must be one of {[c[0] for c in Refund.ReasonCode.choices]}.'}, status=status.HTTP_400_BAD_REQUEST)
+    if reason_code == Refund.ReasonCode.CHANGE_OF_MIND:
+        return Response({'error': 'Refunds are not available for a change of mind.'}, status=status.HTTP_400_BAD_REQUEST)
 
     booking = get_object_or_404(Booking, pk=booking_id)
     if not booking.stripe_payment_intent_id:
@@ -1168,7 +1218,7 @@ def admin_stripe_refund(request):
     if amount > remaining:
         return Response({'error': f'Refund amount exceeds the remaining refundable balance ({remaining}).'}, status=status.HTTP_400_BAD_REQUEST)
 
-    payload = {'booking_id': booking.id, 'amount': str(amount), 'reason': reason, 'initiated_by_id': request.user.id}
+    payload = {'booking_id': booking.id, 'amount': str(amount), 'reason': reason, 'reason_code': reason_code, 'initiated_by_id': request.user.id}
     _, approval = dual_auth.submit_or_execute('stripe_refund', payload, request.user, reason, True)
 
     from superadmin.permissions import log_admin_action
@@ -1193,7 +1243,10 @@ DUAL_AUTH_REFUND_THRESHOLD = 500.00
 @dual_auth.register_executor('payment.refund')
 def _execute_refund(payload):
     payment = Payment.objects.get(pk=payload['payment_id'])
-    result = PaymentService.refund_payment(payment=payment, amount=payload['amount'], reason=payload['reason'])
+    result = PaymentService.refund_payment(
+        payment=payment, amount=payload['amount'], reason=payload['reason'],
+        reason_code=payload.get('reason_code', ''),
+    )
     if not result.get('success'):
         raise RuntimeError(result.get('error', 'Refund processing failed'))
     payment.refresh_from_db()
@@ -1216,6 +1269,7 @@ def admin_refund_payment(request):
 
     payment_id = request.data.get('payment_id')
     reason = str(request.data.get('reason', '')).strip()
+    reason_code = request.data.get('reason_code', Refund.ReasonCode.OTHER)
     if not payment_id or not reason:
         return Response({'error': 'payment_id and reason are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1229,6 +1283,12 @@ def admin_refund_payment(request):
     if payment.status not in ('completed', 'partially_refunded'):
         return Response({'error': f'Only completed or partially-refunded payments can be refunded (this one is {payment.status}).'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Staff discretion is allowed past the eligibility date window, but the
+    # viewing-fee block and the change-of-mind block are absolute (policy §10).
+    eligible, error = _check_refund_eligibility(payment, reason_code, allow_staff_override=True)
+    if not eligible:
+        return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
         amount = float(request.data.get('amount'))
     except (TypeError, ValueError):
@@ -1237,7 +1297,7 @@ def admin_refund_payment(request):
         return Response({'error': 'Amount must be greater than zero.'}, status=status.HTTP_400_BAD_REQUEST)
 
     from superadmin.permissions import log_admin_action
-    payload = {'payment_id': str(payment.id), 'amount': amount, 'reason': reason}
+    payload = {'payment_id': str(payment.id), 'amount': amount, 'reason': reason, 'reason_code': reason_code}
     requires_dual_auth = amount > DUAL_AUTH_REFUND_THRESHOLD
 
     if requires_dual_auth:

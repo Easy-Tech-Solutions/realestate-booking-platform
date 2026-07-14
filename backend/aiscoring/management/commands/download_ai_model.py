@@ -22,6 +22,7 @@ class Command(BaseCommand):
         if os.path.exists(model_path) and not options['force']:
             if self._sha256_matches(model_path):
                 self.stdout.write(self.style.SUCCESS(f'Model already present and verified at {model_path}'))
+                self._delete_old_models()
                 return
             self.stdout.write(self.style.WARNING(f'Existing file at {model_path} failed checksum — re-downloading'))
 
@@ -47,6 +48,13 @@ class Command(BaseCommand):
 
         os.replace(tmp_path, model_path)
         self.stdout.write(self.style.SUCCESS(f'Model downloaded and verified at {model_path}'))
+        self._delete_old_models()
+
+    def _delete_old_models(self):
+        for old in settings.AI_MODEL_DIR.iterdir():
+            if old.suffix == '.gguf' and old != settings.AI_MODEL_PATH:
+                old.unlink()
+                self.stdout.write(self.style.WARNING(f'Deleted old model: {old}'))
 
     def _sha256_matches(self, path):
         expected = settings.AI_MODEL_SHA256

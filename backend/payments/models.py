@@ -138,9 +138,22 @@ class Refund(models.Model):
         ('failed', 'Failed'),
     ]
 
+    # Home Konnect Business Policy §10 — only the first three are actually
+    # eligible for a refund; CHANGE_OF_MIND exists so it can be explicitly
+    # rejected with a clear reason rather than silently falling through.
+    class ReasonCode(models.TextChoices):
+        MISREPRESENTATION = 'misrepresentation', 'Property misrepresentation'
+        LEGAL_ISSUE        = 'legal_issue',        'Legal issue discovered'
+        SAFETY_CONCERN     = 'safety_concern',      'Safety concern'
+        CHANGE_OF_MIND     = 'change_of_mind',      'Change of mind (not eligible)'
+        OTHER              = 'other',               'Other (admin discretion)'
+
+    ELIGIBLE_REASON_CODES = (ReasonCode.MISREPRESENTATION, ReasonCode.LEGAL_ISSUE, ReasonCode.SAFETY_CONCERN)
+
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='refunds')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     reason = models.TextField()
+    reason_code = models.CharField(max_length=20, choices=ReasonCode.choices, default=ReasonCode.OTHER)
     gateway_refund_id = models.CharField(max_length=255, blank=True)
     status = models.CharField(max_length=20, choices=REFUND_STATUS_CHOICE, default='pending')
 
@@ -256,6 +269,7 @@ class StripeRefund(models.Model):
     stripe_payment_intent_id = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     reason = models.TextField()
+    reason_code = models.CharField(max_length=20, choices=Refund.ReasonCode.choices, default=Refund.ReasonCode.OTHER)
     stripe_refund_id = models.CharField(max_length=255, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES)
     error_message = models.TextField(blank=True)

@@ -105,9 +105,22 @@ class PropertyVerificationSerializer(serializers.ModelSerializer):
 
 
 class PropertyVerificationAdminSerializer(PropertyVerificationSerializer):
-    """Adds the AI pre-screen fields — reviewer-only, never returned to the
-    host being assessed (see PropertyVerificationSerializer for that view)."""
+    """Adds the AI pre-screen fields plus the Compliance-stage site-inspection
+    record — reviewer-only, never returned to the host being assessed (see
+    PropertyVerificationSerializer for that view)."""
+
+    inspection_report_url = serializers.SerializerMethodField()
 
     class Meta(PropertyVerificationSerializer.Meta):
-        fields = PropertyVerificationSerializer.Meta.fields + ['ai_risk_score', 'ai_rationale']
+        fields = PropertyVerificationSerializer.Meta.fields + [
+            'ai_risk_score', 'ai_rationale',
+            'due_diligence_done', 'inspection_report_url',
+            'inspection_latitude', 'inspection_longitude',
+        ]
         read_only_fields = fields
+
+    def get_inspection_report_url(self, obj):
+        if not obj.inspection_report:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.inspection_report.url) if request else obj.inspection_report.url

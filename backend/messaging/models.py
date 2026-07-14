@@ -80,6 +80,42 @@ class Message(models.Model):
         return f"Message by {self.sender.email} at {self.created_at:%Y-%m-%d %H:%M}"
 
 
+class MessageViolation(models.Model):
+    """
+    A detected anti-bypass hit (Business Policy §11) — a phone number, email
+    address, or restricted phrase caught in an outgoing message. Recorded
+    regardless of whether the offending content was fully redacted, so
+    repeated attempts can be counted and escalated (see messaging.violations).
+    """
+    class ViolationType(models.TextChoices):
+        PHONE_NUMBER       = 'phone_number',       'Phone number shared'
+        EMAIL              = 'email',              'Email address shared'
+        RESTRICTED_PHRASE  = 'restricted_phrase',  'Restricted phrase (off-platform contact attempt)'
+
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name='violations', null=True, blank=True,
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='message_violations',
+    )
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='message_violations_received',
+    )
+    violation_type = models.CharField(max_length=20, choices=ViolationType.choices)
+    # A short label of what matched (e.g. 'call_me_directly') — never the raw
+    # phone/email/full message text, so this table itself doesn't become a
+    # second place PII leaks to.
+    matched_label = models.CharField(max_length=100, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.sender.username} — {self.violation_type} ({self.created_at:%Y-%m-%d})'
+
+
 class MessageAttachment(models.Model):
     """
     A file attached to a message — photo, video, document, etc.

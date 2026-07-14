@@ -78,6 +78,12 @@ class PropertyVerification(models.Model):
     inspection_report  = models.FileField(
         upload_to='property_verifications/inspections/', storage=_mou_storage, null=True, blank=True,
     )
+    # Captured on-site by the Compliance Officer during the physical
+    # inspection, to corroborate the property's declared location — separate
+    # from Listing.latitude/longitude (which the host self-reports at listing
+    # creation and is never independently verified).
+    inspection_latitude  = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    inspection_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
     status = models.CharField(
         max_length=25, choices=Status.choices, default=Status.SUBMITTED, db_index=True,

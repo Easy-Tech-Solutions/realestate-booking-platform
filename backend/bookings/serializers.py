@@ -26,6 +26,7 @@ class BookingSerializer(serializers.ModelSerializer):
             'status', 'notes', 'requested_at', 'confirmed_at', 'declined_at', 'cancelled_at', 'owner_notes',
             'decline_reason', 'total_price', 'service_fee', 'stripe_payment_intent_id', 'days_until_expiry',
             'requires_viewing', 'host_confirm_deadline', 'host_confirmed_at', 'payment_due_at',
+            'extended_until', 'extended_at', 'extension_reason',
         ]
         # Lifecycle and host/system-controlled fields are read-only here so the
         # generic PUT /api/bookings/<id>/ cannot mutate them. Status transitions
@@ -33,9 +34,12 @@ class BookingSerializer(serializers.ModelSerializer):
         # guest could PUT {"status": "confirmed"} on their own booking and bypass
         # host approval (TEST-AUTHZ-04 / CWE-285). owner_notes & decline_reason
         # are host fields; stripe_payment_intent_id is set during the create flow.
+        # Extension fields are staff-only (see admin_extend_reservation), never
+        # writable through this generic serializer.
         read_only_fields = [
             'customer', 'requested_at', 'confirmed_at', 'declined_at', 'cancelled_at', 'total_price',
             'status', 'owner_notes', 'decline_reason', 'stripe_payment_intent_id',
+            'extended_until', 'extended_at', 'extension_reason',
         ]
 
     def get_days_until_expiry(self, obj):

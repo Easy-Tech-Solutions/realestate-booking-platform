@@ -10,6 +10,11 @@ import uuid
 HOST_CONFIRM_DAYS = 7    # host must confirm a reservation within this window
 PAYMENT_WINDOW_DAYS = 10  # guest must pay within this window after host confirms
 
+# Business Policy §8.2 — "Extended cases: up to 20 days (if agreed)". Absolute
+# ceiling on how far staff can push either deadline out via extend_reservation,
+# measured from the original reservation request, not from the extension date.
+RESERVATION_HOLD_MAX_DAYS = 20
+
 
 class Booking(models.Model):
     STATUS_CHOICES = [
@@ -68,6 +73,19 @@ class Booking(models.Model):
     # Deadline for the guest to complete payment; set at host confirmation.
     payment_due_at = models.DateTimeField(null=True, blank=True)
 
+    # Staff-approved extension record (Business Policy §8.2 — up to 20 days
+    # total "if agreed"). extended_until mirrors whichever of
+    # host_confirm_deadline/payment_due_at was pushed out, kept here purely
+    # for audit/display so the extension is visible regardless of which
+    # clock was active when it was granted.
+    extended_until = models.DateTimeField(null=True, blank=True)
+    extended_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='bookings_extended',
+    )
+    extended_at = models.DateTimeField(null=True, blank=True)
+    extension_reason = models.TextField(blank=True, default='')
+
     class Meta:
         # Only enforce uniqueness while the booking is "alive". A declined,
         # cancelled, expired, or completed booking should not block the same
@@ -121,6 +139,33 @@ class Booking(models.Model):
             and self.payment_due_at is not None
             and timezone.now() >= self.payment_due_at
         )
+
+    def extend_reservation(self, requested_deadline, extended_by, reason):
+        """Push out whichever clock is currently active (host-confirm or
+        payment) to `requested_deadline`, capped at RESERVATION_HOLD_MAX_DAYS
+        total from the original request. Staff-approved only — see
+        bookings.views.admin_extend_reservation. Returns the deadline actually
+        applied (which may be earlier than requested if it hit the cap)."""
+        if self.status not in ('pending_host', 'awaiting_payment'):
+            raise ValueError('Only a pending_host or awaiting_payment reservation can be extended.')
+
+        ceiling = self.requested_at + timedelta(days=RESERVATION_HOLD_MAX_DAYS)
+        new_deadline = min(requested_deadline, ceiling)
+
+        update_fields = ['extended_until', 'extended_by', 'extended_at', 'extension_reason']
+        if self.status == 'pending_host':
+            self.host_confirm_deadline = new_deadline
+            update_fields.append('host_confirm_deadline')
+        else:
+            self.payment_due_at = new_deadline
+            update_fields.append('payment_due_at')
+
+        self.extended_until = new_deadline
+        self.extended_by = extended_by
+        self.extended_at = timezone.now()
+        self.extension_reason = reason
+        self.save(update_fields=update_fields)
+        return new_deadline
 
 
 class PaymentRequest(models.Model):

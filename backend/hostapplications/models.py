@@ -55,6 +55,18 @@ class HostApplication(models.Model):
     headshot    = models.ImageField(upload_to='host_applications/headshots/')
     id_document = models.ImageField(upload_to='host_applications/ids/')
 
+    # Added to match the published Home Konnect Business Policy's mandatory
+    # onboarding documentation. Nullable/blank at the model level so existing
+    # historical applications aren't broken by this migration — required for
+    # NEW submissions via HostApplicationCreateSerializer instead.
+    tax_clearance_receipt = models.FileField(
+        upload_to='host_applications/tax_clearance/', null=True, blank=True,
+        help_text='Updated Tax Clearance Receipt (Business Policy §4.1).',
+    )
+    next_of_kin_name = models.CharField(max_length=255, blank=True, default='')
+    next_of_kin_relationship = models.CharField(max_length=100, blank=True, default='')
+    next_of_kin_phone = models.CharField(max_length=30, blank=True, default='')
+
     status = models.CharField(
         max_length=25,
         choices=Status.choices,

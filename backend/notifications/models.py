@@ -29,6 +29,8 @@ class NotificationType(models.TextChoices):
     PAYOUT_PAID           = 'payout_paid',           'Payout Paid'              # → host (disbursed)
     # Messaging
     NEW_MESSAGE        = 'new_message',        'New Message'
+    MESSAGE_VIOLATION_SENDER    = 'message_violation_sender',    'Message Content Removed'      # → sender
+    MESSAGE_VIOLATION_RECIPIENT = 'message_violation_recipient', 'Contact-Sharing Attempt Flagged'  # → other party
     # Listings
     PRICE_CHANGED      = 'price_changed',      'Price Changed'
     LISTING_AVAILABLE  = 'listing_available',  'Listing Available'

@@ -13,7 +13,16 @@ class HostApplicationCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = HostApplication
-        fields = ['full_name', 'address', 'phone', 'headshot', 'id_document', 'agreement_accepted']
+        fields = [
+            'full_name', 'address', 'phone', 'headshot', 'id_document', 'agreement_accepted',
+            'tax_clearance_receipt', 'next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone',
+        ]
+        extra_kwargs = {
+            'tax_clearance_receipt': {'required': True},
+            'next_of_kin_name': {'required': True, 'allow_blank': False},
+            'next_of_kin_relationship': {'required': True, 'allow_blank': False},
+            'next_of_kin_phone': {'required': True, 'allow_blank': False},
+        }
 
     def validate_agreement_accepted(self, value):
         if not value:
@@ -43,6 +52,7 @@ class HostApplicationSerializer(serializers.ModelSerializer):
     current_stage     = serializers.SerializerMethodField()
     headshot_url      = serializers.SerializerMethodField()
     id_document_url   = serializers.SerializerMethodField()
+    tax_clearance_receipt_url = serializers.SerializerMethodField()
     can_reapply       = serializers.SerializerMethodField()
     email             = serializers.EmailField(source='applicant.email', read_only=True)
 
@@ -50,7 +60,8 @@ class HostApplicationSerializer(serializers.ModelSerializer):
         model = HostApplication
         fields = [
             'id', 'full_name', 'address', 'phone', 'email',
-            'headshot_url', 'id_document_url',
+            'headshot_url', 'id_document_url', 'tax_clearance_receipt_url',
+            'next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone',
             'status', 'status_display', 'current_stage',
             'declined_stage', 'decline_reason', 'can_reapply',
             'created_at', 'updated_at',
@@ -71,6 +82,9 @@ class HostApplicationSerializer(serializers.ModelSerializer):
 
     def get_id_document_url(self, obj):
         return self._abs_url(obj.id_document)
+
+    def get_tax_clearance_receipt_url(self, obj):
+        return self._abs_url(obj.tax_clearance_receipt)
 
     def get_can_reapply(self, obj):
         return obj.status == HostApplication.Status.DECLINED

@@ -21,8 +21,8 @@ export interface HandoffResult {
   conversation_id: number | null;
 }
 
-const POLL_INTERVAL_MS = 1500;
-const POLL_MAX_ATTEMPTS = 40; // 40 × 1.5 s = 60 s max wait
+const POLL_INTERVAL_MS = 3000;
+const POLL_MAX_ATTEMPTS = 150; // 150 × 3 s = 7.5 min — covers model cold start (~6 min)
 
 export const chatbotAPI = {
   /** Enqueue a message. Returns immediately with task_id + session_id. */

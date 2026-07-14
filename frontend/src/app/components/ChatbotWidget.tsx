@@ -47,6 +47,7 @@ export function ChatbotWidget() {
   const [messages, setMessages] = useState<Message[]>(() => loadMessages());
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [waitSeconds, setWaitSeconds] = useState(0);
   const [sessionId, setSessionId] = useState<string | null>(
     () => localStorage.getItem(LS_SESSION_KEY),
   );
@@ -99,9 +100,12 @@ export function ChatbotWidget() {
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
+    setWaitSeconds(0);
 
     try {
-      const res = await chatbotAPI.chat(trimmed, sessionId, () => {});
+      const res = await chatbotAPI.chat(trimmed, sessionId, () => {
+        setWaitSeconds((s) => s + 3);
+      });
       if (res.session_id) persistSession(res.session_id);
 
       setMessages((prev) => [
@@ -280,7 +284,13 @@ export function ChatbotWidget() {
               <div className="flex justify-start">
                 <div className="bg-muted rounded-2xl rounded-bl-sm px-3 py-2 flex items-center gap-1.5">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Thinking…</span>
+                  <span className="text-xs text-muted-foreground">
+                    {waitSeconds < 15
+                      ? 'Thinking…'
+                      : waitSeconds < 60
+                      ? `Still thinking… (${waitSeconds}s)`
+                      : `Loading AI model… (${Math.floor(waitSeconds / 60)}m ${waitSeconds % 60}s) — first message takes a few minutes`}
+                  </span>
                 </div>
               </div>
             )}

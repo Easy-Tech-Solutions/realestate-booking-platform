@@ -84,18 +84,64 @@ def _looks_like_phone(candidate: str) -> bool:
     return _MIN_PHONE_DIGITS <= len(digits) <= _MAX_PHONE_DIGITS
 
 
-def redact_contact_info(text: str) -> tuple[str, bool]:
-    """Return ``(redacted_text, was_redacted)``.
+# ---------------------------------------------------------------------------
+# Restricted phrases (Business Policy §11.2) — attempts to move the deal or
+# the conversation off-platform. These aren't redacted (the phrase itself
+# isn't PII, and cutting it out mid-sentence reads as broken/suspicious) —
+# they're only flagged for the anti-bypass violation/escalation pipeline in
+# messaging.violations.
+# ---------------------------------------------------------------------------
+_RESTRICTED_PHRASES = [
+    (re.compile(r'\bsend\s+me\s+your\s+(contact|number|phone|email|whatsapp)\b', re.I), 'send_me_your_contact'),
+    (re.compile(r"\blet'?s\s+talk\s+outside\b", re.I), 'lets_talk_outside'),
+    (re.compile(r'\bcall\s+me\s+directly\b', re.I), 'call_me_directly'),
+    (re.compile(r'\btext\s+me\s+(at|on)\b', re.I), 'text_me_at'),
+    (re.compile(r'\b(whatsapp|telegram|signal|imo)\s+me\b', re.I), 'messaging_app_handoff'),
+    (re.compile(r'\badd\s+me\s+on\s+(whatsapp|telegram|signal)\b', re.I), 'add_me_on_app'),
+    (re.compile(r'\b(meet|talk|deal|pay)\s+(me\s+)?(directly\s+)?outside\s+(the\s+)?(platform|app|home\s*konn?e[ck]t)\b', re.I), 'outside_platform'),
+    (re.compile(r'\boff[\s-]?platform\b', re.I), 'off_platform'),
+    (re.compile(r'\bpay\s+me\s+(directly|in\s+cash)\b', re.I), 'pay_directly'),
+    (re.compile(r'\bcash\s+payment\b', re.I), 'cash_payment'),
+    (re.compile(r'\bwithout\s+(going\s+through\s+)?(the\s+)?app\b', re.I), 'without_the_app'),
+]
 
-    ``was_redacted`` is True if any phone number or email was replaced, so
-    the caller can surface a warning to the sender.
+
+def detect_restricted_phrases(text: str) -> list[str]:
+    """Returns the list of matched phrase codes (empty if none)."""
+    if not text:
+        return []
+    return [code for pattern, code in _RESTRICTED_PHRASES if pattern.search(text)]
+
+
+def scan_message(text: str) -> tuple[str, list[str]]:
+    """Return ``(redacted_text, violations)``.
+
+    ``violations`` is a list of violation codes — ``'phone_number'``,
+    ``'email'``, and/or ``'restricted_phrase:<code>'`` — empty if the
+    message was clean. Phone numbers and emails are replaced with
+    REDACTION_MARKER in the returned text; restricted phrases are left
+    in place (see module docstring) and only reported via `violations`.
     """
     if not text:
-        return text, False
+        return text, []
+
+    violations: list[str] = []
 
     def _replace_phone(match: re.Match) -> str:
-        return REDACTION_MARKER if _looks_like_phone(match.group(0)) else match.group(0)
+        if _looks_like_phone(match.group(0)):
+            violations.append('phone_number')
+            return REDACTION_MARKER
+        return match.group(0)
 
     redacted = _PHONE_CANDIDATE_RE.sub(_replace_phone, text)
-    redacted = _EMAIL_RE.sub(REDACTION_MARKER, redacted)
-    return redacted, redacted != text
+
+    def _replace_email(match: re.Match) -> str:
+        violations.append('email')
+        return REDACTION_MARKER
+
+    redacted = _EMAIL_RE.sub(_replace_email, redacted)
+
+    for code in detect_restricted_phrases(text):
+        violations.append(f'restricted_phrase:{code}')
+
+    return redacted, violations

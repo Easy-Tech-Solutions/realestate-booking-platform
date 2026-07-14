@@ -123,13 +123,27 @@ def register(request):
     password2 = request.data.get("password2")
     first_name = (request.data.get("first_name") or "").strip()
     last_name = (request.data.get("last_name") or "").strip()
+    date_of_birth_raw = request.data.get("date_of_birth")
 
     # Input validation
-    if not all([password, email, password2, first_name, last_name]):
+    if not all([password, email, password2, first_name, last_name, date_of_birth_raw]):
         return Response(
-            {"error": "first_name, last_name, email, password, and password2 are required"},
+            {"error": "first_name, last_name, email, date_of_birth, password, and password2 are required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    # Age eligibility (Business Policy §3.1 — must be at least 18 years old)
+    from datetime import date
+    try:
+        date_of_birth = date.fromisoformat(str(date_of_birth_raw))
+    except ValueError:
+        return Response({"error": "date_of_birth must be a valid date (YYYY-MM-DD)."}, status=status.HTTP_400_BAD_REQUEST)
+    today = date.today()
+    age = today.year - date_of_birth.year - ((today.month, today.day) < (date_of_birth.month, date_of_birth.day))
+    if date_of_birth > today:
+        return Response({"error": "date_of_birth cannot be in the future."}, status=status.HTTP_400_BAD_REQUEST)
+    if age < 18:
+        return Response({"error": "You must be at least 18 years old to register."}, status=status.HTTP_400_BAD_REQUEST)
 
     # Password confirmation check
     if password != password2:
@@ -158,6 +172,7 @@ def register(request):
                 password=password,
                 first_name=first_name,
                 last_name=last_name,
+                date_of_birth=date_of_birth,
                 is_active=not settings.AUTH_REQUIRE_EMAIL_VERIFICATION,
             )
             if settings.AUTH_REQUIRE_EMAIL_VERIFICATION:

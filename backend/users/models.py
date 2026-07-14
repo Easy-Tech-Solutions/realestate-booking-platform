@@ -12,6 +12,11 @@ class User(AbstractUser):
         ('admin', 'Admin'),
         ('superadmin', 'Superadmin'),
     ]
+    # Nullable for existing accounts created before this field existed —
+    # collected and enforced (18+) at registration time going forward, see
+    # authapp.views.register (Business Policy §3.1 "Be at least 18 years old").
+    date_of_birth = models.DateField(null=True, blank=True)
+
     email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=200, blank=True, null=True)
     email_verification_token_expires_at = models.DateTimeField(null=True, blank=True)

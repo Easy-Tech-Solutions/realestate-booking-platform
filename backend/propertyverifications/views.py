@@ -160,9 +160,14 @@ def review_queue(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def review_decision(request, pk):
     """POST /api/property-verifications/<pk>/review/ — approve, reject, or
-    request correction at whichever stage this verification is awaiting."""
+    request correction at whichever stage this verification is awaiting.
+
+    At the Compliance stage, approving additionally accepts the site-visit
+    record: due_diligence_done (bool), inspection_report (file),
+    inspection_latitude/inspection_longitude (GPS coordinates)."""
     verification = get_object_or_404(PropertyVerification, pk=pk)
     stage = verification.current_stage
     if stage is None:
@@ -177,8 +182,24 @@ def review_decision(request, pk):
     if decision != services.APPROVE and not str(notes).strip():
         return Response({'error': 'Notes are required when rejecting or requesting a correction.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    kwargs = {}
+    if stage == PropertyVerification.Stage.COMPLIANCE:
+        inspection_data = {}
+        if 'due_diligence_done' in request.data:
+            raw = request.data.get('due_diligence_done')
+            inspection_data['due_diligence_done'] = str(raw).lower() in ('true', '1', 'yes')
+        if 'inspection_report' in request.FILES:
+            inspection_data['inspection_report'] = request.FILES['inspection_report']
+        for field in ('inspection_latitude', 'inspection_longitude'):
+            if request.data.get(field) not in (None, ''):
+                try:
+                    inspection_data[field] = float(request.data[field])
+                except (TypeError, ValueError):
+                    return Response({'error': f'{field} must be a number.'}, status=status.HTTP_400_BAD_REQUEST)
+        kwargs['inspection_data'] = inspection_data
+
     try:
-        STAGE_SERVICE_FN[stage](verification, decision, request.user, notes)
+        STAGE_SERVICE_FN[stage](verification, decision, request.user, notes, **kwargs)
     except InvalidTransition as exc:
         return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 

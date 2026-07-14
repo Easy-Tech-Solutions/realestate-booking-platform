@@ -77,9 +77,14 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     restart: unless-stopped
-    command: sh -c "python manage.py download_ai_model && celery -A realestate_backend worker --loglevel=info --concurrency=1 --pool=solo -Q ai_scoring"
+    command: >-
+      sh -c "python manage.py download_ai_model &&
+      python manage.py warmup_ai_model &&
+      celery -A realestate_backend worker --loglevel=info --concurrency=1 --pool=solo -Q ai_scoring"
     env_file:
       - backend/.env
+    environment:
+      - CELERY_QUEUES=ai_scoring
     depends_on:
       redis:
         condition: service_healthy

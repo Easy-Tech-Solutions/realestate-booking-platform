@@ -100,10 +100,41 @@ def ps_decision(verification, decision, officer, notes=''):
     )
 
 
-def compliance_decision(verification, decision, officer, notes=''):
-    """Compliance Officer decision on a `ps_approved` verification."""
+def compliance_decision(verification, decision, officer, notes='', inspection_data=None):
+    """Compliance Officer decision on a `ps_approved` verification.
+
+    `inspection_data` (only used/required on APPROVE) carries the physical
+    site-visit record: due_diligence_done, inspection_report (file),
+    inspection_latitude/inspection_longitude (GPS coordinates captured
+    on-site) — see the Home Konnect Business Policy's Compliance-stage
+    requirements (site inspection, photo validation, GPS coordinates)."""
     if verification.status != PropertyVerification.Status.PS_APPROVED:
         raise InvalidTransition('This verification is not awaiting Compliance review.')
+
+    if decision == APPROVE:
+        inspection_data = inspection_data or {}
+        update_fields = []
+        if inspection_data.get('due_diligence_done') is not None:
+            verification.due_diligence_done = inspection_data['due_diligence_done']
+            update_fields.append('due_diligence_done')
+        if inspection_data.get('inspection_report') is not None:
+            verification.inspection_report = inspection_data['inspection_report']
+            update_fields.append('inspection_report')
+        if inspection_data.get('inspection_latitude') is not None:
+            verification.inspection_latitude = inspection_data['inspection_latitude']
+            update_fields.append('inspection_latitude')
+        if inspection_data.get('inspection_longitude') is not None:
+            verification.inspection_longitude = inspection_data['inspection_longitude']
+            update_fields.append('inspection_longitude')
+        if update_fields:
+            verification.save(update_fields=update_fields)
+
+        if not verification.due_diligence_done or not verification.inspection_report:
+            raise InvalidTransition(
+                'A completed site inspection (due-diligence confirmation + inspection report) '
+                'is required before Compliance can approve.'
+            )
+
     verification.compliance_reviewed_by = officer
     verification.compliance_reviewed_at = timezone.now()
     return _apply_decision(
