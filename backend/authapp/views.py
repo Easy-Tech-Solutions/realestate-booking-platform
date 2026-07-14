@@ -236,6 +236,10 @@ def login_view(request):
     if not email or not password:
         return Response({"error": "email and password required"}, status=status.HTTP_400_BAD_REQUEST)
 
+    blocked = _blocked_fingerprint_response(request)
+    if blocked:
+        return blocked
+
     # Email is not a unique column (see users.models.User), so more than one
     # account can share the same address — try each until one authenticates
     # rather than assuming .get() returns exactly one row.

@@ -117,7 +117,9 @@ INSTALLED_APPS = [
     "inventory",
     "legalops",
     "platformops",
+    "aiscoring",
     "rbac",
+    "chatbot",
 ]
 
 MIDDLEWARE = [
@@ -572,6 +574,24 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(minute=10),  # ten past every hour
     },
 }
+
+# ── Local LLM scoring (KYC pre-screen / fraud / listing moderation) ────────
+# Text-only model — it scores the structured fields submitted alongside a
+# review, not the uploaded ID/MOU/inspection images or listing photos (no
+# vision model, no OCR step). Gated at runtime by the 'ai_scoring_enabled'
+# feature flag (see platformops.utils.is_feature_enabled), default off so a
+# fresh deploy never loads the model until an admin opts in from Settings.
+AI_MODEL_DIR = Path(os.environ.get("AI_MODEL_DIR", BASE_DIR / "ai_models"))
+AI_MODEL_FILENAME = os.environ.get("AI_MODEL_FILENAME", "qwen2.5-3b-instruct-q4_k_m.gguf")
+AI_MODEL_PATH = AI_MODEL_DIR / AI_MODEL_FILENAME
+AI_MODEL_URL = os.environ.get(
+    "AI_MODEL_URL",
+    "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",
+)
+AI_MODEL_SHA256 = os.environ.get(
+    "AI_MODEL_SHA256", "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d"
+)
+AI_MODEL_CONTEXT_SIZE = int(os.environ.get("AI_MODEL_CONTEXT_SIZE", "2048"))
 
 # ── Security settings applied in all environments ──────────────────────────
 # ── Logging ────────────────────────────────────────────────────────────────

@@ -661,7 +661,12 @@ export function AdminUsers() {
   };
 
   useEffect(() => { load(); }, [page, roleFilter, activeFilter]);
-  useEffect(() => { rbacAPI.listRoles().then(setRoles).catch(() => setRoles([])); }, []);
+  useEffect(() => {
+    // Superadmin is reference-only here (see Roles & Permissions for the
+    // full list) — assigning it does nothing, since real superadmin status
+    // bypasses the RBAC engine entirely and is shell-only.
+    rbacAPI.listRoles().then((r) => setRoles(r.filter((role) => role.slug !== 'superadmin'))).catch(() => setRoles([]));
+  }, []);
 
   const toggleOne = (id: number) => {
     setSelected((prev) => {

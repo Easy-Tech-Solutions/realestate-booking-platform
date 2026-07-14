@@ -5,6 +5,7 @@ import { Footer } from '../components/Footer';
 import { MobileNav } from '../components/MobileNav';
 import { Toaster } from '../components/ui/sonner';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
+import { ChatbotWidget } from '../components/ChatbotWidget';
 
 function RouteLoadingFallback() {
   return (
@@ -39,6 +40,7 @@ export function RootLayout() {
       </main>
       {showFooter && <Footer />}
       <MobileNav />
+      <ChatbotWidget />
       <Toaster />
     </div>
   );

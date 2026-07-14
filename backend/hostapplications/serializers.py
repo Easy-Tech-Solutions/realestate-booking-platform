@@ -74,3 +74,12 @@ class HostApplicationSerializer(serializers.ModelSerializer):
 
     def get_can_reapply(self, obj):
         return obj.status == HostApplication.Status.DECLINED
+
+
+class HostApplicationAdminSerializer(HostApplicationSerializer):
+    """Adds the AI pre-screen fields — reviewer-only, never returned to the
+    applicant being assessed (see HostApplicationSerializer for that view)."""
+
+    class Meta(HostApplicationSerializer.Meta):
+        fields = HostApplicationSerializer.Meta.fields + ['ai_risk_score', 'ai_rationale']
+        read_only_fields = fields

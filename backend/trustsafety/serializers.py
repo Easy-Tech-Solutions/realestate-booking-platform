@@ -13,13 +13,13 @@ class FraudFlagSerializer(serializers.ModelSerializer):
         model = FraudFlag
         fields = [
             'id', 'user', 'user_username', 'user_email', 'flag_type', 'flag_type_display',
-            'severity', 'status', 'details', 'ai_score',
+            'severity', 'status', 'details', 'ai_score', 'ai_rationale',
             'reviewed_by', 'reviewed_by_username', 'reviewed_at', 'review_notes',
             'created_at',
         ]
         read_only_fields = [
             'id', 'user', 'user_username', 'user_email', 'flag_type', 'flag_type_display',
-            'ai_score', 'reviewed_by', 'reviewed_by_username', 'reviewed_at', 'created_at',
+            'ai_score', 'ai_rationale', 'reviewed_by', 'reviewed_by_username', 'reviewed_at', 'created_at',
         ]
 
 

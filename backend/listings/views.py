@@ -10,6 +10,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import IntegrityError
 import math
 
+from superadmin.permissions import log_admin_action
+
 # Maximum file size accepted at the application layer (10 MB).
 # Server-level limits (nginx client_max_body_size) are the first line of
 # defence; this is the backend guard.
@@ -988,6 +990,7 @@ def approve_listing(request, id):
         return Response({"error": "Listing is not pending review"}, status=status.HTTP_400_BAD_REQUEST)
     listing.status = 'published'
     listing.save(update_fields=['status'])
+    log_admin_action(request, 'listing.approve', target=listing, reason=f'{listing.title} -> published')
     # Send email notification to host
     try:
         from django.core.mail import send_mail
@@ -1016,6 +1019,7 @@ def reject_listing(request, id):
     listing.status = 'rejected'
     listing.save(update_fields=['status'])
     reason = request.data.get('reason', '')
+    log_admin_action(request, 'listing.reject', target=listing, reason=reason or f'{listing.title} rejected')
     # Notify host
     try:
         from django.core.mail import send_mail

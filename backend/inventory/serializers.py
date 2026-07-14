@@ -14,13 +14,13 @@ class ListingFlagSerializer(serializers.ModelSerializer):
         model = ListingFlag
         fields = [
             'id', 'listing', 'listing_title', 'listing_status', 'flag_type', 'flag_type_display',
-            'severity', 'status', 'details', 'ai_score',
+            'severity', 'status', 'details', 'ai_score', 'ai_rationale',
             'reviewed_by', 'reviewed_by_username', 'reviewed_at', 'review_notes',
             'created_at',
         ]
         read_only_fields = [
             'id', 'listing_title', 'listing_status', 'flag_type_display',
-            'ai_score', 'reviewed_by', 'reviewed_by_username', 'reviewed_at', 'created_at',
+            'ai_score', 'ai_rationale', 'reviewed_by', 'reviewed_by_username', 'reviewed_at', 'created_at',
         ]
 
 

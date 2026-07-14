@@ -102,3 +102,12 @@ class PropertyVerificationSerializer(serializers.ModelSerializer):
 
     def get_can_resubmit(self, obj):
         return obj.status == PropertyVerification.Status.CORRECTION_REQUESTED
+
+
+class PropertyVerificationAdminSerializer(PropertyVerificationSerializer):
+    """Adds the AI pre-screen fields — reviewer-only, never returned to the
+    host being assessed (see PropertyVerificationSerializer for that view)."""
+
+    class Meta(PropertyVerificationSerializer.Meta):
+        fields = PropertyVerificationSerializer.Meta.fields + ['ai_risk_score', 'ai_rationale']
+        read_only_fields = fields

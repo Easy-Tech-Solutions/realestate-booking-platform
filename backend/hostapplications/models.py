@@ -83,6 +83,11 @@ class HostApplication(models.Model):
     declined_stage = models.CharField(max_length=20, choices=Stage.choices, blank=True, default='')
     decline_reason = models.TextField(blank=True, default='')
 
+    # Populated asynchronously by aiscoring.tasks.score_host_application_task
+    # from the submitted text fields only — no document image is analyzed.
+    ai_risk_score = models.FloatField(null=True, blank=True)
+    ai_rationale = models.TextField(blank=True, default='')
+
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 

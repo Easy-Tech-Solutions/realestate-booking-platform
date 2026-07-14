@@ -12,13 +12,18 @@ import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { getErrorMessage } from '../../services/api/shared/errors';
 
-// AI pre-screening isn't wired up yet — this badge is a placeholder for where
-// a confidence score / auto-flag reason will show once a real model is
-// integrated. Every item is manual-review-only for now.
-function AiPreScreenBadge() {
+// Scored asynchronously by a local text-only LLM reading the submitted name/
+// address/phone/ownership fields — it never inspects the ID/headshot/MOU/
+// inspection document images themselves. Still always manual-review-only;
+// this is a pre-screen signal, not an approval.
+function AiPreScreenBadge({ score, rationale }: { score: number | null | undefined; rationale: string | undefined }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-      <Sparkles className="h-3 w-3" /> AI pre-screen: not yet configured — manual review required
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+      title={rationale || undefined}
+    >
+      <Sparkles className="h-3 w-3" />
+      {score == null ? 'AI pre-screen: pending / disabled' : `AI pre-screen score: ${Math.round(score)} (text signals only)`}
     </span>
   );
 }
@@ -55,7 +60,7 @@ function HostApplicationCard({ app, onDecided }: { app: HostApplication; onDecid
         <Badge variant="secondary">{app.status_display}</Badge>
       </CardHeader>
       <CardContent className="space-y-4">
-        <AiPreScreenBadge />
+        <AiPreScreenBadge score={app.ai_risk_score} rationale={app.ai_rationale} />
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1"><ImageIcon className="h-3 w-3" /> Headshot</p>
@@ -121,7 +126,7 @@ function PropertyVerificationCard({ v, onDecided }: { v: PropertyVerification; o
         <Badge variant="secondary">{v.status_display}</Badge>
       </CardHeader>
       <CardContent className="space-y-4">
-        <AiPreScreenBadge />
+        <AiPreScreenBadge score={v.ai_risk_score} rationale={v.ai_rationale} />
         {v.mou_document_url && (
           <a href={v.mou_document_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
             <FileText className="h-3.5 w-3.5" /> View notarized MOU

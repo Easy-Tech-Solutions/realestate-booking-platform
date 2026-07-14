@@ -22,6 +22,10 @@ export interface PropertyVerification {
   resubmission_count: number;
   created_at: string;
   updated_at: string;
+  // Only present in reviewer-facing responses (review queue / review decision) —
+  // never returned to the host being assessed.
+  ai_risk_score?: number | null;
+  ai_rationale?: string;
 }
 
 export const propertyVerificationsAPI = {

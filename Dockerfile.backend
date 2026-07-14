@@ -5,10 +5,12 @@ FROM python:3.12-slim AS builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libpq-dev libjpeg-dev zlib1g-dev && \
+    gcc g++ cmake libpq-dev libjpeg-dev zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt ./
+# llama-cpp-python builds its C++ backend from source at install time (g++/cmake
+# above) — no prebuilt wheel is assumed, so this step is CPU-bound and slow.
 RUN pip install --upgrade pip && \
     pip install --prefix=/install --no-cache-dir -r requirements.txt
 
@@ -20,7 +22,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 libjpeg62-turbo curl && \
+    libpq5 libjpeg62-turbo libgomp1 curl && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local

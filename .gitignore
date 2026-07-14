@@ -51,6 +51,10 @@ nginx/ssl/
 # User-uploaded media (heavy binary files; not part of source control)
 backend/media/
 
+# Local AI scoring model weights (multi-GB GGUF, fetched by `manage.py download_ai_model`)
+backend/ai_models/
+*.gguf
+
 # Migration backups (scripts/backup.sh) — contain secrets, never commit
 backups/
 

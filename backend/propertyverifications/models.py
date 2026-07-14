@@ -105,6 +105,12 @@ class PropertyVerification(models.Model):
     review_notes       = models.TextField(blank=True, default='')
     resubmission_count = models.PositiveIntegerField(default=0)
 
+    # Populated asynchronously by aiscoring.tasks.score_property_verification_task
+    # from the submitted text fields only — no MOU/inspection document image
+    # is analyzed.
+    ai_risk_score = models.FloatField(null=True, blank=True)
+    ai_rationale = models.TextField(blank=True, default='')
+
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 

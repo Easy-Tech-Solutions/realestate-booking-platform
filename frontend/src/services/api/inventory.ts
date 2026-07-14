@@ -11,6 +11,7 @@ export interface ListingFlag {
   status: 'open' | 'dismissed' | 'confirmed';
   details: string;
   ai_score: number | null;
+  ai_rationale: string;
   reviewed_by: number | null;
   reviewed_by_username: string | null;
   reviewed_at: string | null;

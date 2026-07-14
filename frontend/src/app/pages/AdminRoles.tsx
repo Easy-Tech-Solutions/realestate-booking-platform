@@ -165,7 +165,7 @@ function AssignRolePanel({ roles }: { roles: Role[] }) {
           <Input placeholder="User ID" className="w-28" value={userId} onChange={(e) => setUserId(e.target.value)} onBlur={load} />
           <select className="text-sm border border-border rounded-lg px-2 bg-background" value={roleId} onChange={(e) => setRoleId(e.target.value)} title="Role">
             <option value="">Select a role…</option>
-            {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            {roles.filter((r) => r.slug !== 'superadmin').map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
           <Button size="sm" disabled={busy} onClick={assign}>Assign</Button>
           <Button size="sm" variant="outline" onClick={load}>Look up user's roles</Button>

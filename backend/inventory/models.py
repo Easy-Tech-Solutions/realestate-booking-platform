@@ -32,7 +32,8 @@ class ListingFlag(models.Model):
     # Placeholder for a future ML-based content/image moderation score.
     # Always null until a real model is integrated — every flag right now
     # comes from a rule-based detector (see detection.py).
-    ai_score = models.FloatField(null=True, blank=True, help_text='Reserved for a future ML content-moderation model. Not yet populated.')
+    ai_score = models.FloatField(null=True, blank=True, help_text='Populated asynchronously by the local scoring model — see aiscoring.tasks.score_listing_flag_task.')
+    ai_rationale = models.TextField(blank=True, default='')
 
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,

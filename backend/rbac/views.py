@@ -153,6 +153,16 @@ def user_roles_collection(request):
     target_user = get_object_or_404(User, pk=user_id)
     role = get_object_or_404(Role, pk=role_id)
 
+    if role.slug == 'superadmin':
+        return Response(
+            {'error': (
+                'The Superadmin role exists here for reference only — assigning it grants no '
+                'extra access (real superadmin status bypasses the RBAC engine entirely and '
+                'can only be granted via shell/Django admin access to the account itself).'
+            )},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     assignment, created = UserRoleAssignment.objects.get_or_create(
         user=target_user, role=role, defaults={'granted_by': request.user},
     )
@@ -160,9 +170,21 @@ def user_roles_collection(request):
     # "can this person into /superadmin at all", roles/departments scope what
     # they see once there) — assigning a role with no visible effect because
     # is_staff was never separately flipped would be a confusing gotcha.
+    update_fields = []
     if not target_user.is_staff:
         target_user.is_staff = True
-        target_user.save(update_fields=['is_staff'])
+        update_fields.append('is_staff')
+    # The 'admin' preset role is the RBAC-side half of the app-level 'admin'
+    # tier — assigning it should actually promote the account (matching
+    # users.admin_views.admin_update_user's behavior) so the Role badge in
+    # User Management and the account's real role field never disagree.
+    # Superadmin accounts are never touched here — that tier only comes from
+    # the role field itself (or is_superuser), never from an RBAC assignment.
+    if role.slug == 'admin' and target_user.role not in ('admin', 'superadmin'):
+        target_user.role = 'admin'
+        update_fields.append('role')
+    if update_fields:
+        target_user.save(update_fields=update_fields)
 
     log_admin_action(request, 'rbac.user_role.assign', target=assignment, reason=f'{target_user.username} -> {role.slug}')
     return Response(UserRoleAssignmentSerializer(assignment).data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
@@ -176,6 +198,15 @@ def user_role_detail(request, pk):
 
     assignment = get_object_or_404(UserRoleAssignment, pk=pk)
     log_admin_action(request, 'rbac.user_role.revoke', target=assignment, reason=f'{assignment.user.username} x {assignment.role.slug}')
+
+    # Mirror of the promotion side in user_roles_collection: revoking the
+    # 'admin' preset role demotes the account's role field back down too, so
+    # it never lingers as 'admin' with no corresponding grant.
+    target_user = assignment.user
+    if assignment.role.slug == 'admin' and target_user.role == 'admin':
+        target_user.role = 'user'
+        target_user.save(update_fields=['role'])
+
     assignment.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 

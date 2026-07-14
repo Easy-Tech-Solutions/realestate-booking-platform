@@ -143,6 +143,8 @@ def listing_flag_create_manual(request):
     flag = ListingFlag.objects.create(
         listing=listing, flag_type=ListingFlag.FlagType.MANUAL, severity=severity, details=details,
     )
+    from aiscoring.tasks import score_listing_flag_task
+    score_listing_flag_task.delay(flag.id)
     log_admin_action(request, 'listing_flag.create', target=flag, reason=details)
     return Response(ListingFlagSerializer(flag).data, status=status.HTTP_201_CREATED)
 

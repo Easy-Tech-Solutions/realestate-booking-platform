@@ -16,6 +16,10 @@ export interface HostApplication {
   can_reapply: boolean;
   created_at: string;
   updated_at: string;
+  // Only present in reviewer-facing responses (review queue / review decision) —
+  // never returned to the applicant being assessed.
+  ai_risk_score?: number | null;
+  ai_rationale?: string;
 }
 
 export interface AgreementStatus {

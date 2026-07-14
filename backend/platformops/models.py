@@ -4,11 +4,14 @@ from django.db import models
 
 class FeatureFlag(models.Model):
     """A platform-wide on/off switch, checked at request time via
-    `is_feature_enabled(key)`. Two keys are wired to real enforcement today:
-    'maintenance_mode' (read-only API for non-staff, see middleware.py) and
-    'new_registrations_enabled' (gates authapp.register/google_login). Any
-    other key can be created here but won't do anything until something in
-    the codebase actually checks it — this is a switch registry, not magic."""
+    `is_feature_enabled(key)`. Three keys are wired to real enforcement
+    today: 'maintenance_mode' (read-only API for non-staff, see
+    middleware.py), 'new_registrations_enabled' (gates
+    authapp.register/google_login), and 'ai_scoring_enabled' (gates the local
+    LLM scoring tasks in aiscoring.tasks — default off so a fresh deploy never
+    loads the ~3GB model until an admin opts in). Any other key can be
+    created here but won't do anything until something in the codebase
+    actually checks it — this is a switch registry, not magic."""
 
     key = models.SlugField(max_length=60, unique=True)
     name = models.CharField(max_length=120)

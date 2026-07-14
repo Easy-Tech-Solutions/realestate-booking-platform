@@ -65,6 +65,30 @@ services:
     volumes:
       - backend_logs:/app/logs
 
+  # Dedicated worker for the 'ai_scoring' queue (see aiscoring/tasks.py). Kept
+  # separate from the main `celery` service, and pinned to a single process
+  # (--concurrency=1 --pool=solo), so at most one copy of the ~3GB local LLM
+  # is ever loaded in memory — a prefork pool here would load one full model
+  # copy per worker process. Disabled entirely via the 'ai_scoring_enabled'
+  # feature flag (default off) until the model is downloaded and an admin
+  # opts in from Platform Settings.
+  celery-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    command: sh -c "python manage.py download_ai_model && celery -A realestate_backend worker --loglevel=info --concurrency=1 --pool=solo -Q ai_scoring"
+    env_file:
+      - backend/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    volumes:
+      - backend_logs:/app/logs
+      - ai_models:/app/ai_models
+
   frontend:
     build:
       context: .
@@ -90,3 +114,4 @@ volumes:
   redis_data:
   backend_logs:
   static_files:
+  ai_models:

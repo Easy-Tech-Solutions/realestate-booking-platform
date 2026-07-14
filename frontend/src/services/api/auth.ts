@@ -22,9 +22,11 @@ export class MfaRequiredError extends Error {
 export const authAPI = {
   login: async (email: string, password: string): Promise<{ user: User; access: string }> => {
     clearTokens();
+    const fingerprint = await getDeviceFingerprint();
     const data = await fetchPublicJson<AuthLoginResponse>('/api/auth/login/', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+      headers: fingerprint ? { 'X-Device-Fingerprint': fingerprint } : {},
     });
     if (data.mfa_required) {
       throw new MfaRequiredError(data.mfa_token!);

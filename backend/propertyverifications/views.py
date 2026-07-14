@@ -10,6 +10,7 @@ from .serializers import (
     PropertyVerificationCreateSerializer,
     PropertyVerificationResubmitSerializer,
     PropertyVerificationSerializer,
+    PropertyVerificationAdminSerializer,
 )
 from . import services
 from .services import InvalidTransition
@@ -38,6 +39,9 @@ def property_verifications_collection(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     verification = serializer.save(applicant=request.user)
+
+    from aiscoring.tasks import score_property_verification_task
+    score_property_verification_task.delay(verification.id)
 
     # Ensure the listing is unpublished while under review.
     listing = verification.listing
@@ -97,6 +101,8 @@ def resubmit_verification(request, pk):
     serializer.save()
 
     services.resubmit(verification)
+    from aiscoring.tasks import score_property_verification_task
+    score_property_verification_task.delay(verification.id)
     return Response(PropertyVerificationSerializer(verification, context={'request': request}).data)
 
 
@@ -149,7 +155,7 @@ def review_queue(request):
         .select_related('listing', 'applicant')
         .order_by('created_at')
     )
-    return Response(PropertyVerificationSerializer(qs, many=True, context={'request': request}).data)
+    return Response(PropertyVerificationAdminSerializer(qs, many=True, context={'request': request}).data)
 
 
 @api_view(['POST'])
@@ -181,4 +187,4 @@ def review_decision(request, pk):
         request, 'property_verification.review', target=verification, reason=notes,
         decision=decision, stage=stage,
     )
-    return Response(PropertyVerificationSerializer(verification, context={'request': request}).data)
+    return Response(PropertyVerificationAdminSerializer(verification, context={'request': request}).data)

@@ -18,6 +18,11 @@ def _open_flag_exists(flag_type, signal):
     ).exists()
 
 
+def _enqueue_scoring(flag):
+    from aiscoring.tasks import score_listing_flag_task
+    score_listing_flag_task.delay(flag.id)
+
+
 def detect_duplicate_listings(min_group_size=2):
     """Groups live/pending listings by (rounded coordinates, property_type).
     Multiple distinct listings claiming the same spot is either the same host
@@ -49,6 +54,7 @@ def detect_duplicate_listings(min_group_size=2):
             details=f'{len(listings)} listings at nearly the same location ({ptype}) — listing IDs {ids}: {titles}',
         )
         created.append(flag)
+        _enqueue_scoring(flag)
     return created
 
 
@@ -107,6 +113,7 @@ def detect_price_anomalies(min_samples=5, z_threshold=3.5):
                 ),
             )
             created.append(flag)
+            _enqueue_scoring(flag)
     return created
 
 

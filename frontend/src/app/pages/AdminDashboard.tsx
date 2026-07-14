@@ -22,6 +22,7 @@ import type { PlatformFee, EscrowBooking } from '../../services/api/payments';
 import { useApp } from '../../hooks/useApp';
 import { MfaSetupCard } from '../components/MfaSetupCard';
 import { CommunicationsDialog } from '../components/CommunicationsDialog';
+import { FeatureFlagsPanel } from '../components/FeatureFlagsPanel';
 import type { Booking, Payout } from '../../core/types';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -83,7 +84,7 @@ const navGroups: NavGroup[] = [
     { type: 'route', path: '/management/audit-log', label: 'Audit Log' },
   ] },
   { id: 'platform', label: 'Platform & Engineering', icon: Cpu, items: [
-    { type: 'route', path: '/management/platform-ops', label: 'Feature Flags & Health' },
+    { type: 'route', path: '/management/platform-ops', label: 'System Health & Errors' },
   ] },
   { id: 'settings', label: 'Settings', icon: Settings, items: [
     { type: 'section', id: 'settings', label: 'Platform Settings' },
@@ -854,9 +855,6 @@ export function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">Platform Settings</h2>
-        <Button variant="outline" onClick={() => navigate('/management/platform-ops')}>
-          Platform & Engineering
-        </Button>
       </div>
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
@@ -946,6 +944,7 @@ export function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+        <FeatureFlagsPanel />
       </div>
     </div>
   );

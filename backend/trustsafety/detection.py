@@ -19,6 +19,11 @@ RAPID_SIGNUP_WINDOW_MINUTES = 60
 RAPID_SIGNUP_THRESHOLD = 3
 
 
+def _enqueue_scoring(flag):
+    from aiscoring.tasks import score_fraud_flag_task
+    score_fraud_flag_task.delay(flag.id)
+
+
 def detect_rapid_signups(window_minutes=RAPID_SIGNUP_WINDOW_MINUTES, threshold=RAPID_SIGNUP_THRESHOLD):
     """Flag IPs that created >= `threshold` accounts within `window_minutes`."""
     since = timezone.now() - timedelta(minutes=window_minutes)
@@ -53,6 +58,7 @@ def detect_rapid_signups(window_minutes=RAPID_SIGNUP_WINDOW_MINUTES, threshold=R
             ),
         )
         created.append(flag)
+        _enqueue_scoring(flag)
 
     return created
 
@@ -93,6 +99,7 @@ def detect_shared_cards():
             details=f'Card {signature} is saved on {len(usernames)} accounts: {", ".join(usernames)}',
         )
         created.append(flag)
+        _enqueue_scoring(flag)
 
     return created
 

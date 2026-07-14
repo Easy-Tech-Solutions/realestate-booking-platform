@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .models import HostApplication
-from .serializers import HostApplicationCreateSerializer, HostApplicationSerializer
+from .serializers import HostApplicationCreateSerializer, HostApplicationSerializer, HostApplicationAdminSerializer
 from . import agreements
 from .services import ps_decision, compliance_decision, supervisor_decision, InvalidTransition
 
@@ -47,6 +47,9 @@ def host_applications_collection(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     application = serializer.save(applicant=request.user)
+
+    from aiscoring.tasks import score_host_application_task
+    score_host_application_task.delay(application.id)
 
     # Record the Property Owner Agreement acceptance for audit (version + IP +
     # timestamp + user). The serializer already enforced the checkbox was ticked.
@@ -165,7 +168,7 @@ def review_queue(request):
         .select_related('applicant')
         .order_by('created_at')
     )
-    return Response(HostApplicationSerializer(qs, many=True, context={'request': request}).data)
+    return Response(HostApplicationAdminSerializer(qs, many=True, context={'request': request}).data)
 
 
 @api_view(['POST'])
@@ -195,4 +198,4 @@ def review_decision(request, pk):
         request, 'host_application.review', target=application, reason=reason,
         approved=approve, stage=stage,
     )
-    return Response(HostApplicationSerializer(application, context={'request': request}).data)
+    return Response(HostApplicationAdminSerializer(application, context={'request': request}).data)

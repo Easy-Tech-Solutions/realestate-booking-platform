@@ -16,10 +16,13 @@ import { BulkActionBar } from '../components/BulkActionBar';
 import { formatCurrency } from '../../core/utils';
 import { getErrorMessage } from '../../services/api/shared/errors';
 
-function AiScoreBadge({ score }: { score: number | null }) {
+function AiScoreBadge({ score, rationale }: { score: number | null; rationale: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-      <Sparkles className="h-3 w-3" /> {score === null ? 'AI content check: not yet configured' : `AI content score: ${score}`}
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+      title={rationale || undefined}
+    >
+      <Sparkles className="h-3 w-3" /> {score === null ? 'AI content score: pending / disabled' : `AI content score: ${Math.round(score)}`}
     </span>
   );
 }
@@ -68,7 +71,7 @@ function ListingFlagCard({ flag, onDecided }: { flag: ListingFlag; onDecided: ()
         <Badge className={severityColor[flag.severity]}>{flag.severity}</Badge>
       </CardHeader>
       <CardContent className="space-y-4">
-        <AiScoreBadge score={flag.ai_score} />
+        <AiScoreBadge score={flag.ai_score} rationale={flag.ai_rationale} />
         <p className="text-sm whitespace-pre-wrap">{flag.details}</p>
         <Textarea
           placeholder="Review notes"
@@ -323,7 +326,9 @@ export function AdminListingModeration() {
         </div>
         <p className="text-xs text-muted-foreground">
           Flags come from rule-based detectors (possible duplicate listings at the same location, prices far
-          outside the norm for a city/property type) — there is no ML content-moderation model wired in yet.
+          outside the norm for a city/property type). Each flag is then scored by a local AI model
+          reading the listing's title/description/price/amenities and the detector evidence — not the
+          listing photos.
         </p>
         {flagsLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>

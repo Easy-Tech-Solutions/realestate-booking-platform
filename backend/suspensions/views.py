@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from rbac import dual_auth
+from superadmin.permissions import log_admin_action
 
 from .models import Suspension
 from .serializers import (
@@ -143,7 +144,6 @@ def suspensions_collection(request):
         }
         _, approval = dual_auth.submit_or_execute('user.suspend', payload, request.user, reason, True)
 
-        from superadmin.permissions import log_admin_action
         log_admin_action(request, 'suspension.requested', target=target_user, reason=reason, approval_id=approval.id, listing_count=published_listing_count)
 
         return Response(
@@ -155,6 +155,7 @@ def suspensions_collection(request):
         )
 
     suspension = serializer.save(issued_by=request.user)
+    log_admin_action(request, 'user.suspend', target=target_user, reason=suspension.reason)
 
     # Trigger notification (signal handles this, but we fire it here as well as a
     # safety net in case the signal connection isn't active in tests)
@@ -215,10 +216,12 @@ def revoke_suspension(request, pk):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    revocation_reason = serializer.validated_data.get('revocation_reason', '')
     suspension.revoke(
         admin_user=request.user,
-        reason=serializer.validated_data.get('revocation_reason', ''),
+        reason=revocation_reason,
     )
+    log_admin_action(request, 'user.unsuspend', target=suspension.user, reason=revocation_reason)
 
     # Notify the user their suspension was lifted
     try:

@@ -488,13 +488,25 @@ def admin_bulk_user_action(request):
             elif action == 'assign_role':
                 from rbac.models import Role, UserRoleAssignment
                 role = Role.objects.get(pk=role_id)
+                if role.slug == 'superadmin':
+                    raise ValueError('The Superadmin role is reference-only — it cannot be assigned. Real superadmin status is granted via shell access only.')
                 UserRoleAssignment.objects.get_or_create(user=target, role=role, defaults={'granted_by': request.user})
+                update_fields = []
                 if not target.is_staff:
                     target.is_staff = True
-                    target.save(update_fields=['is_staff'])
+                    update_fields.append('is_staff')
+                if role.slug == 'admin' and target.role not in ('admin', 'superadmin'):
+                    target.role = 'admin'
+                    update_fields.append('role')
+                if update_fields:
+                    target.save(update_fields=update_fields)
             elif action == 'remove_role':
-                from rbac.models import UserRoleAssignment
+                from rbac.models import Role, UserRoleAssignment
                 UserRoleAssignment.objects.filter(user=target, role_id=role_id).delete()
+                role = Role.objects.filter(pk=role_id).first()
+                if role and role.slug == 'admin' and target.role == 'admin':
+                    target.role = 'user'
+                    target.save(update_fields=['role'])
 
             results['succeeded'].append(target.pk)
         except Exception as e:

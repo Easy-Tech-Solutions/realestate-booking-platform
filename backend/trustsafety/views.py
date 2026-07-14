@@ -74,6 +74,8 @@ def fraud_flag_create_manual(request):
     flag = FraudFlag.objects.create(
         user=target_user, flag_type=FraudFlag.FlagType.MANUAL, severity=severity, details=details,
     )
+    from aiscoring.tasks import score_fraud_flag_task
+    score_fraud_flag_task.delay(flag.id)
     log_admin_action(request, 'fraud_flag.create', target=flag, reason=details)
     return Response(FraudFlagSerializer(flag).data, status=status.HTTP_201_CREATED)
 
