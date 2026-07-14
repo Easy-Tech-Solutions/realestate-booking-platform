@@ -1,12 +1,13 @@
 import uuid
 
 from django.contrib.auth import get_user_model
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
 from platformops.utils import is_feature_enabled
+from .throttles import ChatRateThrottle
 
 User = get_user_model()
 
@@ -39,6 +40,7 @@ def _get_or_create_session(request, session_id: str | None):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([ChatRateThrottle])
 def chat(request):
     """
     Enqueues a reply task and returns immediately with a task_id.
