@@ -21,6 +21,7 @@ export interface AppStoreState {
     password2: string;
     first_name?: string;
     last_name?: string;
+    date_of_birth: string;
   }) => Promise<{ message: string; verification_url?: string; verification_token?: string }>;
   logout: () => Promise<void>;
   searchFilters: SearchFilters;

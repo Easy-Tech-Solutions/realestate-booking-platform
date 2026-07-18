@@ -100,4 +100,5 @@ def get_chatbot_reply(knowledge: str, history: list[dict], user_message: str) ->
         max_tokens=512,
     )
     raw = completion['choices'][0]['message']['content']
+    logger.info('Chatbot raw model output: %r', raw)
     return _parse_response(raw)

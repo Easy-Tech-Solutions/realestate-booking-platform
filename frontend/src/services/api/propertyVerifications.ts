@@ -20,6 +20,10 @@ export interface PropertyVerification {
   review_notes: string;
   can_resubmit: boolean;
   resubmission_count: number;
+  inspection_report_url: string | null;
+  due_diligence_done: boolean;
+  inspection_latitude: string | null;
+  inspection_longitude: string | null;
   created_at: string;
   updated_at: string;
   // Only present in reviewer-facing responses (review queue / review decision) —
@@ -58,8 +62,42 @@ export const propertyVerificationsAPI = {
     return fetchWithAuth<PropertyVerification[]>('/api/property-verifications/review-queue/');
   },
 
-  /** approve | reject | request_correction at whichever stage this verification is awaiting. */
-  review: async (id: number, decision: 'approve' | 'reject' | 'request_correction', notes = ''): Promise<PropertyVerification> => {
+  /** approve | reject | request_correction at whichever stage this verification is awaiting.
+   * At the Compliance stage, `inspectionData` carries the site-visit record
+   * (due diligence flag, inspection report file, GPS coordinates) and forces
+   * a multipart request; omit it for any other stage. */
+  review: async (
+    id: number,
+    decision: 'approve' | 'reject' | 'request_correction',
+    notes = '',
+    inspectionData?: {
+      due_diligence_done?: boolean;
+      inspection_report?: File | null;
+      inspection_latitude?: string;
+      inspection_longitude?: string;
+    },
+  ): Promise<PropertyVerification> => {
+    if (inspectionData) {
+      const formData = new FormData();
+      formData.append('decision', decision);
+      formData.append('notes', notes);
+      if (inspectionData.due_diligence_done !== undefined) {
+        formData.append('due_diligence_done', String(inspectionData.due_diligence_done));
+      }
+      if (inspectionData.inspection_report) {
+        formData.append('inspection_report', inspectionData.inspection_report);
+      }
+      if (inspectionData.inspection_latitude) {
+        formData.append('inspection_latitude', inspectionData.inspection_latitude);
+      }
+      if (inspectionData.inspection_longitude) {
+        formData.append('inspection_longitude', inspectionData.inspection_longitude);
+      }
+      return fetchWithAuth<PropertyVerification>(`/api/property-verifications/${id}/review/`, {
+        method: 'POST',
+        body: formData,
+      });
+    }
     return fetchWithAuth<PropertyVerification>(`/api/property-verifications/${id}/review/`, {
       method: 'POST',
       body: JSON.stringify({ decision, notes }),

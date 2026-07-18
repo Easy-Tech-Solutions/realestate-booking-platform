@@ -22,13 +22,40 @@ from .permissions import (
     log_admin_action, user_departments,
 )
 from .serializers import AdminAuditLogSerializer, ImpersonationSessionSerializer
-from .throttles import MFAVerifyLoginRateThrottle
+from .throttles import MFAEmailCodeRateThrottle, MFAVerifyLoginRateThrottle
 
 User = get_user_model()
 
 MFA_LOGIN_SALT = 'superadmin-mfa-login'
 MFA_TOKEN_MAX_AGE = 300  # 5 minutes to enter the code after password auth
 BACKUP_CODE_COUNT = 8
+
+
+def _mask_email(email: str) -> str:
+    local, _, domain = email.partition('@')
+    if not domain:
+        return email
+    visible = local[:2]
+    return f'{visible}{"*" * max(len(local) - len(visible), 3)}@{domain}'
+
+
+def _resolve_mfa_token(mfa_token: str):
+    """Shared by mfa_verify_login and mfa_send_email_code: unsign the
+    short-lived step-up token into the pending user, or an error Response."""
+    signer = TimestampSigner(salt=MFA_LOGIN_SALT)
+    try:
+        user_id = signer.unsign(mfa_token, max_age=MFA_TOKEN_MAX_AGE)
+    except SignatureExpired:
+        return None, Response({'error': 'This session has expired. Please log in again.'}, status=status.HTTP_401_UNAUTHORIZED)
+    except BadSignature:
+        return None, Response({'error': 'Invalid session.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return None, Response({'error': 'Invalid session.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    return user, None
 
 
 @api_view(['GET'])
@@ -137,24 +164,16 @@ def mfa_verify_login(request):
     if not mfa_token or not code:
         return Response({'error': 'mfa_token and code are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    signer = TimestampSigner(salt=MFA_LOGIN_SALT)
-    try:
-        user_id = signer.unsign(mfa_token, max_age=MFA_TOKEN_MAX_AGE)
-    except SignatureExpired:
-        return Response({'error': 'This code has expired. Please log in again.'}, status=status.HTTP_401_UNAUTHORIZED)
-    except BadSignature:
-        return Response({'error': 'Invalid session.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
-        return Response({'error': 'Invalid session.'}, status=status.HTTP_401_UNAUTHORIZED)
+    user, error_response = _resolve_mfa_token(mfa_token)
+    if error_response:
+        return error_response
 
     device = MFADevice.objects.filter(user=user, confirmed=True).first()
     if not device:
         return Response({'error': 'MFA is not enabled on this account.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if not device.verify_code_or_backup(code):
+    from authapp.utils import verify_mfa_email_code
+    if not device.verify_code_or_backup(code) and not verify_mfa_email_code(user, code):
         return Response({'error': 'Invalid code.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Same token-issuing shape as authapp.views.login_view
@@ -169,6 +188,34 @@ def mfa_verify_login(request):
     response = Response({'access': access_token, 'user': UserSerializer(user).data})
     _set_refresh_cookie(response, refresh)
     return response
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([MFAEmailCodeRateThrottle])
+def mfa_send_email_code(request):
+    """Step-up fallback for an admin who's lost their authenticator device:
+    email a one-time code that mfa_verify_login accepts in place of a
+    TOTP/backup code. Recovery codes already cover this case — this is the
+    friendlier alternative so an admin doesn't have to burn one."""
+    mfa_token = request.data.get('mfa_token', '')
+    if not mfa_token:
+        return Response({'error': 'mfa_token is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user, error_response = _resolve_mfa_token(mfa_token)
+    if error_response:
+        return error_response
+
+    device = MFADevice.objects.filter(user=user, confirmed=True).first()
+    if not device:
+        return Response({'error': 'MFA is not enabled on this account.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not user.email:
+        return Response({'error': 'This account has no email on file.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from authapp.utils import send_mfa_email_code
+    send_mfa_email_code(user)
+    return Response({'message': f'A verification code was sent to {_mask_email(user.email)}.'})
 
 
 # ── Audit log ─────────────────────────────────────────────────────────────

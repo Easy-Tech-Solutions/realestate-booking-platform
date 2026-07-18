@@ -7,7 +7,7 @@ import { Textarea } from '../components/ui/textarea';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import { bookingsAPI } from '../../services/api.service';
-import { getErrorMessage } from '../../services/api/shared/errors';
+import { getErrorMessage, ApiError } from '../../services/api/shared/errors';
 
 // Free reservation review/confirm page. No payment is taken here — under the
 // revised flow the guest only pays after the host confirms the reservation
@@ -20,6 +20,7 @@ export function Booking() {
   const [specialRequests, setSpecialRequests] = useState('');
   const [agreedToRules, setAgreedToRules] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewingRequired, setViewingRequired] = useState(false);
 
   if (!property) {
     return (
@@ -44,6 +45,7 @@ export function Booking() {
       return;
     }
     setIsSubmitting(true);
+    setViewingRequired(false);
     try {
       const startDate = toISODate(checkIn);
       const endDate = toISODate(checkOut);
@@ -71,6 +73,10 @@ export function Booking() {
         },
       });
     } catch (err) {
+      const code = err instanceof ApiError ? (err.data as { code?: string } | undefined)?.code : undefined;
+      if (code === 'viewing_required') {
+        setViewingRequired(true);
+      }
       toast.error(getErrorMessage(err) || 'Could not create reservation. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -147,6 +153,24 @@ export function Booking() {
                   </span>
                 </label>
               </div>
+
+              {viewingRequired && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm">
+                  <p className="font-medium text-amber-900 mb-1">A property viewing is required first</p>
+                  <p className="text-amber-800 mb-3">
+                    Before you can reserve this property, a Home Konet rep needs to walk you through it in
+                    person. Schedule and complete a viewing, then come back to reserve.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/rooms/${property.id}/viewing`, { state: { property } })}
+                  >
+                    Schedule a viewing
+                  </Button>
+                </div>
+              )}
 
               <Button
                 type="button"

@@ -293,6 +293,7 @@ REST_FRAMEWORK = {
         "phone_change": "5/hour",
         "google_login": "20/min" if DEBUG else "10/min",
         "mfa_verify_login": "10/hour",
+        "mfa_email_code": "3/hour",
         "chatbot": "12/min",
     },
 }

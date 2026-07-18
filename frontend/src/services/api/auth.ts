@@ -44,12 +44,22 @@ export const authAPI = {
     return { user: normalizeUser(data.user), access: data.access };
   },
 
+  // Step-up fallback for a lost authenticator device — emails a one-time
+  // code that verifyMfaLogin accepts in place of a TOTP/backup code.
+  sendMfaEmailCode: async (mfaToken: string): Promise<{ message: string }> => {
+    return fetchPublicJson('/api/superadmin/mfa/send-email-code/', {
+      method: 'POST',
+      body: JSON.stringify({ mfa_token: mfaToken }),
+    });
+  },
+
   register: async (data: {
     email: string;
     password: string;
     password2: string;
     first_name?: string;
     last_name?: string;
+    date_of_birth: string;
   }): Promise<{ message: string }> => {
     const fingerprint = await getDeviceFingerprint();
     return fetchPublicJson('/api/auth/register/', {

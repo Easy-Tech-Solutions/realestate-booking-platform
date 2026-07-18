@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { X, Mail, Lock, User as UserIcon, Eye, EyeOff } from 'lucide-react';
+import { X, Mail, Lock, User as UserIcon, Eye, EyeOff, Calendar } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
@@ -10,6 +10,7 @@ import { Checkbox } from './ui/checkbox';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { authAPI } from '../../services/api.service';
+import { MfaRequiredError } from '../../services/api/auth';
 
 interface AuthDialogProps {
   open: boolean;
@@ -26,6 +27,7 @@ interface FormErrors {
   email?: string;
   password?: string;
   password2?: string;
+  date_of_birth?: string;
   agreedToTerms?: string;
 }
 
@@ -38,8 +40,22 @@ function validatePassword(password: string): string | undefined {
   return undefined;
 }
 
+// Business Policy §3.1 — users must be 18+ to register.
+function validateDateOfBirth(dob: string): string | undefined {
+  if (!dob) return 'Date of birth is required';
+  const parsed = new Date(dob);
+  if (Number.isNaN(parsed.getTime())) return 'Enter a valid date';
+  const today = new Date();
+  if (parsed > today) return 'Date of birth cannot be in the future';
+  let age = today.getFullYear() - parsed.getFullYear();
+  const monthDiff = today.getMonth() - parsed.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < parsed.getDate())) age--;
+  if (age < 18) return 'You must be at least 18 years old to sign up';
+  return undefined;
+}
+
 export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProps) {
-  const { login, register, loginWithGoogle } = useApp();
+  const { login, register, loginWithGoogle, completeMfaLogin } = useApp();
 
   const [view, setView] = useState<AuthView>(mode ?? 'login');
   const [isLoading, setIsLoading] = useState(false);
@@ -49,20 +65,28 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     password2: '',
     first_name: '',
     last_name: '',
+    date_of_birth: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  // Step-up MFA: set once login() reports the account requires a code.
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [sendingEmailCode, setSendingEmailCode] = useState(false);
+
   useEffect(() => {
     setView(mode ?? 'login');
   }, [mode, open]);
 
   const resetForm = () => {
-    setFormData({ email: '', password: '', password2: '', first_name: '', last_name: '' });
+    setFormData({ email: '', password: '', password2: '', first_name: '', last_name: '', date_of_birth: '' });
     setErrors({});
     setAgreedToTerms(false);
+    setMfaToken(null);
+    setMfaCode('');
   };
 
   const handleClose = () => {
@@ -98,6 +122,11 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
       else if (formData.password !== formData.password2) newErrors.password2 = 'Passwords do not match';
     }
 
+    if (view === 'register') {
+      const dobErr = validateDateOfBirth(formData.date_of_birth);
+      if (dobErr) newErrors.date_of_birth = dobErr;
+    }
+
     if (view === 'register' && !agreedToTerms) {
       newErrors.agreedToTerms = 'You must agree to the Terms of Service and Privacy Policy';
     }
@@ -131,22 +160,55 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
           password2: formData.password2,
           first_name: formData.first_name,
           last_name: formData.last_name,
+          date_of_birth: formData.date_of_birth,
         });
         toast.success(result.message || 'Account created! Check your email for the verification link.');
         onModeChange('login');
         handleClose();
       }
     } catch (error: any) {
-      toast.error(
-        error.message ||
-          (view === 'forgot-password'
-            ? 'Unable to send reset link'
-            : view === 'login'
-              ? 'Invalid credentials'
-              : 'Registration failed')
-      );
+      if (error instanceof MfaRequiredError) {
+        setMfaToken(error.mfaToken);
+      } else {
+        toast.error(
+          error.message ||
+            (view === 'forgot-password'
+              ? 'Unable to send reset link'
+              : view === 'login'
+                ? 'Invalid credentials'
+                : 'Registration failed')
+        );
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleMfaVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaToken || mfaCode.trim().length < 6) return;
+    setIsLoading(true);
+    try {
+      await completeMfaLogin(mfaToken, mfaCode.trim());
+      toast.success('Welcome back!');
+      handleClose();
+    } catch (error: any) {
+      toast.error(error.message || 'Invalid or expired code');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendEmailCode = async () => {
+    if (!mfaToken) return;
+    setSendingEmailCode(true);
+    try {
+      const result = await authAPI.sendMfaEmailCode(mfaToken);
+      toast.success(result.message || 'Code sent to your email.');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send code.');
+    } finally {
+      setSendingEmailCode(false);
     }
   };
 
@@ -177,6 +239,58 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
       if (errors[id as keyof FormErrors]) setErrors(prev => ({ ...prev, [id]: undefined }));
     },
   });
+
+  if (mfaToken) {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-[420px] p-0 gap-0">
+          <div className="relative border-b border-border p-6">
+            <button type="button" title="Close dialog" onClick={handleClose} className="absolute left-6 top-6 p-1 rounded-full hover:bg-muted">
+              <X className="w-4 h-4" />
+            </button>
+            <h2 className="text-center font-semibold">Enter your code</h2>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This account requires a verification code from your authenticator app (or one of your backup codes).
+            </p>
+            <form onSubmit={handleMfaVerify} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="mfa-code">Verification code</Label>
+                <Input
+                  id="mfa-code"
+                  inputMode="numeric"
+                  autoFocus
+                  placeholder="123456"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  className="text-center text-lg tracking-widest"
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoading || mfaCode.trim().length < 6}>
+                {isLoading ? 'Verifying...' : 'Verify'}
+              </Button>
+            </form>
+            <button
+              type="button"
+              onClick={handleSendEmailCode}
+              disabled={sendingEmailCode}
+              className="w-full text-sm text-primary font-semibold hover:underline text-center"
+            >
+              {sendingEmailCode ? 'Sending...' : "Lost your phone? Email me a code instead"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMfaToken(null); setMfaCode(''); }}
+              className="w-full text-sm text-muted-foreground hover:text-foreground text-center"
+            >
+              Back to login
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -257,6 +371,17 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                 </div>
                 {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
               </div>
+
+              {view === 'register' && (
+                <div className="space-y-2">
+                  <Label htmlFor="date_of_birth">Date of birth</Label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input id="date_of_birth" type="date" className="pl-10" required {...field('date_of_birth')} />
+                  </div>
+                  {errors.date_of_birth && <p className="text-xs text-destructive">{errors.date_of_birth}</p>}
+                </div>
+              )}
 
               {view !== 'forgot-password' && (
                 <div className="space-y-2">

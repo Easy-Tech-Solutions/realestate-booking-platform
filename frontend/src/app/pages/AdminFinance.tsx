@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, DollarSign, Download, ScrollText, Lock, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
-import { paymentAPI } from '../../services/api/payments';
-import type { EscrowBooking, TaxRate, TaxReportBucket } from '../../services/api/payments';
+import { paymentAPI, REFUND_REASON_OPTIONS } from '../../services/api/payments';
+import type { EscrowBooking, TaxRate, TaxReportBucket, RefundReasonCode } from '../../services/api/payments';
+import { bookingsAPI } from '../../services/api/bookings';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -39,6 +40,7 @@ function RefundDialog({ tx, onDone }: { tx: Transaction; onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [reasonCode, setReasonCode] = useState<RefundReasonCode>('other');
   const [busy, setBusy] = useState(false);
 
   const refundable = tx.gateway_name === 'mtn_momo' && (tx.status === 'completed' || tx.status === 'partially_refunded');
@@ -50,13 +52,18 @@ function RefundDialog({ tx, onDone }: { tx: Transaction; onDone: () => void }) {
       toast.error('A positive amount and a reason are required.');
       return;
     }
+    if (reasonCode === 'change_of_mind') {
+      toast.error('Change of mind is not an eligible refund reason.');
+      return;
+    }
     setBusy(true);
     try {
-      await paymentAPI.adminRefund(tx.id, amt, reason.trim());
+      await paymentAPI.adminRefund(tx.id, amt, reason.trim(), reasonCode);
       toast.success('Refund submitted.');
       setOpen(false);
       setAmount('');
       setReason('');
+      setReasonCode('other');
       onDone();
     } catch (err) {
       toast.error(getErrorMessage(err, 'Refund failed'));
@@ -72,6 +79,14 @@ function RefundDialog({ tx, onDone }: { tx: Transaction; onDone: () => void }) {
   return (
     <div className="flex flex-col gap-2 min-w-[220px]">
       <Input placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      <Select value={reasonCode} onValueChange={(v) => setReasonCode(v as RefundReasonCode)}>
+        <SelectTrigger><SelectValue placeholder="Reason code" /></SelectTrigger>
+        <SelectContent>
+          {REFUND_REASON_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Textarea placeholder="Reason (required)" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
       <div className="flex gap-2">
         <Button size="sm" variant="destructive" disabled={busy} onClick={submit}>Confirm refund</Button>
@@ -304,6 +319,7 @@ function StripeRefundSection() {
   const [bookingId, setBookingId] = useState('');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [reasonCode, setReasonCode] = useState<RefundReasonCode>('other');
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
@@ -313,11 +329,15 @@ function StripeRefundSection() {
       toast.error('Booking ID, a positive amount, and a reason are required.');
       return;
     }
+    if (reasonCode === 'change_of_mind') {
+      toast.error('Change of mind is not an eligible refund reason.');
+      return;
+    }
     setBusy(true);
     try {
-      const result = await paymentAPI.adminStripeRefund(id, amt, reason.trim());
+      const result = await paymentAPI.adminStripeRefund(id, amt, reason.trim(), reasonCode);
       toast.success(result.message);
-      setBookingId(''); setAmount(''); setReason('');
+      setBookingId(''); setAmount(''); setReason(''); setReasonCode('other');
     } catch (err) {
       toast.error(getErrorMessage(err, 'Failed to submit refund request'));
     } finally {
@@ -343,11 +363,74 @@ function StripeRefundSection() {
             <label className="text-xs font-medium text-muted-foreground">Amount (USD)</label>
             <Input className="w-32" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
+          <div className="space-y-1 min-w-[200px]">
+            <label className="text-xs font-medium text-muted-foreground">Reason code</label>
+            <Select value={reasonCode} onValueChange={(v) => setReasonCode(v as RefundReasonCode)}>
+              <SelectTrigger><SelectValue placeholder="Reason code" /></SelectTrigger>
+              <SelectContent>
+                {REFUND_REASON_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex-1 min-w-[200px] space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Reason</label>
             <Textarea rows={1} value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
           <Button disabled={busy} onClick={submit}>Request refund</Button>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function ExtendReservationSection() {
+  const [bookingId, setBookingId] = useState('');
+  const [newDeadline, setNewDeadline] = useState('');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    const id = parseInt(bookingId, 10);
+    if (!id || !newDeadline || !reason.trim()) {
+      toast.error('Booking ID, a new deadline, and a reason are required.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await bookingsAPI.adminExtendReservation(id, new Date(newDeadline).toISOString(), reason.trim());
+      toast.success(result.message);
+      setBookingId(''); setNewDeadline(''); setReason('');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to extend reservation'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-lg font-semibold">Extend a reservation</h2>
+      <p className="text-xs text-muted-foreground">
+        Pushes out whichever clock is currently active for the booking — the host-confirm deadline or the
+        payment deadline. Capped at 20 days total from the original reservation request, per policy.
+      </p>
+      <Card>
+        <CardContent className="p-4 flex flex-wrap gap-2 items-end">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Booking ID</label>
+            <Input className="w-28" value={bookingId} onChange={(e) => setBookingId(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">New deadline</label>
+            <Input type="datetime-local" className="w-56" value={newDeadline} onChange={(e) => setNewDeadline(e.target.value)} />
+          </div>
+          <div className="flex-1 min-w-[200px] space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Reason</label>
+            <Textarea rows={1} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+          <Button disabled={busy} onClick={submit}>Extend</Button>
         </CardContent>
       </Card>
     </section>
@@ -497,6 +580,7 @@ export function AdminFinance() {
           </section>
 
           <StripeRefundSection />
+          <ExtendReservationSection />
           <EscrowSection />
           <TaxRatesSection />
         </>

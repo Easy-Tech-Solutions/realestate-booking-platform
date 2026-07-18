@@ -19,9 +19,15 @@ interface FormState {
   fullName: string;
   address: string;
   phone: string;
+  nextOfKinName: string;
+  nextOfKinRelationship: string;
+  nextOfKinPhone: string;
 }
 
-const INITIAL_FORM: FormState = { fullName: '', address: '', phone: '' };
+const INITIAL_FORM: FormState = {
+  fullName: '', address: '', phone: '',
+  nextOfKinName: '', nextOfKinRelationship: '', nextOfKinPhone: '',
+};
 
 export function BecomeAHost() {
   const navigate = useNavigate();
@@ -34,8 +40,9 @@ export function BecomeAHost() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [headshot, setHeadshot] = useState<File | null>(null);
   const [idDocument, setIdDocument] = useState<File | null>(null);
+  const [taxClearanceReceipt, setTaxClearanceReceipt] = useState<File | null>(null);
   const [agreed, setAgreed] = useState(false);
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState | 'headshot' | 'idDocument' | 'agreement', string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState | 'headshot' | 'idDocument' | 'taxClearanceReceipt' | 'agreement', string>>>({});
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -60,6 +67,10 @@ export function BecomeAHost() {
     if (!form.phone.trim()) errs.phone = 'Phone number is required';
     if (!headshot) errs.headshot = 'A headshot / passport photo is required';
     if (!idDocument) errs.idDocument = 'A photo of your national ID / passport is required';
+    if (!taxClearanceReceipt) errs.taxClearanceReceipt = 'An updated Tax Clearance Receipt is required';
+    if (!form.nextOfKinName.trim()) errs.nextOfKinName = 'Next of kin name is required';
+    if (!form.nextOfKinRelationship.trim()) errs.nextOfKinRelationship = 'Next of kin relationship is required';
+    if (!form.nextOfKinPhone.trim()) errs.nextOfKinPhone = 'Next of kin phone number is required';
     if (!agreed) errs.agreement = 'You must agree to the Property Owner Agreement to continue';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -76,6 +87,10 @@ export function BecomeAHost() {
       payload.append('phone', form.phone.trim());
       if (headshot) payload.append('headshot', headshot);
       if (idDocument) payload.append('id_document', idDocument);
+      if (taxClearanceReceipt) payload.append('tax_clearance_receipt', taxClearanceReceipt);
+      payload.append('next_of_kin_name', form.nextOfKinName.trim());
+      payload.append('next_of_kin_relationship', form.nextOfKinRelationship.trim());
+      payload.append('next_of_kin_phone', form.nextOfKinPhone.trim());
       payload.append('agreement_accepted', 'true');
 
       const created = await hostApplicationsAPI.create(payload);
@@ -84,6 +99,7 @@ export function BecomeAHost() {
       setForm(INITIAL_FORM);
       setHeadshot(null);
       setIdDocument(null);
+      setTaxClearanceReceipt(null);
       setAgreed(false);
       toast.success('Application submitted — we’ll review it shortly.');
     } catch (err: unknown) {
@@ -255,6 +271,54 @@ export function BecomeAHost() {
               error={errors.idDocument}
               onSelect={(f) => { setIdDocument(f); setErrors((p) => ({ ...p, idDocument: '' })); }}
             />
+            <FileField
+              id="ha-tax-clearance"
+              label="Updated Tax Clearance Receipt"
+              accept="image/*,.pdf"
+              file={taxClearanceReceipt}
+              error={errors.taxClearanceReceipt}
+              onSelect={(f) => { setTaxClearanceReceipt(f); setErrors((p) => ({ ...p, taxClearanceReceipt: '' })); }}
+            />
+
+            {/* Next of kin */}
+            <div className="pt-1 border-t border-border">
+              <p className="text-sm font-medium text-foreground mt-4 mb-3">Next of kin</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ha-nok-name">Full name <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="ha-nok-name"
+                    placeholder="Next of kin's full name"
+                    value={form.nextOfKinName}
+                    onChange={(e) => set('nextOfKinName', e.target.value)}
+                    className={errors.nextOfKinName ? 'border-destructive' : ''}
+                  />
+                  {errors.nextOfKinName && <p className="text-xs text-destructive">{errors.nextOfKinName}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ha-nok-relationship">Relationship <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="ha-nok-relationship"
+                    placeholder="e.g. Spouse, Sibling"
+                    value={form.nextOfKinRelationship}
+                    onChange={(e) => set('nextOfKinRelationship', e.target.value)}
+                    className={errors.nextOfKinRelationship ? 'border-destructive' : ''}
+                  />
+                  {errors.nextOfKinRelationship && <p className="text-xs text-destructive">{errors.nextOfKinRelationship}</p>}
+                </div>
+              </div>
+              <div className="space-y-1.5 mt-5">
+                <Label htmlFor="ha-nok-phone">Phone number <span className="text-destructive">*</span></Label>
+                <Input
+                  id="ha-nok-phone"
+                  placeholder="0880 000 000"
+                  value={form.nextOfKinPhone}
+                  onChange={(e) => set('nextOfKinPhone', e.target.value)}
+                  className={errors.nextOfKinPhone ? 'border-destructive' : ''}
+                />
+                {errors.nextOfKinPhone && <p className="text-xs text-destructive">{errors.nextOfKinPhone}</p>}
+              </div>
+            </div>
 
             {/* Property Owner Agreement */}
             <div className="pt-1 border-t border-border">
@@ -308,13 +372,14 @@ export function BecomeAHost() {
 }
 
 function FileField({
-  id, label, file, error, onSelect,
+  id, label, file, error, onSelect, accept = 'image/*',
 }: {
   id: string;
   label: string;
   file: File | null;
   error?: string;
   onSelect: (f: File | null) => void;
+  accept?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -328,12 +393,12 @@ function FileField({
       >
         <Upload className="w-5 h-5 text-muted-foreground shrink-0" />
         <span className="text-sm text-muted-foreground truncate">
-          {file ? file.name : 'Click to upload an image'}
+          {file ? file.name : 'Click to upload a file'}
         </span>
         <input
           id={id}
           type="file"
-          accept="image/*"
+          accept={accept}
           className="hidden"
           onChange={(e) => onSelect(e.target.files?.[0] ?? null)}
         />

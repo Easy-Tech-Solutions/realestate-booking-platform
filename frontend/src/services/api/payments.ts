@@ -27,6 +27,18 @@ interface StripeIntentResponse {
   amount_cents: number;
 }
 
+// Business Policy §10 — refund eligibility reasons. `change_of_mind` is
+// always rejected server-side; `other` is admin-discretion only.
+export type RefundReasonCode = 'misrepresentation' | 'legal_issue' | 'safety_concern' | 'change_of_mind' | 'other';
+
+export const REFUND_REASON_OPTIONS: { value: RefundReasonCode; label: string }[] = [
+  { value: 'misrepresentation', label: 'Property misrepresentation' },
+  { value: 'legal_issue', label: 'Legal issue discovered' },
+  { value: 'safety_concern', label: 'Safety concern' },
+  { value: 'change_of_mind', label: 'Change of mind (not eligible)' },
+  { value: 'other', label: 'Other (admin discretion)' },
+];
+
 export interface PlatformFee {
   booking_fee: string;
   viewing_fee: string;
@@ -124,10 +136,10 @@ export const paymentAPI = {
     });
   },
 
-  requestRefund: async (paymentId: string, amount: number, reason: string): Promise<any> => {
+  requestRefund: async (paymentId: string, amount: number, reason: string, reasonCode: RefundReasonCode): Promise<any> => {
     return fetchWithAuth('/api/payments/refund/', {
       method: 'POST',
-      body: JSON.stringify({ payment_id: paymentId, amount, reason }),
+      body: JSON.stringify({ payment_id: paymentId, amount, reason, reason_code: reasonCode }),
     });
   },
 
@@ -166,10 +178,10 @@ export const paymentAPI = {
     window.URL.revokeObjectURL(url);
   },
 
-  adminRefund: async (paymentId: string, amount: number, reason: string): Promise<any> => {
+  adminRefund: async (paymentId: string, amount: number, reason: string, reasonCode: RefundReasonCode): Promise<any> => {
     return fetchWithAuth('/api/payments/admin/refund/', {
       method: 'POST',
-      body: JSON.stringify({ payment_id: paymentId, amount, reason }),
+      body: JSON.stringify({ payment_id: paymentId, amount, reason, reason_code: reasonCode }),
     });
   },
 
@@ -231,10 +243,10 @@ export const paymentAPI = {
   },
 
   // ── Stripe refunds ────────────────────────────────────────────────────────
-  adminStripeRefund: async (bookingId: number, amount: number, reason: string): Promise<{ pending_approval: boolean; approval_id: number; message: string }> => {
+  adminStripeRefund: async (bookingId: number, amount: number, reason: string, reasonCode: RefundReasonCode): Promise<{ pending_approval: boolean; approval_id: number; message: string }> => {
     return fetchWithAuth('/api/payments/admin/stripe-refund/', {
       method: 'POST',
-      body: JSON.stringify({ booking_id: bookingId, amount, reason }),
+      body: JSON.stringify({ booking_id: bookingId, amount, reason, reason_code: reasonCode }),
     });
   },
 };

@@ -8,6 +8,10 @@ export interface HostApplication {
   email: string;
   headshot_url: string | null;
   id_document_url: string | null;
+  tax_clearance_receipt_url: string | null;
+  next_of_kin_name: string;
+  next_of_kin_relationship: string;
+  next_of_kin_phone: string;
   status: 'submitted' | 'ps_approved' | 'compliance_approved' | 'approved' | 'declined';
   status_display: string;
   current_stage: string | null;

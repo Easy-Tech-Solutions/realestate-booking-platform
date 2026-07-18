@@ -1,6 +1,9 @@
+import random
 import secrets
 from datetime import timedelta
 
+from django.contrib.auth.hashers import check_password, make_password
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
@@ -10,6 +13,13 @@ from django.conf import settings
 TOKEN_BYTES = 32  # 256 bits of entropy (URL-safe base64 → ~43 chars)
 EMAIL_VERIFICATION_EXPIRY_HOURS = 24
 PASSWORD_RESET_EXPIRY_HOURS = 1
+
+# MFA login step-up fallback for admins who've lost their authenticator
+# device — a one-time code emailed to the account's registered address.
+# Recovery/backup codes already cover this case; this is the friendlier
+# alternative so an admin doesn't have to burn one of a limited set.
+MFA_EMAIL_CODE_TTL_SECONDS = 600  # 10 minutes
+_MFA_EMAIL_CODE_CACHE_KEY = 'mfa_email_code:{user_id}'
 
 
 def _generate_secure_token() -> str:
@@ -37,6 +47,44 @@ def send_verification_email(user):
         print("=" * 55)
     send_mail(subject, strip_tags(html_message), settings.DEFAULT_FROM_EMAIL,
               [user.email], html_message=html_message)
+
+
+def send_mfa_email_code(user):
+    """Generate and email a 6-digit one-time code as an MFA login step-up
+    fallback. Stored hashed in cache (Redis-backed), never in the DB —
+    short-lived and single-use. Consumed by verify_mfa_email_code(), which
+    superadmin.views.mfa_verify_login falls back to when the submitted code
+    doesn't match a TOTP or backup code."""
+    code = f'{random.SystemRandom().randrange(0, 1_000_000):06d}'
+    cache.set(
+        _MFA_EMAIL_CODE_CACHE_KEY.format(user_id=user.id),
+        make_password(code),
+        timeout=MFA_EMAIL_CODE_TTL_SECONDS,
+    )
+
+    subject = "Your verification code"
+    html_message = render_to_string("auth/mfa_email_code.html", {
+        "user": user,
+        "code": code,
+        "site_name": settings.SITE_NAME,
+        "expiry_minutes": MFA_EMAIL_CODE_TTL_SECONDS // 60,
+    })
+    if settings.DEBUG or settings.EMAIL_BACKEND.endswith("console.EmailBackend"):
+        print(f"\n=== MFA EMAIL CODE FOR {user.username} ===")
+        print(f"Code: {code}")
+        print(f"Expires in {MFA_EMAIL_CODE_TTL_SECONDS // 60} minutes")
+        print("=" * 55)
+    send_mail(subject, strip_tags(html_message), settings.DEFAULT_FROM_EMAIL,
+              [user.email], html_message=html_message)
+
+
+def verify_mfa_email_code(user, code: str) -> bool:
+    key = _MFA_EMAIL_CODE_CACHE_KEY.format(user_id=user.id)
+    hashed = cache.get(key)
+    if not hashed or not code or not check_password(code, hashed):
+        return False
+    cache.delete(key)
+    return True
 
 
 def send_password_reset_email(user):

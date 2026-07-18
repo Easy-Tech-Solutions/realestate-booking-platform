@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
-import { MfaRequiredError } from '../../services/api/auth';
+import { MfaRequiredError, authAPI } from '../../services/api/auth';
 
 type Mode = 'login' | 'signup';
 
@@ -22,6 +22,7 @@ export function Login() {
   const [mode, setMode] = React.useState<Mode>(initialMode);
   const [mfaToken, setMfaToken] = React.useState<string | null>(null);
   const [mfaCode, setMfaCode] = React.useState('');
+  const [sendingEmailCode, setSendingEmailCode] = React.useState(false);
   const [firstName, setFirstName] = React.useState('');
   const [lastName, setLastName] = React.useState('');
   const [email, setEmail] = React.useState('');
@@ -82,6 +83,19 @@ export function Login() {
       toast.error(error?.message || 'Invalid or expired code');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSendEmailCode = async () => {
+    if (!mfaToken) return;
+    setSendingEmailCode(true);
+    try {
+      const result = await authAPI.sendMfaEmailCode(mfaToken);
+      toast.success(result.message || 'Code sent to your email.');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to send code.');
+    } finally {
+      setSendingEmailCode(false);
     }
   };
 
@@ -175,6 +189,14 @@ export function Login() {
             <Button type="submit" className="w-full" disabled={isLoading || mfaCode.trim().length < 6}>
               {isLoading ? 'Verifying…' : 'Verify'}
             </Button>
+            <button
+              type="button"
+              onClick={handleSendEmailCode}
+              disabled={sendingEmailCode}
+              className="w-full text-sm text-primary font-semibold hover:underline"
+            >
+              {sendingEmailCode ? 'Sending…' : "Lost your phone? Email me a code instead"}
+            </button>
             <button
               type="button"
               onClick={() => { setMfaToken(null); setMfaCode(''); }}

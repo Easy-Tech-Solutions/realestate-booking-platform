@@ -69,4 +69,16 @@ export const bookingsAPI = {
   }> => {
     return fetchWithAuth(`/api/bookings/admin/${id}/communications/`);
   },
+
+  // Admin/staff: push out whichever reservation clock (host-confirm or
+  // payment) is currently active. Capped at 20 days total from the original
+  // request (Business Policy §8.2).
+  adminExtendReservation: async (id: string | number, newDeadline: string, reason: string): Promise<{
+    booking_id: number; new_deadline: string; capped_at_policy_ceiling: boolean; message: string;
+  }> => {
+    return fetchWithAuth(`/api/bookings/admin/${id}/extend-reservation/`, {
+      method: 'POST',
+      body: JSON.stringify({ new_deadline: newDeadline, reason }),
+    });
+  },
 };
