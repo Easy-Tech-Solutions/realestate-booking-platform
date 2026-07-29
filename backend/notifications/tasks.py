@@ -91,6 +91,20 @@ def send_notification_email(self, notification_id: int):
             to=[user.email],
         )
         email.attach_alternative(html_content, 'text/html')
+
+        # Attach the Agreement of Lease PDF when the notification flags it
+        # (long-term booking-request emails).
+        lease_booking_id = (notification.data or {}).get('attach_lease_booking_id')
+        if lease_booking_id:
+            try:
+                from leaseagreements.models import LeaseAgreement
+                lease = LeaseAgreement.objects.filter(booking_id=lease_booking_id).first()
+                if lease and lease.document:
+                    with lease.document.open('rb') as fh:
+                        email.attach('Agreement-of-Lease.pdf', fh.read(), 'application/pdf')
+            except Exception:
+                logger.exception('Could not attach lease for booking %s', lease_booking_id)
+
         email.send()
 
         notification.email_sent = True

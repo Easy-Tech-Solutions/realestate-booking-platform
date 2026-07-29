@@ -15,6 +15,7 @@ import { Booking } from '../../core/types';
 import { bookingStatusMeta } from '../../core/bookingStatus';
 import { useUserTrips } from '../../hooks/queries/useTrips';
 import { aircoverClaimsAPI } from '../../services/api/aircoverClaims';
+import { LeaseDownloadLink } from '../components/LeaseDownloadLink';
 
 const CLAIM_TYPES: { value: string; label: string }[] = [
   { value: 'property_damage', label: 'Property damage' },
@@ -162,6 +163,8 @@ export function Trips() {
               Payment received — we're confirming it. Your host's contact will be shared once confirmed.
             </div>
           )}
+
+          <LeaseDownloadLink bookingId={trip.booking.id} />
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-border">
             <div>

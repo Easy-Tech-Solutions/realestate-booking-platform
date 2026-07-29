@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4; margin: 2.2cm 2cm; }
+    body { font-family: "Liberation Serif", "Times New Roman", serif; font-size: 12pt; line-height: 1.5; color: #000; }
+    .country { margin: 0; font-weight: bold; }
+    h1 { text-align: center; font-size: 14pt; text-decoration: underline; margin: 18px 0 20px; }
+    p { margin: 0 0 12px; text-align: justify; }
+    .fill { font-weight: bold; text-decoration: underline; }
+    ol.terms { padding-left: 20px; }
+    ol.terms > li { margin: 12px 0; }
+    ol.terms > li > .h { font-weight: bold; text-decoration: underline; }
+    ol.sub { list-style: upper-alpha; padding-left: 22px; margin-top: 6px; }
+    ol.sub > li { margin: 4px 0; }
+    .sign { margin-top: 40px; }
+    .sign .line { border-top: 1px solid #000; width: 260px; margin-top: 34px; }
+    .sign .role { margin: 2px 0 0; }
+    .stamp { margin-top: 22px; padding: 10px 12px; border: 1px solid #000; font-size: 10.5pt; }
+    .note { margin-top: 20px; font-size: 11pt; }
+  </style>
+</head>
+<body>
+  <p class="country">REPUBLIC OF LIBERIA,</p>
+  <p class="country">MONTSERRADO COUNTY.</p>
+
+  <h1>AGREEMENT OF LEASE</h1>
+
+  <p>
+    THIS RESIDENTIAL LEASE is entered into this <span class="fill">{{ day }}</span> day of
+    <span class="fill">{{ month }}</span>, A.D. <span class="fill">{{ year }}</span>, by and between
+    <span class="fill">{{ landlord_name }}</span>, and <span class="fill">{{ property_address }}</span>
+    of the City of Monrovia, County of Montserrado, Liberia, hereinafter known and referred to as the
+    &ldquo;LANDLORD&rdquo;, <span class="fill">{{ tenant_name }}</span>, also of the City of Monrovia,
+    County of Montserrado, Republic of Liberia, hereinafter known and referred to as the
+    &ldquo;TENANT&rdquo;, the LANDLORD AND TENANT shall together be called the parties and individually
+    as the party. It is hereby agreed:
+  </p>
+
+  <p>
+    THEREFORE, IN CONSIDERATION OF THE PARTIES' COMMON PROMISES AND AGREEMENTS CONTAINED HEREIN, THE
+    TENANT AGREES TO LEASE THE PREMISES FROM THE LANDLORD ON THE FOLLOWING CONDITIONS:
+  </p>
+
+  <ol class="terms">
+    <li>
+      <span class="h">RENT.</span>
+      <p>The lease of the property has been agreed by the parties for the value of:
+        <span class="fill">{{ rent_display }}</span>, the landlord and tenant are both interested in
+        leasing the property from the landlord on the terms outlined in this personal property lease
+        agreement.</p>
+      <p>The Landlord shall receive all benefits of ownership of the property and this agreement shall be
+        recognized as a true lease under the laws of the Republic of Liberia.</p>
+    </li>
+    <li>
+      <span class="h">Type of Lease.</span>
+      <p>This contract will be regarded as a fixed lease. The lease term for the premises is from
+        <span class="fill">{{ lease_start }}</span> to <span class="fill">{{ lease_end }}</span>.</p>
+      <p>At the end of the lease term and no renewal is made, the Tenant may continue to lease the premises
+        under the same terms of this agreement under a month-to-month arrangement.</p>
+      <p>The Tenant will pay the rent on or before the first (1st) to fifth (5th) day of each and every
+        month of the term of this lease to the Landlord either by cash, check or mobile money. The Landlord
+        will have the discretion to change the mode of payment and then communicate the said change to the
+        Tenant by written notice or text message.</p>
+    </li>
+    <li>
+      <span class="h">Late Payments.</span>
+      <p>For any rental payment that is not paid within three (3) days of its due date, the Tenant shall pay
+        a late fee of Five United States Dollars ($5.00 USD).</p>
+    </li>
+    <li>
+      <span class="h">First Rent.</span>
+      <p>The Tenant is required to pay the first rent as agreed upon by the parties upon the first (1st) day
+        of the signing of this rental agreement.</p>
+    </li>
+    <li>
+      <span class="h">Utilities.</span>
+      <p>The Tenant will be responsible for paying for all utilities on the premises, including but not
+        limited to electricity, water, cable TV, etc.</p>
+    </li>
+    <li>
+      <span class="h">Title to Property.</span>
+      <p>The Landlord shall retain title to the property. The Tenant only acquires the right to use the
+        property in the regular course of his/her business, but the property shall remain the personal
+        property of the Landlord in fee simple.</p>
+    </li>
+    <li>
+      <span class="h">Taxes.</span>
+      <p>Excluding real property taxes, the Tenant shall be responsible for any or all other taxes
+        associated with using the property during the duration of this lease agreement.</p>
+    </li>
+    <li>
+      <span class="h">Right of entry (Inspections).</span>
+      <p>The Landlord shall have the right to enter the property during the life of this rental agreement at
+        normal working hours, by giving at least twenty-four (24) hours&rsquo; notice to the Tenant to
+        conduct inspection; make any necessary repairs, modifications or improvements and provide services
+        as agreed; or for any reasonable purpose. The Landlord shall retain the authority to display
+        property to interested parties, buyers or possible tenants.</p>
+    </li>
+    <li>
+      <span class="h">Hazardous Materials.</span>
+      <p>The Tenant shall not keep on the property any item of a dangerous, flammable or explosive nature
+        that might unreasonably increase the danger of fire or explosion on the property or that might be
+        considered hazardous or extra hazardous by any insurance company.</p>
+    </li>
+    <li>
+      <span class="h">Rules, Maintenance, and Repairs.</span>
+      <p>Maintenance, minor repairs, and servicing of the property, including but not limited to
+        air-conditioning equipment, plumbing fixtures (such as showers, bath tubs, toilets, or sinks),
+        shall be the Tenant&rsquo;s sole responsibility and expense. The tenant shall be responsible for
+        maintaining the property&rsquo;s cleanliness and general condition throughout the duration of this
+        lease.</p>
+      <ol class="sub">
+        <li>The Tenant shall abide by all laws, ordinances, health and safety standards and the terms of this lease agreement.</li>
+        <li>Properly dispose of all garbage.</li>
+        <li>Do not block any structure that is meant to be used for entrance, egress, passage from and to the property.</li>
+        <li>Keep railings, windows, balconies, and other fittings and structures intact and clean from the exterior view of the building.</li>
+        <li>Before changing or putting in new transoms, locks, hooks, doorknobs, etc., the tenant must get the Landlord&rsquo;s approval.</li>
+        <li>Refrain from acts that cause extreme annoyance to other inhabitants and neighbors; other actions that create intolerably loud noise.</li>
+      </ol>
+    </li>
+    <li>
+      <span class="h">Default.</span>
+      <p>The Tenant is entitled to use any legal remedies if the Landlord violates any of the terms and
+        conditions of this rental agreement or any applicable laws, regulations, or codes. The Landlord
+        shall give the Tenant a reasonable amount of time (at least a month) to resolve any breach or
+        failure to comply with any of the terms and conditions of this rental agreement or any relevant
+        laws, rules, or regulations. This time frame will start the day the Tenant receives notice of the
+        violation or failure to comply with the demand to make necessary corrections.</p>
+      <p>The Tenant will be in default if they don&rsquo;t follow the rules, don&rsquo;t fix the problem, or
+        can&rsquo;t fix it in a reasonable amount of time. Following a default by the Tenant, the Landlord
+        has the right to end the lease, give the Tenant notice of termination and eviction, and retake
+        possession of the property.</p>
+    </li>
+    <li>
+      <span class="h">Abandonment.</span>
+      <p>In the event that the Tenant abandons the property, the Landlord may declare the Lease terminated,
+        retake possession of the property, enter the premises, remove the Tenant&rsquo;s belongings, and
+        lease the property to a third party without incurring any liability to the Tenant for doing so.
+        Until the property is leased to another person or is otherwise inhabited by the Landlord or another
+        person under the Landlord&rsquo;s authority, the Landlord may reclaim from the Tenant any overdue
+        rent in the event that the property is abandoned. The property shall be deemed abandoned in the
+        event the Tenant is physically absent from the property for a period of Forty-Eight (48) days
+        without officially informing the Landlord of the absence.</p>
+    </li>
+    <li>
+      <span class="h">Modification to document.</span>
+      <p>The parties acknowledge and agree that this document constitutes the whole understanding between
+        them and that this Lease may not be amended, modified, changed, or in any manner changed except by
+        a written amendment executed by all parties hereto.</p>
+    </li>
+    <li>
+      <span class="h">Binding effect.</span>
+      <p>The terms, obligations, conditions, and covenants of this Lease shall be binding upon and shall
+        inure to the benefit of the Tenant, the Landlord, their heirs, legal representatives, and
+        successors in interest.</p>
+    </li>
+    <li>
+      <span class="h">Early Termination.</span>
+      <p>The Tenant shall have the right to end this Lease at any time by giving the Landlord written notice
+        at least thirty (30) days in advance of the end of the lease and paying an early termination fee in
+        the amount of Forty United States Dollars (US$40.00). The Tenant shall be liable for rent payments
+        during the notice of termination period.</p>
+    </li>
+    <li>
+      <span class="h">Compliance with law.</span>
+      <p>In relation to the property and the Tenant&rsquo;s occupancy and use of it, the Tenant agrees to
+        abide by all applicable laws, rules, regulations, codes, and other issuances, including municipal,
+        county, and regulatory bodies' issuances.</p>
+    </li>
+    <li>
+      <span class="h">Possession.</span>
+      <p>By taking possession of the premises, the Tenant recognizes that they have accepted the premises in
+        good order and in their present state. The Tenant has inspected the premises&rsquo; condition.</p>
+      <p>This agreement may be terminated at the Tenant&rsquo;s choice if the Landlord fails to provide the
+        Tenant possession of the premises at the beginning of the lease term. The Security Deposit (if any)
+        and any other prepaid rent and fees, including any fees the Tenant paid during the application
+        process prior to the execution of this agreement, shall also be returned to the Tenant in the event
+        the Landlord fails to deliver possession, and the Tenant cancels this agreement.</p>
+    </li>
+  </ol>
+
+  <p style="margin-top:26px;">IN WITNESS WHEREOF, THE PARTIES HAVE SET THEIR HANDS AND AFFIXED THEIR
+    SIGNATURES HEREUNTO ON THE DAY AND DATE FIRST ABOVE WRITTEN.</p>
+
+  <div class="sign">
+    <div class="line"></div>
+    <p class="role">LESSOR</p>
+    <div class="line"></div>
+    <p class="role">Tenant</p>
+  </div>
+
+  <p class="note">$5.00 REVENUE STAMP AFFIXED ON THE ORIGINAL</p>
+
+  {% if accepted_by %}
+  <div class="stamp">
+    <strong>Electronically accepted</strong> by {{ accepted_by }} on {{ accepted_at }} (Agreement of Lease
+    v{{ version }}). Accepted online via Home Konet as part of the reservation payment.
+  </div>
+  {% endif %}
+</body>
+</html>

@@ -24,6 +24,8 @@ export { hostApplicationsAPI } from './hostApplications';
 export type { HostApplication } from './hostApplications';
 export { propertyVerificationsAPI } from './propertyVerifications';
 export type { PropertyVerification } from './propertyVerifications';
+export { leaseAgreementsAPI } from './leaseAgreements';
+export type { LeaseAgreement } from './leaseAgreements';
 export { superadminAPI } from './superadmin';
 export type { SuperadminMe, MfaSetupResponse, AuditLogEntry, AuditLogPage } from './superadmin';
 export type { Testimonial } from './testimonials';
