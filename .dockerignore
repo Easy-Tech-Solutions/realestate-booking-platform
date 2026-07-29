@@ -1,0 +1,30 @@
+# Keep the Docker build context small and avoid runtime-created, root-owned
+# paths (logs/media) that break "docker build" with permission-denied errors.
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+.venv/
+venv/
+*.sqlite3
+
+# Runtime-created (mounted at runtime, never baked into the image)
+backend/logs/
+backend/media/
+backend/staticfiles/
+
+# Node / frontend build output
+frontend/node_modules/
+frontend/dist/
+
+# Secrets & local env (provided via env_file at runtime)
+**/.env
+**/.env.*
+!**/.env.example
+
+# VCS / tooling / docs
+.git/
+.gitignore
+.github/
+**/.DS_Store
+*.md
