@@ -112,6 +112,7 @@ INSTALLED_APPS = [
     "support",
     "hostapplications",
     "propertyverifications",
+    "leaseagreements",
     "superadmin",
     "trustsafety",
     "inventory",

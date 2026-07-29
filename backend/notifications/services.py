@@ -220,6 +220,29 @@ def notify_booking_submitted(booking):
     service_fee = amounts['guest_service_fee']
     total = amounts['guest_total']
 
+    data = {
+        'booking_id':     booking.id,
+        'listing_id':     booking.listing.id,
+        'listing_title':  booking.listing.title,
+        'owner_name':     booking.listing.owner.get_full_name() or booking.listing.owner.username,
+        'start_date':     str(booking.start_date),
+        'end_date':       str(booking.end_date),
+        'booking_amount': f'{booking_amount:.2f}',
+        'service_fee':    f'{service_fee:.2f}',
+        'total_amount':   f'{total:.2f}',
+    }
+
+    # Long-term (monthly) reservations: generate the Agreement of Lease and flag
+    # it so the email task attaches the PDF to this "Booking Requested" email.
+    try:
+        from leaseagreements import agreements as lease_agreements
+        if lease_agreements.is_long_term(booking.listing):
+            lease = lease_agreements.generate_lease_for_booking(booking)
+            if lease and lease.document:
+                data['attach_lease_booking_id'] = booking.id
+    except Exception:
+        logger.exception('Lease generation failed for booking #%s', booking.id)
+
     create_notification(
         user=booking.customer,
         notification_type='booking_submitted',
@@ -229,17 +252,7 @@ def notify_booking_submitted(booking):
             f'{booking.start_date} to {booking.end_date} has been sent to the host. '
             f"You'll be notified once they accept or decline."
         ),
-        data={
-            'booking_id':     booking.id,
-            'listing_id':     booking.listing.id,
-            'listing_title':  booking.listing.title,
-            'owner_name':     booking.listing.owner.get_full_name() or booking.listing.owner.username,
-            'start_date':     str(booking.start_date),
-            'end_date':       str(booking.end_date),
-            'booking_amount': f'{booking_amount:.2f}',
-            'service_fee':    f'{service_fee:.2f}',
-            'total_amount':   f'{total:.2f}',
-        },
+        data=data,
     )
 
 

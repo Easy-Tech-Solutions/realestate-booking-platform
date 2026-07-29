@@ -40,6 +40,7 @@ urlpatterns = [
     path('api/platform-ops/', include('platformops.urls')),
     path('api/rbac/', include('rbac.urls')),
     path('api/chatbot/', include('chatbot.urls')),
+    path('api/lease-agreements/', include('leaseagreements.urls')),
 ]
 
 if settings.DEBUG:

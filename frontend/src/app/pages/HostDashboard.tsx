@@ -22,6 +22,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { ListingVerificationCell } from '../components/ListingVerificationCell';
+import { LeaseDownloadLink } from '../components/LeaseDownloadLink';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../hooks/queries/keys';
@@ -1073,6 +1074,7 @@ export function HostDashboard() {
                   {booking.status === 'payment_received' && (
                     <p className="text-xs text-muted-foreground mt-0.5">Payment received — awaiting admin confirmation.</p>
                   )}
+                  <div className="mt-1"><LeaseDownloadLink bookingId={booking.id} /></div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap flex-shrink-0">
                   {isPending ? (

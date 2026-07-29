@@ -12,6 +12,7 @@ import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import type { Booking, PaymentMethod } from '../../core/types';
 import { bookingsAPI, paymentAPI } from '../../services/api.service';
+import { leaseAgreementsAPI, type LeaseAgreement } from '../../services/api/leaseAgreements';
 import { getErrorMessage } from '../../services/api/shared/errors';
 
 const MOMO_POLL_INTERVAL_MS = 3000;
@@ -38,6 +39,8 @@ function PaymentForm() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [momoStatus, setMomoStatus] = useState<'idle' | 'awaiting'>('idle');
+  const [lease, setLease] = useState<LeaseAgreement | null>(null);
+  const [agreedLease, setAgreedLease] = useState(false);
 
   const bookingId = booking?.id || params.id;
 
@@ -51,6 +54,16 @@ function PaymentForm() {
         .finally(() => setLoading(false));
     }
   }, [booking, params.id]);
+
+  // Load the Agreement of Lease for this booking (present only for long-term
+  // rentals). If accepted already, pre-check the box.
+  useEffect(() => {
+    if (!bookingId) return;
+    leaseAgreementsAPI
+      .getForBooking(bookingId)
+      .then((l) => { setLease(l); if (l?.is_accepted) setAgreedLease(true); })
+      .catch(() => setLease(null));
+  }, [bookingId]);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
@@ -101,6 +114,22 @@ function PaymentForm() {
     if (paymentMethod === 'stripe' && (!stripe || !elements)) {
       toast.error('Stripe has not finished loading. Please wait a moment and try again.');
       return;
+    }
+
+    // Long-term rentals require agreeing to (and recording acceptance of) the
+    // Agreement of Lease before payment.
+    if (lease && !agreedLease) {
+      toast.error('Please review and agree to the Agreement of Lease to continue.');
+      return;
+    }
+    if (lease && !lease.is_accepted) {
+      try {
+        const updated = await leaseAgreementsAPI.accept(bookingId!);
+        setLease(updated);
+      } catch {
+        toast.error('Could not record your lease acceptance. Please try again.');
+        return;
+      }
     }
 
     setIsProcessing(true);
@@ -254,7 +283,36 @@ function PaymentForm() {
                 </div>
               )}
 
-              <Button type="button" onClick={handlePayment} disabled={isProcessing || momoStatus === 'awaiting'} className="w-full" size="lg">
+              {lease && (
+                <div className="rounded-lg border border-border bg-muted/30 p-4">
+                  <p className="text-sm text-foreground">
+                    Please review the{' '}
+                    <a
+                      href={lease.document_url ?? '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary font-medium hover:underline"
+                    >
+                      Agreement of Lease
+                    </a>{' '}
+                    before completing your payment. By proceeding, you confirm that you have read,
+                    understood, and agree to the terms of the Agreement of Lease.
+                  </p>
+                  <label className="flex items-start gap-3 cursor-pointer mt-3">
+                    <input
+                      type="checkbox"
+                      checked={agreedLease}
+                      onChange={(e) => setAgreedLease(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary shrink-0"
+                    />
+                    <span className="text-sm text-foreground">
+                      I have read, understood, and agree to the Agreement of Lease.
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              <Button type="button" onClick={handlePayment} disabled={isProcessing || momoStatus === 'awaiting' || (!!lease && !agreedLease)} className="w-full" size="lg">
                 {momoStatus === 'awaiting' ? 'Waiting for MoMo approval…' : isProcessing ? 'Processing…' : `Pay ${formatCurrency(total)}`}
               </Button>
             </div>
