@@ -96,24 +96,9 @@ def bookings_collection(request):
                 serializer.validated_data.pop('payment_method', None)
                 serializer.validated_data.pop('stripe_payment_intent_id', None)
 
-                # QA (viewing) inspection is mandatory before reserving a
-                # long-term rental — Business Policy §7.3. Hotel-room bookings
-                # are exempt (ViewingAppointment models the long-term-rental
-                # viewing flow only, not instant-book hotel stays). Guests who
-                # complete a viewing normally reserve via reserve_from_viewing
-                # directly; this only blocks skipping straight here instead.
-                if not hotel_room:
-                    has_completed_viewing = ViewingAppointment.objects.filter(
-                        listing=listing, guest=request.user, status='completed',
-                    ).exists()
-                    if not has_completed_viewing:
-                        return Response({
-                            'error': (
-                                'A completed property viewing (QA inspection) is required before you can '
-                                'reserve this property. Please schedule a viewing first.'
-                            ),
-                            'code': 'viewing_required',
-                        }, status=status.HTTP_400_BAD_REQUEST)
+                # Property viewing is OPTIONAL — a guest may reserve directly, or
+                # (optionally) schedule a guided viewing first. Do not gate
+                # reservation on a completed viewing.
 
                 # A guest can't hold two active reservations for the same dates.
                 existing_booking = Booking.objects.filter(
