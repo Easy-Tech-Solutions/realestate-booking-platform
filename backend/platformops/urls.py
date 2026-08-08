@@ -10,4 +10,5 @@ urlpatterns = [
     path('flush-cache/', views.flush_cache, name='flush-cache'),
     path('server-metrics/', views.server_metrics, name='server-metrics'),
     path('log-viewer/', views.log_viewer, name='log-viewer'),
+    path('docs/<slug:slug>/', views.docs_view, name='docs-view'),
 ]

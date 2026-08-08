@@ -100,7 +100,7 @@ class PaymentService:
             return {'success': False, 'error': 'Payment gateway not available'}
 
         try:
-            result = gateway.verify_payment(payment.gateway_transaction_id)
+            result = gateway.verify_payment(payment.gateway_transaction_id, payment.currency.code)
 
             if result.get('success'):
                 mtn_status = result.get('status')  # 'pending' | 'completed' | 'failed'
@@ -128,32 +128,6 @@ class PaymentService:
 
         except Exception as e:
             return {'success': False, 'error': str(e)}
-
-    @classmethod
-    def handle_webhook(cls, payment: Payment, mtn_status: str,
-                       payload: Dict[str, Any]) -> None:
-        """
-        Called by the webhook view after signature validation.
-        Updates payment and booking, then triggers owner payout.
-        """
-        with transaction.atomic():
-            payment.gateway_response = payload
-            if mtn_status == 'SUCCESSFUL':
-                if payment.status != 'completed':
-                    payment.status = 'completed'
-                    payment.completed_at = timezone.now()
-                    payment.save(update_fields=['status', 'completed_at', 'gateway_response'])
-                else:
-                    payment.save(update_fields=['gateway_response'])
-                # Idempotent — safe to run even if already completed.
-                cls._on_payment_confirmed(payment)
-
-            elif mtn_status in ('FAILED', 'TIMEOUT'):
-                payment.status = 'failed'
-                payment.save(update_fields=['status', 'gateway_response'])
-
-            else:
-                payment.save(update_fields=['gateway_response'])
 
     @classmethod
     def _on_payment_confirmed(cls, payment: Payment) -> None:

@@ -1,12 +1,22 @@
 import uuid
 import base64
 import requests
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from payments.models import PaymentGateway
 
 
 class Command(BaseCommand):
-    help = 'Provision a new MTN MoMo sandbox API user and update the gateway credentials'
+    help = (
+        'Provision a new MTN MoMo API user (sandbox by default, --live for production) and '
+        'print the resulting MTN_MOMO_USER_ID / MTN_MOMO_API_SECRET for backend/.env.'
+    )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--live', action='store_true',
+            help='Provision against the live/production host (gateway.live_url) instead of sandbox.',
+        )
 
     def handle(self, *args, **options):
         try:
@@ -15,16 +25,28 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR('No mtn_momo gateway found in admin. Create it first.'))
             return
 
-        sub_key = gateway.api_key
+        # The Collection Subscription Key is env-sourced (MTN_MOMO_COLLECTION_KEY), not a DB
+        # field — same for every other MTN credential except sandbox_mode/sandbox_url/
+        # live_url, which stay on the PaymentGateway row. See payments/gateways/mtn_momo.py.
+        sub_key = settings.PAYMENT_GATEWAYS.get('mtn_momo', {}).get('collection_key', '')
         if not sub_key:
-            self.stdout.write(self.style.ERROR('api_key (Collection Subscription Key) is empty on the gateway record.'))
+            self.stdout.write(self.style.ERROR(
+                'MTN_MOMO_COLLECTION_KEY is not set in backend/.env (Collection Subscription Key). '
+                'Set it and redeploy the backend before running this.'
+            ))
             return
 
-        base_url = gateway.sandbox_url.rstrip('/')
+        env = 'live' if options['live'] else 'sandbox'
+        base_url = (gateway.live_url if options['live'] else gateway.sandbox_url).rstrip('/')
+        if not base_url:
+            field = 'live_url' if options['live'] else 'sandbox_url'
+            self.stdout.write(self.style.ERROR(f'gateway.{field} is empty — set it in Django admin first.'))
+            return
+
         new_user_id = str(uuid.uuid4())
 
         # Step 1 — create API user
-        self.stdout.write(f'Step 1 — Creating sandbox API user: {new_user_id}')
+        self.stdout.write(f'Step 1 — Creating {env} API user against {base_url}: {new_user_id}')
         r1 = requests.post(
             f'{base_url}/v1_0/apiuser',
             headers={
@@ -32,12 +54,22 @@ class Command(BaseCommand):
                 'Ocp-Apim-Subscription-Key': sub_key,
                 'Content-Type': 'application/json',
             },
-            json={'providerCallbackHost': 'localhost'},
+            json={'providerCallbackHost': 'homekonet.com'},
             timeout=30,
         )
         self.stdout.write(f'  Status: {r1.status_code}  Body: {r1.text or "(empty)"}')
         if r1.status_code != 201:
-            self.stdout.write(self.style.ERROR('Step 1 failed. Check your Collection Subscription Key (api_key field).'))
+            if options['live'] and r1.status_code == 404:
+                self.stdout.write(self.style.ERROR(
+                    "Step 1 failed with 404 'Resource not found'. This almost certainly means what it "
+                    "looks like: MTN's production host does not expose self-service API-user creation — "
+                    "/v1_0/apiuser is a sandbox-only convenience endpoint. In production, MTN issues the "
+                    "API User ID + API Key directly as part of your go-live approval (check onboarding "
+                    "email, the momodeveloper.mtn.com portal, or ask MTN/Lonestar Cell MTN integration "
+                    "support) — you cannot generate them yourself the way this command does for sandbox."
+                ))
+            else:
+                self.stdout.write(self.style.ERROR('Step 1 failed. Check your MTN_MOMO_COLLECTION_KEY (Collection Subscription Key).'))
             return
 
         # Step 2 — generate API key
@@ -70,12 +102,15 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f'Token verification failed: {r3.text}'))
             return
 
-        # Step 4 — save to database
-        gateway.merchant_id = new_user_id
-        gateway.secret_key = api_key_secret
-        gateway.save(update_fields=['merchant_id', 'secret_key'])
-
-        self.stdout.write(self.style.SUCCESS('\nCredentials saved to database successfully!'))
-        self.stdout.write(f'  merchant_id : {new_user_id}')
-        self.stdout.write(f'  secret_key  : {api_key_secret}')
-        self.stdout.write('\nYou can now retry the Postman payment request.')
+        self.stdout.write(self.style.SUCCESS(f'\n{env.upper()} API user provisioned and verified successfully!'))
+        self.stdout.write(self.style.WARNING(
+            '\nThese are NOT written to the database — MTN credentials are env-sourced.'
+            '\nAdd these two lines to backend/.env, then redeploy the backend:\n'
+        ))
+        self.stdout.write(f'  MTN_MOMO_USER_ID={new_user_id}')
+        self.stdout.write(f'  MTN_MOMO_API_SECRET={api_key_secret}')
+        self.stdout.write(
+            '\n(This provisions the COLLECTION API user only. The Disbursement product uses its own '
+            'subscription key — MTN_MOMO_DISBURSEMENT_KEY — but shares this same user_id/api_secret pair; '
+            'no separate provisioning call is needed for it.)'
+        )

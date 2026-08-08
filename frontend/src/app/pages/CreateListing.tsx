@@ -305,6 +305,7 @@ export function CreateListing() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [draftListingId, setDraftListingId] = useState<string | null>(null);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [minMonthlyPrice, setMinMonthlyPrice] = useState(5);
 
   const [form, setForm] = useState({
     propertyType: 'apartment',
@@ -393,6 +394,19 @@ export function CreateListing() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.paymentSchedule]);
+
+  useEffect(() => {
+    propertiesAPI.getListingSettings()
+      .then((settings) => {
+        const fetchedMin = Number(settings.min_monthly_price);
+        if (!Number.isFinite(fetchedMin)) return;
+        setMinMonthlyPrice(fetchedMin);
+        // Only bump the price if the host hasn't touched it yet — don't
+        // clobber a value they've already set.
+        setForm((prev) => (prev.monthlyPrice === 5 ? { ...prev, monthlyPrice: fetchedMin } : prev));
+      })
+      .catch(() => { /* keep the built-in fallback of 5 */ });
+  }, []);
 
   const currentAmenities = useMemo(() => {
     if (propertyGroup === 'hotel') return HOTEL_AMENITIES;
@@ -645,11 +659,11 @@ export function CreateListing() {
       case 'title': return form.title.trim().length > 0;
       case 'description': return form.description.trim().length > 0;
       case 'land_details': return form.squareFootage > 0;
-      case 'monthly_price': return form.monthlyPrice >= 5;
+      case 'monthly_price': return form.monthlyPrice >= minMonthlyPrice;
       case 'final_details': return Boolean(form.address1 && form.city && form.country);
       default: return true;
     }
-  }, [currentStep, form, minPhotos]);
+  }, [currentStep, form, minPhotos, minMonthlyPrice]);
 
   const next = () => {
     if (!canContinue) return;
@@ -1635,8 +1649,8 @@ export function CreateListing() {
             </div>
             <p className="text-xl sm:text-3xl text-muted-foreground mt-3">per month</p>
             <div className="mt-8 flex justify-center gap-3">
-              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: Math.max(5, form.monthlyPrice - 50) })}>-50</Button>
-              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: Math.max(5, form.monthlyPrice - 10) })}>-10</Button>
+              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: Math.max(minMonthlyPrice, form.monthlyPrice - 50) })}>-50</Button>
+              <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: Math.max(minMonthlyPrice, form.monthlyPrice - 10) })}>-10</Button>
               <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: form.monthlyPrice + 10 })}>+10</Button>
               <Button variant="outline" size="sm" onClick={() => update({ monthlyPrice: form.monthlyPrice + 50 })}>+50</Button>
             </div>
@@ -1645,10 +1659,10 @@ export function CreateListing() {
               <Input
                 id="monthly-price-input"
                 type="number"
-                min={5}
+                min={minMonthlyPrice}
                 value={form.monthlyPrice || ''}
                 onChange={(e) => update({ monthlyPrice: e.target.value === '' ? 0 : Number(e.target.value) })}
-                onBlur={() => { if (!form.monthlyPrice || form.monthlyPrice < 5) update({ monthlyPrice: 5 }); }}
+                onBlur={() => { if (!form.monthlyPrice || form.monthlyPrice < minMonthlyPrice) update({ monthlyPrice: minMonthlyPrice }); }}
                 className="mt-2 text-center text-lg"
               />
             </div>

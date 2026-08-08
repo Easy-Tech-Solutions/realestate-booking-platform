@@ -3,6 +3,11 @@ import { fetchWithAuth } from './shared/client';
 import { buildSearchParams, normalizeListing, normalizeReview, normalizeHotelRoom, normalizeHotelRoomAvailability } from './shared/normalizers';
 import type { AvailabilityResponse, ListingPricingResponse } from './shared/contracts';
 
+export interface ListingSettings {
+  min_monthly_price: string;
+  updated_at: string;
+}
+
 export const propertiesAPI = {
   getAll: async (): Promise<Property[]> => {
     const data = await fetchWithAuth<unknown>('/api/listings/?ordering=-created_at');
@@ -60,6 +65,17 @@ export const propertiesAPI = {
 
   deleteCategory: async (id: number): Promise<void> => {
     await fetchWithAuth(`/api/listings/categories/${id}/`, { method: 'DELETE' });
+  },
+
+  getListingSettings: async (): Promise<ListingSettings> => {
+    return fetchWithAuth('/api/listings/settings/');
+  },
+
+  adminUpdateListingSettings: async (payload: Partial<ListingSettings>): Promise<ListingSettings> => {
+    return fetchWithAuth('/api/listings/settings/', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
   },
 
   create: async (formData: FormData): Promise<Property> => {

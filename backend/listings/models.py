@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
@@ -297,3 +298,36 @@ class HotelRoomImage(models.Model):
 
     def __str__(self):
         return f'{self.room.name} - Image {self.order + 1}'
+
+
+class ListingSettings(models.Model):
+    """
+    Singleton configuration for listing-creation constraints.
+    Edit via Django admin or the superadmin dashboard — only one row is ever
+    stored. Mirrors payments.PlatformFee's singleton pattern.
+    """
+    min_monthly_price = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('5.00'),
+        help_text='Minimum price (USD) a listing can be created or saved with. Enforced both in the create-listing wizard and server-side.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Listing Settings'
+        verbose_name_plural = 'Listing Settings'
+
+    def __str__(self):
+        return f'Minimum listing price: ${self.min_monthly_price}'
+
+    def save(self, *args, **kwargs):
+        # Enforce singleton — only one configuration row allowed.
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        pass  # Prevent deletion of the singleton row
+
+    @classmethod
+    def get_current(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

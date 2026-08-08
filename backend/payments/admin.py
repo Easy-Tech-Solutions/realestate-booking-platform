@@ -14,10 +14,17 @@ class PaymentGatewayAdmin(admin.ModelAdmin):
         ('Basic Info', {
             'fields': ('name', 'is_active', 'sandbox_mode')
         }),
-        ('API Credentials', {
+        ('API Credentials (not used by MTN MoMo)', {
             'fields': ('api_key', 'secret_key', 'webhook_secret', 'merchant_id', 'business_number'),
             'classes': ('collapse',),
-            'description': 'For MTN MoMo: api_key=Collection Subscription Key, secret_key=Collection API Key, merchant_id=Collection User ID, business_number=Disbursement Subscription Key'
+            'description': (
+                'MTN MoMo reads its credentials from environment variables '
+                '(MTN_MOMO_COLLECTION_KEY, MTN_MOMO_DISBURSEMENT_KEY, '
+                'MTN_MOMO_USER_ID_LRD/_USD, MTN_MOMO_API_SECRET_LRD/_USD on '
+                'the backend container) — editing the fields below has no '
+                'effect on it. They remain here only for a future gateway '
+                'that stores credentials in the database instead.'
+            )
         }),
         ('URLs', {
             'fields': ('sandbox_url', 'live_url'),

@@ -119,7 +119,9 @@
       <h4>Data &amp; Ops</h4>
       <a href="#database">Database &amp; Migrations</a>
       <a href="#deployment">Deployment &amp; Infrastructure</a>
+      <a href="#backup-migration">Backup &amp; Migration</a>
       <a href="#cli">CLI Reference</a>
+      <a href="#docs-viewer">Online Documentation Viewer</a>
       <a href="#monitoring">Monitoring &amp; Logging</a>
       <a href="#testing">Testing &amp; Release Gate</a>
 
@@ -139,7 +141,7 @@
 
       <section class="doc-section" id="architecture">
         <h2>🏗️ Architecture Overview</h2>
-        <p class="section-intro">Django 5 + DRF + Channels + Celery backend, React + TypeScript + Vite frontend, deployed as six Docker Compose services behind a single Nginx container. No Kubernetes, no separate load balancer, no CDN — everything in this diagram runs on one host.</p>
+        <p class="section-intro">Django 5 + DRF + Channels + Celery backend, React + TypeScript + Vite frontend, deployed as seven Docker Compose services behind a single Nginx container (plus pgAdmin as a standalone DB-admin tool, not part of the request path). No Kubernetes, no separate load balancer, no CDN — everything in this diagram runs on one host.</p>
 
         <div class="diagram">
           <div class="row">
@@ -157,6 +159,7 @@
           <div class="row">
             <div class="box">Postgres<small>External / managed (Neon) — no local db container or volume; reached over <code class="inline">DATABASE_URL</code></small></div>
             <div class="box">Redis<small>One instance, three jobs: Celery broker+result backend, Django cache, Channels layer</small></div>
+            <div class="box">pgAdmin<small>Standalone DB-admin UI, own <code class="inline">pgadmin_data</code> volume — not in the request path, published directly on port 5050 (not proxied through <code class="inline">nginx</code>)</small></div>
           </div>
           <div class="arrow">↓ tasks dispatched via the Redis broker</div>
           <div class="row">
@@ -198,9 +201,14 @@
             <tr><td><code class="inline">celery</code></td><td><code class="inline">celery -A realestate_backend worker --concurrency=2</code> (default queue)</td><td><code class="inline">redis</code> healthy, <code class="inline">backend</code> started</td><td>No healthcheck, no published port. Same image as <code class="inline">backend</code>, different <code class="inline">command</code>.</td></tr>
             <tr><td><code class="inline">celery-beat</code></td><td><code class="inline">celery -A realestate_backend beat</code></td><td>same as <code class="inline">celery</code></td><td>Scheduler only — ticks jobs onto the broker, never executes them itself.</td></tr>
             <tr><td><code class="inline">celery-ai</code></td><td><code class="inline">download_ai_model &amp;&amp; celery ... --concurrency=1 --pool=solo -Q ai_scoring</code></td><td>same as <code class="inline">celery</code></td><td>Own <code class="inline">ai_models</code> volume (persists the ~3GB GGUF file across restarts). Pinned to one process/one pool so exactly one copy of the model is ever resident in memory.</td></tr>
-            <tr><td><code class="inline">frontend</code></td><td><code class="inline">nginx -g "daemon off;"</code></td><td><code class="inline">backend</code> (start order only, no health condition)</td><td>Only service with published ports (<code class="inline">80:80</code>, <code class="inline">443:443</code>). Mounts <code class="inline">nginx.conf</code> and TLS certs read-only, plus the shared <code class="inline">static_files</code> volume and the same <code class="inline">./backend/media</code> bind mount as <code class="inline">backend</code> (read-only here).</td></tr>
+            <tr><td><code class="inline">frontend</code></td><td><code class="inline">nginx -g "daemon off;"</code></td><td><code class="inline">backend</code> (start order only, no health condition)</td><td>Published ports <code class="inline">80:80</code>, <code class="inline">443:443</code>. Mounts <code class="inline">nginx.conf</code> and TLS certs read-only, plus the shared <code class="inline">static_files</code> volume and the same <code class="inline">./backend/media</code> bind mount as <code class="inline">backend</code> (read-only here).</td></tr>
+            <tr><td><code class="inline">pgadmin</code></td><td><code class="inline">dpage/pgadmin4</code> (official image, not built from a local Dockerfile)</td><td>—</td><td>Published port <code class="inline">5050:80</code>, reachable directly (not proxied through <code class="inline">nginx</code>/TLS-terminated). Credentials come from <code class="inline">PGADMIN_DEFAULT_EMAIL</code>/<code class="inline">PGADMIN_DEFAULT_PASSWORD</code> in the root <code class="inline">.env</code>. <strong>Check the current GCP firewall rule for this port before assuming it's only reachable internally</strong> — see the callout below.</td></tr>
           </tbody>
         </table>
+        <div class="callout danger">
+          <span class="callout-label">Verify pgAdmin's firewall exposure before relying on this table alone</span>
+          <code class="inline">docker-compose.yml</code> publishes pgAdmin on <code class="inline">5050:80</code>, and nothing in Compose itself restricts who can reach that port — that's entirely down to whatever firewall sits in front of the host (GCP firewall rules, <code class="inline">ufw</code>, etc.), and those two can disagree with each other. On this host specifically, GCP firewall rules are the actual authority: check <code class="inline">gcloud compute firewall-rules list</code> for a rule targeting this instance's network tags on port 5050, and confirm its <code class="inline">sourceRanges</code> is restricted to specific trusted IPs, not <code class="inline">0.0.0.0/0</code> — a full database-admin UI reachable from the entire internet, protected by only a login password, is a real production risk, not a hypothetical one.
+        </div>
         <p>Every container built from <code class="inline">Dockerfile.backend</code> (<code class="inline">backend</code>, <code class="inline">celery</code>, <code class="inline">celery-beat</code>, <code class="inline">celery-ai</code>) shares <code class="inline">docker-entrypoint.sh</code> as its <code class="inline">ENTRYPOINT</code>: it runs <code class="inline">migrate --no-input</code>, then <code class="inline">collectstatic --no-input</code>, then <code class="inline">exec</code>s whatever <code class="inline">CMD</code>/<code class="inline">command</code> was set. That means migrations and static collection happen redundantly on all four container starts — harmless, since both commands are idempotent, but worth knowing so a slow redeploy of, say, <code class="inline">celery-beat</code> alone isn't surprising.</p>
 
         <h3>Data &amp; caching layer</h3>
@@ -268,6 +276,12 @@
         <div class="callout tip">
           <span class="callout-label">Flutterwave / Orange Money env vars exist but aren't wired up</span>
           <code class="inline">.env.example</code> has placeholders for both, but no code anywhere references them — they're vestigial from an earlier plan, not a second live mobile-money gateway. MTN MoMo is the only mobile money integration that actually runs.
+        </div>
+        <div class="callout warn">
+          <span class="callout-label">MTN MoMo dual-currency: one PaymentGateway row, one subscription pair, TWO API users</span>
+          <p>This app accepts both LRD and USD. MTN's Collections/Disbursements subscription keys (<code class="inline">MTN_MOMO_COLLECTION_KEY</code>/<code class="inline">MTN_MOMO_DISBURSEMENT_KEY</code>) are shared across both currencies (MTN's callback webhooks aren't signed, so there's no webhook secret to share or configure) — but the "API user" (a <code class="inline">user_id</code> + <code class="inline">api_secret</code> pair used for OAuth Basic Auth) is <strong>tied to one specific MTN account</strong> and cannot be shared. MTN's partner portal (not the momodeveloper.mtn.com developer portal — a separate business-management portal, e.g. <code class="inline">mmpartner.lonestarcellmtn.com</code>) has a "My settings → API access → Configure → Create API user" flow with an <code class="inline">Account: LRD/USD</code> selector — each currency needs its own trip through that flow.</p>
+          <p>Env vars: <code class="inline">MTN_MOMO_USER_ID_LRD</code>/<code class="inline">MTN_MOMO_API_SECRET_LRD</code> and <code class="inline">MTN_MOMO_USER_ID_USD</code>/<code class="inline">MTN_MOMO_API_SECRET_USD</code> (see <code class="inline">realestate_backend/settings.py</code>'s <code class="inline">PAYMENT_GATEWAYS['mtn_momo']['accounts']</code>). <code class="inline">MTNMoMoGateway._account_for(currency)</code> resolves the right pair per call — <code class="inline">process_payment</code>/<code class="inline">verify_payment</code>/<code class="inline">refund_payment</code>/<code class="inline">transfer_to_owner</code> all take or already carry a <code class="inline">currency</code>, and the OAuth token cache key is currency-scoped too (LRD and USD get independent Bearer tokens). Submitting a payment in a currency with no configured API user raises a clear <code class="inline">ValueError</code> naming the exact env vars to set — it never silently reuses the wrong currency's credentials.</p>
+          <p><strong>Production has no self-service "create your own API user" API</strong> — <code class="inline">POST /v1_0/apiuser</code> (what <code class="inline">manage.py provision_mtn_sandbox</code> uses) is sandbox-only and 404s on the live host. That's expected, not a bug; live API users only come from the partner portal flow above.</p>
         </div>
 
         <h3>Frontend build &amp; runtime</h3>
@@ -400,6 +414,85 @@ python manage.py createcachetable   # only needed if not using Redis cache
 # (backend, celery, celery-beat, celery-ai all do this redundantly — harmless, idempotent)</code></pre>
         <p>Some migrations are <strong>data migrations</strong>, not just schema — e.g. <code class="inline">hostapplications/migrations/0002_create_reviewer_groups.py</code> seeds reviewer Django Groups; <code class="inline">listings/migrations/0011_...</code> and <code class="inline">0018_...</code> seed/rename property categories. Be careful squashing or deleting these.</p>
         <p>Before considering a deploy release-ready, confirm zero pending migrations: <code class="inline">python manage.py showmigrations</code> (the release-check script enforces this automatically — see <a href="#testing">Testing &amp; Release Gate</a>).</p>
+
+        <h3>Database user management</h3>
+        <p>"Database user" means two different things here — keep them separate, since mixing them up is a common source of confusion:</p>
+        <table>
+          <thead><tr><th></th><th>Application user (<code class="inline">users.User</code>)</th><th>Postgres role</th></tr></thead>
+          <tbody>
+            <tr><td>What it is</td><td>A row in the <code class="inline">users_user</code> table — a person who logs into HomeKonet</td><td>A login credential Postgres itself authenticates connections with (e.g. <code class="inline">homekonet_app</code>)</td></tr>
+            <tr><td>Where it's managed</td><td>Django admin, the Management Portal's Users screen, or <code class="inline">manage.py</code> commands below</td><td><code class="inline">psql</code>/<code class="inline">dbshell</code>, or the Neon console today (see <a href="#gcp-migration-note">below</a> for the self-hosted future)</td></tr>
+            <tr><td>"Password reset" means</td><td>Changing what that person types into the login form</td><td>Changing the credential the whole Django app uses to open <em>every</em> connection to Postgres — rotating this requires updating <code class="inline">backend/.env</code> and redeploying, not a user-facing action</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Application users — day-to-day</h4>
+        <pre><code># Create the one shell-only superadmin account (see RBAC Model below —
+# there is intentionally no dashboard control for granting role='superadmin')
+docker compose exec backend python manage.py createsuperuser
+
+# Reset a user's login password directly (bypasses the "forgot password" email flow —
+# useful when email delivery itself is the problem, or for a locked-out admin)
+docker compose exec backend python manage.py changepassword &lt;username&gt;
+
+# Look up / edit a user directly against the real DB
+docker compose exec backend python manage.py shell -c "
+from django.contrib.auth import get_user_model
+u = get_user_model().objects.get(email='someone@example.com')
+print(u.id, u.role, u.is_active, u.is_staff)
+"
+
+# Deactivate an account without deleting it (preserves bookings/payments FKs)
+docker compose exec backend python manage.py shell -c "
+from django.contrib.auth import get_user_model
+get_user_model().objects.filter(email='someone@example.com').update(is_active=False)
+"</code></pre>
+        <div class="callout tip">
+          <span class="callout-label">Prefer the Management Portal when you can</span>
+          Everything above is also reachable through <code class="inline">AdminUsers.tsx</code> (Users screen) for a normal admin/superadmin account change — reach for the shell only when the UI itself is inaccessible (e.g. the account that needs fixing is the only superadmin and it's locked out), or for a bulk/scripted change the UI doesn't expose.
+        </div>
+
+        <h4>Postgres roles — infrastructure level</h4>
+        <p>There is currently no local <code class="inline">db</code> container — the real database is external managed Postgres (Neon). Everything below runs by connecting directly to it.</p>
+        <pre><code># Open a SQL shell using the app's own configured connection
+docker compose exec backend python manage.py dbshell
+
+# Equivalent, with the driver directly (useful outside the Django app context)
+psql "$DATABASE_URL"
+
+# List roles and their privileges
+\du
+-- or via SQL:
+SELECT rolname, rolsuper, rolcanlogin, rolconnlimit FROM pg_roles;
+
+# Create an additional role (e.g. a read-only account for reporting/BI access)
+CREATE ROLE reporting_readonly WITH LOGIN PASSWORD '&lt;strong-password&gt;';
+GRANT CONNECT ON DATABASE &lt;dbname&gt; TO reporting_readonly;
+GRANT USAGE ON SCHEMA public TO reporting_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO reporting_readonly;
+-- so future tables/migrations are covered too:
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO reporting_readonly;
+
+# Rotate the app's own role password (Neon: do this from the Neon console, not raw SQL,
+# so Neon's connection pooler picks up the change) — then update backend/.env's
+# DATABASE_URL and redeploy:
+docker compose up -d --force-recreate backend celery celery-beat celery-ai
+
+# See who/what is currently connected — useful when diagnosing a "too many connections" error
+SELECT pid, usename, client_addr, state, query, query_start
+FROM pg_stat_activity ORDER BY query_start;
+
+# Terminate a specific stuck/runaway connection (get the pid from the query above)
+SELECT pg_terminate_backend(&lt;pid&gt;);
+
+# Table and database sizes — useful before a migration or when disk/compute usage looks off
+SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) AS size
+FROM pg_catalog.pg_statio_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 15;
+SELECT pg_size_pretty(pg_database_size(current_database()));</code></pre>
+        <div class="callout danger" id="gcp-migration-note">
+          <span class="callout-label">Neon compute-quota outages — see the migration plan</span>
+          On 2026-07-26, Neon returned <code class="inline">ERROR: Your account or project has exceeded the compute time quota</code> for every single connection attempt — every endpoint that touched the DB (login, listings, health check) failed with a 500 simultaneously, with no local fix available since the database itself was refusing connections. See <a href="#common-errors">Common Errors #9</a> for the full incident, and <code class="inline">docs/gcp-postgres-migration.md</code> for the plan to move off Neon onto a self-hosted PostgreSQL VM we control, which removes this exact failure mode. Until that migration happens, the only mitigation is monitoring Neon's dashboard for compute-time usage trending toward the quota and upgrading the plan proactively.
+        </div>
       </section>
 
       <section class="doc-section" id="deployment">
@@ -426,6 +519,7 @@ python manage.py createcachetable   # only needed if not using Redis cache
             <tr><td><code class="inline">static_files</code></td><td>backend, frontend</td><td>Collected static, shared between Django and Nginx</td></tr>
             <tr><td><code class="inline">ai_models</code></td><td>celery-ai only</td><td>The downloaded GGUF model file</td></tr>
             <tr><td><code class="inline">./backend/media</code> (bind mount)</td><td>backend (rw), frontend (ro)</td><td>User uploads, when Cloudinary isn't configured</td></tr>
+            <tr><td><code class="inline">pgadmin_data</code></td><td>pgadmin only</td><td><code class="inline">/var/lib/pgadmin</code> — saved server connections/preferences; see <a href="#backup-migration">Backup &amp; Migration</a> for how it's included in <code class="inline">scripts/backup.sh</code></td></tr>
           </tbody>
         </table>
 
@@ -440,6 +534,127 @@ docker compose logs --tail=50 backend</code></pre>
 
         <h3>Nginx</h3>
         <p><code class="inline">nginx/nginx.conf</code> terminates TLS, sets security headers (HSTS, X-Frame-Options, etc.), and proxies: <code class="inline">/api/</code> (60s read timeout) and <code class="inline">/ws/</code> (86400s read timeout, for long-lived WebSockets) to <code class="inline">backend:8000</code>; serves <code class="inline">/static/</code>, <code class="inline">/media/</code>, and <code class="inline">/assets/</code> with long cache lifetimes; falls back to the SPA's <code class="inline">index.html</code> for everything else.</p>
+      </section>
+
+      <section class="doc-section" id="backup-migration">
+        <h2>🗂️ Backup &amp; Migration</h2>
+        <p class="section-intro">Everything needed to back up the whole stack — database, pgAdmin, media, secrets, TLS cert — and move it to a brand-new server with minimal downtime. The canonical, always-current runbook lives at <code class="inline">MIGRATION.md</code> in the repo root (open it directly when actually performing a migration); this section covers the same ground with the reasoning behind each piece. The database-specific deep dive (provisioning a dedicated self-hosted Postgres VM) lives in <code class="inline">docs/gcp-postgres-migration.md</code>.</p>
+
+        <h3>What actually needs to move</h3>
+        <table>
+          <thead><tr><th>Component</th><th>Needs migrating?</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Database</td><td><strong>Yes</strong> — the most important item</td><td>Every row of real data: users, listings, bookings, payments, messages.</td></tr>
+            <tr><td>pgAdmin (<code class="inline">pgadmin_data</code> volume)</td><td>Yes</td><td>Saved server connections/preferences — small, but tedious to lose.</td></tr>
+            <tr><td><code class="inline">backend/media/</code></td><td>Yes</td><td>Real user-uploaded photos/attachments; the only irreplaceable data on local disk.</td></tr>
+            <tr><td><code class="inline">.env</code>, <code class="inline">backend/.env</code>, <code class="inline">frontend/.env</code></td><td>Yes</td><td>Every secret: DB credentials, Stripe/Brevo/MTN keys, Django secret key, VAPID keys, pgAdmin credentials.</td></tr>
+            <tr><td><code class="inline">nginx/ssl/</code></td><td>Yes (or re-issue)</td><td>Lets the new server serve HTTPS immediately instead of waiting on a fresh Certbot issuance.</td></tr>
+            <tr><td>Certbot renewal hooks</td><td>Yes</td><td>Live in <code class="inline">/etc/letsencrypt/</code>, outside git — reproduced via <code class="inline">scripts/install-certbot-hooks.sh</code>, not copied.</td></tr>
+            <tr><td>Redis (<code class="inline">redis_data</code>)</td><td>No (optional)</td><td>Pure cache + Celery broker + Channels layer — repopulates from empty. Transferable with <code class="inline">--include-redis</code> if you want it anyway.</td></tr>
+            <tr><td>Local LLM model (<code class="inline">ai_models</code>)</td><td>No (optional)</td><td>Re-downloadable via <code class="inline">manage.py download_ai_model</code>. Transferable with <code class="inline">--include-ai-models</code> to skip the download on a slow link.</td></tr>
+            <tr><td>Static files, Docker images, nginx config, Dockerfiles</td><td>No</td><td>All either regenerated (<code class="inline">collectstatic</code>) or reproduced from git (<code class="inline">docker compose build</code>).</td></tr>
+          </tbody>
+        </table>
+
+        <h3>The backup/restore mechanism</h3>
+        <p><code class="inline">scripts/backup.sh</code> bundles everything in the "Yes" rows above into <strong>one GPG-encrypted archive</strong>. It queries the <em>running</em> <code class="inline">backend</code> container's actual environment to find the database connection info, so it works unchanged whether the database is external managed Postgres (Neon, via <code class="inline">DATABASE_URL</code>) or self-hosted (via discrete <code class="inline">POSTGRES_*</code> vars):</p>
+        <pre><code>cd /opt/homekonet
+bash scripts/backup.sh                    # DB dump, pgAdmin data, media, secrets, TLS cert
+bash scripts/backup.sh --include-ai-models # + the ~3GB local LLM
+bash scripts/backup.sh --include-redis     # + cache/session/broker state
+bash scripts/backup.sh --full              # everything
+
+# Non-interactive (e.g. cron) — skips the passphrase prompt:
+BACKUP_PASSPHRASE="$(cat /root/.backup-passphrase)" bash scripts/backup.sh</code></pre>
+        <p>Produces <code class="inline">backups/homekonet-backup-&lt;timestamp&gt;.tar.gz.gpg</code> — gitignored (see the callout below) and encrypted with a passphrase you choose. <strong>Remember that passphrase</strong>; you need the identical one to decrypt on the new server. Internally it:</p>
+        <ol class="steps">
+          <li>Reads <code class="inline">DATABASE_URL</code> (or <code class="inline">POSTGRES_*</code>) from <code class="inline">docker compose exec -T backend env</code> — the container's real, in-effect configuration, not a re-parse of <code class="inline">backend/.env</code> that could drift from what's actually running.</li>
+          <li>Runs <code class="inline">pg_dump --format=custom --schema=public --no-owner --no-acl</code> against it. <code class="inline">--schema=public</code> matters on Neon specifically — its internal <code class="inline">neon_auth</code> schema is Neon's own metadata, and most app-level roles get <code class="inline">permission denied for schema neon_auth</code> if you try to dump the whole database including it. We don't need that schema backed up anyway; it isn't our data.</li>
+          <li>Exports the <code class="inline">pgadmin_data</code> Docker volume via a throwaway <code class="inline">alpine</code> container (<code class="inline">docker run --rm -v pgadmin_data:/data:ro ...</code> — volumes aren't a plain host path, so <code class="inline">tar</code> can't reach them directly).</li>
+          <li>Tars all of it together (env files, <code class="inline">backend/media/</code>, <code class="inline">nginx/ssl/</code>, the DB dump, the pgAdmin export) and pipes straight into <code class="inline">gpg --symmetric --cipher-algo AES256</code> — the plaintext tarball never touches disk.</li>
+        </ol>
+
+        <p><code class="inline">scripts/restore.sh</code> is the other half — run on the <strong>new</strong> server, after <code class="inline">git clone</code> but before <code class="inline">docker compose up</code>:</p>
+        <pre><code>git clone https://github.com/Easy-Tech-Solutions/realestate-booking-platform.git /opt/homekonet
+cd /opt/homekonet
+bash scripts/restore.sh /path/to/homekonet-backup-*.tar.gz.gpg</code></pre>
+        <div class="callout warn">
+          <span class="callout-label">The database is deliberately NOT auto-restored</span>
+          <code class="inline">restore.sh</code> extracts <code class="inline">backend/media/</code>, all three <code class="inline">.env</code> files, and <code class="inline">nginx/ssl/</code> directly into the repo tree and fixes their permissions — but it stages the database dump and pgAdmin export at <code class="inline">backups/database.dump</code> / <code class="inline">backups/pgadmin_data.tar.gz</code> <em>without</em> running <code class="inline">pg_restore</code> automatically. Whether to restore into a database is a judgment call the script can't safely make for you — is this a new app server pointed at the <em>same</em>, unchanged Neon project (skip the restore, nothing to do), or a genuinely new/empty database that needs populating (run the printed <code class="inline">pg_restore</code> command)? Guessing wrong here is either a silent no-op or a destructive overwrite — the script prints the exact command for your situation instead of picking for you.
+        </div>
+
+        <h3>Restoring the database (when the database itself is moving too)</h3>
+        <pre><code># Managed Postgres (Neon) — via DATABASE_URL:
+pg_restore --no-owner --no-acl --clean --if-exists \
+  --dbname="$(grep -m1 ^DATABASE_URL= backend/.env | cut -d= -f2-)" \
+  backups/database.dump
+
+# Self-hosted Postgres — via discrete POSTGRES_* vars:
+source &lt;(grep -E '^POSTGRES_' backend/.env)
+PGPASSWORD="$POSTGRES_PASSWORD" pg_restore --no-owner --no-acl --clean --if-exists \
+  -h "$POSTGRES_HOST" -p "${POSTGRES_PORT:-5432}" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  backups/database.dump</code></pre>
+        <p><code class="inline">--clean --if-exists</code> drops existing objects before recreating them — safe against a genuinely empty/fresh database, <strong>destructive</strong> against one that already has different real data in it. Always re-read <code class="inline">backend/.env</code>'s DB connection values immediately before running this.</p>
+
+        <h3>Restoring pgAdmin's saved servers</h3>
+        <pre><code>docker compose stop pgadmin
+docker run --rm -v homekonet_pgadmin_data:/data -v "$(pwd)/backups:/backup" alpine \
+  sh -c 'rm -rf /data/* &amp;&amp; tar -xzf /backup/pgadmin_data.tar.gz -C / '
+docker compose start pgadmin</code></pre>
+        <p><code class="inline">homekonet_pgadmin_data</code> assumes the Compose project is named <code class="inline">homekonet</code> (the default when cloned into a directory of that name) — confirm with <code class="inline">docker volume ls | grep pgadmin_data</code> if it was cloned elsewhere.</p>
+
+        <h3>Full migration runbook (condensed)</h3>
+        <p>See <code class="inline">MIGRATION.md</code> for the complete, always-current version with every command in full — this is the shape of it:</p>
+        <ol class="steps">
+          <li><strong>Old server:</strong> <code class="inline">bash scripts/backup.sh</code>, then <code class="inline">scp</code> the resulting archive to the new server.</li>
+          <li><strong>New server:</strong> provision it (<a href="#deployment">Deployment &amp; Infrastructure</a> for the app tier; <code class="inline">docs/gcp-postgres-migration.md</code> §6–11 first if the database is also moving to a new self-hosted VM), <code class="inline">git clone</code>, then <code class="inline">bash scripts/restore.sh &lt;archive&gt;</code>.</li>
+          <li>Review the restored <code class="inline">backend/.env</code> — update DB connection values if the database is moving too, and any domain/host-specific values.</li>
+          <li>If the database moved: run the <code class="inline">pg_restore</code> command above <em>before</em> bringing the stack up.</li>
+          <li><code class="inline">docker compose config --quiet &amp;&amp; docker compose build</code> — validate and build without starting yet (DNS still points at the old server).</li>
+          <li>Cut over DNS (<code class="inline">homekonet.com</code> + <code class="inline">www</code> A records → new server's IP); wait for propagation.</li>
+          <li>Issue TLS fresh on the new server (<code class="inline">certbot certonly --standalone</code>), install renewal hooks (<code class="inline">scripts/install-certbot-hooks.sh</code>).</li>
+          <li><code class="inline">docker compose up -d</code>, verify <code class="inline">docker compose ps</code> + <code class="inline">curl https://homekonet.com/api/health/</code>, smoke-test login/listings/password-reset in a browser.</li>
+          <li>Restore pgAdmin's saved servers (above).</li>
+          <li>Keep the old server (and old database, if it moved) reachable as a fallback for a day or two before decommissioning.</li>
+        </ol>
+
+        <h3>Backup CLI commands (<code class="inline">manage.py</code>)</h3>
+        <p><code class="inline">scripts/backup.sh</code> is also wrapped as a Django management command, so it fits the same <code class="inline">manage.py &lt;command&gt;</code> convention as every other admin/maintenance task in this app (<code class="inline">reconcile_payments</code>, <code class="inline">backfill_payouts</code>, etc.):</p>
+        <pre><code>cd /opt/homekonet
+.venv/bin/python backend/manage.py backup                    # same as: bash scripts/backup.sh
+.venv/bin/python backend/manage.py backup --full              # --include-ai-models --include-redis
+.venv/bin/python backend/manage.py backup --passphrase 'xxx'  # non-interactive
+
+# Weekly cron setup
+.venv/bin/python backend/manage.py schedule_backup            # print setup instructions + the cron line
+.venv/bin/python backend/manage.py schedule_backup --install  # install it (idempotent)
+.venv/bin/python backend/manage.py schedule_backup --remove   # remove it</code></pre>
+        <div class="callout warn">
+          <span class="callout-label">Host virtualenv only — never <code class="inline">docker compose exec backend</code></span>
+          Both commands <strong>must</strong> run via the host virtualenv at <code class="inline">/opt/homekonet/.venv</code> (the same one <code class="inline">scripts/prelaunch_check.py</code>-style tooling uses), not inside the <code class="inline">backend</code> container. The backend image only contains the <code class="inline">backend/</code> directory — <code class="inline">scripts/</code> doesn't exist inside it — and the container deliberately has no <code class="inline">docker</code>/<code class="inline">gpg</code>/<code class="inline">pg_dump</code> binaries or Docker-socket access (mounting the socket into a public-facing web container would let anyone who compromises it control the whole Docker daemon). <code class="inline">backup.sh</code> needs all of that to orchestrate the <em>other</em> containers and volumes, so this is a host-side operation by design. Running it the wrong way fails fast with a clear <code class="inline">CommandError</code> rather than a confusing low-level one — but the right invocation is always <code class="inline">cd /opt/homekonet &amp;&amp; .venv/bin/python backend/manage.py backup</code>.
+        </div>
+
+        <h3>Weekly automated backup</h3>
+        <p>One-time setup on the host:</p>
+        <pre><code># 1. Store the GPG passphrase (used non-interactively by cron)
+echo "your-strong-passphrase" | sudo tee /root/.backup-passphrase
+sudo chmod 600 /root/.backup-passphrase
+
+# 2. Install the weekly cron entry (every Sunday 03:00 UTC)
+cd /opt/homekonet
+.venv/bin/python backend/manage.py schedule_backup --install
+
+# 3. Verify after the first run
+tail -f /var/log/homekonet-backup.log
+ls -lh /opt/homekonet/backups/</code></pre>
+        <p>The installed cron entry runs <code class="inline">bash scripts/backup.sh</code> directly (not through <code class="inline">manage.py</code> — no Django import needed just to shell out), equivalent to:</p>
+        <pre><code>0 3 * * 0  cd /opt/homekonet &amp;&amp; BACKUP_PASSPHRASE="$(cat /root/.backup-passphrase)" bash scripts/backup.sh >> /var/log/homekonet-backup.log 2>&amp;1</code></pre>
+        <p>Copy the resulting archives off the server on the same schedule (<code class="inline">gsutil cp</code> to a GCS bucket, <code class="inline">rclone</code>, etc.) — a backup that only ever lives on the server it's backing up isn't a real backup if that server is lost entirely. <code class="inline">schedule_backup --remove</code> uninstalls the cron entry; re-running <code class="inline">--install</code> is idempotent (checks for its own marker comment first).</p>
+
+        <div class="callout danger">
+          <span class="callout-label">Never <code class="inline">git add</code> a database dump, secret, or backup archive — even temporarily</span>
+          This is exactly what the encrypted-archive mechanism above exists to prevent. <code class="inline">backups/</code>, <code class="inline">*.dump</code>, <code class="inline">*.sql</code>, <code class="inline">*.pem</code>/<code class="inline">*.key</code>/<code class="inline">*.crt</code>, and <code class="inline">backend/certs/</code> are all gitignored specifically so a real backup or cert never ends up in version control by accident. Git history is effectively permanent — deleting the file in a later commit does <strong>not</strong> remove it from history, and if the branch has already been pushed, it's already on every remote and every other clone of the repo. If a dump or secret ever does end up committed: stop, don't push further if it hasn't gone out yet, and treat it as a real incident requiring a history rewrite (<code class="inline">git filter-repo</code>, coordinated with everyone who has a clone) plus rotating whatever credentials were exposed — not a quiet follow-up commit that only fixes it going forward.
+        </div>
       </section>
 
       <section class="doc-section" id="cli">
@@ -538,6 +753,13 @@ docker compose exec frontend sh             # nginx:alpine — sh only, no bash
 # One-off Python (not manage.py shell — no Django app registry loaded)
 docker compose exec backend python3 -c "print('quick check')"</code></pre>
 
+        <h3>pgAdmin access</h3>
+        <p>Reachable at <code class="inline">http://&lt;server-ip&gt;:5050/</code> — published directly by <code class="inline">docker-compose.yml</code>'s <code class="inline">pgadmin</code> service, <strong>not</strong> proxied through <code class="inline">nginx</code>/TLS. Login is <code class="inline">PGADMIN_DEFAULT_EMAIL</code>/<code class="inline">PGADMIN_DEFAULT_PASSWORD</code> from the root <code class="inline">.env</code> (not <code class="inline">backend/.env</code>). After logging in, register a server manually with whatever the app's actual DB connection details are (<code class="inline">DATABASE_URL</code>/<code class="inline">POSTGRES_*</code> in <code class="inline">backend/.env</code>) — pgAdmin doesn't pick these up automatically, it's a standalone tool pointed at the same database.</p>
+        <div class="callout danger">
+          <span class="callout-label">Confirm who can actually reach port 5050 before trusting this is internal-only</span>
+          Whether this URL is reachable from the whole internet or only from trusted IPs depends entirely on the firewall in front of this host (GCP firewall rules on this deployment) — Compose publishing a port doesn't imply anything about who can reach it externally. Check <code class="inline">gcloud compute firewall-rules list</code> for a rule covering this instance's tags on <code class="inline">tcp:5050</code>, and make sure its <code class="inline">sourceRanges</code> is a short, specific allowlist (your office/VPN IP, not <code class="inline">0.0.0.0/0</code>). A full database-admin UI facing the open internet behind only a login password is a real, live risk — treat finding <code class="inline">0.0.0.0/0</code> here as an incident, not a backlog item.
+        </div>
+
         <h3>Database &amp; disk housekeeping</h3>
         <pre><code># Disk usage on the host
 df -h /
@@ -581,6 +803,21 @@ openssl x509 -in nginx/ssl/fullchain.pem -noout -enddate   # check expiry
 git pull origin main
 git log --oneline -10
 git status</code></pre>
+      </section>
+
+      <section class="doc-section" id="docs-viewer">
+        <h2>📖 Online Documentation Viewer</h2>
+        <p class="section-intro">All three HTML guides (this one, the Management Portal guide, and the User guide) are readable directly inside the admin dashboard at <code class="inline">/management/docs</code> — no SSH/file access needed to check something while working in the UI.</p>
+        <h3>How it's wired</h3>
+        <ul>
+          <li><strong>Backend:</strong> <code class="inline">GET /api/platform-ops/docs/&lt;slug&gt;/</code> (<code class="inline">platformops.views.docs_view</code>), where <code class="inline">slug</code> is <code class="inline">user-guide</code>, <code class="inline">management-portal-guide</code>, or <code class="inline">developer-guide</code>. Gated to <code class="inline">is_superadmin_staff</code> — the same admin/superadmin/officer tier as the rest of Platform Ops.</li>
+          <li><strong>Files served from disk, not the image:</strong> <code class="inline">docker-compose.yml</code> bind-mounts <code class="inline">./docs:/app/docs:ro</code> into the <code class="inline">backend</code> container. Editing an HTML file on the server takes effect immediately — no rebuild, no redeploy.</li>
+          <li><strong>Frontend:</strong> <code class="inline">AdminDocs.tsx</code> at <code class="inline">/management/docs</code> (behind <code class="inline">&lt;ProtectedRoute requireAdmin&gt;</code>).</li>
+        </ul>
+        <div class="callout warn">
+          <span class="callout-label">Why the iframe uses <code class="inline">srcdoc</code>, not a plain <code class="inline">src</code> URL</span>
+          This app authenticates via JWT bearer token (<code class="inline">Authorization</code> header), not session cookies — <code class="inline">docs_view</code> is decorated <code class="inline">@api_view</code> + <code class="inline">@permission_classes([IsAuthenticated])</code> specifically because a plain Django view would only ever see <code class="inline">request.user</code> as <code class="inline">AnonymousUser</code> (Django's own <code class="inline">AuthenticationMiddleware</code> is cookie-based) and permanently 403 every caller. A bare <code class="inline">&lt;iframe src="/api/platform-ops/docs/developer-guide/"&gt;</code> has the same problem from the other side — the browser's navigation request can't carry a custom <code class="inline">Authorization</code> header. <code class="inline">AdminDocs.tsx</code> fetches the HTML itself via <code class="inline">fetchTextWithAuth</code> (correctly authenticated) and hands the iframe the content directly via <code class="inline">srcdoc</code>. "Open in new tab" works the same way — it builds a <code class="inline">Blob</code> URL from the already-fetched HTML rather than linking to the (unauthenticatable-from-a-plain-link) API URL directly.
+        </div>
       </section>
 
       <section class="doc-section" id="monitoring">
@@ -680,7 +917,16 @@ docker compose up -d --build   # requires backend/.env to exist</code></pre>
         <p>Standard Django approach: <code class="inline">python manage.py migrate &lt;app&gt; zero</code> to unapply, remove migration files, <code class="inline">makemigrations</code> again — but watch for the data migrations called out in <a href="#database">Database &amp; Migrations</a>; squashing/deleting them needs care since they seed real data, not just schema.</p>
 
         <h3>Connecting to the database</h3>
-        <p>Since there's no local <code class="inline">db</code> container, connect directly to whatever <code class="inline">DATABASE_URL</code>/<code class="inline">POSTGRES_*</code> point to — <code class="inline">python manage.py dbshell</code>, or <code class="inline">psql</code> directly with the credentials in <code class="inline">backend/.env</code>.</p>
+        <p>Since there's no local <code class="inline">db</code> container, connect directly to whatever <code class="inline">DATABASE_URL</code>/<code class="inline">POSTGRES_*</code> point to — <code class="inline">python manage.py dbshell</code>, or <code class="inline">psql</code> directly with the credentials in <code class="inline">backend/.env</code>. See <a href="#database">Database user management</a> for the full set of role/connection-troubleshooting queries (active connections, table sizes, killing a stuck query, etc.).</p>
+
+        <h3>Every request that touches the DB is failing at once (500s across login, listings, everything)</h3>
+        <ol class="steps">
+          <li>Check the backend logs first — <code class="inline">docker compose logs --tail=100 backend</code> — a <code class="inline">django.db.utils.OperationalError</code> at the top means Postgres itself is unreachable, not an application bug. Don't start debugging application code until this is ruled out.</li>
+          <li>If the error text mentions <strong>"exceeded the compute time quota"</strong> or similar plan-limit language, this is Neon (or whatever managed Postgres provider) refusing new connections at the account/project level — no amount of restarting the backend container fixes this. Check the provider's dashboard directly and either wait for the quota to reset or upgrade the plan. See <a href="#common-errors">Common Errors #9</a>.</li>
+          <li>If the error instead mentions <strong>connection refused</strong> or a timeout with no quota language, confirm the DB host is actually reachable from the app server: <code class="inline">nc -zv &lt;db-host&gt; 5432</code>. For a self-hosted Postgres box (see <code class="inline">docs/gcp-postgres-migration.md</code>), also check the firewall rule still allows the app server's specific IP and that the <code class="inline">postgresql</code> service is running (<code class="inline">systemctl status postgresql</code> on the DB VM).</li>
+          <li>If the error mentions <strong>"too many connections"</strong>, run the <code class="inline">pg_stat_activity</code> query from <a href="#database">Database user management</a> to see what's holding connections open, and check <code class="inline">POSTGRES_CONN_MAX_AGE</code> in <code class="inline">backend/.env</code> — a value that's too low relative to traffic can cause excessive reconnect churn under load.</li>
+          <li>Once the database is reachable again, confirm recovery with <code class="inline">curl -sk https://homekonet.com/api/health/</code> before telling anyone the incident is resolved — the health check itself queries the DB, so it's a true end-to-end signal, not just "the container is up."</li>
+        </ol>
       </section>
 
       <section class="doc-section" id="common-errors">
@@ -782,6 +1028,25 @@ if assignment.role.slug == 'admin' and target_user.role == 'admin':
     )}, status=status.HTTP_400_BAD_REQUEST)</code></pre>
           <p>Also filtered out of every frontend assignable-role picker (<code class="inline">AdminUsers.tsx</code>, <code class="inline">AdminRoles.tsx</code>) so it can't be selected in the first place — defense in depth, since the backend block is the actual guarantee.</p>
           <p><strong>Avoid it again:</strong> if a database row exists purely for display/documentation (not to be acted on), make the code that would act on it refuse explicitly rather than relying on it "just doing nothing harmful" — a silent no-op that returns 200 is indistinguishable from success to both the caller and whoever's debugging their report later.</p>
+        </div>
+
+        <div class="card">
+          <h4>9. Managed Postgres quota exhaustion took down every DB-backed endpoint at once</h4>
+          <p><strong>Symptom:</strong> total outage, reported as "properties are not loading" and "internal server error when I try to login" — <em>every</em> request that touched the database failed with a 500, simultaneously, with no code path spared. <code class="inline">docker compose logs backend</code> showed:</p>
+          <pre><code>django.db.utils.OperationalError: connection to server at "ep-plain-sea-....neon.tech" (35.173.20.131), port 5432 failed:
+ERROR:  Your account or project has exceeded the compute time quota. Upgrade your plan to increase limits.</code></pre>
+          <p><strong>Cause:</strong> the production database is external managed Postgres (Neon), billed/limited on compute-time. Once the quota was exhausted, Neon refused the TCP connection at its side entirely — this is not a Django, Docker, or application-level failure at all; every container (backend, celery, celery-beat, celery-ai) was healthy and running the whole time. <code class="inline">docker compose ps</code> even showed the backend as <code class="inline">unhealthy</code> only because its own healthcheck hits <code class="inline">/api/health/</code>, which itself queries the DB — a correct signal, but easy to misread as "the container crashed" rather than "the container's dependency is unreachable."</p>
+          <p><strong>Fix:</strong> nothing fixable from the app server — this is a provider-side plan limit. Resolved by the Neon account owner addressing the quota (upgrade plan or wait for reset) from the Neon dashboard; the backend recovered on its own the moment connections were accepted again, no redeploy needed.</p>
+          <p><strong>Avoid it again:</strong> a self-hosted managed dependency you don't control the limits of is a single point of failure no amount of application-level error handling can route around. The real fix in progress is <code class="inline">docs/gcp-postgres-migration.md</code> — moving to a dedicated self-hosted PostgreSQL VM removes the "someone else's billing plan can 500 every endpoint" failure mode entirely. Until that lands, treat "every DB-touching endpoint 500s at once with the rest of the stack looking healthy" as the signature of this exact failure class — check the provider's dashboard before spending time in application code. See <a href="#troubleshooting">Troubleshooting</a> for the diagnostic checklist and <a href="#database">Database user management</a> for the connection-diagnostic queries.</p>
+        </div>
+
+        <div class="card">
+          <h4>10. The real production <code class="inline">DJANGO_SECRET_KEY</code> was committed to git as an "example" value</h4>
+          <p><strong>Symptom:</strong> found during a routine documentation-completeness audit, not reported by anyone — <code class="inline">backend/.env.example</code>'s <code class="inline">DJANGO_SECRET_KEY</code> line was byte-for-byte identical to the real value in the live <code class="inline">backend/.env</code>, confirmed by comparing SHA-256 hashes of each rather than assuming. The file had carried this exact value since one of the earliest commits in the project's history, present on <code class="inline">main</code>, already pushed to the shared remote.</p>
+          <p><strong>Cause:</strong> whoever first wrote <code class="inline">backend/.env.example</code> filled it in with a real generated key (from an actual local <code class="inline">.env</code>) instead of an obvious placeholder string — an easy mistake, since a real-looking key "just works" if anyone copies the example file verbatim, which is exactly what made it invisible for so long. An example/template env file is, by convention, meant to be committed and shared; nothing about the normal review process flags "this looks like a real secret" the way it would for, say, a stray <code class="inline">.env</code> itself (which is gitignored specifically to prevent this).</p>
+          <p><strong>Why this matters:</strong> Django's <code class="inline">SECRET_KEY</code> signs session cookies, CSRF tokens, and every <code class="inline">django.core.signing</code>-based token in the app — including the MFA login step-up token (<code class="inline">superadmin.views.mfa_verify_login</code>'s <code class="inline">TimestampSigner(salt=MFA_LOGIN_SALT)</code>). Anyone holding it can forge any of those, up to and including a session cookie for an arbitrary user.</p>
+          <p><strong>Fix:</strong> generated a fresh key (<code class="inline">django.core.management.utils.get_random_secret_key()</code>, run inside the backend container so the value never touched the host shell's history or this session's transcript), replaced it in <code class="inline">backend/.env</code>, and force-recreated <code class="inline">backend</code>/<code class="inline">celery</code>/<code class="inline">celery-beat</code>/<code class="inline">celery-ai</code> so every process picked up the new value. Also fixed <code class="inline">backend/.env.example</code> to use an obvious non-functional placeholder. Rotation force-logs-out every currently authenticated user and invalidates any in-flight signed token (e.g. a password-reset link mid-click) — expected and unavoidable, not a bug in the rotation itself.</p>
+          <p><strong>Avoid it again:</strong> an example/template env file must contain values that are obviously fake at a glance (<code class="inline">replace-with-a-real-random-secret...</code>, not something the same length/shape/entropy as a real key) — never copy-paste a real value into one "just to show the format." Periodically diff (or hash-compare, as done here) every <code class="inline">*.env.example</code> against its real counterpart across the whole repo, on every branch — a value that matches is either a coincidence or an exposure, and it's cheap to check.</p>
         </div>
       </section>
 

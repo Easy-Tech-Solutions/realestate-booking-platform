@@ -19,6 +19,18 @@ def _validate_currency(value):
     return value
 
 
+def _validate_gateway_currency(attrs):
+    # TEMPORARY: see payments/gateways/mtn_momo.py's _account_for — MTN's
+    # partner portal has only provisioned an API user for USD so far, not
+    # LRD. Delete this once MTN_MOMO_USER_ID_LRD / MTN_MOMO_API_SECRET_LRD
+    # are set in backend/.env.
+    if attrs.get('gateway') == 'mtn_momo' and attrs.get('currency') == 'LRD':
+        raise serializers.ValidationError(
+            {'currency': 'MTN MoMo payments in LRD are temporarily unavailable — pay in USD instead.'}
+        )
+    return attrs
+
+
 class PaymentInitiateSerializer(serializers.ModelSerializer):
     #Serializer for initiating payments
     booking_id = serializers.IntegerField()
@@ -53,6 +65,9 @@ class PaymentInitiateSerializer(serializers.ModelSerializer):
     def validate_currency(self, value):
         return _validate_currency(value)
 
+    def validate(self, attrs):
+        return _validate_gateway_currency(attrs)
+
 
 class ViewingPaymentInitiateSerializer(serializers.Serializer):
     """Initiate a (mobile-money/bank) payment of the non-refundable viewing fee."""
@@ -80,7 +95,10 @@ class ViewingPaymentInitiateSerializer(serializers.Serializer):
 
     def validate_currency(self, value):
         return _validate_currency(value)
-    
+
+    def validate(self, attrs):
+        return _validate_gateway_currency(attrs)
+
 
 class PaymentVerifySerializer(serializers.Serializer):
     #Serializer for payment verification
