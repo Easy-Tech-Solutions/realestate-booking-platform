@@ -58,6 +58,17 @@ backend/ai_models/
 # Migration backups (scripts/backup.sh) — contain secrets, never commit
 backups/
 
+# Raw database dumps and ad-hoc certs/keys — never commit these directly,
+# even temporarily. Use scripts/backup.sh (encrypts into backups/, already
+# gitignored above) instead of a bare `pg_dump`/`cp` + `git add`.
+*.dump
+*.sql
+*.sql.gz
+backend/certs/
+*.pem
+*.key
+*.crt
+
 # IDE and Editor
 .vscode/
 .idea/

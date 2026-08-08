@@ -37,6 +37,7 @@ RESOURCE_TREE = [
     ('listings.content', 'Content', True, 'Titles, descriptions, photos — approve/reject pending listings (listings app).'),
     ('listings.availability', 'Availability', True, 'Booking status, suspension state (inventory app).'),
     ('listings.compliance', 'Compliance', True, 'Local registration number + legal occupancy cap (Listing.local_registration_number/occupancy_cap) — enforced against the host\'s own max_guests. Set via PATCH /api/inventory/listings/<id>/compliance/.'),
+    ('listings.settings', 'Listing Settings', True, 'Minimum listing price enforced at listing creation (listings.ListingSettings) — takes effect immediately, no deploy needed.'),
 
     ('reservations', 'Reservations', True, 'Wildcard — grants every reservation sub-resource below (transactional data, communications).'),
     ('reservations.transactional_data', 'Transactional Data', True, 'Booking dates, guest counts, payment confirmation (bookings app).'),

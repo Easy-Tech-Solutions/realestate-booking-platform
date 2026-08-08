@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    categories_collection, category_detail,
+    categories_collection, category_detail, listing_settings,
     listings_collection, listing_detail, listing_images, listing_image_detail,
     favorite_listing, favorites_collection, listing_reviews, all_reviews, create_review,
     review_detail, user_reviews, listing_stats, agent_analytics, popular_listings,
@@ -13,6 +13,7 @@ from .views import (
 urlpatterns = [
     path('categories/', categories_collection, name='categories_collection'),
     path('categories/<int:id>/', category_detail, name='category_detail'),
+    path('settings/', listing_settings, name='listing_settings'),
     path('my-drafts/', my_drafts, name='my_drafts'),
     path('my-listings/', my_listings, name='my_listings'),
     path('pending-review/', pending_review_listings, name='pending_review_listings'),

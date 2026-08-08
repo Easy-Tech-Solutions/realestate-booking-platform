@@ -507,7 +507,19 @@ else:
     MEDIA_URL = os.environ.get("MEDIA_URL", "/media/")
     media_root = os.environ.get("MEDIA_ROOT", "")
     MEDIA_ROOT = os.path.abspath(media_root or os.path.join(BASE_DIR, "media"))
-    os.makedirs(MEDIA_ROOT, exist_ok=True)
+    try:
+        os.makedirs(MEDIA_ROOT, exist_ok=True)
+    except OSError:
+        # MEDIA_ROOT in backend/.env is deliberately container-specific
+        # (/app/media) — that path doesn't exist when this same settings
+        # module is imported by a management command run via the HOST
+        # virtualenv (.venv/bin/python backend/manage.py ..., e.g. for
+        # scripts/backup.sh-adjacent tooling that needs docker/gpg on the
+        # host). Fall back to a real, always-creatable directory rather than
+        # crashing every management command on that path — media storage
+        # itself is irrelevant to most host-run commands anyway.
+        MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+        os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 # Files/directories written by FileSystemStorage must be readable and
 # traversable by the nginx worker (a different OS user) that serves /media/.
@@ -522,13 +534,43 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
+# MTN MoMo credentials — env-sourced (never stored in the database, unlike the
+# other PaymentGateway model fields). Mirrors how STRIPE_SECRET_KEY above is
+# handled. sandbox_mode/sandbox_url/live_url stay on the PaymentGateway DB
+# row (payments.models.PaymentGateway, name='mtn_momo') since those aren't
+# secrets and are convenient to toggle from Django admin without a redeploy.
+#
+# Dual-currency (LRD + USD): MTN's Collections/Disbursements subscription
+# keys and the webhook secret are shared across both currencies — but the
+# "API User" (user_id + api_secret) is tied to ONE specific MTN account in
+# their partner portal ("Account: LRD" or "Account: USD" when you click
+# Configure -> Create API user). Each currency needs its own API user;
+# submitting a currency's payment through the wrong one's credentials will
+# be rejected by MTN the same way sandbox rejects any currency but its own
+# test currency (see payments/gateways/mtn_momo.py).
 PAYMENT_GATEWAYS = {
     'mtn_momo': {
-        'api_key': os.environ.get('MTN_MOMO_API_KEY'),
-        'user_id': os.environ.get('MTN_MOMO_USER_ID'),
-        'api_secret': os.environ.get('MTN_MOMO_API_SECRET'),
-        'sandbox_url': 'https://sandbox.momodeveloper.mtn.com',
-        'live_url': 'https://api.momodeveloper.mtn.com',
+        'collection_key': os.environ.get('MTN_MOMO_COLLECTION_KEY', ''),
+        'disbursement_key': os.environ.get('MTN_MOMO_DISBURSEMENT_KEY', ''),
+        'accounts': {
+            # LRD falls back to the original un-suffixed vars so a
+            # single-currency setup (from before dual-currency support)
+            # keeps working without renaming anything.
+            'LRD': {
+                'user_id': os.environ.get('MTN_MOMO_USER_ID_LRD', os.environ.get('MTN_MOMO_USER_ID', '')),
+                'api_secret': os.environ.get('MTN_MOMO_API_SECRET_LRD', os.environ.get('MTN_MOMO_API_SECRET', '')),
+            },
+            'USD': {
+                'user_id': os.environ.get('MTN_MOMO_USER_ID_USD', ''),
+                'api_secret': os.environ.get('MTN_MOMO_API_SECRET_USD', ''),
+            },
+            # MTN's sandbox is one shared test environment with no LRD/USD
+            # split — also falls back to the un-suffixed vars.
+            'SANDBOX': {
+                'user_id': os.environ.get('MTN_MOMO_USER_ID_SANDBOX', os.environ.get('MTN_MOMO_USER_ID', '')),
+                'api_secret': os.environ.get('MTN_MOMO_API_SECRET_SANDBOX', os.environ.get('MTN_MOMO_API_SECRET', '')),
+            },
+        },
     },
 }
 

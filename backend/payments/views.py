@@ -457,14 +457,22 @@ def admin_cancel_payout(request, payout_id):
 def mtn_momo_webhook(request):
     """
     Receive MTN MoMo payment status callbacks.
-    Validates the HMAC-SHA256 signature, updates payment + booking status,
-    and triggers owner disbursement on successful payments.
+
+    MTN's MoMo API does not sign or authenticate these callback POSTs — there
+    is no HMAC secret or shared token to configure for it anywhere in MTN's
+    developer or partner portal (unlike Stripe). So the payload's own
+    `status` field is never trusted here. This view only uses the callback
+    as a trigger: it looks up which payment it's about via `externalId`,
+    then re-verifies the real status directly against MTN's API using our
+    own OAuth credentials (PaymentService.verify_payment — the same
+    authoritative check the frontend's polling loop uses). A forged
+    "SUCCESSFUL" callback from anyone but MTN can't move a payment to
+    completed this way, since only MTN's own API response is trusted.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
     raw_body = request.body
-    webhook_log = None
 
     try:
         payload = json.loads(raw_body)
@@ -486,24 +494,10 @@ def mtn_momo_webhook(request):
         processed=False,
     )
 
-    # Signature validation is mandatory — reject the request if the secret is not configured.
-    if not gateway_config.webhook_secret:
-        if webhook_log:
-            webhook_log.error_message = 'webhook_secret not configured; refusing to process unsigned webhook'
-            webhook_log.save(update_fields=['error_message'])
-        return JsonResponse({'error': 'Webhook secret not configured'}, status=500)
-
-    signature = request.headers.get('X-Signature', '')
-    gateway = PaymentService.get_gateway('mtn_momo')
-    if not gateway or not gateway.validate_webhook(payload, signature):
-        webhook_log.error_message = 'Invalid webhook signature'
-        webhook_log.save(update_fields=['error_message'])
-        return JsonResponse({'error': 'Invalid signature'}, status=401)
-
     # Look up the payment by our UUID embedded as externalId
     external_id = payload.get('externalId')
     try:
-        payment = Payment.objects.select_related('booking', 'booking__listing__owner').get(
+        payment = Payment.objects.select_related('booking', 'booking__listing__owner', 'currency').get(
             id=external_id
         )
     except (Payment.DoesNotExist, Exception):
@@ -511,11 +505,12 @@ def mtn_momo_webhook(request):
         webhook_log.save(update_fields=['error_message'])
         return JsonResponse({'error': 'Payment not found'}, status=404)
 
-    # Delegate all status/booking/payout logic to the service
-    PaymentService.handle_webhook(payment, mtn_status, payload)
+    result = PaymentService.verify_payment(payment)
 
-    webhook_log.processed = True
-    webhook_log.save(update_fields=['processed'])
+    webhook_log.processed = bool(result.get('success'))
+    if not result.get('success'):
+        webhook_log.error_message = result.get('error', 'verification failed')
+    webhook_log.save(update_fields=['processed', 'error_message'])
 
     return JsonResponse({'status': 'ok'})
 

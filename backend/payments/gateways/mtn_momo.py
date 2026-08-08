@@ -2,10 +2,8 @@ import re
 import uuid
 import base64
 import requests
-import hashlib
-import hmac
-import json
 from typing import Dict, Any
+from django.conf import settings
 from django.core.cache import cache
 from .base import PaymentGatewayBase
 
@@ -17,12 +15,28 @@ class MTNMoMoGateway(PaymentGatewayBase):
     Uses the MTN MoMo Collection API (Request to Pay) for customer payments
     and the Disbursement API (Transfer) for paying property owners.
 
-    Credentials stored on the PaymentGateway model:
-        api_key        → Collection product subscription key (Ocp-Apim-Subscription-Key)
-        merchant_id    → Collection API user ID
-        secret_key     → Collection API key (used in Basic Auth for OAuth2 token)
-        business_number → Disbursement product subscription key
-        webhook_secret → HMAC secret for validating incoming webhook payloads
+    Credentials come from environment variables (settings.PAYMENT_GATEWAYS),
+    the same pattern used for STRIPE_SECRET_KEY — never stored in the
+    database. Only sandbox_mode/sandbox_url/live_url stay on the
+    PaymentGateway model row, since those aren't secrets and are convenient
+    to toggle from Django admin without a redeploy:
+        MTN_MOMO_COLLECTION_KEY    → Collection product subscription key (Ocp-Apim-Subscription-Key) — shared across currencies
+        MTN_MOMO_DISBURSEMENT_KEY  → Disbursement product subscription key — shared across currencies
+        MTN_MOMO_USER_ID_LRD/USD   → Collection API user ID — ONE PER CURRENCY (see below)
+        MTN_MOMO_API_SECRET_LRD/USD → Collection API key (Basic Auth) — ONE PER CURRENCY
+
+    Dual-currency (LRD + USD): MTN ties the "API User" (user_id + api_secret)
+    to a specific account in their partner portal ("Account: LRD" or
+    "Account: USD" when creating an API user) — the subscription keys are
+    shared, but the API user is not. Every credential-dependent call below
+    takes a `currency` argument and resolves the right API user via
+    _account_for() — there is no single fixed self.user_id.
+
+    Webhooks: MTN's callback POSTs are not signed (no HMAC, no shared secret
+    — unlike Stripe). See mtn_momo_webhook() in payments/views.py — it treats
+    the callback purely as a trigger and re-verifies the real status directly
+    against MTN's API with our own OAuth credentials instead of trusting
+    anything in the inbound payload.
     """
 
     # MTN MoMo API path segments
@@ -33,40 +47,69 @@ class MTNMoMoGateway(PaymentGatewayBase):
 
     def __init__(self, gateway_config):
         super().__init__(gateway_config)
-        self.subscription_key = gateway_config.api_key          # Collection subscription key
-        self.user_id = gateway_config.merchant_id               # Collection API user ID
-        self.api_key_secret = gateway_config.secret_key         # Collection API key (Basic Auth)
-        self.disbursement_key = gateway_config.business_number  # Disbursement subscription key
-        self.webhook_secret = gateway_config.webhook_secret
+        mtn_config = settings.PAYMENT_GATEWAYS.get('mtn_momo', {})
+        self.collection_key = mtn_config.get('collection_key', '')        # Collection subscription key
+        self.disbursement_key = mtn_config.get('disbursement_key', '')    # Disbursement subscription key
+        self._accounts = mtn_config.get('accounts', {})
         self.target_env = 'sandbox' if self.is_sandbox else 'production'
+
+    def _account_for(self, currency: str) -> dict:
+        """Resolve the (user_id, api_secret) pair for a specific currency's
+        MTN account. Raises ValueError with a clear, actionable message if
+        that currency has no API user configured — callers already wrap
+        their public methods in try/except and surface this as a normal
+        {'success': False, ...} error rather than a raw traceback."""
+        key = 'SANDBOX' if self.is_sandbox else (currency or '').upper()
+
+        # TEMPORARY: MTN's partner portal only let us create one API user so
+        # far (the USD account) — LRD is suppressed in production until its
+        # own API user is provisioned there too. Delete this block (and the
+        # LRD entry stays ready to go) once MTN_MOMO_USER_ID_LRD /
+        # MTN_MOMO_API_SECRET_LRD are set in backend/.env.
+        if not self.is_sandbox and key == 'LRD':
+            raise ValueError(
+                'MTN MoMo payments in LRD are temporarily unavailable — only the USD '
+                'account is provisioned right now. Pay in USD instead.'
+            )
+
+        account = self._accounts.get(key) or {}
+        if not account.get('user_id') or not account.get('api_secret'):
+            if self.is_sandbox:
+                raise ValueError('No MTN MoMo sandbox API user configured (MTN_MOMO_USER_ID_SANDBOX / MTN_MOMO_API_SECRET_SANDBOX, or the legacy MTN_MOMO_USER_ID / MTN_MOMO_API_SECRET).')
+            raise ValueError(
+                f"No MTN MoMo API user configured for the {key} account. Create one in MTN's partner "
+                f"portal (Configure -> Create API user, Account: {key}) and set "
+                f"MTN_MOMO_USER_ID_{key} / MTN_MOMO_API_SECRET_{key} in backend/.env."
+            )
+        return account
 
     # ------------------------------------------------------------------ #
     #  OAuth2 token management                                            #
     # ------------------------------------------------------------------ #
 
-    def _get_access_token(self, product: str = 'collection') -> str:
+    def _get_access_token(self, currency: str, product: str = 'collection') -> str:
         """
-        Fetch (or return a cached) OAuth2 Bearer token for the given product.
-        Tokens are cached for 50 minutes (MTN tokens expire in 60 minutes).
+        Fetch (or return a cached) OAuth2 Bearer token for the given product
+        AND currency (LRD and USD are different MTN accounts with different
+        API users, so they get different tokens). Tokens are cached for 50
+        minutes (MTN tokens expire in 60 minutes).
         """
-        cache_key = f'mtn_momo_{product}_token'
+        account = self._account_for(currency)
+        cache_currency = 'SANDBOX' if self.is_sandbox else currency.upper()
+        cache_key = f'mtn_momo_{self.target_env}_{cache_currency}_{product}_token'
         token = cache.get(cache_key)
         if token:
             return token
 
         if product == 'collection':
             token_url = self.get_api_url(self.COLLECTION_TOKEN_PATH)
-            sub_key = self.subscription_key
-            basic_user = self.user_id
-            basic_pass = self.api_key_secret
+            sub_key = self.collection_key
         else:
             token_url = self.get_api_url(self.DISBURSEMENT_TOKEN_PATH)
-            sub_key = self.disbursement_key or self.subscription_key
-            basic_user = self.user_id
-            basic_pass = self.api_key_secret
+            sub_key = self.disbursement_key or self.collection_key
 
         credentials = base64.b64encode(
-            f'{basic_user}:{basic_pass}'.encode()
+            f"{account['user_id']}:{account['api_secret']}".encode()
         ).decode()
 
         response = requests.post(
@@ -82,11 +125,11 @@ class MTNMoMoGateway(PaymentGatewayBase):
         cache.set(cache_key, token, timeout=50 * 60)
         return token
 
-    def _collection_headers(self, reference_id: str = None) -> Dict[str, str]:
-        token = self._get_access_token('collection')
+    def _collection_headers(self, currency: str, reference_id: str = None) -> Dict[str, str]:
+        token = self._get_access_token(currency, 'collection')
         headers = {
             'Authorization': f'Bearer {token}',
-            'Ocp-Apim-Subscription-Key': self.subscription_key,
+            'Ocp-Apim-Subscription-Key': self.collection_key,
             'X-Target-Environment': self.target_env,
             'Content-Type': 'application/json',
         }
@@ -94,9 +137,9 @@ class MTNMoMoGateway(PaymentGatewayBase):
             headers['X-Reference-Id'] = reference_id
         return headers
 
-    def _disbursement_headers(self, reference_id: str = None) -> Dict[str, str]:
-        token = self._get_access_token('disbursement')
-        sub_key = self.disbursement_key or self.subscription_key
+    def _disbursement_headers(self, currency: str, reference_id: str = None) -> Dict[str, str]:
+        token = self._get_access_token(currency, 'disbursement')
+        sub_key = self.disbursement_key or self.collection_key
         headers = {
             'Authorization': f'Bearer {token}',
             'Ocp-Apim-Subscription-Key': sub_key,
@@ -125,10 +168,14 @@ class MTNMoMoGateway(PaymentGatewayBase):
 
             # MTN sandbox only accepts EUR — every other currency 400s with
             # NOT_ENOUGH_FUNDS / WRONG_CURRENCY. The local Payment row still
-            # stores the user-facing currency (LRD); this override is purely
-            # the wire format for sandbox testing.
-            if self.is_sandbox:
-                currency = 'EUR'
+            # stores the user-facing currency (LRD/USD); this override is
+            # purely the wire format for sandbox testing. account_currency
+            # is what selects credentials (_account_for) — always the real
+            # currency, even in sandbox, so a misconfigured USD sandbox
+            # account still gets a clear "not configured" error rather than
+            # silently borrowing LRD's credentials.
+            account_currency = currency
+            wire_currency = 'EUR' if self.is_sandbox else currency
 
             if not self.is_sandbox and not self._validate_liberian_phone(phone_number):
                 return {
@@ -147,7 +194,7 @@ class MTNMoMoGateway(PaymentGatewayBase):
 
             body = {
                 'amount': formatted_amount,
-                'currency': currency,
+                'currency': wire_currency,
                 'externalId': str(payment_id),   # our Payment UUID → used in webhook lookup
                 'payer': {
                     'partyIdType': 'MSISDN',
@@ -158,7 +205,7 @@ class MTNMoMoGateway(PaymentGatewayBase):
             }
 
             url = self.get_api_url(self.COLLECTION_REQUEST_PATH)
-            headers = self._collection_headers(reference_id=momo_reference)
+            headers = self._collection_headers(account_currency, reference_id=momo_reference)
 
             response = requests.post(url, json=body, headers=headers, timeout=30)
 
@@ -193,16 +240,19 @@ class MTNMoMoGateway(PaymentGatewayBase):
         except Exception as e:
             return {'success': False, 'error': 'Payment processing error', 'details': str(e)}
 
-    def verify_payment(self, transaction_id: str) -> Dict[str, Any]:
+    def verify_payment(self, transaction_id: str, currency: str = 'LRD') -> Dict[str, Any]:
         """
         Poll the MTN MoMo API for the current status of a transaction.
         transaction_id is the UUID we originally sent as X-Reference-Id.
+        currency must match whatever currency the original process_payment()
+        call used — it selects which currency's API user authenticates this
+        poll (see _account_for).
         """
         try:
             url = self.get_api_url(f'{self.COLLECTION_REQUEST_PATH}/{transaction_id}')
             response = requests.get(
                 url,
-                headers=self._collection_headers(),
+                headers=self._collection_headers(currency),
                 timeout=30,
             )
 
@@ -301,7 +351,7 @@ class MTNMoMoGateway(PaymentGatewayBase):
             response = requests.post(
                 self.get_api_url(self.DISBURSEMENT_TRANSFER_PATH),
                 json=body,
-                headers=self._disbursement_headers(reference_id=reference),
+                headers=self._disbursement_headers(currency, reference_id=reference),
                 timeout=30,
             )
 
@@ -336,20 +386,15 @@ class MTNMoMoGateway(PaymentGatewayBase):
 
     def validate_webhook(self, payload: Dict[str, Any], signature: str) -> bool:
         """
-        Validate MTN MoMo webhook payload using HMAC-SHA256 with webhook_secret.
+        MTN MoMo doesn't sign its callback POSTs — there's no secret or
+        signature to check here (unlike Stripe). Always returns False so
+        nothing accidentally trusts an inbound payload on its own; real
+        authenticity comes from mtn_momo_webhook() re-verifying the status
+        directly against MTN's API with our own credentials instead of
+        calling this method. Implemented only to satisfy
+        PaymentGatewayBase's abstract interface.
         """
-        if not self.webhook_secret:
-            return False
-        try:
-            json_payload = json.dumps(payload, separators=(',', ':'), sort_keys=True)
-            expected = hmac.new(
-                self.webhook_secret.encode('utf-8'),
-                json_payload.encode('utf-8'),
-                hashlib.sha256,
-            ).hexdigest()
-            return hmac.compare_digest(expected, signature)
-        except Exception:
-            return False
+        return False
 
     # ------------------------------------------------------------------ #
     #  Phone number helpers                                               #

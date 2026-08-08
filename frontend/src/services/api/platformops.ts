@@ -1,4 +1,6 @@
-import { fetchWithAuth } from './shared/client';
+import { fetchWithAuth, fetchTextWithAuth } from './shared/client';
+
+export type DocSlug = 'user-guide' | 'management-portal-guide' | 'developer-guide';
 
 export interface FeatureFlag {
   id: number;
@@ -106,5 +108,13 @@ export const platformOpsAPI = {
     if (params.level) qs.set('level', params.level);
     if (params.search) qs.set('search', params.search);
     return fetchWithAuth<LogEntry[]>(`/api/platform-ops/log-viewer/?${qs.toString()}`);
+  },
+
+  // Raw HTML — the view requires staff auth (JWT bearer, same as every other
+  // endpoint here), so this can't be loaded as a plain <iframe src="..."> —
+  // the browser's own navigation request wouldn't carry the Authorization
+  // header. Fetch it authenticated instead and inject via iframe.srcdoc.
+  getDocs: async (slug: DocSlug): Promise<string> => {
+    return fetchTextWithAuth(`/api/platform-ops/docs/${slug}/`);
   },
 };

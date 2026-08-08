@@ -126,6 +126,7 @@
       <h4>Platform</h4>
       <a href="#settings">Platform Settings</a>
       <a href="#platform-ops">Platform &amp; Engineering</a>
+      <a href="#docs">Documentation</a>
       <a href="#legal">Legal Documents</a>
       <a href="#gaps">Known Gaps</a>
       <a href="#troubleshooting">Troubleshooting</a>
@@ -332,6 +333,11 @@
         <p>This page is diagnostics-only (feature flags live in Settings, above). It shows live system health — database, Redis, Celery worker, and disk status — plus a table of scheduled background tasks with their last run time and success/failure state, and a feed of the most recent application errors, so engineering staff can spot problems without needing server/SSH access.</p>
       </section>
 
+      <section class="doc-section" id="docs">
+        <h2>📖 Documentation</h2>
+        <p>All three guides — this one, the User Guide, and the Developer Guide — are readable directly in the dashboard at <strong>Documentation</strong> (<code class="inline">/management/docs</code>), with a tab to switch between them and an "Open in new tab" link. No file/SSH access needed to check something while you're already in the portal. Same access requirement as everything else here — admin/superadmin/officer.</p>
+      </section>
+
       <section class="doc-section" id="legal">
         <h2>📜 Legal Documents</h2>
         <p>Publish new versions of the Terms of Service or Privacy Policy: set a version string, effective date, a summary of changes, and the document body (structured as sections). Publishing goes live immediately on the public site and is kept as permanent version history you can review at any time.</p>
@@ -379,6 +385,12 @@
           <h4>Bulk-assigning a role to several users shows some as "failed"</h4>
           <p><strong>Cause:</strong> Bulk actions report per-account results rather than failing the whole batch. Common reasons a single account fails: it's a superadmin account (protected), the role being assigned is Superadmin (never assignable), or the account no longer exists.</p>
           <p><strong>Fix:</strong> Check the per-account error in the result toast/response — the succeeded accounts are already done, so you only need to address the failed ones individually.</p>
+        </div>
+
+        <div class="card">
+          <h4>The whole site is down — nobody can log in, listings won't load, everything shows an error</h4>
+          <p><strong>Cause:</strong> This pattern (login, listings, and everything else failing at the same time) usually means the database itself is unreachable, not a bug in any one feature — it has happened before when the hosted database provider hit an account-level usage limit and stopped accepting connections entirely, independent of anything wrong with the app.</p>
+          <p><strong>Fix:</strong> This isn't something to troubleshoot from within the portal — it requires engineering/infrastructure access to diagnose and resolve (see the Developer Guide's Troubleshooting and Common Errors sections). Report it immediately to engineering with the exact error text if you have it (screenshot the error message shown on screen), rather than repeatedly retrying — retrying doesn't help when the database itself is the thing that's down.</p>
         </div>
       </section>
     </main>

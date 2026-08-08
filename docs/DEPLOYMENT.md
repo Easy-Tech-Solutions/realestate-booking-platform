@@ -965,6 +965,7 @@ Before going live, verify **all** of the following:
 
 - [ ] SSH password login disabled; key-based authentication only
 - [ ] UFW firewall active — only ports 22, 80, 443 open
+- [ ] If `pgadmin` (or any other DB-admin/ops tool) is added to `docker-compose.yml`, its published port (`5050` by default) is **not** reachable from `0.0.0.0/0` — restrict it to specific trusted IPs at whichever firewall layer actually governs this host (cloud provider firewall rules take priority over `ufw`/`iptables` on most cloud VMs — check both, don't assume `ufw` alone is authoritative)
 - [ ] Fail2ban installed and active (`systemctl status fail2ban`)
 - [ ] Non-root user running the application
 - [ ] Automatic security updates enabled (`unattended-upgrades`)

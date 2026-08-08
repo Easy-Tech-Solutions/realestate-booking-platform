@@ -13,8 +13,9 @@ class PaymentGatewayBase(ABC):
         pass
 
     @abstractmethod
-    def verify_payment(self, transaction_id: str) -> Dict[str, Any]:
-        #Verify payment status
+    def verify_payment(self, transaction_id: str, currency: str = 'LRD') -> Dict[str, Any]:
+        #Verify payment status. currency must match the original payment's
+        #currency for gateways where credentials are per-currency (MTN MoMo).
         pass
 
     @abstractmethod
