@@ -20,6 +20,7 @@ class NotificationType(models.TextChoices):
     VIEWING_REQUESTED  = 'viewing_requested',  'Viewing Requested'   # → admins
     VIEWING_FEE_PAID   = 'viewing_fee_paid',   'Viewing Fee Paid'    # → guest (receipt)
     VIEWING_SCHEDULED  = 'viewing_scheduled',  'Viewing Scheduled'   # → guest
+    VIEWING_CANCELLED  = 'viewing_cancelled',  'Viewing Cancelled'   # → guest
     # Payments
     PAYMENT_RECEIVED      = 'payment_received',      'Payment Received'         # → guest (paid)
     PAYMENT_RECEIVED_HOST = 'payment_received_host', 'Payment Received (Host)'  # → host (earned)

@@ -552,6 +552,12 @@ PAYMENT_GATEWAYS = {
     'mtn_momo': {
         'collection_key': os.environ.get('MTN_MOMO_COLLECTION_KEY', ''),
         'disbursement_key': os.environ.get('MTN_MOMO_DISBURSEMENT_KEY', ''),
+        # The X-Target-Environment header value for LIVE calls. MTN assigns
+        # this per merchant during onboarding — it is NOT always the literal
+        # word "production" (a mismatch here is exactly what causes MTN's
+        # NOT_ALLOWED_TARGET_ENVIRONMENT error). Confirm the correct value
+        # with Lonestar Cell MTN / the partner portal before going live.
+        'target_environment': os.environ.get('MTN_MOMO_TARGET_ENVIRONMENT', 'production'),
         'accounts': {
             # LRD falls back to the original un-suffixed vars so a
             # single-currency setup (from before dual-currency support)

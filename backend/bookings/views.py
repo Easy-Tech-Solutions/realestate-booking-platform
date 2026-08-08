@@ -792,6 +792,90 @@ def reserve_from_viewing(request, viewing_id):
     return Response(BookingSerializer(booking, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
 
+def _require_reservations_data(request):
+    """Full admins (superadmin) always pass; is_staff accounts need a
+    custom role granting reservations.transactional_data directly."""
+    from rbac.permissions import is_full_admin, has_any_permission
+    from superadmin.permissions import is_superadmin_staff
+    user = request.user
+    if is_full_admin(user):
+        return True
+    return is_superadmin_staff(user) and has_any_permission(user, 'reservations.transactional_data')
+
+
+# Which status an admin may move a viewing request into, from its current status.
+_VIEWING_STATUS_TRANSITIONS = {
+    'requested': {'cancelled'},
+    'fee_paid': {'scheduled', 'cancelled'},
+    'scheduled': {'completed', 'cancelled'},
+}
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_viewings_collection(request):
+    """Admin: list all viewing requests (optionally filtered by ?status=), so
+    staff can see and act on what notify_viewing_requested's email tells them
+    to ("Schedule and confirm the appointment") — there was previously no UI
+    for this at all, only the email."""
+    if not _require_reservations_data(request):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from .serializers import ViewingAppointmentSerializer
+    qs = ViewingAppointment.objects.select_related('listing', 'guest').order_by('-created_at')
+    status_filter = request.GET.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    return Response(ViewingAppointmentSerializer(qs, many=True, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_update_viewing_status(request, id):
+    """Admin: schedule, complete, or cancel a viewing request."""
+    if not _require_reservations_data(request):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    try:
+        viewing = ViewingAppointment.objects.select_related('listing', 'guest').get(pk=id)
+    except ViewingAppointment.DoesNotExist:
+        return Response({'error': 'Viewing not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    new_status = request.data.get('status')
+    notes = request.data.get('admin_notes', '')
+    old_status = viewing.status
+    allowed = _VIEWING_STATUS_TRANSITIONS.get(old_status, set())
+    if new_status not in allowed:
+        return Response(
+            {'error': f'Cannot move a viewing from "{old_status}" to "{new_status}".'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    viewing.status = new_status
+    update_fields = ['status']
+    if notes:
+        viewing.admin_notes = notes
+        update_fields.append('admin_notes')
+    if new_status == 'scheduled':
+        viewing.scheduled_at = timezone.now()
+        viewing.confirmed_by = request.user
+        update_fields += ['scheduled_at', 'confirmed_by']
+    viewing.save(update_fields=update_fields)
+
+    from notifications.services import notify_viewing_scheduled, notify_viewing_cancelled
+    try:
+        if new_status == 'scheduled':
+            notify_viewing_scheduled(viewing)
+        elif new_status == 'cancelled':
+            notify_viewing_cancelled(viewing, reason=notes)
+    except Exception:
+        pass
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'viewing.update_status', target=viewing, reason=f'{old_status} -> {new_status}')
+
+    from .serializers import ViewingAppointmentSerializer
+    return Response(ViewingAppointmentSerializer(viewing, context={'request': request}).data)
+
+
 # ===== Admin: reservation communications (Trust & Safety / Support) =========
 
 @api_view(['GET'])

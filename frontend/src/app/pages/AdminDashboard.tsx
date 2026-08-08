@@ -17,9 +17,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Skeleton } from '../components/ui/skeleton';
 import { formatCurrency } from '../../core/utils';
 import { toast } from 'sonner';
-import { usersAPI, propertiesAPI, bookingsAPI, payoutsAPI, paymentAPI } from '../../services/api';
+import { usersAPI, propertiesAPI, bookingsAPI, payoutsAPI, paymentAPI, viewingsAPI } from '../../services/api';
 import type { PlatformFee, EscrowBooking } from '../../services/api/payments';
 import type { ListingSettings } from '../../services/api/properties';
+import type { ViewingAppointment } from '../../core/types';
 import { useApp } from '../../hooks/useApp';
 import { MfaSetupCard } from '../components/MfaSetupCard';
 import { CommunicationsDialog } from '../components/CommunicationsDialog';
@@ -57,6 +58,7 @@ const navGroups: NavGroup[] = [
   ] },
   { id: 'bookings', label: 'Bookings', icon: Calendar, items: [
     { type: 'section', id: 'bookings', label: 'All Bookings' },
+    { type: 'section', id: 'viewings', label: 'Viewing Requests' },
   ] },
   { id: 'finance', label: 'Financial Management', icon: DollarSign, items: [
     { type: 'section', id: 'payments', label: 'Payments' },
@@ -111,6 +113,16 @@ const paymentStatusColor: Record<string, string> = {
   failed:    'bg-red-100 text-red-600',
 };
 
+const viewingStatusColor: Record<string, string> = {
+  requested:  'bg-yellow-100 text-yellow-700',
+  fee_paid:   'bg-blue-100 text-blue-700',
+  scheduled:  'bg-primary/10 text-primary',
+  completed:  'bg-gray-100 text-gray-600',
+  reserved:   'bg-green-100 text-green-700',
+  cancelled:  'bg-red-100 text-red-600',
+  expired:    'bg-red-100 text-red-600',
+};
+
 function StatCard({ label, value, icon: Icon, sub }: { label: string; value: string | number; icon: React.ElementType; sub?: string }) {
   return (
     <Card>
@@ -148,6 +160,12 @@ export function AdminDashboard() {
   const [propSearch, setPropSearch] = useState('');
   const [pendingListings, setPendingListings] = useState<any[]>([]);
   const [propTab, setPropTab] = useState<'published' | 'pending'>('published');
+
+  // Viewing requests state
+  const [viewings, setViewings] = useState<ViewingAppointment[]>([]);
+  const [viewingsLoading, setViewingsLoading] = useState(false);
+  const [viewingStatusFilter, setViewingStatusFilter] = useState('');
+  const [viewingActionBusyId, setViewingActionBusyId] = useState<string | null>(null);
 
   // Settings state
   const [platformFee, setPlatformFee] = useState<PlatformFee | null>(null);
@@ -270,6 +288,10 @@ export function AdminDashboard() {
       setPendingListings(prev => prev.filter(p => String(p.id) !== String(listingId)));
       await loadData();
     } catch (err: any) {
+      if (err?.status === 409) {
+        toast.error(err.message, { action: { label: 'Go to Verification Queue', onClick: () => navigate('/management/kyc-queue') } });
+        return;
+      }
       toast.error(err?.message || 'Failed to approve listing');
     }
   };
@@ -282,6 +304,10 @@ export function AdminDashboard() {
       toast.success(`"${title}" rejected.`);
       setPendingListings(prev => prev.filter(p => String(p.id) !== String(listingId)));
     } catch (err: any) {
+      if (err?.status === 409) {
+        toast.error(err.message, { action: { label: 'Go to Verification Queue', onClick: () => navigate('/management/kyc-queue') } });
+        return;
+      }
       toast.error(err?.message || 'Failed to reject listing');
     }
   };
@@ -587,6 +613,97 @@ export function AdminDashboard() {
                       </TableRow>
                     ))
                 }
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // ── Viewing Requests ──────────────────────────────────────────────────────
+  const VIEWING_NEXT_ACTIONS: Record<string, Array<{ status: 'scheduled' | 'completed' | 'cancelled'; label: string }>> = {
+    requested: [{ status: 'cancelled', label: 'Cancel' }],
+    fee_paid: [{ status: 'scheduled', label: 'Mark Scheduled' }, { status: 'cancelled', label: 'Cancel' }],
+    scheduled: [{ status: 'completed', label: 'Mark Completed' }, { status: 'cancelled', label: 'Cancel' }],
+  };
+
+  const renderViewings = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h2 className="text-2xl font-semibold">Viewing Requests</h2>
+        <Select value={viewingStatusFilter || 'all'} onValueChange={(v) => setViewingStatusFilter(v === 'all' ? '' : v)}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="requested">Requested</SelectItem>
+            <SelectItem value="fee_paid">Fee Paid</SelectItem>
+            <SelectItem value="scheduled">Scheduled</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="reserved">Reserved</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="expired">Expired</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Guest</TableHead>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Date &amp; Time</TableHead>
+                  <TableHead>Fee</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {viewingsLoading ? (
+                  [...Array(5)].map((_, i) => (
+                    <TableRow key={i}>
+                      {[...Array(6)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                    </TableRow>
+                  ))
+                ) : viewings.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      No viewing requests{viewingStatusFilter ? ` with status "${viewingStatusFilter}"` : ''}.
+                    </TableCell>
+                  </TableRow>
+                ) : viewings.map((v) => (
+                  <TableRow key={v.id}>
+                    <TableCell>{v.guestUsername || '—'}</TableCell>
+                    <TableCell className="max-w-[180px] truncate">{v.listingTitle}</TableCell>
+                    <TableCell className="text-sm">
+                      {v.viewingDate}{v.viewingTimeRange ? ` · ${v.viewingTimeRange}` : ''}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {formatCurrency(v.viewingFee)} {v.isFeePaid ? <span className="text-green-600">(paid)</span> : <span className="text-muted-foreground">(unpaid)</span>}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={viewingStatusColor[v.status] ?? ''}>{v.statusDisplay}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {(VIEWING_NEXT_ACTIONS[v.status] ?? []).map((action) => (
+                          <Button
+                            key={action.status}
+                            size="sm"
+                            variant={action.status === 'cancelled' ? 'outline' : 'default'}
+                            className={action.status === 'cancelled' ? 'text-red-600 border-red-200' : ''}
+                            disabled={viewingActionBusyId === v.id}
+                            onClick={() => handleUpdateViewingStatus(v, action.status)}
+                          >
+                            {action.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -1066,6 +1183,44 @@ export function AdminDashboard() {
     }
   };
 
+  const loadViewings = useCallback(async () => {
+    setViewingsLoading(true);
+    try {
+      const data = await viewingsAPI.adminGetAll(viewingStatusFilter || undefined);
+      setViewings(data);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to load viewing requests');
+    } finally {
+      setViewingsLoading(false);
+    }
+  }, [viewingStatusFilter]);
+
+  useEffect(() => {
+    if (activeSection === 'viewings') loadViewings();
+  }, [activeSection, loadViewings]);
+
+  const handleUpdateViewingStatus = async (
+    viewing: ViewingAppointment,
+    newStatus: 'scheduled' | 'completed' | 'cancelled',
+  ) => {
+    let admin_notes: string | undefined;
+    if (newStatus === 'cancelled') {
+      const reason = window.prompt(`Reason for cancelling this viewing (optional):`);
+      if (reason === null) return; // cancelled the prompt
+      admin_notes = reason;
+    }
+    setViewingActionBusyId(viewing.id);
+    try {
+      const updated = await viewingsAPI.adminUpdateStatus(viewing.id, { status: newStatus, admin_notes });
+      setViewings((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+      toast.success(`Viewing marked as ${newStatus.replace('_', ' ')}.`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update viewing status');
+    } finally {
+      setViewingActionBusyId(null);
+    }
+  };
+
   const ticketStatusColor: Record<string, string> = {
     open:         'bg-blue-100 text-blue-700',
     in_progress:  'bg-yellow-100 text-yellow-700',
@@ -1446,6 +1601,7 @@ export function AdminDashboard() {
       case 'overview':   return renderOverview();
       case 'properties': return renderPropertyManagement();
       case 'bookings':   return renderBookings();
+      case 'viewings':   return renderViewings();
       case 'payments':   return renderPayments();
       case 'payouts':    return renderPayouts();
       case 'support':    return renderSupport();

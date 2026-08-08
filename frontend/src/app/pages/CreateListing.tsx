@@ -352,7 +352,8 @@ export function CreateListing() {
     pricingModel: 'monthly' as 'monthly' | 'nightly',
     monthlyPrice: 5,
     paymentSchedule: 'monthly' as 'monthly' | 'quarterly' | 'biannual' | 'annual',
-    leaseTermMonths: 12 as 6 | 12 | 24 | 36,
+    leaseTermMonths: 12 as number,
+    leaseTermOther: false,
 
     exteriorCamera: false,
     noiseMonitor: false,
@@ -389,8 +390,12 @@ export function CreateListing() {
   useEffect(() => {
     const min = SCHEDULE_TO_MONTHS[form.paymentSchedule];
     if (form.leaseTermMonths < min) {
-      const next = ([6, 12, 24, 36] as const).find((m) => m >= min) ?? 36;
-      update({ leaseTermMonths: next });
+      if (form.leaseTermOther) {
+        update({ leaseTermMonths: min });
+      } else {
+        const next = ([1, 6, 12, 24, 36] as const).find((m) => m >= min) ?? 36;
+        update({ leaseTermMonths: next });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.paymentSchedule]);
@@ -660,6 +665,7 @@ export function CreateListing() {
       case 'description': return form.description.trim().length > 0;
       case 'land_details': return form.squareFootage > 0;
       case 'monthly_price': return form.monthlyPrice >= minMonthlyPrice;
+      case 'lease_term': return form.leaseTermMonths >= SCHEDULE_TO_MONTHS[form.paymentSchedule];
       case 'final_details': return Boolean(form.address1 && form.city && form.country);
       default: return true;
     }
@@ -1720,6 +1726,7 @@ export function CreateListing() {
             </p>
             <div className="space-y-4 max-w-xl">
               {([
+                { value: 1, label: '1 month' },
                 { value: 6, label: '6 months' },
                 { value: 12, label: '1 year' },
                 { value: 24, label: '2 years' },
@@ -1732,7 +1739,7 @@ export function CreateListing() {
                   className={`flex items-center gap-4 p-4 border-2 rounded-xl transition-colors ${
                     disabled
                       ? 'border-border opacity-50 cursor-not-allowed'
-                      : form.leaseTermMonths === opt.value
+                      : !form.leaseTermOther && form.leaseTermMonths === opt.value
                         ? 'border-primary bg-primary/5 cursor-pointer'
                         : 'border-border hover:border-primary/50 cursor-pointer'
                   }`}
@@ -1741,8 +1748,8 @@ export function CreateListing() {
                     type="radio"
                     name="leaseTermMonths"
                     value={opt.value}
-                    checked={form.leaseTermMonths === opt.value}
-                    onChange={() => update({ leaseTermMonths: opt.value })}
+                    checked={!form.leaseTermOther && form.leaseTermMonths === opt.value}
+                    onChange={() => update({ leaseTermMonths: opt.value, leaseTermOther: false })}
                     disabled={disabled}
                     className="w-4 h-4 accent-primary"
                   />
@@ -1755,6 +1762,38 @@ export function CreateListing() {
                 </label>
               );
               })}
+              <label
+                className={`flex items-center gap-4 p-4 border-2 rounded-xl transition-colors cursor-pointer ${
+                  form.leaseTermOther ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="leaseTermMonths"
+                  checked={form.leaseTermOther}
+                  onChange={() => update({
+                    leaseTermOther: true,
+                    leaseTermMonths: Math.max(minLeaseMonths, form.leaseTermOther ? form.leaseTermMonths : 1),
+                  })}
+                  className="w-4 h-4 accent-primary"
+                />
+                <div className="flex-1">
+                  <p className="text-xl font-semibold">Other</p>
+                  {form.leaseTermOther && (
+                    <div className="mt-2 flex items-center gap-2" onClick={(e) => e.preventDefault()}>
+                      <Input
+                        type="number"
+                        min={minLeaseMonths}
+                        value={form.leaseTermMonths || ''}
+                        onChange={(e) => update({ leaseTermMonths: e.target.value === '' ? 0 : Number(e.target.value) })}
+                        onBlur={() => { if (form.leaseTermMonths < minLeaseMonths) update({ leaseTermMonths: minLeaseMonths }); }}
+                        className="w-28"
+                      />
+                      <span className="text-base text-muted-foreground">months</span>
+                    </div>
+                  )}
+                </div>
+              </label>
             </div>
           </section>
           );
