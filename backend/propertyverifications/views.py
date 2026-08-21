@@ -190,6 +190,9 @@ def review_decision(request, pk):
             inspection_data['due_diligence_done'] = str(raw).lower() in ('true', '1', 'yes')
         if 'inspection_report' in request.FILES:
             inspection_data['inspection_report'] = request.FILES['inspection_report']
+        if 'owner_authorization_confirmed' in request.data:
+            raw = request.data.get('owner_authorization_confirmed')
+            inspection_data['owner_authorization_confirmed'] = str(raw).lower() in ('true', '1', 'yes')
         for field in ('inspection_latitude', 'inspection_longitude'):
             if request.data.get(field) not in (None, ''):
                 try:

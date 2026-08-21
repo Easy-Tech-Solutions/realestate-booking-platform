@@ -121,6 +121,7 @@ INSTALLED_APPS = [
     "aiscoring",
     "rbac",
     "chatbot",
+    "agents",
 ]
 
 MIDDLEWARE = [

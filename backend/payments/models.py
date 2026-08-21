@@ -194,6 +194,13 @@ class Payout(models.Model):
     net_amount = models.DecimalField(max_digits=12, decimal_places=2)         # what the host receives
     currency = models.CharField(max_length=3, default='USD')
 
+    # Agent-sourced payouts: `host` is the Home Konet Ops account, but the money
+    # is disbursed to the real owner's captured number. Blank on normal host
+    # payouts (disburse to the host's Profile MoMo number as usual).
+    recipient_name         = models.CharField(max_length=255, blank=True, default='')
+    recipient_momo_number  = models.CharField(max_length=30, blank=True, default='')
+    recipient_network      = models.CharField(max_length=10, blank=True, default='')
+
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     reference = models.CharField(max_length=255, blank=True, help_text='Disbursement transaction reference')
     paid_at = models.DateTimeField(null=True, blank=True)
@@ -389,6 +396,14 @@ class PlatformFee(models.Model):
         max_digits=8, decimal_places=2, null=True, blank=True,
         help_text='Maximum USD fee (range type only)',
     )
+    agent_commission_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('0.50'),
+        help_text=(
+            "Sourcing-agent commission, as a percent of the booking rent, paid on "
+            "agent-sourced bookings. Default 0.50 = 0.5% of the rent (i.e. 25% of the "
+            "platform's 2% net guest-side fee)."
+        ),
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -415,6 +430,11 @@ class PlatformFee(models.Model):
     def service_fee_rate(self) -> Decimal:
         """The service fee as a fraction (e.g. 0.04 for 4%)."""
         return (self.service_fee_percent or Decimal('0')) / Decimal('100')
+
+    @property
+    def agent_commission_rate(self) -> Decimal:
+        """The sourcing-agent commission as a fraction of the rent (e.g. 0.005)."""
+        return (self.agent_commission_percent or Decimal('0')) / Decimal('100')
 
     def compute_transaction_fee(self, amount_usd: Decimal) -> Decimal:
         """Return the transaction fee for a given amount."""
@@ -445,6 +465,11 @@ def get_service_fee_rate() -> Decimal:
     twice this rate overall.
     """
     return PlatformFee.get_current().service_fee_rate
+
+
+def get_agent_commission_rate() -> Decimal:
+    """Sourcing-agent commission as a fraction of the booking rent (e.g. 0.005)."""
+    return PlatformFee.get_current().agent_commission_rate
 
 
 def get_viewing_fee() -> Decimal:

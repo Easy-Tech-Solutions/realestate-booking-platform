@@ -26,6 +26,10 @@ import { cn } from '../../core/utils';
 import { AMENITIES, PROPERTY_CATEGORIES } from '../../core/constants';
 import { propertiesAPI } from '../../services/api.service';
 import { PropertyVerificationForm } from '../components/PropertyVerificationForm';
+import { AgentOwnerForm, type AgentOwnerDetails } from '../components/AgentOwnerForm';
+import { useApp } from '../../hooks/useApp';
+import { useSearchParams } from 'react-router';
+import { agentsAPI } from '../../services/api/agents';
 import { toast } from 'sonner';
 
 type WizardStep =
@@ -297,6 +301,12 @@ const GROUP_LABELS: Record<PropertyGroup, { place: string; title: string; descri
 
 export function CreateListing() {
   const navigate = useNavigate();
+  const { user } = useApp();
+  const [searchParams] = useSearchParams();
+  // Agent-sourcing mode: an approved agent lists on an owner's behalf. Reaches
+  // this wizard from the agent dashboard ("Source a property" → ?mode=agent).
+  const agentMode = searchParams.get('mode') === 'agent' && !!user?.isAgent;
+  const [showAgentOwner, setShowAgentOwner] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // After the listing is created it enters ownership verification before publishing.
@@ -678,7 +688,7 @@ export function CreateListing() {
     setStepIndex((s) => Math.max(0, s - 1));
   };
 
-  const publish = async () => {
+  const publish = async (agentOwner?: AgentOwnerDetails) => {
     if (!canContinue || isSubmitting) return;
 
     if (form.images.length === 0) {
@@ -751,6 +761,25 @@ export function CreateListing() {
 
       if (form.images[0]) {
         payload.append('main_image', form.images[0]);
+      }
+
+      // ── Agent-sourcing branch ──────────────────────────────────────────
+      // One authorized call to the agents endpoint creates the Ops-owned
+      // listing + gallery + verification (owner details attached). The agent
+      // never touches the owner-gated listing endpoints.
+      if (agentMode && agentOwner) {
+        for (const file of form.images.slice(1, 10)) payload.append('gallery_images', file);
+        payload.append('owner_name', agentOwner.name);
+        payload.append('owner_phone', agentOwner.phone);
+        payload.append('owner_email', agentOwner.email);
+        payload.append('owner_payout_number', agentOwner.payoutNumber);
+        payload.append('owner_payout_network', agentOwner.payoutNetwork);
+        payload.append('owner_consent', 'true');
+        await agentsAPI.listProperty(payload);
+        localStorage.removeItem(DRAFT_KEY);
+        toast.success('Submitted for verification — you’ll earn commission on its bookings.');
+        navigate('/agent');
+        return;
       }
 
       const created = draftListingId
@@ -848,6 +877,16 @@ export function CreateListing() {
       { label: 'Bathrooms', key: 'bathrooms' as const },
     ];
   }, [propertyGroup]);
+
+  if (showAgentOwner) {
+    return (
+      <AgentOwnerForm
+        onBack={() => setShowAgentOwner(false)}
+        onSubmit={(owner) => publish(owner)}
+        submitting={isSubmitting}
+      />
+    );
+  }
 
   if (showVerification && createdListingId != null) {
     return (
@@ -1854,8 +1893,8 @@ export function CreateListing() {
             </Button>
 
             {currentStep === 'final_details' ? (
-              <Button onClick={publish} disabled={!canContinue || isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create listing'}
+              <Button onClick={() => (agentMode ? setShowAgentOwner(true) : publish())} disabled={!canContinue || isSubmitting}>
+                {isSubmitting ? 'Creating...' : agentMode ? 'Continue' : 'Create listing'}
               </Button>
             ) : currentStep === 'weekend_price' ? (
               <div className="flex items-center gap-2">

@@ -15,6 +15,9 @@ export function normalizeUser(u: any): User {
     bio: u.profile?.bio || undefined,
     phone: u.profile?.momo_number || undefined,
     isHost: u.role === 'agent' || u.role === 'admin' || u.role === 'superadmin',
+    // Approved sourcing-agent capability — independent of role (a host or a
+    // plain user can also be an agent). Backend: UserSerializer.is_agent.
+    isAgent: Boolean(u.is_agent),
     isAdmin: u.role === 'admin' || u.role === 'superadmin',
     isSuperadmin: u.role === 'superadmin',
     isStaff: Boolean(u.is_staff),

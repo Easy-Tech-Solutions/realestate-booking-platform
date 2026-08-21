@@ -166,6 +166,14 @@ def admin_confirm_payment(booking, admin_user=None):
 
     payout = create_payout_for_booking(booking)
 
+    # Agent-sourced booking: the sourcing agent's commission is earned now that
+    # the payment is confirmed (funds secured).
+    try:
+        from agents.commissions import create_agent_commission_for_booking
+        create_agent_commission_for_booking(booking)
+    except Exception as exc:
+        logger.warning('Could not create agent commission for booking %s: %s', booking.pk, exc)
+
     # The confirmation notification (which shares host contact) is sent by the
     # booking_post_save signal on the status→confirmed change — not here.
     if payout:
@@ -269,13 +277,24 @@ def create_payout_for_booking(booking):
     fee = (gross * get_service_fee_rate()).quantize(Decimal('0.01'))
     net = (gross - fee).quantize(Decimal('0.01'))
 
-    return Payout.objects.create(
+    payout = Payout.objects.create(
         booking=booking,
         host=booking.listing.owner,
         gross_amount=gross,
         service_fee_amount=fee,
         net_amount=net,
     )
+
+    # Agent-sourced: `host` is the Ops account, but the money is disbursed to
+    # the real owner's captured number — surface it on the payout.
+    listing = booking.listing
+    if getattr(listing, 'sourced_by_agent_id', None):
+        payout.recipient_name = listing.agent_owner_name
+        payout.recipient_momo_number = listing.agent_owner_payout_number
+        payout.recipient_network = listing.agent_owner_payout_network
+        payout.save(update_fields=['recipient_name', 'recipient_momo_number', 'recipient_network'])
+
+    return payout
 
 
 # ---- Expiry (called by Celery beat) -----------------------------------------

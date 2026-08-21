@@ -1121,6 +1121,149 @@ def notify_host_application_approved(application):
     )
 
 
+# ---- Sourcing-agent application helpers --------------------------------------
+
+def _agent_application_data(application):
+    return {
+        'application_id': application.id,
+        'applicant_name': application.full_name,
+        'status':         application.status,
+    }
+
+
+def notify_agent_application_submitted(application):
+    """A user applied to become a sourcing agent — notify Product Support Officers."""
+    from agents.models import GROUP_PRODUCT_SUPPORT
+    _notify_group(
+        GROUP_PRODUCT_SUPPORT,
+        notification_type='agent_application_submitted',
+        title='New Agent Application',
+        message=(
+            f'{application.full_name} applied to become a sourcing agent. '
+            f'Review the application to approve or decline it.'
+        ),
+        data=_agent_application_data(application),
+    )
+
+
+def notify_agent_application_advanced(application):
+    """Approved at one stage — notify the next stage's reviewers."""
+    from agents.models import AgentApplication, GROUP_COMPLIANCE, GROUP_SUPERVISOR
+    next_group = {
+        AgentApplication.Status.PS_APPROVED:         GROUP_COMPLIANCE,
+        AgentApplication.Status.COMPLIANCE_APPROVED: GROUP_SUPERVISOR,
+    }.get(application.status)
+    if not next_group:
+        return
+    _notify_group(
+        next_group,
+        notification_type='agent_application_advanced',
+        title='Agent Application Awaiting Review',
+        message=(
+            f"{application.full_name}'s agent application has advanced to your stage. "
+            f'Please review it to approve or decline.'
+        ),
+        data=_agent_application_data(application),
+    )
+
+
+def notify_agent_application_received(application):
+    """Confirm to the applicant that their agent application was received."""
+    create_notification(
+        user=application.applicant,
+        notification_type='agent_application_received',
+        title='We Received Your Agent Application',
+        message=(
+            'Thanks for applying to become a sourcing agent on Home Konet. Our team is '
+            "reviewing your application — we'll email you at each step."
+        ),
+        data={'application_id': application.id},
+    )
+
+
+def notify_agent_application_progress(application):
+    """Tell the applicant their agent application cleared a stage."""
+    from agents.models import AgentApplication
+    labels = {
+        AgentApplication.Status.PS_APPROVED:         ('Product Support', 'the Compliance team'),
+        AgentApplication.Status.COMPLIANCE_APPROVED: ('Compliance', 'a Supervisor for final approval'),
+    }.get(application.status)
+    if not labels:
+        return
+    passed_stage, next_stage = labels
+    create_notification(
+        user=application.applicant,
+        notification_type='agent_application_progress',
+        title='Your Agent Application Is Moving Forward',
+        message=(
+            f'Good news — your agent application passed the {passed_stage} review '
+            f'and is now with {next_stage}.'
+        ),
+        data={'application_id': application.id, 'passed_stage': passed_stage, 'next_stage': next_stage},
+    )
+
+
+def notify_agent_application_declined(application):
+    """Notify the applicant their agent application was declined, with the reason."""
+    create_notification(
+        user=application.applicant,
+        notification_type='agent_application_declined',
+        title='Agent Application Declined',
+        message=(
+            'Unfortunately your application to become a sourcing agent was not approved. '
+            f'Reason: {application.decline_reason or "No reason provided."}'
+        ),
+        data={'application_id': application.id, 'decline_reason': application.decline_reason,
+              'declined_stage': application.declined_stage},
+    )
+
+
+def notify_agent_application_approved(application):
+    """Notify the applicant they are now an approved sourcing agent."""
+    create_notification(
+        user=application.applicant,
+        notification_type='agent_application_approved',
+        title="You're Approved — Welcome, Agent!",
+        message=(
+            'Congratulations! Your application has been approved. You can now source and '
+            'list properties on behalf of owners and earn commission on their bookings.'
+        ),
+        data={'application_id': application.id},
+    )
+
+
+def notify_agent_commission_earned(commission):
+    """Tell the agent they earned a commission on a confirmed booking."""
+    create_notification(
+        user=commission.agent,
+        notification_type='agent_commission_earned',
+        title='You Earned a Commission',
+        message=(
+            f'You earned {commission.amount} {commission.currency} commission from a booking on '
+            f'"{commission.listing.title if commission.listing else "a property you sourced"}". '
+            f"It's pending and will be paid out shortly."
+        ),
+        data={'commission_id': commission.id, 'booking_id': commission.booking_id,
+              'amount': f'{commission.amount:.2f}', 'currency': commission.currency},
+    )
+
+
+def notify_agent_commission_paid(commission):
+    """Tell the agent their commission has been disbursed."""
+    create_notification(
+        user=commission.agent,
+        notification_type='agent_commission_paid',
+        title='Your Commission Was Paid',
+        message=(
+            f'Your commission of {commission.amount} {commission.currency} has been paid out. '
+            f'Thanks for sourcing with Home Konet!'
+        ),
+        data={'commission_id': commission.id, 'booking_id': commission.booking_id,
+              'amount': f'{commission.amount:.2f}', 'currency': commission.currency,
+              'reference': commission.reference},
+    )
+
+
 # ---- Property verification helpers -------------------------------------------
 
 def _property_verification_data(verification):

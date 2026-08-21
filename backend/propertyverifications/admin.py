@@ -39,7 +39,7 @@ class PropertyVerificationAdminForm(forms.ModelForm):
 
     class Meta:
         model = PropertyVerification
-        fields = ['review_notes', 'due_diligence_done', 'inspection_report']
+        fields = ['review_notes', 'due_diligence_done', 'inspection_report', 'owner_authorization_confirmed']
 
     def clean_inspection_report(self):
         f = self.cleaned_data.get('inspection_report')
@@ -65,6 +65,11 @@ class PropertyVerificationAdminForm(forms.ModelForm):
                 self.add_error('due_diligence_done', 'Mark due diligence as "Yes" to approve at the Compliance stage.')
             if not (cleaned.get('inspection_report') or self.instance.inspection_report):
                 self.add_error('inspection_report', 'Attach the PDF/PowerPoint inspection report to approve.')
+            # Agent-sourced: the owner-authorization phone check is also required.
+            if self.instance.ownership_type == PropertyVerification.OwnershipType.AGENT \
+                    and cleaned.get('owner_authorization_confirmed') is not True:
+                self.add_error('owner_authorization_confirmed',
+                               'Confirm the owner authorized this agent (and the payout number) to approve.')
         return cleaned
 
 
@@ -97,11 +102,12 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
             ),
         }),
         ('Compliance inspection', {
-            'fields': ('due_diligence_done', 'inspection_report'),
+            'fields': ('due_diligence_done', 'inspection_report', 'owner_authorization_confirmed'),
             'description': (
                 'Compliance stage: confirm the on-site inspection (due diligence) and attach the '
-                'PDF/PowerPoint report. Both are required to approve at this stage. You can save '
-                'these without deciding yet and come back to approve.'
+                'PDF/PowerPoint report — both required to approve. For AGENT-sourced properties, '
+                'also confirm (by phone) the owner authorized this agent and the payout number. '
+                'You can save these without deciding yet and come back to approve.'
             ),
         }),
         ('Decision', {
@@ -150,7 +156,7 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
 
         # Persist the inspection answer/report entered on this save before the
         # transition (the service handlers save only their own status fields).
-        obj.save(update_fields=['due_diligence_done', 'inspection_report', 'updated_at'])
+        obj.save(update_fields=['due_diligence_done', 'inspection_report', 'owner_authorization_confirmed', 'updated_at'])
 
         notes = form.cleaned_data.get('review_notes', '')
         try:

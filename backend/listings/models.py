@@ -121,8 +121,36 @@ class Listing(models.Model):
     # category pages) by an explicit `deleted_at__isnull=True` filter.
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     main_image = models.ImageField(upload_to='listings/main/', null=True, blank=True)
+
+    # ── Agent-sourced properties ──────────────────────────────────────────
+    # When a sourcing agent lists a property on an owner's behalf, `owner` is
+    # the Home Konet Operations account (platform manages inquiries/bookings),
+    # `sourced_by_agent` is the agent (earns commission, no management rights),
+    # and the real owner is captured below as fields (no user account — the
+    # owner may later "claim" via `claimed_by_user`).
+    sourced_by_agent = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='sourced_listings',
+    )
+    agent_owner_name           = models.CharField(max_length=255, blank=True, default='')
+    agent_owner_phone          = models.CharField(max_length=30, blank=True, default='')
+    agent_owner_email          = models.EmailField(blank=True, default='')
+    agent_owner_payout_number  = models.CharField(max_length=30, blank=True, default='')
+    agent_owner_payout_network = models.CharField(
+        max_length=10, blank=True, default='',
+        choices=[('mtn', 'MTN Mobile Money'), ('orange', 'Orange Money')],
+    )
+    claimed_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='claimed_listings',
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def is_agent_sourced(self):
+        return self.sourced_by_agent_id is not None
 
     # Set when Trust & Safety / Inventory staff take a published listing down
     # for a policy violation. Distinct from the host's own soft-delete

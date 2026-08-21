@@ -24,6 +24,8 @@ export { hostApplicationsAPI } from './hostApplications';
 export type { HostApplication } from './hostApplications';
 export { propertyVerificationsAPI } from './propertyVerifications';
 export type { PropertyVerification } from './propertyVerifications';
+export { agentsAPI } from './agents';
+export type { AgentApplication, AgentApplicationState, AgentDashboard } from './agents';
 export { leaseAgreementsAPI } from './leaseAgreements';
 export type { LeaseAgreement } from './leaseAgreements';
 export { superadminAPI } from './superadmin';

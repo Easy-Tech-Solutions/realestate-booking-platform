@@ -53,6 +53,15 @@ class NotificationType(models.TextChoices):
     HOST_APPLICATION_PROGRESS  = 'host_application_progress',  'Host Application Progress'   # → applicant
     HOST_APPLICATION_DECLINED  = 'host_application_declined',  'Host Application Declined'   # → applicant
     HOST_APPLICATION_APPROVED  = 'host_application_approved',  'Host Application Approved'   # → applicant
+    # Sourcing-agent applications
+    AGENT_APPLICATION_SUBMITTED = 'agent_application_submitted', 'Agent Application Submitted'  # → reviewers
+    AGENT_APPLICATION_ADVANCED  = 'agent_application_advanced',  'Agent Application Advanced'   # → next reviewers
+    AGENT_APPLICATION_RECEIVED  = 'agent_application_received',  'Agent Application Received'   # → applicant
+    AGENT_APPLICATION_PROGRESS  = 'agent_application_progress',  'Agent Application Progress'   # → applicant
+    AGENT_APPLICATION_DECLINED  = 'agent_application_declined',  'Agent Application Declined'   # → applicant
+    AGENT_APPLICATION_APPROVED  = 'agent_application_approved',  'Agent Application Approved'   # → applicant
+    AGENT_COMMISSION_EARNED     = 'agent_commission_earned',     'Agent Commission Earned'      # → agent
+    AGENT_COMMISSION_PAID       = 'agent_commission_paid',       'Agent Commission Paid'        # → agent
     # Property verification (listing owner/non-owner verification flow)
     PROPERTY_VERIFICATION_SUBMITTED  = 'property_verification_submitted',  'Property Verification Submitted'  # → reviewers
     PROPERTY_VERIFICATION_ADVANCED   = 'property_verification_advanced',   'Property Verification Advanced'   # → next reviewers

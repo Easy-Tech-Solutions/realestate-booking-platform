@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard, Info, HelpCircle, Mail, CalendarCheck, ShieldCheck } from 'lucide-react';
+import { Search, Menu, User, Heart, MessageSquare, Home as HomeIcon, Settings, LogOut, UserCircle, Bell, LayoutDashboard, Info, HelpCircle, Mail, CalendarCheck, ShieldCheck, Handshake } from 'lucide-react';
 import logo from '../../assets/logo2.jpg';
 import { Button } from './ui/button';
 import {
@@ -178,6 +178,10 @@ export function Header() {
                           Become a host
                         </DropdownMenuItem>
                       )}
+                      <DropdownMenuItem onClick={() => navigate(user?.isAgent ? '/agent' : '/become-an-agent')}>
+                        <Handshake className="w-4 h-4 mr-2" />
+                        {user?.isAgent ? 'Agent Dashboard' : 'Become an agent'}
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       {user?.isHost && (
                         <>

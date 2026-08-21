@@ -65,6 +65,8 @@ const Messages = lazyPage(() => import('./pages/Messages').then((module) => ({ d
 const Account = lazyPage(() => import('./pages/Account').then((module) => ({ default: module.Account })));
 const HostDashboard = lazyPage(() => import('./pages/HostDashboard').then((module) => ({ default: module.HostDashboard })));
 const BecomeAHost = lazyPage(() => import('./pages/BecomeAHost').then((module) => ({ default: module.BecomeAHost })));
+const BecomeAgent = lazyPage(() => import('./pages/BecomeAgent').then((module) => ({ default: module.BecomeAgent })));
+const AgentDashboard = lazyPage(() => import('./pages/AgentDashboard').then((module) => ({ default: module.AgentDashboard })));
 const PropertyOwnerAgreement = lazyPage(() => import('./pages/PropertyOwnerAgreement').then((module) => ({ default: module.PropertyOwnerAgreement })));
 const CreateListing = lazyPage(() => import('./pages/CreateListing').then((module) => ({ default: module.CreateListing })));
 const UserDashboard = lazyPage(() => import('./pages/UserDashboard').then((module) => ({ default: module.UserDashboard })));
@@ -163,6 +165,22 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'become-an-agent',
+        element: (
+          <ProtectedRoute>
+            <BecomeAgent />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'agent',
+        element: (
+          <ProtectedRoute requireAgent>
+            <AgentDashboard />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'host',
         element: (
           <ProtectedRoute requireHost>
@@ -173,7 +191,7 @@ export const router = createBrowserRouter([
       {
         path: 'host/new',
         element: (
-          <ProtectedRoute requireHost>
+          <ProtectedRoute requireHostOrAgent>
             <AgreementGuard>
               <CreateListing />
             </AgreementGuard>
