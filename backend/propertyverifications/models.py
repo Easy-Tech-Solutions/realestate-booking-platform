@@ -39,6 +39,7 @@ class PropertyVerification(models.Model):
     class OwnershipType(models.TextChoices):
         OWNER     = 'owner',     'Owner'
         NON_OWNER = 'non_owner', 'Non-Owner (MOU)'
+        AGENT     = 'agent',     'Agent-Sourced'
 
     class Status(models.TextChoices):
         SUBMITTED            = 'submitted',            'Submitted — Product Support review'
@@ -84,6 +85,10 @@ class PropertyVerification(models.Model):
     # creation and is never independently verified).
     inspection_latitude  = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     inspection_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    # Agent-sourced only: the Compliance Officer confirms (by phone) that the
+    # real owner authorized this agent and that the payout number is theirs.
+    # null = not yet answered; required True to approve an agent-sourced listing.
+    owner_authorization_confirmed = models.BooleanField(null=True, blank=True)
 
     status = models.CharField(
         max_length=25, choices=Status.choices, default=Status.SUBMITTED, db_index=True,

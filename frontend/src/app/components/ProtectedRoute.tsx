@@ -6,10 +6,12 @@ import { AccessDenied } from './AccessDenied';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireHost?: boolean;
+  requireAgent?: boolean;
+  requireHostOrAgent?: boolean;
   requireAdmin?: boolean;
 }
 
-export function ProtectedRoute({ children, requireHost, requireAdmin }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requireHost, requireAgent, requireHostOrAgent, requireAdmin }: ProtectedRouteProps) {
   const { isAuthenticated, user, isLoading } = useApp();
   const location = useLocation();
 
@@ -21,6 +23,15 @@ export function ProtectedRoute({ children, requireHost, requireAdmin }: Protecte
   }
 
   if (requireHost && !user?.isHost) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (requireAgent && !user?.isAgent) {
+    return <Navigate to="/become-an-agent" replace />;
+  }
+
+  // Listing a property is allowed for hosts (own/MOU) and sourcing agents.
+  if (requireHostOrAgent && !user?.isHost && !user?.isAgent) {
     return <Navigate to="/" replace />;
   }
 

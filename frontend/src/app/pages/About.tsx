@@ -15,12 +15,12 @@ const VALUES = [
   {
     icon: MapPin,
     title: 'Local Expertise',
-    description: 'From city apartments to beachside lodges, we spotlight the best stays across Ghana and beyond.',
+    description: 'From city apartments to beachside lodges, we spotlight the best stays in Liberia.',
   },
   {
     icon: Star,
     title: 'Quality Experience',
-    description: 'Our Superhost program and review system ensure guests always know what to expect before they book.',
+    description: 'Our Compliance Officers and review system ensure guests always know what to expect before they book.',
   },
 ];
 
@@ -32,7 +32,7 @@ export function About() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-16 text-center">
           <h1 className="text-4xl sm:text-5xl font-semibold mb-4">About HomeKonet</h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            HomeKonet is a property booking platform that makes it easy to find, book, and host unique accommodations — from cosy apartments to luxury hotels.
+            HomeKonet is a property booking platform that makes it easy to find, book, and host unique accommodations, from cozy apartments to luxury hotels.
           </p>
         </div>
       </div>
@@ -41,10 +41,10 @@ export function About() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-20 py-16 max-w-3xl">
         <h2 className="text-2xl font-semibold mb-4">Our Story</h2>
         <p className="text-muted-foreground leading-relaxed mb-4">
-          HomeKonet was founded with a simple mission: make finding a great place to stay as easy as possible. We saw that travellers were spending hours comparing options across platforms while hosts struggled to reach the right guests. We built a single, seamless marketplace to solve both problems.
+          HomeKonet was founded with a simple mission: make finding a great place to stay as easy as possible. We saw that people were spending days and months looking for accomodations while hosts/property owners struggled to reach the right guests/tenants. We built a single, seamless marketplace to solve both problems.
         </p>
         <p className="text-muted-foreground leading-relaxed">
-          Today, HomeKonet hosts thousands of listings across multiple property types — apartments, hotels, lodges, beachside retreats, and more — all bookable in minutes with support for mobile money and card payments.
+          Today, HomeKonet provides a platform to explore listings across multiple property types(apartments, family homes, hotels, lodges, and more), all bookable in minutes with support for mobile money and card payments.
         </p>
       </div>
 

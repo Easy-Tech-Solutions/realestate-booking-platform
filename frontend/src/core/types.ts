@@ -10,6 +10,7 @@ export interface User {
   phone?: string;
   bio?: string;
   isHost: boolean;
+  isAgent?: boolean;
   isAdmin?: boolean;
   isSuperadmin?: boolean;
   isStaff?: boolean;

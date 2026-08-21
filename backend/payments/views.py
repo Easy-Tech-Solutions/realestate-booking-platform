@@ -447,6 +447,13 @@ def admin_cancel_payout(request, payout_id):
     payout.cancellation_reason = reason
     payout.save(update_fields=['status', 'cancelled_at', 'cancelled_by', 'cancellation_reason'])
 
+    # Agent-sourced: clawback the sourcing agent's (still-pending) commission.
+    try:
+        from agents.commissions import void_agent_commission
+        void_agent_commission(payout.booking, reason=f'Payout cancelled: {reason}')
+    except Exception:
+        pass
+
     from superadmin.permissions import log_admin_action
     log_admin_action(request, 'payout.cancel', target=payout, reason=reason)
 

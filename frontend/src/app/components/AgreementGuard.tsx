@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
@@ -14,12 +14,19 @@ import { getErrorMessage } from '../../services/api/shared/errors';
  * transient API error never traps a host out of listing.
  */
 export function AgreementGuard({ children }: { children: React.ReactNode }) {
+  const [searchParams] = useSearchParams();
+  // Agent-sourcing mode: the agent accepted the *Agent* Agreement at onboarding
+  // and isn't the property owner, so the Property Owner Agreement gate doesn't
+  // apply — let them straight through to the wizard.
+  const agentMode = searchParams.get('mode') === 'agent';
+
   const [status, setStatus] = useState<AgreementStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!agentMode);
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (agentMode) return;
     let active = true;
     hostApplicationsAPI
       .agreementStatus()
@@ -27,7 +34,9 @@ export function AgreementGuard({ children }: { children: React.ReactNode }) {
       .catch(() => { if (active) setStatus(null); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [agentMode]);
+
+  if (agentMode) return <>{children}</>;
 
   const accept = async () => {
     setSubmitting(true);

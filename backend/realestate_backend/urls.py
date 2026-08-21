@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/support/', include('support.urls')),
     path('api/host-applications/', include('hostapplications.urls')),
     path('api/property-verifications/', include('propertyverifications.urls')),
+    path('api/agents/', include('agents.urls')),
     path('api/superadmin/', include('superadmin.urls')),
     path('api/trust-safety/', include('trustsafety.urls')),
     path('api/inventory/', include('inventory.urls')),

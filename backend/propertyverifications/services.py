@@ -126,6 +126,9 @@ def compliance_decision(verification, decision, officer, notes='', inspection_da
         if inspection_data.get('inspection_longitude') is not None:
             verification.inspection_longitude = inspection_data['inspection_longitude']
             update_fields.append('inspection_longitude')
+        if inspection_data.get('owner_authorization_confirmed') is not None:
+            verification.owner_authorization_confirmed = inspection_data['owner_authorization_confirmed']
+            update_fields.append('owner_authorization_confirmed')
         if update_fields:
             verification.save(update_fields=update_fields)
 
@@ -133,6 +136,15 @@ def compliance_decision(verification, decision, officer, notes='', inspection_da
             raise InvalidTransition(
                 'A completed site inspection (due-diligence confirmation + inspection report) '
                 'is required before Compliance can approve.'
+            )
+
+        # Agent-sourced properties additionally require the owner-authorization
+        # phone check (owner confirmed they authorized this agent + payout number).
+        if verification.ownership_type == PropertyVerification.OwnershipType.AGENT \
+                and not verification.owner_authorization_confirmed:
+            raise InvalidTransition(
+                'For agent-sourced properties, you must confirm the owner authorized this '
+                'agent (and the payout number) before Compliance can approve.'
             )
 
     verification.compliance_reviewed_by = officer
