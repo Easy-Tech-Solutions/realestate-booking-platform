@@ -19,6 +19,7 @@ import { formatCurrency } from '../../core/utils';
 import { toast } from 'sonner';
 import { usersAPI, propertiesAPI, bookingsAPI, payoutsAPI, paymentAPI } from '../../services/api';
 import type { PlatformFee, EscrowBooking } from '../../services/api/payments';
+import type { ListingSettings } from '../../services/api/properties';
 import { useApp } from '../../hooks/useApp';
 import { MfaSetupCard } from '../components/MfaSetupCard';
 import { CommunicationsDialog } from '../components/CommunicationsDialog';
@@ -153,6 +154,10 @@ export function AdminDashboard() {
   const [platformFeeDraft, setPlatformFeeDraft] = useState<Partial<PlatformFee>>({});
   const [platformFeeLoading, setPlatformFeeLoading] = useState(false);
   const [platformFeeSaving, setPlatformFeeSaving] = useState(false);
+  const [listingSettings, setListingSettings] = useState<ListingSettings | null>(null);
+  const [listingSettingsDraft, setListingSettingsDraft] = useState<Partial<ListingSettings>>({});
+  const [listingSettingsLoading, setListingSettingsLoading] = useState(false);
+  const [listingSettingsSaving, setListingSettingsSaving] = useState(false);
 
   // Support state
   const [supportTickets, setSupportTickets]     = useState<SupportTicket[]>([]);
@@ -944,6 +949,34 @@ export function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader><CardTitle>Listings</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {listingSettingsLoading || !listingSettings ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : (
+              <>
+                <div>
+                  <label className="text-sm font-medium">Minimum listing price (USD)</label>
+                  <Input
+                    type="number" step="0.01" min="0" className="w-32 mt-1"
+                    value={listingSettingsDraft.min_monthly_price ?? ''}
+                    onChange={(e) => setListingSettingsDraft((d) => ({ ...d, min_monthly_price: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The lowest price a host can set when creating or editing a listing.
+                  </p>
+                </div>
+                <Button disabled={listingSettingsSaving} onClick={handleSaveListingSettings}>
+                  {listingSettingsSaving ? 'Saving…' : 'Save changes'}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Takes effect immediately — no deployment needed.
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
         <FeatureFlagsPanel />
       </div>
     </div>
@@ -999,6 +1032,37 @@ export function AdminDashboard() {
       toast.error(err?.message || 'Failed to save platform fees');
     } finally {
       setPlatformFeeSaving(false);
+    }
+  };
+
+  const loadListingSettings = useCallback(async () => {
+    setListingSettingsLoading(true);
+    try {
+      const settings = await propertiesAPI.getListingSettings();
+      setListingSettings(settings);
+      setListingSettingsDraft(settings);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to load listing settings');
+    } finally {
+      setListingSettingsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'settings') loadListingSettings();
+  }, [activeSection, loadListingSettings]);
+
+  const handleSaveListingSettings = async () => {
+    setListingSettingsSaving(true);
+    try {
+      const updated = await propertiesAPI.adminUpdateListingSettings(listingSettingsDraft);
+      setListingSettings(updated);
+      setListingSettingsDraft(updated);
+      toast.success('Listing settings updated.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to save listing settings');
+    } finally {
+      setListingSettingsSaving(false);
     }
   };
 

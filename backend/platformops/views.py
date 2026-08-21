@@ -265,6 +265,51 @@ def server_metrics(request):
     return Response({'live': _collect_metrics(), 'history': history})
 
 
+# ---------------------------------------------------------------------------
+# Docs viewer — serves the three HTML documentation files to staff only.
+# Accessed at /api/platform-ops/docs/<slug>/ where slug is one of:
+#   user-guide | management-portal-guide | developer-guide
+# The frontend embeds these in an iframe at /management/docs.
+# ---------------------------------------------------------------------------
+
+_DOCS_SLUGS = {
+    'user-guide': 'user-guide.html',
+    'management-portal-guide': 'management-portal-guide.html',
+    'developer-guide': 'developer-guide.html',
+}
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def docs_view(request, slug):
+    """Serve a documentation HTML file. Requires is_staff (admin/superadmin/officer).
+
+    @api_view is required here (not a plain Django view) — this app
+    authenticates via JWT bearer token, which only DRF's authentication
+    classes parse. A plain view would only ever see request.user as
+    AnonymousUser (Django's own AuthenticationMiddleware is session-cookie
+    based), permanently 403ing every legitimate caller.
+    """
+    from django.http import HttpResponse, Http404
+    from superadmin.permissions import is_superadmin_staff
+
+    if not is_superadmin_staff(request.user):
+        return HttpResponse('Forbidden', status=403, content_type='text/plain')
+
+    filename = _DOCS_SLUGS.get(slug)
+    if not filename:
+        raise Http404
+
+    # settings.BASE_DIR is /app inside the container (see docker-compose.yml's
+    # `./docs:/app/docs:ro` bind mount on the backend service) — docs/ is NOT
+    # baked into the image, so it stays current without a rebuild.
+    docs_path = Path(settings.BASE_DIR) / 'docs' / filename
+    if not docs_path.exists():
+        raise Http404
+
+    return HttpResponse(docs_path.read_text(encoding='utf-8'), content_type='text/html; charset=utf-8')
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def log_viewer(request):

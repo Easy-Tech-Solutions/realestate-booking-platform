@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Listing, ListingImage, Favorite, PropertyCategory
+from .models import Listing, ListingImage, Favorite, PropertyCategory, ListingSettings
 
 
 @admin.register(PropertyCategory)
@@ -8,6 +8,18 @@ class PropertyCategoryAdmin(admin.ModelAdmin):
     list_filter = ['is_active']
     search_fields = ['name', 'slug']
     ordering = ['sort_order', 'name']
+
+
+@admin.register(ListingSettings)
+class ListingSettingsAdmin(admin.ModelAdmin):
+    list_display = ['min_monthly_price', 'updated_at']
+    readonly_fields = ['updated_at']
+
+    def has_add_permission(self, request):
+        return not ListingSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 class ListingImageInline(admin.TabularInline):
     model = ListingImage

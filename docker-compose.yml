@@ -25,6 +25,7 @@ services:
       - backend_logs:/app/logs
       - ./backend/media:/app/media
       - static_files:/app/static
+      - ./docs:/app/docs:ro
     expose:
       - "8000"
     healthcheck:
@@ -117,8 +118,20 @@ services:
     depends_on:
       - backend
 
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
 volumes:
   redis_data:
   backend_logs:
   static_files:
   ai_models:
+  pgadmin_data:

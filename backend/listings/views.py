@@ -29,7 +29,7 @@ def _check_image_size(request):
     return None
 from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyView, PropertyStats, PropertyCategory, HotelRoom, HotelRoomImage
 from bookings.models import Booking
-from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer, HotelRoomImageSerializer
+from .serializers import ListingSerializer, ListingImageCreateSerializer, FavoriteSerializer, ReviewSerializer, ReviewCreateSerializer, PropertyCategorySerializer, HotelRoomSerializer, HotelRoomImageSerializer, ListingSettingsSerializer
 
 
 def _optimize_listings(qs):
@@ -59,9 +59,18 @@ class _ListingPagination(PageNumberPagination):
     max_page_size = 100
 
 
-def _is_admin(user):
+def _is_admin(user, resource=None):
+    """Full admins (superadmin) always pass; when `resource` is given, a
+    custom role granting that specific resource directly also passes."""
     from rbac.permissions import is_full_admin
-    return is_full_admin(user)
+    if is_full_admin(user):
+        return True
+    if resource:
+        from superadmin.permissions import is_superadmin_staff
+        from rbac.permissions import has_any_permission
+        if user and user.is_authenticated and is_superadmin_staff(user):
+            return has_any_permission(user, resource)
+    return False
 
 
 @api_view(["GET", "POST"])
@@ -79,6 +88,31 @@ def categories_collection(request):
     if serializer.is_valid():
         category = serializer.save()
         return Response(PropertyCategorySerializer(category).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET", "PATCH"])
+def listing_settings(request):
+    """
+    GET: readable by anyone (needed by hosts creating a listing — the
+    create-listing wizard fetches min_monthly_price to show/enforce the
+    admin-configured floor instead of a hardcoded one).
+    PATCH: superadmin, or a custom role granted 'listings.settings'.
+    """
+    from .models import ListingSettings
+    settings_obj = ListingSettings.get_current()
+
+    if request.method == "GET":
+        return Response(ListingSettingsSerializer(settings_obj).data)
+
+    if not _is_admin(request.user, 'listings.settings'):
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = ListingSettingsSerializer(settings_obj, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        log_admin_action(request, 'listing_settings.update', target=settings_obj, metadata_snapshot=serializer.data)
+        return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

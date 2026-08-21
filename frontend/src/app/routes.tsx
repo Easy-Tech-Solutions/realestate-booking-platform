@@ -85,6 +85,7 @@ const AdminRoles = lazyPage(() => import('./pages/AdminRoles').then((module) => 
 const AdminApprovals = lazyPage(() => import('./pages/AdminApprovals').then((module) => ({ default: module.AdminApprovals })));
 const AdminBreakGlass = lazyPage(() => import('./pages/AdminBreakGlass').then((module) => ({ default: module.AdminBreakGlass })));
 const AdminAircoverClaims = lazyPage(() => import('./pages/AdminAircoverClaims').then((module) => ({ default: module.AdminAircoverClaims })));
+const AdminDocs = lazyPage(() => import('./pages/AdminDocs').then((module) => ({ default: module.AdminDocs })));
 const Notifications = lazyPage(() => import('./pages/Notifications').then((module) => ({ default: module.Notifications })));
 const Login = lazyPage(() => import('./pages/Login').then((module) => ({ default: module.Login })));
 const VerifyEmail = lazyPage(() => import('./pages/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
@@ -339,6 +340,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requireAdmin>
             <AdminAircoverClaims />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/docs',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminDocs />
           </ProtectedRoute>
         ),
       },

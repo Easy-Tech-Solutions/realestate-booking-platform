@@ -1,6 +1,6 @@
 from rest_framework import serializers
 import json
-from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyCategory, HotelRoom, HotelRoomImage
+from .models import Listing, ListingImage, Favorite, Review, ReviewImage, PropertyCategory, HotelRoom, HotelRoomImage, ListingSettings
 
 
 class PropertyCategorySerializer(serializers.ModelSerializer):
@@ -11,6 +11,13 @@ class PropertyCategorySerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'slug': {'required': False, 'allow_blank': True},
         }
+
+
+class ListingSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ListingSettings
+        fields = ['min_monthly_price', 'updated_at']
+        read_only_fields = ['updated_at']
 
 
 class ListingImageSerializer(serializers.ModelSerializer):
@@ -129,6 +136,11 @@ class ListingSerializer(serializers.ModelSerializer):
         cap = self.instance.occupancy_cap if self.instance is not None else None
         if cap is not None and 'max_guests' in attrs and attrs['max_guests'] > cap:
             raise serializers.ValidationError({'max_guests': f'This property is capped at {cap} guests by local compliance requirements.'})
+
+        if 'price' in attrs and attrs['price'] is not None:
+            min_price = ListingSettings.get_current().min_monthly_price
+            if attrs['price'] < min_price:
+                raise serializers.ValidationError({'price': f'Price must be at least ${min_price}.'})
 
         return attrs
 

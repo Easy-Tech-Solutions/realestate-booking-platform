@@ -121,3 +121,33 @@ export async function fetchWithAuth<T>(url: string, options: RequestInit = {}): 
 
   return response.json() as Promise<T>;
 }
+
+// Same auth/refresh handling as fetchWithAuth, but for endpoints that return
+// raw text/HTML rather than JSON (e.g. the docs viewer) — response.json()
+// would throw on a non-JSON body.
+export async function fetchTextWithAuth(url: string, options: RequestInit = {}): Promise<string> {
+  const makeRequest = async (token: string | null) => {
+    const headers: Record<string, string> = {
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(options.headers as Record<string, string>),
+    };
+
+    return fetch(`${API_BASE_URL}${url}`, { ...options, headers, credentials: 'include' });
+  };
+
+  let response = await makeRequest(accessToken);
+
+  if (response.status === 401) {
+    const newToken = await attemptTokenRefresh();
+    if (newToken) {
+      response = await makeRequest(newToken);
+    }
+  }
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new ApiError(body || response.statusText || `Request failed (${response.status})`, response.status);
+  }
+
+  return response.text();
+}
