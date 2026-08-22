@@ -183,11 +183,19 @@ def verify_payment(request):
                     booking_id=payment.booking_id,
                     gateway_status='verified',
                 )
+                # Booking-rent payments have a booking; viewing-fee payments
+                # have a viewing instead — payment.booking is None for those,
+                # so accessing .status on it unconditionally 500s every poll.
+                extra = {}
+                if payment.booking_id:
+                    extra['booking_status'] = payment.booking.status
+                elif payment.viewing_id:
+                    extra['viewing_status'] = payment.viewing.status
                 return Response({
                     'success': True,
                     'payment': PaymentSerializer(payment, context={'request': request}).data,
                     'verification': result,
-                    'booking_status': payment.booking.status,
+                    **extra,
                 })
 
             log_transaction(

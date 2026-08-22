@@ -86,6 +86,7 @@ const navGroups: NavGroup[] = [
   ] },
   { id: 'platform', label: 'Platform & Engineering', icon: Cpu, items: [
     { type: 'route', path: '/management/platform-ops', label: 'System Health & Errors' },
+    { type: 'route', path: '/management/docs', label: 'Documentation' },
   ] },
   { id: 'settings', label: 'Settings', icon: Settings, items: [
     { type: 'section', id: 'settings', label: 'Platform Settings' },

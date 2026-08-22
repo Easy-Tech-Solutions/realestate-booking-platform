@@ -724,11 +724,9 @@ def viewings_collection(request):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        from notifications.services import notify_viewing_requested
-        notify_viewing_requested(viewing)
-    except Exception:
-        pass
+    # Admins are notified once the (non-refundable) fee is actually paid —
+    # see mark_viewing_fee_paid — not here at request time, so they're never
+    # asked to schedule a visit for a request that might not get paid.
 
     from .serializers import ViewingAppointmentSerializer
     return Response(ViewingAppointmentSerializer(viewing, context={'request': request}).data, status=status.HTTP_201_CREATED)
