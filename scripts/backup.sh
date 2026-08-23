@@ -41,6 +41,29 @@ if ! command -v pg_dump >/dev/null; then
   echo "    Continuing WITHOUT a database dump — everything else will still be backed up."
 fi
 
+# pg_dump's custom-format archive version is tied to its own major version,
+# not the server's — a newer pg_dump (e.g. 17) produces a dump pg_restore
+# from an older server (e.g. 16) can't read ("unsupported version in file
+# header"), even though the dump itself succeeds silently. Debian's
+# postgresql-client-common lets multiple client majors coexist at
+# /usr/lib/postgresql/<major>/bin/ — prefer the one matching the actual
+# server, falling back to whatever's on PATH if that's all there is.
+pick_pg_dump() {
+  # $1, if given, is a full connection URI; otherwise psql uses the PG* env
+  # vars (PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE) already set by the caller.
+  local server_major
+  if [[ -n "${1:-}" ]]; then
+    server_major="$(psql "$1" -tAc 'SHOW server_version_num;' 2>/dev/null | cut -c1-2)"
+  else
+    server_major="$(psql -tAc 'SHOW server_version_num;' 2>/dev/null | cut -c1-2)"
+  fi
+  if [[ -n "$server_major" && -x "/usr/lib/postgresql/$server_major/bin/pg_dump" ]]; then
+    echo "/usr/lib/postgresql/$server_major/bin/pg_dump"
+  else
+    command -v pg_dump
+  fi
+}
+
 mkdir -p "$OUT_DIR"
 cd "$ROOT_DIR"
 
@@ -66,18 +89,21 @@ if command -v pg_dump >/dev/null; then
 
   DB_URL="$(env_var DATABASE_URL)"
   if [[ -n "$DB_URL" ]]; then
-    echo "==> Dumping database (managed Postgres via DATABASE_URL)"
-    pg_dump --format=custom --no-owner --no-acl --schema=public --dbname="$DB_URL" \
+    PG_DUMP_BIN="$(pick_pg_dump "$DB_URL")"
+    echo "==> Dumping database (managed Postgres via DATABASE_URL) using $PG_DUMP_BIN"
+    "$PG_DUMP_BIN" --format=custom --no-owner --no-acl --schema=public --dbname="$DB_URL" \
       --file="$STAGE_DIR/database.dump"
   else
     PGHOST_VAL="$(env_var POSTGRES_HOST)"
     if [[ -n "$PGHOST_VAL" ]]; then
-      echo "==> Dumping database (self-hosted Postgres via POSTGRES_* vars)"
-      PGPASSWORD="$(env_var POSTGRES_PASSWORD)" pg_dump --format=custom --no-owner --no-acl --schema=public \
-        -h "$PGHOST_VAL" \
-        -p "$(env_var POSTGRES_PORT)" \
-        -U "$(env_var POSTGRES_USER)" \
-        -d "$(env_var POSTGRES_DB)" \
+      export PGHOST="$PGHOST_VAL"
+      export PGPORT="$(env_var POSTGRES_PORT)"
+      export PGUSER="$(env_var POSTGRES_USER)"
+      export PGPASSWORD="$(env_var POSTGRES_PASSWORD)"
+      export PGDATABASE="$(env_var POSTGRES_DB)"
+      PG_DUMP_BIN="$(pick_pg_dump)"
+      echo "==> Dumping database (self-hosted Postgres via POSTGRES_* vars) using $PG_DUMP_BIN"
+      "$PG_DUMP_BIN" --format=custom --no-owner --no-acl --schema=public \
         --file="$STAGE_DIR/database.dump"
     else
       echo "==> No DATABASE_URL or POSTGRES_HOST found in the backend container's env"

@@ -14,7 +14,7 @@ This guide covers deploying the HomeKonet real-estate booking platform on a Linu
 | Cache / queue broker | Redis 7 |
 | Background tasks | Celery worker |
 | Scheduled tasks | Celery beat (booking expiry, etc.) |
-| Media storage | Cloudinary (production) |
+| Media storage | Local disk by default; Cloudinary optional (set `CLOUDINARY_URL` to switch) |
 | Email | Brevo (Sendinblue) via `django-anymail` |
 | Reverse proxy / TLS | Nginx |
 | Container runtime (Path A) | Docker + Docker Compose v2 |
@@ -59,7 +59,7 @@ This guide covers deploying the HomeKonet real-estate booking platform on a Linu
 | Service | Purpose | Where to get it |
 |---|---|---|
 | PostgreSQL credentials | Database | Neon, Supabase, or self-hosted |
-| Cloudinary | Persistent media storage | cloudinary.com |
+| Cloudinary (optional) | Persistent media storage instead of local disk — recommended if the app server's disk isn't backed up/migrated reliably | cloudinary.com |
 | Brevo (Sendinblue) | Transactional email | brevo.com → Settings → API Keys |
 | Stripe secret key + webhook secret | Card payments | dashboard.stripe.com |
 | Stripe publishable key | Frontend card form | dashboard.stripe.com |
