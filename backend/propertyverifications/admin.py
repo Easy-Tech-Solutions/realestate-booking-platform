@@ -84,6 +84,7 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
 
     readonly_fields = [
         'listing_link', 'applicant', 'ownership_type', 'owner_name',
+        'owner_phone', 'owner_email', 'owner_payout',
         'property_location', 'deed_volume_number', 'mou_link',
         'status', 'current_stage_display', 'resubmission_count',
         'ps_reviewed_by', 'ps_reviewed_at',
@@ -116,6 +117,25 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
         }),
         ('Timestamps', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
+
+    def get_fieldsets(self, request, obj=None):
+        """For agent-sourced properties, insert an owner-contact section right
+        after 'Property' so Compliance can phone the real owner to confirm the
+        agent's authorization and the payout number. The owner's contact/payout
+        details live on the Listing (entered by the agent), not the
+        verification, so they're surfaced here as read-only display fields."""
+        fieldsets = [(name, dict(opts)) for name, opts in self.fieldsets]
+        if obj and obj.ownership_type == PropertyVerification.OwnershipType.AGENT:
+            owner_contact = ('Owner contact (agent-sourced)', {
+                'fields': ('owner_phone', 'owner_email', 'owner_payout'),
+                'description': (
+                    'The sourcing agent entered these on the owner\'s behalf. Call the '
+                    'owner on this number to confirm they authorized the agent and the '
+                    'payout number, then tick "owner authorization confirmed" below.'
+                ),
+            })
+            fieldsets.insert(1, owner_contact)
+        return fieldsets
 
     # ---- Visibility & permissions -------------------------------------------
 
@@ -178,6 +198,23 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
     def current_stage_display(self, obj):
         stage = obj.current_stage
         return stage.label if stage else '— (closed)'
+
+    @admin.display(description='Owner phone')
+    def owner_phone(self, obj):
+        return obj.listing.agent_owner_phone or '—'
+
+    @admin.display(description='Owner email')
+    def owner_email(self, obj):
+        return obj.listing.agent_owner_email or '—'
+
+    @admin.display(description='Owner payout number')
+    def owner_payout(self, obj):
+        number = obj.listing.agent_owner_payout_number
+        if not number:
+            return '—'
+        network = obj.listing.get_agent_owner_payout_network_display() \
+            if obj.listing.agent_owner_payout_network else ''
+        return f'{number} ({network})' if network else number
 
     @admin.display(description='MOU document')
     def mou_link(self, obj):
