@@ -8,5 +8,5 @@
   <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Now with:</strong> {{ data.next_stage }}</td></tr>
 </table>
 <p style="margin:0 0 24px;color:#444444;font-size:15px;line-height:1.6;">We'll email you again at the next step.</p>
-<a href="{{ site_url }}/host" style="display:inline-block;background:#004406;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">Go to Host Dashboard</a>
+<a href="{{ site_url }}{{ data.dashboard_url|default:'/host' }}" style="display:inline-block;background:#004406;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">{{ data.dashboard_label|default:'Go to Host Dashboard' }}</a>
 {% endblock %}

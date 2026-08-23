@@ -1267,12 +1267,22 @@ def notify_agent_commission_paid(commission):
 # ---- Property verification helpers -------------------------------------------
 
 def _property_verification_data(verification):
+    # Agent-sourced listings are submitted by a sourcing agent, not a host, so
+    # every applicant-facing email must point at the AGENT dashboard, never the
+    # host one. Decide the CTA label + path ONCE here (from ownership_type) and
+    # have the templates render these fields — so a host/agent link can never be
+    # crossed in an individual template, and new verification emails inherit the
+    # right button for free.
+    from propertyverifications.models import PropertyVerification
+    is_agent = verification.ownership_type == PropertyVerification.OwnershipType.AGENT
     return {
         'verification_id': verification.id,
         'listing_id':      verification.listing_id,
         'listing_title':   verification.listing.title,
         'ownership_type':  verification.ownership_type,
         'status':          verification.status,
+        'dashboard_url':   '/agent' if is_agent else '/host',
+        'dashboard_label': 'Go to Agent Dashboard' if is_agent else 'Go to Host Dashboard',
     }
 
 
