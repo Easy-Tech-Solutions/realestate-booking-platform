@@ -10,6 +10,10 @@
 # It extracts the dump and prints the exact commands to run once you've
 # confirmed backend/.env points at the right (and, for a fresh DB, empty)
 # database.
+#
+# RESTORE_PASSPHRASE=... bash scripts/restore.sh <archive>   # non-interactive
+# (needed when running via 'ssh host command=...' or similar — gpg can't show
+# an interactive passphrase prompt without a real TTY.)
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -38,7 +42,11 @@ STAGE_DIR="$(mktemp -d)"
 trap 'rm -rf "$STAGE_DIR"' EXIT
 
 echo "==> Decrypting and extracting $ARCHIVE"
-gpg --decrypt "$ARCHIVE" 2>/dev/null | tar -xzf - -C "$STAGE_DIR"
+if [[ -n "${RESTORE_PASSPHRASE:-}" ]]; then
+  gpg --batch --yes --passphrase "$RESTORE_PASSPHRASE" --decrypt "$ARCHIVE" 2>/dev/null | tar -xzf - -C "$STAGE_DIR"
+else
+  gpg --decrypt "$ARCHIVE" 2>/dev/null | tar -xzf - -C "$STAGE_DIR"
+fi
 
 # Plain files/directories go straight into the repo tree.
 for path in .env backend/.env frontend/.env backend/media nginx/ssl; do

@@ -50,7 +50,7 @@ This guide covers deploying the HomeKonet real-estate booking platform on a Linu
 ## 1. Prerequisites
 
 ### Minimum server spec
-- Ubuntu 22.04 LTS, **2 GB RAM / 2 vCPUs / 20 GB disk** (4 GB RAM recommended)
+- Debian 12 (bookworm) — what production actually runs; Ubuntu 22.04 LTS also works, just swap `linux/debian` for `linux/ubuntu` in §3's Docker repo setup. **2 GB RAM / 2 vCPUs / 20 GB disk** minimum (4 GB RAM recommended)
 - A domain name (e.g. `homekonet.com`) with DNS A records pointing to the server's public IP
 - SSH access as a non-root user with `sudo` privileges
 
@@ -107,16 +107,18 @@ sudo usermod -aG docker homekonet   # add after Docker is installed
 ## 3. Install Docker and Docker Compose
 
 ```bash
-# Add Docker's official GPG key and repository
+# Add Docker's official GPG key and repository. Use the repo matching your
+# actual distro — production runs Debian 12 (bookworm), so this uses
+# linux/debian; swap to linux/ubuntu if you're really on Ubuntu.
 sudo apt install -y ca-certificates curl gnupg
 sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+curl -fsSL https://download.docker.com/linux/debian/gpg \
   | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu \
+  https://download.docker.com/linux/debian \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
   | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
