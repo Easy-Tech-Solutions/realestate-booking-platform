@@ -57,11 +57,21 @@ def _check_superhost(owner):
 @permission_classes([IsAuthenticated])
 def bookings_collection(request):
     if request.method == "GET":
-        # Always return the requester's bookings as a guest (what /trips shows).
-        # Agents access bookings on their *listings* via the host dashboard
-        # endpoint (/api/users/me/dashboard/), which is a separate, role-aware
-        # surface — so this endpoint doesn't need to branch on role.
-        bookings = Booking.objects.filter(customer=request.user).order_by("-requested_at")
+        # Default: the requester's bookings as a guest (what /trips shows). The
+        # web host dashboard instead gets its data from the separate, richer
+        # /api/users/me/dashboard/ aggregate endpoint — but the mobile app's
+        # host bookings screen calls this endpoint with ?role=host expecting
+        # it to return bookings on the host's *listings* instead of their own
+        # guest bookings. Honor that explicitly rather than silently ignoring
+        # it and returning the wrong (guest-side) rows.
+        if request.GET.get('role') == 'host':
+            bookings = Booking.objects.filter(listing__owner=request.user)
+            status_filter = request.GET.get('status')
+            if status_filter:
+                bookings = bookings.filter(status=status_filter)
+            bookings = bookings.order_by("-requested_at")
+        else:
+            bookings = Booking.objects.filter(customer=request.user).order_by("-requested_at")
         return Response(BookingSerializer(bookings, many=True, context={'request': request}).data)
 
     elif request.method == "POST":
