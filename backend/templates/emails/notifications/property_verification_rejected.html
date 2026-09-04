@@ -7,5 +7,5 @@
   {% if data.review_notes %}<tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Reason:</strong> {{ data.review_notes }}</td></tr>{% endif %}
 </table>
 <p style="margin:0 0 24px;color:#444444;font-size:15px;line-height:1.6;">If you believe this was a mistake or you can address the reason above, you're welcome to submit a new listing.</p>
-<a href="{{ site_url }}/host" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">Go to Host Dashboard</a>
+<a href="{{ site_url }}{{ data.dashboard_url|default:'/host' }}" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">{{ data.dashboard_label|default:'Go to Host Dashboard' }}</a>
 {% endblock %}

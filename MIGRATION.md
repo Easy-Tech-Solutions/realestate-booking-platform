@@ -4,9 +4,12 @@ This doc covers everything that needs to move to stand the whole stack up
 cleanly on a new server: the database, pgAdmin, the backend, the frontend,
 and every other service in `docker-compose.yml`. See also
 `docs/developer-guide.html`'s **Backup & Migration** section for the same
-material in the engineering handbook, and `docs/gcp-postgres-migration.md`
+material in the engineering handbook, `docs/gcp-postgres-migration.md`
 for the deeper, Postgres-specific plan if the database itself is also moving
-onto a new self-hosted GCP VM as part of this.
+onto a new self-hosted GCP VM as part of this, and
+`docs/migration-to-easytechproducts.md` for the concrete, filled-in version
+of this runbook for the current move to the `easytechproducts` GCP project
+(exact server names/IPs, what's already been provisioned, what's left).
 
 ## What does NOT need migrating
 
