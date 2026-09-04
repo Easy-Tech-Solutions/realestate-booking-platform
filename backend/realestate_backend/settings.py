@@ -553,6 +553,14 @@ PAYMENT_GATEWAYS = {
     'mtn_momo': {
         'collection_key': os.environ.get('MTN_MOMO_COLLECTION_KEY', ''),
         'disbursement_key': os.environ.get('MTN_MOMO_DISBURSEMENT_KEY', ''),
+        # The X-Target-Environment value MTN registered for our live API user.
+        # This is NOT the literal string "production" — MTN assigns a
+        # per-OpCo identifier at commercial go-live (Liberia = "mtnliberia");
+        # sending the wrong value gets every requesttopay/transfer call
+        # rejected with NOT_ALLOWED_TARGET_ENVIRONMENT before MTN ever pushes
+        # a prompt to the payer's phone. Sandbox is unaffected — it always
+        # uses the literal "sandbox" value regardless of this setting.
+        'target_environment': os.environ.get('MTN_MOMO_TARGET_ENVIRONMENT', 'production'),
         'accounts': {
             # LRD falls back to the original un-suffixed vars so a
             # single-currency setup (from before dual-currency support)

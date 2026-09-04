@@ -51,7 +51,10 @@ class MTNMoMoGateway(PaymentGatewayBase):
         self.collection_key = mtn_config.get('collection_key', '')        # Collection subscription key
         self.disbursement_key = mtn_config.get('disbursement_key', '')    # Disbursement subscription key
         self._accounts = mtn_config.get('accounts', {})
-        self.target_env = 'sandbox' if self.is_sandbox else 'production'
+        # Sandbox always uses the literal "sandbox" value; live traffic uses
+        # whatever OpCo-specific identifier MTN registered for our API user
+        # (see MTN_MOMO_TARGET_ENVIRONMENT in settings.py — Liberia = "mtnliberia").
+        self.target_env = 'sandbox' if self.is_sandbox else mtn_config.get('target_environment', 'production')
 
     def _account_for(self, currency: str) -> dict:
         """Resolve the (user_id, api_secret) pair for a specific currency's
