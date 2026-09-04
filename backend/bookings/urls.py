@@ -5,6 +5,7 @@ from .views import (
     admin_payment_received_bookings, admin_booking_communications, admin_extend_reservation,
     request_payment, my_payment_requests,
     viewing_slots, viewings_collection, reserve_from_viewing,
+    admin_viewings_collection, admin_update_viewing_status,
     my_payouts,
     search_alerts, saved_search_detail,
     saved_searches, test_search, property_comparisons, comparison_detail,
@@ -26,6 +27,8 @@ urlpatterns = [
     # Viewing appointments (Path C)
     path('viewings/', viewings_collection, name='viewings_collection'),
     path('viewings/slots/<int:listing_id>/', viewing_slots, name='viewing_slots'),
+    path('viewings/admin/', admin_viewings_collection, name='admin_viewings_collection'),
+    path('viewings/admin/<int:id>/status/', admin_update_viewing_status, name='admin_update_viewing_status'),
     path('viewings/<int:viewing_id>/reserve/', reserve_from_viewing, name='reserve_from_viewing'),
     # Payouts (host)
     path('payouts/', my_payouts, name='my_payouts'),

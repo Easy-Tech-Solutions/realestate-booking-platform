@@ -43,4 +43,23 @@ export const viewingsAPI = {
     });
     return normalizeBooking(data);
   },
+
+  // Admin: every viewing request across all guests/listings, optionally filtered by status.
+  adminGetAll: async (statusFilter?: string): Promise<ViewingAppointment[]> => {
+    const qs = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : '';
+    const data = await fetchWithAuth<unknown[]>(`/api/bookings/viewings/admin/${qs}`);
+    return data.map(normalizeViewing);
+  },
+
+  // Admin: schedule, complete, or cancel a viewing request.
+  adminUpdateStatus: async (
+    viewingId: string,
+    payload: { status: 'scheduled' | 'completed' | 'cancelled'; admin_notes?: string }
+  ): Promise<ViewingAppointment> => {
+    const data = await fetchWithAuth(`/api/bookings/viewings/admin/${viewingId}/status/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return normalizeViewing(data);
+  },
 };

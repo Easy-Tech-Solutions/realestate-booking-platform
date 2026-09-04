@@ -1,11 +1,14 @@
 import re
 import uuid
 import base64
+import logging
 import requests
 from typing import Dict, Any
 from django.conf import settings
 from django.core.cache import cache
 from .base import PaymentGatewayBase
+
+logger = logging.getLogger(__name__)
 
 
 class MTNMoMoGateway(PaymentGatewayBase):
@@ -191,9 +194,19 @@ class MTNMoMoGateway(PaymentGatewayBase):
             # Use a fresh UUID as the MTN reference; store it as gateway_transaction_id
             momo_reference = str(uuid.uuid4())
 
-            # MTN requires a whole-number string — no decimals (e.g. "150" not "150.0")
+            # MTN requires a whole-number string — no decimals (e.g. "150" not
+            # "150.0"). A fee under $1 (e.g. $0.10) would round down to "0",
+            # which MTN always 400s on — reject it up front with a clear
+            # message instead of a confusing "MTN API error 400".
             from decimal import Decimal as _D
-            formatted_amount = str(int(_D(str(amount)).to_integral_value()))
+            whole_amount = int(_D(str(amount)).to_integral_value())
+            if whole_amount < 1:
+                return {
+                    'success': False,
+                    'error': f'MTN Mobile Money cannot process amounts under 1 whole {wire_currency} '
+                              f'(this charge is {amount} {wire_currency}). Use a different payment method.',
+                }
+            formatted_amount = str(whole_amount)
 
             body = {
                 'amount': formatted_amount,
@@ -227,6 +240,15 @@ class MTNMoMoGateway(PaymentGatewayBase):
             except Exception:
                 error_detail = response.text or '(empty body)'
 
+            # Full detail (URL, request body, response) is server-log only —
+            # never returned in the API response, since that goes straight
+            # back to the guest's browser. 'debug' in the return value stays
+            # sandbox-only for the same reason.
+            logger.error(
+                'MTN MoMo requesttopay failed: env=%s status=%s url=%s currency=%s response=%s',
+                self.target_env, response.status_code, url, wire_currency, error_detail,
+            )
+
             return {
                 'success': False,
                 'error': f'MTN API error {response.status_code}',
@@ -239,8 +261,10 @@ class MTNMoMoGateway(PaymentGatewayBase):
             }
 
         except requests.exceptions.RequestException as e:
+            logger.error('MTN MoMo requesttopay network error: %s', e)
             return {'success': False, 'error': 'Network error', 'details': str(e)}
         except Exception as e:
+            logger.exception('MTN MoMo requesttopay unexpected error')
             return {'success': False, 'error': 'Payment processing error', 'details': str(e)}
 
     def verify_payment(self, transaction_id: str, currency: str = 'LRD') -> Dict[str, Any]:
@@ -283,6 +307,10 @@ class MTNMoMoGateway(PaymentGatewayBase):
                     'gateway_data': data,
                 }
 
+            logger.error(
+                'MTN MoMo verify_payment failed: env=%s status=%s transaction_id=%s response=%s',
+                self.target_env, response.status_code, transaction_id, response.text,
+            )
             return {
                 'success': False,
                 'error': f'Verification failed: {response.status_code}',
@@ -290,6 +318,7 @@ class MTNMoMoGateway(PaymentGatewayBase):
             }
 
         except Exception as e:
+            logger.exception('MTN MoMo verify_payment unexpected error for transaction %s', transaction_id)
             return {'success': False, 'error': 'Verification error', 'details': str(e)}
 
     def refund_payment(self, payment, amount: float, reason: str) -> Dict[str, Any]:
