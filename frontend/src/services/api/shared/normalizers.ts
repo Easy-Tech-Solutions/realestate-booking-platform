@@ -235,6 +235,7 @@ export function normalizeViewing(v: any): import('../../../core/types').ViewingA
     id: String(v.id),
     listingId: String(v.listing),
     listingTitle: v.listing_title || 'Property',
+    guestUsername: v.guest_username || undefined,
     viewingDate: v.viewing_date,
     viewingTime: v.viewing_time || undefined,
     viewingTimeRange: v.viewing_time_range || '',
@@ -245,6 +246,8 @@ export function normalizeViewing(v: any): import('../../../core/types').ViewingA
     feePaidAt: v.fee_paid_at || undefined,
     scheduledAt: v.scheduled_at || undefined,
     bookingId: v.booking ? String(v.booking) : undefined,
+    adminNotes: v.admin_notes || undefined,
+    guestNotes: v.guest_notes || undefined,
     createdAt: v.created_at,
   };
 }

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
@@ -95,20 +96,15 @@ class Listing(models.Model):
         ('biannual', 'Every 6 Months'),
         ('annual', 'Annual'),
     ]
-    LEASE_TERMS = [
-        (6, '6 months'),
-        (12, '1 year'),
-        (24, '2 years'),
-        (36, '3 years'),
-    ]
     pricing_type = models.CharField(max_length=10, choices=PRICING_TYPES, default='nightly')
     payment_schedule = models.CharField(
         max_length=15, choices=PAYMENT_SCHEDULES, null=True, blank=True,
         help_text='Required for monthly-priced listings (room, apartment, house)',
     )
     lease_term_months = models.PositiveIntegerField(
-        choices=LEASE_TERMS, null=True, blank=True,
-        help_text='Lease length for long-term (monthly) listings — sets the booking end date.',
+        null=True, blank=True, validators=[MinValueValidator(1)],
+        help_text='Lease length in months for long-term (monthly) listings — sets the booking end date. '
+                   'Any positive number of months is allowed (the wizard offers 1/6/12/24/36-month presets plus a custom "Other" option).',
     )
     cancellation_policy = models.CharField(max_length=20, choices=CANCELLATION_POLICIES, default='flexible')
     is_available = models.BooleanField(default=True)

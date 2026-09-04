@@ -612,6 +612,30 @@ def notify_viewing_scheduled(viewing):
     )
 
 
+def notify_viewing_cancelled(viewing, reason=''):
+    """Admin cancelled the viewing — notify the guest."""
+    message = (
+        f'Your viewing of "{viewing.listing.title}" on {viewing.viewing_date} '
+        f'({viewing.viewing_time_range}) has been cancelled.'
+    )
+    if reason:
+        message += f' Reason: {reason}'
+    create_notification(
+        user=viewing.guest,
+        notification_type='viewing_cancelled',
+        title='Viewing Cancelled',
+        message=message,
+        data={
+            'viewing_id':    viewing.id,
+            'listing_id':    viewing.listing.id,
+            'listing_title': viewing.listing.title,
+            'viewing_date':  str(viewing.viewing_date),
+            'viewing_time':  viewing.viewing_time_range,
+            'reason':        reason,
+        },
+    )
+
+
 def notify_payout_pending(payout):
     """Notify admins that a host payout is now owed."""
     host_name = payout.host.get_full_name() or payout.host.username

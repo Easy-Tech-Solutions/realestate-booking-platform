@@ -254,13 +254,18 @@ def listing_images(request, listing_id):
             return size_error
         serializer = ListingImageCreateSerializer(data=request.data)
         if serializer.is_valid():
-            if serializer.validated_data.get("order") is None:
-                max_order = listing.gallery_images.aggregate(models.Max("order"))["order__max"] or 0
-                serializer.validated_data["order"] = max_order + 1
+            # order is server-owned, not client-supplied — there's no reorder
+            # endpoint, so the only thing a client-provided value could do is
+            # collide with an existing image's order (e.g. the host's browser
+            # numbering new uploads from 0 without knowing how many gallery
+            # images already exist), which used to surface as a confusing
+            # "already exists" error on a brand-new photo. Always append.
+            max_order = listing.gallery_images.aggregate(models.Max("order"))["order__max"]
+            serializer.validated_data["order"] = 0 if max_order is None else max_order + 1
             try:
                 image = serializer.save(listing=listing)
             except IntegrityError:
-                return Response({"error": "An image with this display order already exists for the listing."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "An image with this display order already exists for the listing. Please try again."}, status=status.HTTP_400_BAD_REQUEST)
             return Response(ListingImageCreateSerializer(image).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1013,7 +1018,19 @@ def pending_review_listings(request):
 
 @api_view(["POST"])
 def approve_listing(request, id):
-    """Admin approves a pending listing — sets status to published."""
+    """
+    Admin approves a pending listing — sets status to published.
+
+    New listings actually go live through the propertyverifications pipeline
+    (Product Support -> Compliance -> Supervisor), which is also the only
+    thing that sets is_available=True. This endpoint predates that pipeline
+    and used to just flip Listing.status, leaving is_available=False and the
+    verification stuck mid-review — the listing looked "published" in admin
+    but never appeared anywhere public. Regular admins are now redirected to
+    the verification queue instead; only full admins (superadmin) can still
+    fast-track approve directly, which also resolves the verification record
+    so the two never diverge again.
+    """
     if not _require_listing_content(request):
         return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
     try:
@@ -1022,8 +1039,30 @@ def approve_listing(request, id):
         return Response({"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND)
     if listing.status not in ('pending_review', 'rejected'):
         return Response({"error": "Listing is not pending review"}, status=status.HTTP_400_BAD_REQUEST)
+
+    from rbac.permissions import is_full_admin
+    from propertyverifications.models import PropertyVerification
+
+    verification = PropertyVerification.objects.filter(listing=listing).first()
+    needs_pipeline = verification is not None and verification.status != PropertyVerification.Status.APPROVED
+
+    if needs_pipeline and not is_full_admin(request.user):
+        return Response({
+            "error": "This listing has a property verification in progress. Approve it from "
+                     "the Verification queue instead — approving here would skip Product "
+                     "Support/Compliance/Supervisor review.",
+            "verification_id": verification.id,
+        }, status=status.HTTP_409_CONFLICT)
+
+    if needs_pipeline:
+        note = f'Fast-tracked by superadmin {request.user.username} via the listing-approval queue, bypassing remaining review stages.'
+        verification.review_notes = f'{verification.review_notes}\n{note}'.strip()
+        verification.status = PropertyVerification.Status.APPROVED
+        verification.save(update_fields=['status', 'review_notes', 'updated_at'])
+
     listing.status = 'published'
-    listing.save(update_fields=['status'])
+    listing.is_available = True
+    listing.save(update_fields=['status', 'is_available'])
     log_admin_action(request, 'listing.approve', target=listing, reason=f'{listing.title} -> published')
     # Send email notification to host
     try:
@@ -1043,16 +1082,39 @@ def approve_listing(request, id):
 
 @api_view(["POST"])
 def reject_listing(request, id):
-    """Admin rejects a pending listing."""
+    """Admin rejects a pending listing. See approve_listing's docstring —
+    same verification-queue redirect applies here for non-full-admins."""
     if not _require_listing_content(request):
         return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
     try:
         listing = Listing.objects.get(pk=id)
     except Listing.DoesNotExist:
         return Response({"error": "Listing not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    from rbac.permissions import is_full_admin
+    from propertyverifications.models import PropertyVerification
+
+    verification = PropertyVerification.objects.filter(listing=listing).first()
+    needs_pipeline = verification is not None and verification.status != PropertyVerification.Status.APPROVED
+
+    if needs_pipeline and not is_full_admin(request.user):
+        return Response({
+            "error": "This listing has a property verification in progress. Reject it from "
+                     "the Verification queue instead.",
+            "verification_id": verification.id,
+        }, status=status.HTTP_409_CONFLICT)
+
+    reason = request.data.get('reason', '')
+
+    if needs_pipeline:
+        stage_at_rejection = verification.current_stage or verification.outcome_stage
+        verification.status = PropertyVerification.Status.REJECTED
+        verification.outcome_stage = stage_at_rejection
+        verification.review_notes = reason or f'Rejected by superadmin {request.user.username} via the listing-rejection queue.'
+        verification.save(update_fields=['status', 'outcome_stage', 'review_notes', 'updated_at'])
+
     listing.status = 'rejected'
     listing.save(update_fields=['status'])
-    reason = request.data.get('reason', '')
     log_admin_action(request, 'listing.reject', target=listing, reason=reason or f'{listing.title} rejected')
     # Notify host
     try:
