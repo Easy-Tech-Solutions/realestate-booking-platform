@@ -234,9 +234,17 @@ def pending_bookings(request):
     return Response(BookingSerializer(bookings, many=True, context={'request': request}).data)
 
 
-# Statuses a host can act on when confirming/declining a reservation
-# ('requested'/'pending' are legacy rows from before the flow change).
+# Statuses a host can confirm from ('requested'/'pending' are legacy rows
+# from before the flow change).
 _HOST_ACTIONABLE = ('pending_host', 'requested', 'pending')
+
+# Statuses a host can decline from. A superset of _HOST_ACTIONABLE: a host
+# can also back out of a reservation they already confirmed (awaiting_payment)
+# as long as the guest hasn't paid yet — no money has moved, so this is a
+# plain status change + relist, same as declining outright. Once the guest
+# pays (payment_received/confirmed), the host can no longer unilaterally
+# decline; that requires a refund and goes through admin instead.
+_HOST_DECLINABLE = _HOST_ACTIONABLE + ('awaiting_payment',)
 
 
 @api_view(['POST'])
@@ -276,6 +284,14 @@ def confirm_booking(request, id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def decline_booking(request, id):
+    """
+    Host declines a reservation — either one still awaiting their decision
+    (pending_host), or one they already confirmed but the guest hasn't paid
+    for yet (awaiting_payment). Either way this relists the property (if
+    nothing else holds it) and notifies the guest. Once the guest has paid,
+    a host can no longer unilaterally back out — see admin_confirm_payment /
+    admin-side cancellation for the post-payment path (needs a refund).
+    """
     try:
         booking = Booking.objects.get(pk=id)
     except Booking.DoesNotExist:
@@ -284,7 +300,12 @@ def decline_booking(request, id):
     if booking.listing.owner != request.user:
         return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-    if booking.status not in _HOST_ACTIONABLE:
+    if booking.status not in _HOST_DECLINABLE:
+        if booking.status in ('payment_received', 'confirmed'):
+            return Response(
+                {"error": "This reservation has already been paid for and can no longer be declined directly — contact support to cancel and refund it."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response({"error": "Booking cannot be declined"}, status=status.HTTP_400_BAD_REQUEST)
 
     serializer = BookingConfrimationSerializer(data=request.data)

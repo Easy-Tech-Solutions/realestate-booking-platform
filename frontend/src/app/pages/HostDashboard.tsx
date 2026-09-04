@@ -1057,6 +1057,9 @@ export function HostDashboard() {
               booking.userId ||
               'Guest';
             const isPending = booking.status === 'pending_host' || booking.status === 'pending';
+            // Confirmed but the guest hasn't paid yet — the host can still back
+            // out (no money has moved). Once paid, only support can cancel/refund.
+            const canWithdraw = booking.status === 'awaiting_payment';
             const isBusy = bookingActionId === booking.id;
             const statusMeta = bookingStatusMeta(booking.status);
             return (
@@ -1095,6 +1098,25 @@ export function HostDashboard() {
                         Decline
                       </Button>
                     </>
+                  ) : canWithdraw ? (
+                    <>
+                      <span
+                        className={cn(
+                          'inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold select-none',
+                          statusMeta.className,
+                        )}
+                      >
+                        {statusMeta.label}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => openDeclineDialog(booking.id)}
+                        disabled={isBusy}
+                      >
+                        Decline
+                      </Button>
+                    </>
                   ) : (
                     <span
                       className={cn(
@@ -1118,31 +1140,39 @@ export function HostDashboard() {
         </div>
       </CardContent>
 
-      <Dialog open={declineDialogBookingId !== null} onOpenChange={(open) => !open && setDeclineDialogBookingId(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Decline booking</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Add a reason (optional). The guest will see this message.
-          </p>
-          <Textarea
-            value={declineReason}
-            onChange={(e) => setDeclineReason(e.target.value)}
-            placeholder="e.g. The property is no longer available for these dates."
-            rows={3}
-            className="bg-card border-border"
-          />
-          <div className="flex justify-end gap-2 mt-2">
-            <Button variant="outline" onClick={() => setDeclineDialogBookingId(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={submitDecline}>
-              Decline booking
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {(() => {
+        const decliningBooking = bookings.find((b) => b.id === declineDialogBookingId);
+        const isWithdrawal = decliningBooking?.status === 'awaiting_payment';
+        return (
+          <Dialog open={declineDialogBookingId !== null} onOpenChange={(open) => !open && setDeclineDialogBookingId(null)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>{isWithdrawal ? 'Decline accepted booking' : 'Decline booking'}</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                {isWithdrawal
+                  ? "You already accepted this reservation. Declining now cancels it before the guest pays — they'll be notified, and the property will become available again."
+                  : 'Add a reason (optional). The guest will see this message.'}
+              </p>
+              <Textarea
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder="e.g. The property is no longer available for these dates."
+                rows={3}
+                className="bg-card border-border"
+              />
+              <div className="flex justify-end gap-2 mt-2">
+                <Button variant="outline" onClick={() => setDeclineDialogBookingId(null)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={submitDecline}>
+                  {isWithdrawal ? 'Decline reservation' : 'Decline booking'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </Card>
   );
 
