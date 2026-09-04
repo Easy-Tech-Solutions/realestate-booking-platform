@@ -287,20 +287,35 @@ def notify_booking_confirmed(booking):
 
 
 def notify_booking_declined(booking):
-    """Notify the customer their booking was declined."""
+    """
+    Notify the customer their booking was declined.
+
+    host_confirmed_at is only ever set once a host has confirmed a
+    reservation (see Booking.mark_host_confirmed) — if it's set here, the
+    host declined AFTER accepting (withdrew), not as their first response
+    to the request, so the guest gets a message reflecting that instead of
+    implying the request was simply turned down.
+    """
+    previously_confirmed = booking.host_confirmed_at is not None
     create_notification(
         user=booking.customer,
         notification_type='booking_declined',
-        title='Booking Declined',
+        title='Reservation Cancelled by Host' if previously_confirmed else 'Booking Declined',
         message=(
-            f'Your booking request for "{booking.listing.title}" was declined. '
-            f'Reason: {booking.decline_reason or "No reason provided."}'
+            (
+                f'Your confirmed reservation for "{booking.listing.title}" was cancelled by the host '
+                f'before payment. Reason: {booking.decline_reason or "No reason provided."}'
+            ) if previously_confirmed else (
+                f'Your booking request for "{booking.listing.title}" was declined. '
+                f'Reason: {booking.decline_reason or "No reason provided."}'
+            )
         ),
         data={
-            'booking_id':     booking.id,
-            'listing_id':     booking.listing.id,
-            'listing_title':  booking.listing.title,
-            'decline_reason': booking.decline_reason,
+            'booking_id':            booking.id,
+            'listing_id':            booking.listing.id,
+            'listing_title':         booking.listing.title,
+            'decline_reason':        booking.decline_reason,
+            'previously_confirmed':  previously_confirmed,
         },
     )
 

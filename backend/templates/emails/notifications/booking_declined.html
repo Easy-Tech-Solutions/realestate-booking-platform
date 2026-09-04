@@ -1,7 +1,12 @@
 ﻿{% extends "emails/notifications/base_email.html" %}
 {% block content %}
+{% if data.previously_confirmed %}
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Reservation Cancelled by Host</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">Your host cancelled this reservation before payment</p>
+{% else %}
 <h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Booking Request Declined</h2>
 <p style="margin:0 0 24px;color:#666666;font-size:14px;">Unfortunately your request was not accepted</p>
+{% endif %}
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border-radius:6px;padding:20px;margin:0 0 24px;border-left:4px solid #ef4444;">
   <tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Property:</strong> {{ data.listing_title }}</td></tr>
   {% if data.decline_reason %}<tr><td style="padding:5px 0;font-size:15px;color:#111111;"><strong>Reason:</strong> {{ data.decline_reason }}</td></tr>{% endif %}
