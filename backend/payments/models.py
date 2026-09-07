@@ -364,10 +364,6 @@ class PlatformFee(models.Model):
         ('range', 'Range (Min–Max USD)'),
     ]
 
-    booking_fee = models.DecimalField(
-        max_digits=8, decimal_places=2, default=Decimal('3.00'),
-        help_text='Flat fee charged at booking time (USD)',
-    )
     viewing_fee = models.DecimalField(
         max_digits=8, decimal_places=2, default=Decimal('3.00'),
         help_text='Flat fee charged for a long-term property viewing appointment (USD). Non-refundable.',
@@ -411,7 +407,7 @@ class PlatformFee(models.Model):
         verbose_name_plural = 'Platform Fee Configuration'
 
     def __str__(self):
-        return f'Booking fee: ${self.booking_fee} | Transaction: {self.get_transaction_fee_type_display()}'
+        return f'Service fee: {self.service_fee_percent}% | Transaction: {self.get_transaction_fee_type_display()}'
 
     def save(self, *args, **kwargs):
         # Enforce singleton — only one configuration row allowed.

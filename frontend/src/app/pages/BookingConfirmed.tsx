@@ -7,8 +7,6 @@ import { formatCurrency, formatDate } from '../../core/utils';
 import type { Booking } from '../../core/types';
 import { useBookingConfirmedData } from '../../hooks/queries/useBookingConfirmed';
 
-const BOOKING_FEE = 3;
-
 export function BookingConfirmed() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -21,28 +19,28 @@ export function BookingConfirmed() {
     if (!booking) return;
     const checkIn = formatDate(booking.checkIn, 'MMM dd, yyyy');
     const checkOut = formatDate(booking.checkOut, 'MMM dd, yyyy');
-    const bookingFee = (booking as any).bookingFee ?? BOOKING_FEE;
-    const total = (booking.basePrice || 0) + (booking.serviceFee || 0) + bookingFee;
     const lines = [
       '==============================',
-      '     HOMEKONET BOOKING RECEIPT',
+      '     HOMEKONET BOOKING REQUEST',
       '==============================',
       '',
       `Booking ID  : ${booking.id}`,
       `Property    : ${booking.property?.title ?? '—'}`,
       `Location    : ${booking.property?.location?.city ?? ''}, ${booking.property?.location?.state ?? ''}`,
-      `Hosted by   : ${booking.property?.host?.firstName ?? '—'}`,
+      `Hosted by   : ${[booking.property?.host?.firstName, booking.property?.host?.lastName].filter(Boolean).join(' ') || '—'}`,
       '',
       `Check-in    : ${checkIn}`,
       `Check-out   : ${checkOut}`,
       `Guests      : ${booking.guests}`,
       '',
-      '--- Price Breakdown -----------',
+      '--- Price (if your host confirms) -----------',
       `Subtotal    : ${formatCurrency(booking.basePrice)}`,
       `Service fee : ${formatCurrency(booking.serviceFee)}`,
-      `Booking fee : ${formatCurrency(bookingFee)}`,
       '------------------------------',
-      `Total       : ${formatCurrency(total)}`,
+      `Total       : ${formatCurrency(booking.totalPrice)}`,
+      '',
+      'This reservation is free to request — nothing has been charged yet.',
+      'You will be asked to pay only after the host confirms availability.',
       '',
       'Thank you for booking with HomeKonet!',
       'homekonnet@gmail.com',
@@ -107,7 +105,7 @@ export function BookingConfirmed() {
               <p className="text-sm text-muted-foreground capitalize">{booking.property.propertyType}</p>
               <h2 className="font-semibold leading-snug">{booking.property.title}</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Hosted by {booking.property.host.firstName}
+                Hosted by {booking.property.host.firstName} {booking.property.host.lastName}
               </p>
             </div>
           </div>
@@ -153,15 +151,14 @@ export function BookingConfirmed() {
               <span className="text-muted-foreground">Service fee</span>
               <span>{formatCurrency(booking.serviceFee)}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Booking fee</span>
-              <span>{formatCurrency((booking as any).bookingFee ?? BOOKING_FEE)}</span>
-            </div>
             <Separator className="my-3" />
             <div className="flex justify-between font-semibold">
-              <span>Total</span>
+              <span>Total if your host confirms</span>
               <span>{formatCurrency(booking.totalPrice)}</span>
             </div>
+            <p className="text-xs text-muted-foreground pt-1">
+              This reservation is free to request — you won't be charged unless the host confirms.
+            </p>
           </div>
         </div>
 

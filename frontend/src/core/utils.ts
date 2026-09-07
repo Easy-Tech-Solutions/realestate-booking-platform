@@ -18,6 +18,21 @@ export function formatCurrency(amount: number, currency: string = 'USD'): string
   }).format(amount);
 }
 
+// Room-based listings (hotel/lodge) don't have a single meaningful price —
+// each room type is priced independently. Cards/headline prices show the
+// cheapest active room's rate as a "from" price instead of the listing's own
+// `price` field (which, for these listings, is just a starting-price snapshot
+// taken at publish time and can go stale as rooms are added/edited later).
+export function getListingDisplayPrice(
+  property: { price: number; hotelRooms?: { pricePerNight: number; isActive: boolean }[] },
+): { amount: number; isFromPrice: boolean } {
+  const activeRooms = property.hotelRooms?.filter((r) => r.isActive) ?? [];
+  if (activeRooms.length === 0) {
+    return { amount: property.price, isFromPrice: false };
+  }
+  return { amount: Math.min(...activeRooms.map((r) => r.pricePerNight)), isFromPrice: true };
+}
+
 export function formatDate(date: string | Date, formatStr: string = 'MMM d, yyyy'): string {
   const dateObj = typeof date === 'string' ? parseISO(date) : date;
   return format(dateObj, formatStr);

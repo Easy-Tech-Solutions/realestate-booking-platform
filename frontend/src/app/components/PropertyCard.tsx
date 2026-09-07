@@ -3,7 +3,8 @@ import { Heart, Star } from 'lucide-react';
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
 import { Property } from '../../core/types';
-import { formatCurrency } from '../../core/utils';
+import { ROOM_BASED_PROPERTY_TYPES } from '../../core/constants';
+import { formatCurrency, getListingDisplayPrice } from '../../core/utils';
 import { useApp } from '../../hooks/useApp';
 import { cn } from '../../core/utils';
 import { ImageWithFallback } from './figma/ImageWithFallback';
@@ -17,6 +18,12 @@ export function PropertyCard({ property }: PropertyCardProps) {
   const { wishlistIds, toggleWishlist } = useApp();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const isWishlisted = wishlistIds.includes(property.id);
+  const displayPrice = getListingDisplayPrice(property);
+  // A room-based listing (hotel/lodge) has no single bedroom/bed/bathroom
+  // count — each room type has its own — so Listing.bedrooms etc. are always
+  // 0 for these. Show the room-type count instead of a misleading "0 bed".
+  const isRoomBased = ROOM_BASED_PROPERTY_TYPES.includes(property.propertyType);
+  const roomTypeCount = property.hotelRooms?.length ?? 0;
 
   useEffect(() => {
     if (property.images.length <= 1) return;
@@ -153,11 +160,14 @@ export function PropertyCard({ property }: PropertyCardProps) {
           </p>
 
           <p className="text-muted-foreground text-sm">
-            {property.guests} guests · {property.bedrooms} bedroom{property.bedrooms > 1 ? 's' : ''} · {property.beds} bed{property.beds > 1 ? 's' : ''} · {property.bathrooms} bath{property.bathrooms > 1 ? 's' : ''}
+            {isRoomBased
+              ? `${property.guests} guests · ${roomTypeCount} room type${roomTypeCount !== 1 ? 's' : ''}`
+              : `${property.guests} guests · ${property.bedrooms} bedroom${property.bedrooms > 1 ? 's' : ''} · ${property.beds} bed${property.beds > 1 ? 's' : ''} · ${property.bathrooms} bath${property.bathrooms > 1 ? 's' : ''}`}
           </p>
 
           <div className="pt-1">
-            <span className="font-semibold">{formatCurrency(property.price)}</span>
+            {displayPrice.isFromPrice && <span className="text-muted-foreground">From </span>}
+            <span className="font-semibold">{formatCurrency(displayPrice.amount)}</span>
             <span className="text-muted-foreground"> {property.pricingType === 'monthly' ? 'month' : 'night'}</span>
           </div>
         </div>

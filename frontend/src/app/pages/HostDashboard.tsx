@@ -65,8 +65,8 @@ import {
 } from '../components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Separator } from '../components/ui/separator';
-import { cn, formatCurrency, formatDate } from '../../core/utils';
-import { AMENITIES, PROPERTY_CATEGORIES } from '../../core/constants';
+import { cn, formatCurrency, formatDate, getListingDisplayPrice } from '../../core/utils';
+import { AMENITIES, PROPERTY_CATEGORIES, ROOM_BASED_PROPERTY_TYPES } from '../../core/constants';
 import { propertiesAPI } from '../../services/api.service';
 import { bookingsAPI } from '../../services/api.service';
 import {
@@ -984,7 +984,10 @@ export function HostDashboard() {
                     <p className="text-sm text-muted-foreground truncate">
                       {property.location.city}, {property.location.state} · {property.rating.toFixed(1)}★ · {property.reviewCount} reviews
                     </p>
-                    <p className="text-sm font-semibold mt-1">{formatCurrency(property.price)}/{property.pricingType === 'monthly' ? 'month' : 'night'}</p>
+                    <p className="text-sm font-semibold mt-1">
+                      {getListingDisplayPrice(property).isFromPrice && 'From '}
+                      {formatCurrency(getListingDisplayPrice(property).amount)}/{property.pricingType === 'monthly' ? 'month' : 'night'}
+                    </p>
                     {property.status === 'suspended' && property.suspensionReason && (
                       <p className="text-xs text-destructive mt-1">Taken down by our team: {property.suspensionReason}</p>
                     )}
@@ -994,7 +997,7 @@ export function HostDashboard() {
                   <Button variant="outline" size="sm" onClick={() => setEditingProperty(property)}>
                     <Edit className="w-3 h-3 mr-1" /> Edit
                   </Button>
-                  {property.propertyType === 'hotels' && (
+                  {ROOM_BASED_PROPERTY_TYPES.includes(property.propertyType) && (
                     <Button variant="outline" size="sm" onClick={() => navigate(`/host/listings/${property.id}/rooms`)}>
                       <Hotel className="w-3 h-3 mr-1" /> Manage Rooms
                     </Button>

@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { cn } from '../../core/utils';
-import { AMENITIES, PROPERTY_CATEGORIES } from '../../core/constants';
+import { AMENITIES, PROPERTY_CATEGORIES, ROOM_BASED_PROPERTY_TYPES } from '../../core/constants';
 import { propertiesAPI } from '../../services/api.service';
 import { PropertyVerificationForm } from '../components/PropertyVerificationForm';
 import { AgentOwnerForm, type AgentOwnerDetails } from '../components/AgentOwnerForm';
@@ -63,12 +63,12 @@ type WizardStep =
 type PropertyGroup = 'residential' | 'hotel' | 'land' | 'commercial' | 'long_term_rental' | 'airbnb';
 
 function getPropertyGroup(type: string): PropertyGroup {
-  if (type === 'hotels') return 'hotel';
+  if (ROOM_BASED_PROPERTY_TYPES.includes(type)) return 'hotel';
   if (type === 'land') return 'land';
   if (['apartment', 'room', 'house'].includes(type)) return 'long_term_rental';
   if (type === 'airbnb') return 'airbnb';
   if (['office-space', 'hall', 'roadside', 'highway'].includes(type)) return 'commercial';
-  // lodge, beaches and any other short-term rental → nightly pricing, no guests field
+  // beaches and any other short-term rental → nightly pricing, no guests field
   return 'residential';
 }
 
@@ -392,7 +392,13 @@ export function CreateListing() {
     return STEPS_BY_GROUP[propertyGroup];
   }, [propertyGroup, form.pricingModel]);
   const currentStep = steps[stepIndex];
-  const groupLabels = GROUP_LABELS[propertyGroup];
+  // Room-based listings share one wizard flow ('hotel' group) across property
+  // types (hotels, lodges) — swap in the right noun so a lodge host isn't
+  // told they're creating a "hotel listing".
+  const roomBasedNoun = form.propertyType === 'lodge' ? 'lodge' : 'hotel';
+  const groupLabels = propertyGroup === 'hotel'
+    ? { ...GROUP_LABELS.hotel, place: `${roomBasedNoun} / room`, title: `Give your ${roomBasedNoun} listing a name` }
+    : GROUP_LABELS[propertyGroup];
 
   // Keep the lease term valid for the chosen payment schedule: if the host
   // raises the schedule (e.g. to annual) past the current term, bump the term
@@ -723,7 +729,15 @@ export function CreateListing() {
       // A long-term listing is only "monthly" if the host chose that model;
       // they can also publish a long-term property for per-night stays.
       const isMonthlyListing = propertyGroup === 'long_term_rental' && form.pricingModel === 'monthly';
-      payload.append('price', String(isMonthlyListing ? form.monthlyPrice : form.weekdayBasePrice));
+      // Room-based listings (hotel/lodge) don't go through the weekday/weekend
+      // price step — form.weekdayBasePrice is left at its unused default. The
+      // parent listing's headline price is instead the cheapest room's rate,
+      // shown as a "from $X/night" figure on cards and search results.
+      const validHotelRooms = form.hotelRooms.filter((r) => r.name.trim() && r.pricePerNight > 0);
+      const price = propertyGroup === 'hotel'
+        ? Math.min(...validHotelRooms.map((r) => r.pricePerNight))
+        : isMonthlyListing ? form.monthlyPrice : form.weekdayBasePrice;
+      payload.append('price', String(price));
       payload.append('pricing_type', isMonthlyListing ? 'monthly' : 'nightly');
       if (isMonthlyListing) {
         payload.append('payment_schedule', form.paymentSchedule);
@@ -742,7 +756,7 @@ export function CreateListing() {
       payload.append('amenities', JSON.stringify(form.amenities));
       payload.append('highlights', JSON.stringify(form.highlights));
       payload.append('booking_mode', form.bookingMode.startsWith('approve') ? 'approve_first' : 'instant');
-      payload.append('weekend_premium_percent', String(propertyGroup === 'land' ? 0 : form.weekendPremiumPercent));
+      payload.append('weekend_premium_percent', String(propertyGroup === 'land' || propertyGroup === 'hotel' ? 0 : form.weekendPremiumPercent));
       payload.append('new_listing_promo', String(form.newListingPromo));
       payload.append('last_minute_discount_enabled', String(form.lastMinuteDiscountEnabled));
       payload.append('last_minute_discount_percent', String(form.lastMinuteDiscountPercent));
@@ -849,6 +863,16 @@ export function CreateListing() {
 
   const guestPriceBeforeTaxes = Math.round(form.weekdayBasePrice * 1.04);
   const weekendPrice = Math.round(form.weekdayBasePrice * (1 + form.weekendPremiumPercent / 100));
+  // Room-based (hotel/lodge) pricing lives per-room, not on form.weekdayBasePrice
+  // — summarize it as the price range across the rooms defined so far.
+  const validRoomPrices = form.hotelRooms
+    .filter((r) => r.name.trim() && r.pricePerNight > 0)
+    .map((r) => r.pricePerNight);
+  const hotelRoomPriceRange = validRoomPrices.length === 0
+    ? null
+    : Math.min(...validRoomPrices) === Math.max(...validRoomPrices)
+      ? `$${Math.min(...validRoomPrices)}/night`
+      : `$${Math.min(...validRoomPrices)}–$${Math.max(...validRoomPrices)}/night`;
 
   // Basics step rows — differ by property group
   const basicsRows = useMemo(() => {
@@ -1042,7 +1066,7 @@ export function CreateListing() {
 
         {currentStep === 'hotel_room_count' && (
           <section className="max-w-3xl mx-auto py-8">
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">How many room types does your hotel have?</h2>
+            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">How many room types does your {roomBasedNoun} have?</h2>
             <p className="text-base sm:text-2xl text-muted-foreground mb-8">
               A room type is a category of rooms with the same specs and price (e.g. Standard, Deluxe Suite). You can add more later.
             </p>
@@ -1370,7 +1394,7 @@ export function CreateListing() {
           <section className="max-w-4xl mx-auto py-8">
             <h2 className="text-3xl sm:text-5xl lg:text-6xl font-semibold mb-3">
               {propertyGroup === 'hotel'
-                ? 'What does your hotel offer?'
+                ? `What does your ${roomBasedNoun} offer?`
                 : propertyGroup === 'commercial'
                 ? 'What does your space have?'
                 : `Tell ${groupLabels.occupant}s what your place has to offer`}
@@ -1890,9 +1914,11 @@ export function CreateListing() {
               <p className="text-xl sm:text-3xl mt-2">
                 {propertyGroup === 'long_term_rental'
                   ? `Monthly rent: $${form.monthlyPrice} · Schedule: ${form.paymentSchedule}`
-                  : propertyGroup === 'land' || propertyGroup === 'commercial'
-                    ? `Daily rate: $${form.weekdayBasePrice}`
-                    : `Weekday: $${form.weekdayBasePrice} · Weekend: $${weekendPrice}`}
+                  : propertyGroup === 'hotel'
+                    ? (hotelRoomPriceRange || 'No room prices set yet')
+                    : propertyGroup === 'land' || propertyGroup === 'commercial'
+                      ? `Daily rate: $${form.weekdayBasePrice}`
+                      : `Weekday: $${form.weekdayBasePrice} · Weekend: $${weekendPrice}`}
               </p>
             </div>
 

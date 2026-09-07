@@ -532,51 +532,6 @@ def mtn_momo_webhook(request):
 
 # ── Stripe PaymentIntent ───────────────────────────────────────────────────────
 
-def _get_booking_fee():
-    """Return the current booking fee from PlatformFee config."""
-    from .models import PlatformFee
-    return float(PlatformFee.get_current().booking_fee)
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_booking_fee_intent(request):
-    """
-    Creates a Stripe PaymentIntent for the booking fee only.
-    Called at initial booking time — the property rental amount is collected
-    separately via a PaymentRequest after owner-guest agreement.
-    """
-    from django.conf import settings as django_settings
-
-    stripe_secret = getattr(django_settings, 'STRIPE_SECRET_KEY', '') or ''
-    if not stripe_secret:
-        return Response({'error': 'Stripe is not configured on the server'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    listing_id = request.data.get('listing_id')
-    currency = request.data.get('currency', 'usd').lower()
-
-    booking_fee_usd = _get_booking_fee()
-    amount_cents = round(booking_fee_usd * 100)
-
-    try:
-        import stripe
-        stripe.api_key = stripe_secret
-        intent = stripe.PaymentIntent.create(
-            amount=amount_cents,
-            currency=currency,
-            metadata={
-                'user_id': str(request.user.id),
-                'listing_id': str(listing_id) if listing_id else '',
-                'type': 'booking_fee',
-            },
-        )
-        return Response({'client_secret': intent.client_secret, 'amount_cents': amount_cents})
-    except ImportError:
-        return Response({'error': 'Stripe library is not installed on the server'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_viewing_fee_intent(request):
@@ -731,7 +686,7 @@ def create_stripe_payment_intent(request):
 
     # Compute canonical total — never trust the client-supplied amount.
     pricing     = compute_listing_pricing(listing, check_in, check_out, room=room)
-    total_usd   = pricing['discounted_subtotal'] + pricing['service_fee'] + _BOOKING_FEE_USD
+    total_usd   = pricing['discounted_subtotal'] + pricing['service_fee']
     amount_cents = round(total_usd * 100)
 
     try:
@@ -825,16 +780,6 @@ def stripe_webhook(request):
                     viewing.save(update_fields=['stripe_payment_intent_id'])
                     mark_viewing_fee_paid(viewing)
                 except ViewingAppointment.DoesNotExist:
-                    pass
-        elif pi_type == 'booking_fee':
-            # Booking fee paid — update status to 'requested' (booking confirmed pending owner review)
-            booking_id = meta.get('booking_id')
-            if booking_id:
-                try:
-                    booking = Booking.objects.get(pk=booking_id, status='requested')
-                    booking.stripe_payment_intent_id = pi_id
-                    booking.save(update_fields=['stripe_payment_intent_id'])
-                except Booking.DoesNotExist:
                     pass
         elif pi_type == 'property_payment':
             # Full property payment — mark booking as payment_received; awaiting admin confirmation

@@ -988,14 +988,6 @@ export function AdminDashboard() {
             ) : (
               <>
                 <div>
-                  <label className="text-sm font-medium">Booking fee (USD, flat)</label>
-                  <Input
-                    type="number" step="0.01" className="w-32 mt-1"
-                    value={platformFeeDraft.booking_fee ?? ''}
-                    onChange={(e) => setPlatformFeeDraft((d) => ({ ...d, booking_fee: e.target.value }))}
-                  />
-                </div>
-                <div>
                   <label className="text-sm font-medium">Viewing fee (USD, flat)</label>
                   <Input
                     type="number" step="0.01" className="w-32 mt-1"

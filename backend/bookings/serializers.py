@@ -73,6 +73,11 @@ class BookingCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('End date must be after start date')
         if data['start_date'] < timezone.now().date():
             raise serializers.ValidationError('Start date cannot be in the past')
+        # A property with defined room types (hotel/lodge) is booked one room
+        # at a time, not as a single whole-listing stay — otherwise it's
+        # ambiguous which room (if any) the reservation would hold.
+        if not data.get('hotel_room') and data['listing'].hotel_rooms.filter(is_active=True).exists():
+            raise serializers.ValidationError({'hotel_room': 'This property offers specific room types — please select one to book.'})
         return data
 
 

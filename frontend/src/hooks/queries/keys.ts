@@ -2,7 +2,7 @@ export const queryKeys = {
   properties: {
     detail: (id: string) => ['properties', 'detail', id] as const,
     reviews: (id: string) => ['properties', 'reviews', id] as const,
-    availability: (id: string) => ['properties', 'availability', id] as const,
+    availability: (id: string, roomId?: string) => ['properties', 'availability', id, roomId ?? null] as const,
     pricing: (id: string, startDate: string, endDate: string) => ['properties', 'pricing', id, startDate, endDate] as const,
     favorites: ['properties', 'favorites'] as const,
     byHost: (id: string) => ['properties', 'host', id] as const,
