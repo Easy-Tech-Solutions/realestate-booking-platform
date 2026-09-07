@@ -12,8 +12,8 @@ import { Separator } from '../components/ui/separator';
 import { Calendar } from '../components/ui/calendar';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
-import { CANCELLATION_POLICIES } from '../../core/constants';
-import { formatCurrency, calculateNights, formatDate, getInitials } from '../../core/utils';
+import { CANCELLATION_POLICIES, ROOM_BASED_PROPERTY_TYPES } from '../../core/constants';
+import { formatCurrency, calculateNights, formatDate, getInitials, getListingDisplayPrice } from '../../core/utils';
 import { useApp } from '../../hooks/useApp';
 import { toast } from 'sonner';
 import { messagesAPI, propertiesAPI } from '../../services/api.service';
@@ -71,8 +71,12 @@ export function PropertyDetails() {
   const [mobileSlideIndex, setMobileSlideIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const touchStartX = useRef<number>(0);
+  // Declared ahead of usePropertyDetails so the room's own booked-dates can be
+  // fetched for it (a room-based listing's calendar depends on which room is
+  // selected — see the availability query below).
+  const [selectedRoom, setSelectedRoom] = useState<HotelRoom | null>(null);
 
-  const { propertyQuery, reviewsQuery, availabilityQuery } = usePropertyDetails(id);
+  const { propertyQuery, reviewsQuery, availabilityQuery } = usePropertyDetails(id, selectedRoom?.id);
 
   const pauseAndResume = useCallback(() => {
     setIsAutoPlaying(false);
@@ -112,7 +116,6 @@ export function PropertyDetails() {
     cleanliness: 0, accuracy: 0, check_in_rating: 0,
     communication: 0, location_rating: 0, value: 0,
   });
-  const [selectedRoom, setSelectedRoom] = useState<HotelRoom | null>(null);
   const [roomQuantity, setRoomQuantity] = useState(1);
   // Long-term listings derive the date range from move-in + lease term; nightly
   // listings use the calendar range. Everything downstream (pricing, reserve)
@@ -133,7 +136,7 @@ export function PropertyDetails() {
 
   const startDateStr = effFrom?.toISOString().split('T')[0];
   const endDateStr = effTo?.toISOString().split('T')[0];
-  const isHotel = propertyQuery.data?.propertyType === 'hotels';
+  const isHotel = ROOM_BASED_PROPERTY_TYPES.includes(propertyQuery.data?.propertyType ?? '');
 
   const roomAvailabilityQuery = useQuery({
     queryKey: ['hotel-rooms-availability', id, startDateStr, endDateStr],
@@ -192,6 +195,10 @@ export function PropertyDetails() {
   }
 
   const isWishlisted = wishlistIds.includes(property.id);
+  // Room-based listings (hotel/lodge) price per room, not on `property.price`
+  // directly — fall back to the cheapest active room's rate as a "from" price
+  // until the guest picks a specific room.
+  const displayPrice = getListingDisplayPrice(property);
   const nights = dateRange?.from && dateRange?.to ? calculateNights(dateRange.from, dateRange.to) : 0;
   const reviewCategoryAverages = reviews.length ? [
     { label: 'Cleanliness', value: reviews.reduce((sum, review) => sum + review.cleanliness, 0) / reviews.length },
@@ -267,8 +274,11 @@ export function PropertyDetails() {
   const bookingCard = (
     <div className="border border-border rounded-xl p-4 sm:p-6 shadow-xl">
       <div className="flex items-baseline gap-1 mb-4">
+        {!selectedRoom && displayPrice.isFromPrice && (
+          <span className="text-muted-foreground text-sm">From</span>
+        )}
         <span className="text-2xl font-semibold">
-          {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : property.price)}
+          {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : displayPrice.amount)}
         </span>
         <span className="text-muted-foreground">{selectedRoom ? 'night' : priceUnit}</span>
         {selectedRoom && (
@@ -552,12 +562,21 @@ export function PropertyDetails() {
                     </h2>
                     <div className="flex items-center gap-2 text-muted-foreground flex-wrap text-sm">
                       <span>{property.guests} guests</span>
-                      <span>·</span>
-                      <span>{property.bedrooms} bedrooms</span>
-                      <span>·</span>
-                      <span>{property.beds} beds</span>
-                      <span>·</span>
-                      <span>{property.bathrooms} baths</span>
+                      {isHotel ? (
+                        <>
+                          <span>·</span>
+                          <span>{property.hotelRooms?.length ?? 0} room type{(property.hotelRooms?.length ?? 0) !== 1 ? 's' : ''}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>·</span>
+                          <span>{property.bedrooms} bedrooms</span>
+                          <span>·</span>
+                          <span>{property.beds} beds</span>
+                          <span>·</span>
+                          <span>{property.bathrooms} baths</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   {property.host.avatar ? (
@@ -831,7 +850,7 @@ export function PropertyDetails() {
                           booked: 'line-through opacity-50 text-muted-foreground',
                         }}
                         numberOfMonths={2}
-                        disabled={isPastDate}
+                        disabled={[isPastDate, isBookedDate]}
                         className="border rounded-xl p-4"
                       />
                     </div>
@@ -1103,8 +1122,13 @@ export function PropertyDetails() {
       {/* Mobile sticky CTA */}
       <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-white border-t border-border px-4 py-3 flex items-center justify-between shadow-lg">
         <div>
-          <span className="text-lg font-semibold">{formatCurrency(property.price)}</span>
-          <span className="text-muted-foreground text-sm"> / {priceUnit}</span>
+          {!selectedRoom && displayPrice.isFromPrice && (
+            <span className="text-muted-foreground text-sm">From </span>
+          )}
+          <span className="text-lg font-semibold">
+            {formatCurrency(selectedRoom ? selectedRoom.pricePerNight : displayPrice.amount)}
+          </span>
+          <span className="text-muted-foreground text-sm"> / {selectedRoom ? 'night' : priceUnit}</span>
           {nights > 0 && pricing && (
             <p className="text-xs text-muted-foreground">
               {pricing.pricingType === 'monthly'

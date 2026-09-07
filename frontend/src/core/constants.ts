@@ -25,6 +25,12 @@ export const PROPERTY_CATEGORIES = [
   { id: 'hall', name: 'Hall', icon: '🏛️' },
 ];
 
+// Property types booked one room/unit type at a time (see backend HotelRoom
+// model) rather than as a single whole-listing stay. Drives the create-listing
+// wizard's room-based flow, the room picker on the listing detail page, and
+// the host dashboard's "Manage Rooms" link.
+export const ROOM_BASED_PROPERTY_TYPES = ['hotels', 'lodge'];
+
 export const AMENITIES = [
   { id: 'wifi', name: 'Wifi', icon: 'Wifi', category: 'Basic' },
   { id: 'kitchen', name: 'Kitchen', icon: 'ChefHat', category: 'Basic' },

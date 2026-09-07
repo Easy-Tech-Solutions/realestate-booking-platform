@@ -653,19 +653,48 @@ def nearby_listings(request):
 
 @api_view(["GET"])
 def listing_availability(request, listing_id):
+    """
+    Dates already held by an active reservation, for calendar display.
+
+    A room-based listing (hotel/lodge) is booked per room type, not as a
+    single unit — pass ?room_id= to get that room's own booked dates (a date
+    only blocks further bookings once every unit of that room type, per
+    HotelRoom.total_count, is already held for it — see
+    _get_available_room_count). Without room_id, only whole-listing bookings
+    (hotel_room is null) count, since a room-scoped booking never occupies
+    the property's other room types.
+    """
     from datetime import timedelta as _td
     listing = get_object_or_404(Listing, pk=listing_id)
-    bookings = Booking.objects.filter(
-        listing=listing,
-        status__in=["requested", "confirmed"],
-    ).values("start_date", "end_date")
 
-    booked_dates = []
-    for b in bookings:
-        current = b["start_date"]
-        while current < b["end_date"]:
-            booked_dates.append(current.isoformat())
-            current += _td(days=1)
+    room_id = request.GET.get("room_id")
+    if room_id:
+        room = get_object_or_404(HotelRoom, pk=room_id, listing=listing, is_active=True)
+        bookings = Booking.objects.filter(
+            hotel_room=room,
+            status__in=Booking.ACTIVE_STATUSES,
+        ).values("start_date", "end_date")
+
+        date_counts = {}
+        for b in bookings:
+            current = b["start_date"]
+            while current < b["end_date"]:
+                date_counts[current] = date_counts.get(current, 0) + 1
+                current += _td(days=1)
+        booked_dates = [d.isoformat() for d, count in date_counts.items() if count >= room.total_count]
+    else:
+        bookings = Booking.objects.filter(
+            listing=listing,
+            hotel_room__isnull=True,
+            status__in=Booking.ACTIVE_STATUSES,
+        ).values("start_date", "end_date")
+
+        booked_dates = []
+        for b in bookings:
+            current = b["start_date"]
+            while current < b["end_date"]:
+                booked_dates.append(current.isoformat())
+                current += _td(days=1)
 
     return Response({"booked_dates": booked_dates})
 
@@ -854,7 +883,7 @@ def review_response(request, id):
 def _get_available_room_count(room, start_date, end_date):
     overlapping = Booking.objects.filter(
         hotel_room=room,
-        status__in=['requested', 'confirmed'],
+        status__in=Booking.ACTIVE_STATUSES,
         start_date__lt=end_date,
         end_date__gt=start_date,
     ).count()

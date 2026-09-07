@@ -211,8 +211,11 @@ export function normalizeBooking(b: any): Booking {
     children: 0,
     infants: 0,
     pets: 0,
+    // The Booking API never returns a separate base_price — it only stores
+    // the final total and the service fee (see backend compute_listing_pricing).
+    // The pre-fee subtotal is exactly their difference.
     totalPrice: Number(b.total_price || 0),
-    basePrice: Number(b.base_price || 0),
+    basePrice: Number(b.total_price || 0) - Number(b.service_fee || 0),
     cleaningFee: 0,
     serviceFee: Number(b.service_fee || 0),
     taxes: 0,

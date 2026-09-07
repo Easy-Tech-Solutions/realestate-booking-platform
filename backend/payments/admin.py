@@ -91,7 +91,7 @@ class RefundAdmin(admin.ModelAdmin):
 
 @admin.register(PlatformFee)
 class PlatformFeeAdmin(admin.ModelAdmin):
-    list_display = ['service_fee_percent', 'viewing_fee', 'booking_fee', 'transaction_fee_type', 'transaction_fee_value', 'updated_at']
+    list_display = ['service_fee_percent', 'viewing_fee', 'transaction_fee_type', 'transaction_fee_value', 'updated_at']
     readonly_fields = ['updated_at']
     fieldsets = (
         ('Service Fee', {
@@ -106,11 +106,6 @@ class PlatformFeeAdmin(admin.ModelAdmin):
         ('Viewing Appointment Fee', {
             'fields': ('viewing_fee',),
             'description': 'Flat, non-refundable fee a guest pays to book a long-term property viewing (in USD).',
-        }),
-        ('Booking Fee (legacy)', {
-            'fields': ('booking_fee',),
-            'classes': ('collapse',),
-            'description': 'Legacy flat fee. No longer charged at reservation under the current booking flow.',
         }),
         ('Transaction Fee (added to guest total at payment)', {
             'fields': ('transaction_fee_type', 'transaction_fee_value', 'transaction_fee_min', 'transaction_fee_max'),

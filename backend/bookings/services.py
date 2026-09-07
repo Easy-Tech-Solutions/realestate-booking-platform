@@ -76,6 +76,15 @@ def _decline_competing_reservations(winning_booking):
     The decline notification is sent by the booking_post_save signal when the
     status flips to 'declined' — no explicit notify here (avoids a double send).
     """
+    if winning_booking.hotel_room_id is not None:
+        # Room bookings already had their capacity (HotelRoom.total_count)
+        # checked at request time — every other active reservation on this
+        # room legitimately holds one of its own units, so there are no
+        # "losing" competitors to auto-decline the way a single-unit listing
+        # has. Confirming this one room booking must not touch reservations
+        # for other rooms (or other guests of the same room) on this listing.
+        return
+
     competitors = Booking.objects.filter(
         listing=winning_booking.listing,
         status='pending_host',
@@ -95,10 +104,16 @@ def host_confirm_reservation(booking):
     """
     Host accepts a reservation: pull the listing, start the 10-day payment
     clock, decline competing reservations, and tell the guest to pay.
+
+    A room booking (booking.hotel_room set) never pulls the listing — a
+    multi-room property (hotel/lodge) stays publicly bookable for its other
+    room types; only this room's own capacity is affected, which is already
+    reflected dynamically via HotelRoom.total_count vs. active bookings.
     """
     booking.mark_host_confirmed()
     _decline_competing_reservations(booking)
-    _pull_listing(booking.listing)
+    if booking.hotel_room_id is None:
+        _pull_listing(booking.listing)
 
     try:
         from notifications.services import notify_reservation_ready_to_pay

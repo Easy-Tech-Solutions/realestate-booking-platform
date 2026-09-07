@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { propertiesAPI, reviewsAPI } from '../../services/api.service';
 import { queryKeys } from './keys';
 
-export function usePropertyDetails(propertyId?: string) {
+export function usePropertyDetails(propertyId?: string, roomId?: string) {
   const propertyQuery = useQuery({
     queryKey: propertyId ? queryKeys.properties.detail(propertyId) : ['properties', 'detail', 'empty'],
     queryFn: () => propertiesAPI.getById(propertyId!),
@@ -16,8 +16,8 @@ export function usePropertyDetails(propertyId?: string) {
   });
 
   const availabilityQuery = useQuery({
-    queryKey: propertyId ? queryKeys.properties.availability(propertyId) : ['properties', 'availability', 'empty'],
-    queryFn: () => propertiesAPI.getAvailability(propertyId!),
+    queryKey: propertyId ? queryKeys.properties.availability(propertyId, roomId) : ['properties', 'availability', 'empty'],
+    queryFn: () => propertiesAPI.getAvailability(propertyId!, roomId),
     enabled: Boolean(propertyId),
   });
 

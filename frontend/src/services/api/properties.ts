@@ -148,8 +148,9 @@ export const propertiesAPI = {
     return data.map((favorite: any) => normalizeListing(favorite.listing));
   },
 
-  getAvailability: async (id: string): Promise<string[]> => {
-    const data = await fetchWithAuth<AvailabilityResponse>(`/api/listings/${id}/availability/`);
+  getAvailability: async (id: string, roomId?: string): Promise<string[]> => {
+    const query = roomId ? `?room_id=${encodeURIComponent(roomId)}` : '';
+    const data = await fetchWithAuth<AvailabilityResponse>(`/api/listings/${id}/availability/${query}`);
     return data.booked_dates || [];
   },
 

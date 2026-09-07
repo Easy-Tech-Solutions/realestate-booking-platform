@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Listing, ListingImage, Favorite, PropertyCategory, ListingSettings
+from .models import Listing, ListingImage, Favorite, PropertyCategory, ListingSettings, HotelRoom
 
 
 @admin.register(PropertyCategory)
@@ -27,9 +27,18 @@ class ListingImageInline(admin.TabularInline):
     fields = ['image', 'caption', 'order']
     ordering = ['order']
 
+class HotelRoomInline(admin.TabularInline):
+    """Room types for a hotel/lodge listing — Listing.bedrooms is always 0 for
+    these (each room type has its own beds/bathrooms), so this is the only
+    place in admin that shows what the listing actually offers."""
+    model = HotelRoom
+    extra = 0
+    fields = ['name', 'room_type', 'price_per_night', 'beds', 'bed_type', 'bathrooms', 'total_count', 'is_active']
+    show_change_link = True
+
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
-    list_display = ['title', 'price', 'property_type', 'bedrooms', 'owner_full_name', 'status', 'is_available', 'created_at']
+    list_display = ['title', 'price', 'property_type', 'bedrooms_display', 'owner_full_name', 'status', 'is_available', 'created_at']
     list_filter = ['property_type', 'status', 'is_available', 'created_at', 'owner']
     search_fields = [
         'title',
@@ -41,12 +50,22 @@ class ListingAdmin(admin.ModelAdmin):
         'owner__email',
     ]
     readonly_fields = ['created_at', 'updated_at']
-    inlines = [ListingImageInline]
+    inlines = [HotelRoomInline, ListingImageInline]
 
     @admin.display(description='Owner', ordering='owner__last_name')
     def owner_full_name(self, obj):
         return obj.owner.get_full_name() or obj.owner.username
-    
+
+    @admin.display(description='Bedrooms', ordering='bedrooms')
+    def bedrooms_display(self, obj):
+        # A room-based listing (hotel/lodge) has no single "bedrooms" count —
+        # each room type has its own — so Listing.bedrooms is always 0 for
+        # these. Show the room-type count instead of a bare, confusing 0.
+        room_count = obj.hotel_rooms.count()
+        if room_count:
+            return f'{room_count} room type{"s" if room_count != 1 else ""}'
+        return obj.bedrooms
+
     fieldsets = (
         ('Basic Information', {
             'fields': ('title', 'description', 'owner')

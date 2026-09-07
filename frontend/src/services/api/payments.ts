@@ -40,7 +40,6 @@ export const REFUND_REASON_OPTIONS: { value: RefundReasonCode; label: string }[]
 ];
 
 export interface PlatformFee {
-  booking_fee: string;
   viewing_fee: string;
   service_fee_percent: string;
   transaction_fee_type: 'fixed' | 'percentage' | 'range';
