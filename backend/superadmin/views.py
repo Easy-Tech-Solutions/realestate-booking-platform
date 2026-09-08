@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -16,12 +17,15 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken
 
 from .constants import DEPARTMENTS
-from .models import AdminAuditLog, ImpersonationSession, MFADevice
+from .models import AdminAuditLog, ImpersonationSession, MFADevice, StaffProfile, StaffEducation, StaffLegalRecord
 from .permissions import (
     get_client_ip, is_full_admin, is_superadmin_staff,
     log_admin_action, user_departments,
 )
-from .serializers import AdminAuditLogSerializer, ImpersonationSessionSerializer
+from .serializers import (
+    AdminAuditLogSerializer, ImpersonationSessionSerializer,
+    StaffProfileSerializer, StaffEducationSerializer, StaffLegalRecordSerializer,
+)
 from .throttles import MFAEmailCodeRateThrottle, MFAVerifyLoginRateThrottle
 
 User = get_user_model()
@@ -334,3 +338,211 @@ def impersonate_stop(request):
             duration_seconds=(session.ended_at - session.started_at).total_seconds(),
         )
     return Response({'message': 'Impersonation ended.'})
+
+
+# ── Staff onboarding & management ───────────────────────────────────────────
+
+def _require_staff_management(request):
+    from rbac.permissions import has_any_permission
+    return is_full_admin(request.user) or has_any_permission(request.user, 'users.staff_management')
+
+
+def _unique_username_from_email(email):
+    import re
+    base = re.sub(r'[^a-z0-9_]', '', email.split('@')[0].lower())[:20] or 'user'
+    candidate = base
+    while User.objects.filter(username=candidate).exists():
+        candidate = f'{base}-{secrets.token_hex(3)}'
+    return candidate
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def admin_staff_list(request):
+    """Admin/HR: list all onboarded staff, or onboard a new one.
+
+    Onboarding links to an existing account by email if one already exists
+    (case-insensitively, matching users.User's unique_lower_email
+    constraint) — otherwise creates a brand-new account with an unusable
+    password and emails them a password-reset link to set their own
+    credential, the same pattern used for granting any new staff access."""
+    if not _require_staff_management(request):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == 'GET':
+        qs = StaffProfile.objects.select_related('user', 'onboarded_by').prefetch_related('education', 'legal_records')
+        return Response(StaffProfileSerializer(qs, many=True).data)
+
+    email = str(request.data.get('email', '')).strip().lower()
+    if not email:
+        return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.filter(email__iexact=email).first()
+    account_created = False
+    if user is None:
+        first_name = str(request.data.get('first_name', '')).strip()
+        last_name = str(request.data.get('last_name', '')).strip()
+        user = User(
+            username=_unique_username_from_email(email), email=email,
+            first_name=first_name, last_name=last_name,
+            is_active=True, email_verified=True,
+        )
+        user.set_unusable_password()
+        user.save()
+        account_created = True
+
+    if hasattr(user, 'staff_profile'):
+        return Response({'error': f'{user.email} is already onboarded as staff.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Staff need is_staff to reach the admin dashboard shell at all — RBAC
+    # roles (assigned separately, see rbac.user-roles) scope what they see
+    # once inside.
+    if not user.is_staff:
+        user.is_staff = True
+        user.save(update_fields=['is_staff'])
+
+    hire_date = request.data.get('hire_date') or None
+    staff = StaffProfile.objects.create(
+        user=user,
+        position=str(request.data.get('position', '')).strip(),
+        department=str(request.data.get('department', '')).strip(),
+        hire_date=hire_date,
+        phone_number=str(request.data.get('phone_number', '')).strip(),
+        onboarded_by=request.user,
+    )
+
+    if account_created:
+        from authapp.utils import send_password_reset_email
+        send_password_reset_email(user)
+
+    log_admin_action(
+        request, 'staff.onboard', target=staff,
+        reason='new account' if account_created else 'linked existing account',
+    )
+    data = StaffProfileSerializer(staff).data
+    data['account_created'] = account_created
+    return Response(data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_staff_detail(request, pk):
+    """Admin/HR: view or update a staff member's position/department/hire
+    date/phone, or offboard them (soft — deactivates the profile, keeps
+    their history; does not touch the underlying User account or its roles)."""
+    if not _require_staff_management(request):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    staff = get_object_or_404(StaffProfile.objects.select_related('user'), pk=pk)
+
+    if request.method == 'DELETE':
+        staff.is_active = False
+        staff.save(update_fields=['is_active'])
+        log_admin_action(request, 'staff.offboard', target=staff)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    if request.method == 'PATCH':
+        for field in ('position', 'department', 'phone_number'):
+            if field in request.data:
+                setattr(staff, field, str(request.data[field]).strip())
+        if 'hire_date' in request.data:
+            staff.hire_date = request.data['hire_date'] or None
+        if 'is_active' in request.data:
+            staff.is_active = bool(request.data['is_active'])
+        staff.save()
+        log_admin_action(request, 'staff.update', target=staff)
+
+    return Response(StaffProfileSerializer(staff).data)
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def staff_me(request):
+    """Self-service: a staff member's own profile. Position/department/hire
+    date are HR-controlled (set at onboarding, updated via admin_staff_detail
+    above) — only bio and phone number are self-editable here."""
+    staff = StaffProfile.objects.filter(user=request.user).first()
+    if not staff:
+        return Response({'error': 'You do not have a staff profile.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'PATCH':
+        for field in ('bio', 'phone_number'):
+            if field in request.data:
+                setattr(staff, field, str(request.data[field]).strip())
+        staff.save()
+
+    return Response(StaffProfileSerializer(staff).data)
+
+
+def _get_own_staff_profile(request):
+    return StaffProfile.objects.filter(user=request.user).first()
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def staff_me_education(request):
+    """Self-service: add/list the caller's own education entries."""
+    staff = _get_own_staff_profile(request)
+    if not staff:
+        return Response({'error': 'You do not have a staff profile.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'POST':
+        serializer = StaffEducationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(staff=staff)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    return Response(StaffEducationSerializer(staff.education.all(), many=True).data)
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def staff_me_education_detail(request, pk):
+    staff = _get_own_staff_profile(request)
+    if not staff:
+        return Response({'error': 'You do not have a staff profile.'}, status=status.HTTP_404_NOT_FOUND)
+    entry = get_object_or_404(StaffEducation, pk=pk, staff=staff)
+
+    if request.method == 'DELETE':
+        entry.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    serializer = StaffEducationSerializer(entry, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def staff_me_legal(request):
+    """Self-service: add/list the caller's own legal records (ID, work
+    permit, contract, certification, ...), with an optional document upload."""
+    staff = _get_own_staff_profile(request)
+    if not staff:
+        return Response({'error': 'You do not have a staff profile.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'POST':
+        serializer = StaffLegalRecordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(staff=staff)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    return Response(StaffLegalRecordSerializer(staff.legal_records.all(), many=True).data)
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def staff_me_legal_detail(request, pk):
+    staff = _get_own_staff_profile(request)
+    if not staff:
+        return Response({'error': 'You do not have a staff profile.'}, status=status.HTTP_404_NOT_FOUND)
+    entry = get_object_or_404(StaffLegalRecord, pk=pk, staff=staff)
+
+    if request.method == 'DELETE':
+        entry.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    serializer = StaffLegalRecordSerializer(entry, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)

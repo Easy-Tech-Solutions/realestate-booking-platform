@@ -64,6 +64,7 @@ const navGroups: NavGroup[] = [
     { type: 'section', id: 'payments', label: 'Payments' },
     { type: 'section', id: 'payouts', label: 'Host Payouts' },
     { type: 'route', path: '/management/finance', label: 'Finance & Legal Center' },
+    { type: 'route', path: '/management/payments', label: 'Payments & Disbursements' },
     { type: 'route', path: '/management/legal-documents', label: 'Legal Documents' },
   ] },
   { id: 'trust_safety', label: 'Trust & Safety', icon: ShieldCheck, items: [
@@ -78,6 +79,7 @@ const navGroups: NavGroup[] = [
     { type: 'route', path: '/management/aircover-claims', label: 'AirCover Claims' },
   ] },
   { id: 'rbac', label: 'Roles & Permissions', icon: KeySquare, items: [
+    { type: 'route', path: '/management/staff', label: 'Staff Directory' },
     { type: 'route', path: '/management/roles', label: 'Roles & Custom Roles' },
     { type: 'route', path: '/management/approvals', label: 'Pending Approvals' },
     { type: 'route', path: '/management/break-glass', label: 'Break-Glass Access' },

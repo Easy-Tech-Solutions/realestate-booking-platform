@@ -8,6 +8,7 @@ import { Separator } from '../components/ui/separator';
 import { Switch } from '../components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { MfaSetupCard, USER_MFA_API } from '../components/MfaSetupCard';
+import { StaffProfileSection } from '../components/StaffProfileSection';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -788,6 +789,8 @@ export function Account() {
               ))}
             </div>
           </div>
+
+          <StaffProfileSection />
 
           {/* Legal */}
           <div className="border border-border rounded-xl p-6">

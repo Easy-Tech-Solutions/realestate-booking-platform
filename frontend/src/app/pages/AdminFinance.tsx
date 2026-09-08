@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, DollarSign, Download, ScrollText, Lock, Unlock } from 'lucide-react';
+import { ArrowLeft, DollarSign, Download, ScrollText, Lock, Unlock, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { paymentAPI, REFUND_REASON_OPTIONS } from '../../services/api/payments';
 import type { EscrowBooking, TaxRate, TaxReportBucket, RefundReasonCode } from '../../services/api/payments';
@@ -493,9 +493,14 @@ export function AdminFinance() {
           </Button>
           <h1 className="text-2xl font-semibold flex items-center gap-2"><DollarSign className="h-5 w-5" /> Finance & Legal Center</h1>
         </div>
-        <Button variant="outline" onClick={() => navigate('/management/legal-documents')}>
-          <ScrollText className="h-3.5 w-3.5 mr-1" /> Legal Documents
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/management/payments')}>
+            <Wallet className="h-3.5 w-3.5 mr-1" /> Payments
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/management/legal-documents')}>
+            <ScrollText className="h-3.5 w-3.5 mr-1" /> Legal Documents
+          </Button>
+        </div>
       </div>
 
       {error ? (

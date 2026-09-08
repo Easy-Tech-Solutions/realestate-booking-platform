@@ -59,12 +59,17 @@ class MTNMoMoGateway(PaymentGatewayBase):
         # (see MTN_MOMO_TARGET_ENVIRONMENT in settings.py — Liberia = "mtnliberia").
         self.target_env = 'sandbox' if self.is_sandbox else mtn_config.get('target_environment', 'production')
 
-    def _account_for(self, currency: str) -> dict:
+    def _account_for(self, currency: str, product: str = 'collection') -> dict:
         """Resolve the (user_id, api_secret) pair for a specific currency's
-        MTN account. Raises ValueError with a clear, actionable message if
-        that currency has no API user configured — callers already wrap
-        their public methods in try/except and surface this as a normal
-        {'success': False, ...} error rather than a raw traceback."""
+        MTN account AND product. MTN ties an API user to one product only —
+        a Disbursement-only API user authenticates fine on a Collection call
+        but gets rejected with NOT_ALLOWED once MTN checks the account's
+        actual authorization, so Collection and Disbursement never share
+        credentials here even within the same currency. Raises ValueError
+        with a clear, actionable message if that currency/product has no API
+        user configured — callers already wrap their public methods in
+        try/except and surface this as a normal {'success': False, ...}
+        error rather than a raw traceback."""
         key = 'SANDBOX' if self.is_sandbox else (currency or '').upper()
 
         # TEMPORARY: MTN's partner portal only let us create one API user so
@@ -78,14 +83,17 @@ class MTNMoMoGateway(PaymentGatewayBase):
                 'account is provisioned right now. Pay in USD instead.'
             )
 
-        account = self._accounts.get(key) or {}
+        account = (self._accounts.get(key) or {}).get(product) or {}
         if not account.get('user_id') or not account.get('api_secret'):
             if self.is_sandbox:
                 raise ValueError('No MTN MoMo sandbox API user configured (MTN_MOMO_USER_ID_SANDBOX / MTN_MOMO_API_SECRET_SANDBOX, or the legacy MTN_MOMO_USER_ID / MTN_MOMO_API_SECRET).')
+            # Collection credentials are prefixed (MTN_MOMO_COLLECTION_USER_ID_USD);
+            # disbursement keeps the original un-prefixed names for backward compat.
+            var_prefix = 'MTN_MOMO_COLLECTION_' if product == 'collection' else 'MTN_MOMO_'
             raise ValueError(
-                f"No MTN MoMo API user configured for the {key} account. Create one in MTN's partner "
-                f"portal (Configure -> Create API user, Account: {key}) and set "
-                f"MTN_MOMO_USER_ID_{key} / MTN_MOMO_API_SECRET_{key} in backend/.env."
+                f"No MTN MoMo {product} API user configured for the {key} account. Create one in MTN's "
+                f"partner portal (Configure -> Create API user, Account: {key}, Product: {product}) and set "
+                f"{var_prefix}USER_ID_{key} / {var_prefix}API_SECRET_{key} in backend/.env."
             )
         return account
 
@@ -100,7 +108,7 @@ class MTNMoMoGateway(PaymentGatewayBase):
         API users, so they get different tokens). Tokens are cached for 50
         minutes (MTN tokens expire in 60 minutes).
         """
-        account = self._account_for(currency)
+        account = self._account_for(currency, product)
         cache_currency = 'SANDBOX' if self.is_sandbox else currency.upper()
         cache_key = f'mtn_momo_{self.target_env}_{cache_currency}_{product}_token'
         token = cache.get(cache_key)

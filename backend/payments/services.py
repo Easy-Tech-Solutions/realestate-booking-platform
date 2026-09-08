@@ -181,6 +181,26 @@ class PaymentService:
         )
 
     @classmethod
+    def disburse_to_phone(cls, phone_number: str, amount, currency: str, note: str) -> Dict[str, Any]:
+        """
+        Generic MTN MoMo disbursement to any phone number — used by the
+        Finance dashboard's payout / agent-commission / employee-payment
+        "Pay" actions. Always goes through the Disbursement API user (see
+        MTNMoMoGateway._account_for), never Collection.
+        """
+        gateway = cls.get_gateway('mtn_momo')
+        if not gateway:
+            return {'success': False, 'error': 'Payment gateway not available'}
+        if not phone_number:
+            return {'success': False, 'error': 'No MoMo number on file for this recipient.'}
+        return gateway.transfer_to_owner(
+            owner_phone=phone_number,
+            amount=float(amount),
+            currency=currency,
+            booking_ref=note,
+        )
+
+    @classmethod
     def refund_payment(cls, payment: Payment, amount: float, reason: str, reason_code: str = '') -> Dict[str, Any]:
         gateway = cls.get_gateway(payment.gateway.name)
         if not gateway:

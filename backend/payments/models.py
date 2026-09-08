@@ -226,6 +226,62 @@ class Payout(models.Model):
         return f'Payout to {self.host.username} — {self.net_amount} {self.currency} ({self.status})'
 
 
+class Employee(models.Model):
+    """
+    Internal staff member paid directly via MTN MoMo disbursement from the
+    Finance dashboard — separate from the User/auth system since employees
+    don't necessarily have (or need) a platform login.
+    """
+    name = models.CharField(max_length=255)
+    role_title = models.CharField(max_length=100, blank=True, default='')
+    momo_number = models.CharField(max_length=30)
+    momo_network = models.CharField(max_length=10, default='MTN')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f'{self.name} ({self.role_title})' if self.role_title else self.name
+
+
+class EmployeePayment(models.Model):
+    """
+    One ad-hoc disbursement to an employee (salary, bonus, reimbursement —
+    whatever `description` says). Unlike Payout/AgentCommission, there's no
+    prior 'owed' record — the payment and the amount are decided at the
+    moment someone pays it from the dashboard.
+    """
+    STATUS_CHOICES = [
+        ('paid', 'Paid'),
+        ('failed', 'Failed'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, default='USD')
+    description = models.CharField(max_length=255, blank=True, default='')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    reference = models.CharField(max_length=255, blank=True, help_text='Disbursement transaction reference')
+    error_message = models.CharField(max_length=500, blank=True, default='')
+
+    paid_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='employee_payments_processed',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Payment to {self.employee.name} — {self.amount} {self.currency} ({self.status})'
+
+
 class EscrowHold(models.Model):
     """A temporary freeze on releasing a booking's held guest payment — the
     real analog of 'finances.escrow' in the RBAC resource tree. Guest

@@ -468,6 +468,266 @@ def admin_cancel_payout(request, payout_id):
     return Response(_serialize_payout(payout))
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_disburse_payout(request, payout_id):
+    """Admin: pay a pending payout via a live MTN MoMo disbursement. Only
+    marks it paid if the disbursement is actually accepted by MTN — a failed
+    attempt leaves the payout pending so it can be retried or paid manually."""
+    if not _is_admin(request.user, 'finances.payouts'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from .models import Payout
+    try:
+        payout = Payout.objects.select_related('host__profile', 'booking__listing').get(pk=payout_id)
+    except Payout.DoesNotExist:
+        return Response({'error': 'Payout not found'}, status=status.HTTP_404_NOT_FOUND)
+    if payout.status != 'pending':
+        return Response({'error': f'Only pending payouts can be disbursed (this one is {payout.status}).'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Agent-sourced payouts disburse to the captured owner number; a normal
+    # host payout disburses to the host's own registered MoMo number.
+    phone = payout.recipient_momo_number
+    if not phone:
+        try:
+            phone = payout.host.profile.momo_number
+        except Exception:
+            phone = ''
+
+    result = PaymentService.disburse_to_phone(
+        phone_number=phone, amount=payout.net_amount, currency=payout.currency,
+        note=f'Host payout — booking #{payout.booking_id}',
+    )
+    if not result.get('success'):
+        return Response({'error': result.get('error', 'Disbursement failed'), 'details': result.get('details')}, status=status.HTTP_400_BAD_REQUEST)
+
+    from django.utils import timezone as _tz
+    payout.status = 'paid'
+    payout.paid_at = _tz.now()
+    payout.paid_by = request.user
+    payout.reference = result.get('refund_id', '')
+    payout.save(update_fields=['status', 'paid_at', 'paid_by', 'reference'])
+    try:
+        from notifications.services import notify_payout_paid
+        notify_payout_paid(payout)
+    except Exception:
+        pass
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'payout.disburse', target=payout, reason='MTN MoMo disbursement')
+
+    return Response(_serialize_payout(payout))
+
+
+# ── Agent commissions (Finance dashboard) ──────────────────────────────────
+
+def _serialize_agent_commission(c):
+    return {
+        'id': c.id,
+        'booking_id': c.booking_id,
+        'listing_title': c.listing.title if c.listing_id else '',
+        'agent_name': (c.agent.get_full_name() or c.agent.username),
+        'agent_id': c.agent_id,
+        'booking_amount': str(c.booking_amount),
+        'amount': str(c.amount),
+        'currency': c.currency,
+        'status': c.status,
+        'reference': c.reference,
+        'paid_at': c.paid_at.isoformat() if c.paid_at else None,
+        'voided_at': c.voided_at.isoformat() if c.voided_at else None,
+        'created_at': c.created_at.isoformat(),
+    }
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_agent_commissions(request):
+    """Admin: list sourcing-agent commissions, optionally filtered by ?status=pending|paid|voided."""
+    if not _is_admin(request.user, 'finances.agent_commissions'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from agents.models import AgentCommission
+    qs = AgentCommission.objects.select_related('agent', 'listing').order_by('-created_at')
+    status_filter = request.GET.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    return Response([_serialize_agent_commission(c) for c in qs])
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_disburse_agent_commission(request, commission_id):
+    """Admin: pay a pending agent commission via a live MTN MoMo disbursement."""
+    if not _is_admin(request.user, 'finances.agent_commissions'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from agents.models import AgentCommission
+    try:
+        commission = AgentCommission.objects.select_related('agent__profile', 'listing').get(pk=commission_id)
+    except AgentCommission.DoesNotExist:
+        return Response({'error': 'Commission not found'}, status=status.HTTP_404_NOT_FOUND)
+    if commission.status != AgentCommission.Status.PENDING:
+        return Response({'error': f'Only pending commissions can be disbursed (this one is {commission.status}).'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        phone = commission.agent.profile.momo_number
+    except Exception:
+        phone = ''
+
+    result = PaymentService.disburse_to_phone(
+        phone_number=phone, amount=commission.amount, currency=commission.currency,
+        note=f'Agent commission — booking #{commission.booking_id}',
+    )
+    if not result.get('success'):
+        return Response({'error': result.get('error', 'Disbursement failed'), 'details': result.get('details')}, status=status.HTTP_400_BAD_REQUEST)
+
+    from django.utils import timezone as _tz
+    commission.status = AgentCommission.Status.PAID
+    commission.paid_at = _tz.now()
+    commission.paid_by = request.user
+    commission.reference = result.get('refund_id', '')
+    commission.save(update_fields=['status', 'paid_at', 'paid_by', 'reference', 'updated_at'])
+    try:
+        from notifications.services import notify_agent_commission_paid
+        notify_agent_commission_paid(commission)
+    except Exception:
+        pass
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'agent_commission.disburse', target=commission, reason='MTN MoMo disbursement')
+
+    return Response(_serialize_agent_commission(commission))
+
+
+# ── Employees (Finance dashboard) ───────────────────────────────────────────
+
+def _serialize_employee(e):
+    return {
+        'id': e.id,
+        'name': e.name,
+        'role_title': e.role_title,
+        'momo_number': e.momo_number,
+        'momo_network': e.momo_network,
+        'is_active': e.is_active,
+        'created_at': e.created_at.isoformat(),
+    }
+
+
+def _serialize_employee_payment(p):
+    return {
+        'id': str(p.id),
+        'employee_id': p.employee_id,
+        'employee_name': p.employee.name,
+        'amount': str(p.amount),
+        'currency': p.currency,
+        'description': p.description,
+        'status': p.status,
+        'reference': p.reference,
+        'error_message': p.error_message,
+        'created_at': p.created_at.isoformat(),
+    }
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def admin_employees(request):
+    """Admin: list active employees, or add a new one."""
+    if not _is_admin(request.user, 'finances.employees'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from .models import Employee
+    if request.method == 'POST':
+        name = str(request.data.get('name', '')).strip()
+        momo_number = str(request.data.get('momo_number', '')).strip()
+        if not name or not momo_number:
+            return Response({'error': 'Name and MoMo number are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        employee = Employee.objects.create(
+            name=name, momo_number=momo_number,
+            role_title=str(request.data.get('role_title', '')).strip(),
+        )
+        return Response(_serialize_employee(employee), status=status.HTTP_201_CREATED)
+    qs = Employee.objects.filter(is_active=True)
+    return Response([_serialize_employee(e) for e in qs])
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_employee_detail(request, employee_id):
+    """Admin: update an employee's details, or deactivate them (soft-delete —
+    their payment history is kept)."""
+    if not _is_admin(request.user, 'finances.employees'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from .models import Employee
+    try:
+        employee = Employee.objects.get(pk=employee_id)
+    except Employee.DoesNotExist:
+        return Response({'error': 'Employee not found'}, status=status.HTTP_404_NOT_FOUND)
+    if request.method == 'DELETE':
+        employee.is_active = False
+        employee.save(update_fields=['is_active'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    for field in ('name', 'role_title', 'momo_number', 'momo_network'):
+        if field in request.data:
+            setattr(employee, field, str(request.data[field]).strip())
+    employee.save()
+    return Response(_serialize_employee(employee))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_pay_employee(request, employee_id):
+    """Admin: pay an employee an ad-hoc amount via a live MTN MoMo disbursement."""
+    if not _is_admin(request.user, 'finances.employees'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from .models import Employee, EmployeePayment
+    try:
+        employee = Employee.objects.get(pk=employee_id, is_active=True)
+    except Employee.DoesNotExist:
+        return Response({'error': 'Employee not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    from decimal import Decimal, InvalidOperation
+    try:
+        amount = Decimal(str(request.data.get('amount', '')))
+    except InvalidOperation:
+        amount = None
+    if not amount or amount <= 0:
+        return Response({'error': 'A positive amount is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    currency = request.data.get('currency', 'USD')
+    description = str(request.data.get('description', '')).strip()
+
+    result = PaymentService.disburse_to_phone(
+        phone_number=employee.momo_number, amount=amount, currency=currency,
+        note=description or f'Employee payment — {employee.name}',
+    )
+
+    payment = EmployeePayment.objects.create(
+        employee=employee, amount=amount, currency=currency, description=description,
+        status='paid' if result.get('success') else 'failed',
+        reference=result.get('refund_id', '') if result.get('success') else '',
+        error_message='' if result.get('success') else str(result.get('error', 'Disbursement failed')),
+        paid_by=request.user,
+    )
+
+    if not result.get('success'):
+        return Response({'error': result.get('error', 'Disbursement failed'), 'details': result.get('details'),
+                          'payment': _serialize_employee_payment(payment)}, status=status.HTTP_400_BAD_REQUEST)
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(request, 'employee_payment.disburse', target=payment, reason=description or 'MTN MoMo disbursement')
+
+    return Response(_serialize_employee_payment(payment), status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_employee_payments(request):
+    """Admin: payment history across all employees, optionally ?employee_id=."""
+    if not _is_admin(request.user, 'finances.employees'):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+    from .models import EmployeePayment
+    qs = EmployeePayment.objects.select_related('employee').order_by('-created_at')
+    employee_id = request.GET.get('employee_id')
+    if employee_id:
+        qs = qs.filter(employee_id=employee_id)
+    return Response([_serialize_employee_payment(p) for p in qs[:200]])
+
+
 @csrf_exempt
 def mtn_momo_webhook(request):
     """
