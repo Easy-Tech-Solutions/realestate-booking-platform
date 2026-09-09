@@ -8,6 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import type { Booking, PaymentMethod } from '../../core/types';
@@ -37,6 +38,8 @@ function PaymentForm() {
   const [loading, setLoading] = useState(!booking);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [momoCurrency, setMomoCurrency] = useState<'USD' | 'LRD'>('USD');
+  const [currencies, setCurrencies] = useState<{ code: string; symbol: string; exchange_rate_to_usd: string }[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [momoStatus, setMomoStatus] = useState<'idle' | 'awaiting'>('idle');
   const [lease, setLease] = useState<LeaseAgreement | null>(null);
@@ -64,6 +67,12 @@ function PaymentForm() {
       .then((l) => { setLease(l); if (l?.is_accepted) setAgreedLease(true); })
       .catch(() => setLease(null));
   }, [bookingId]);
+
+  // Currencies available for MTN MoMo (USD, LRD, ...) — used for the
+  // currency picker and to preview the converted amount before paying.
+  useEffect(() => {
+    paymentAPI.getCurrencies().then(setCurrencies).catch(() => setCurrencies([]));
+  }, []);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
@@ -162,7 +171,7 @@ function PaymentForm() {
       }
 
       // MTN MoMo
-      const payment = await paymentAPI.initiateMomoPayment(bookingId!, phoneNumber);
+      const payment = await paymentAPI.initiateMomoPayment(bookingId!, phoneNumber, momoCurrency);
       const paymentId = payment?.id || payment?.payment?.id;
       if (!paymentId) {
         toast.error('Could not start MoMo payment. Please try again.');
@@ -272,6 +281,31 @@ function PaymentForm() {
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone number</Label>
                   <Input id="phone" placeholder="0880123456" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+
+                  {currencies.length > 1 && (
+                    <>
+                      <Label htmlFor="momo-currency">Pay in</Label>
+                      <Select value={momoCurrency} onValueChange={(v) => setMomoCurrency(v as 'USD' | 'LRD')}>
+                        <SelectTrigger id="momo-currency"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {currencies.map((c) => (
+                            <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {momoCurrency !== 'USD' && (() => {
+                        const c = currencies.find((cur) => cur.code === momoCurrency);
+                        if (!c) return null;
+                        const converted = Math.round(total * parseFloat(c.exchange_rate_to_usd));
+                        return (
+                          <p className="text-xs text-muted-foreground">
+                            You'll be charged ≈ {c.symbol}{converted.toLocaleString()} {c.code} (converted from ${total.toFixed(2)}).
+                          </p>
+                        );
+                      })()}
+                    </>
+                  )}
+
                   <p className="text-xs text-muted-foreground">MTN Mobile Money charges a 2% transaction fee on top of the amount above.</p>
                 </div>
               )}

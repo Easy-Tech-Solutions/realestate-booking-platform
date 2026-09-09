@@ -82,13 +82,13 @@ export const paymentAPI = {
   initiatePayment,
 
   // ── Rent / booking payment (after host confirmation) ──────────────────────
-  initiateMomoPayment: async (bookingId: string, phoneNumber: string): Promise<any> => {
+  initiateMomoPayment: async (bookingId: string, phoneNumber: string, currency: 'USD' | 'LRD' = 'USD'): Promise<any> => {
     return initiatePayment({
       booking_id: bookingId,
       phone_number: phoneNumber,
       gateway: 'mtn_momo',
       payment_method: 'mobile_money',
-      currency: 'USD',
+      currency,
     });
   },
 
@@ -101,7 +101,7 @@ export const paymentAPI = {
   },
 
   // ── Viewing appointment fee ($3) ──────────────────────────────────────────
-  initiateViewingMomoPayment: async (viewingId: string, phoneNumber: string): Promise<any> => {
+  initiateViewingMomoPayment: async (viewingId: string, phoneNumber: string, currency: 'USD' | 'LRD' = 'USD'): Promise<any> => {
     const data = await fetchWithAuth<PaymentEnvelope>('/api/payments/viewing/initiate/', {
       method: 'POST',
       body: JSON.stringify({
@@ -109,10 +109,15 @@ export const paymentAPI = {
         phone_number: phoneNumber,
         gateway: 'mtn_momo',
         payment_method: 'mobile_money',
-        currency: 'USD',
+        currency,
       }),
     });
     return data.payment || data;
+  },
+
+  // Active currencies + USD exchange rate, for a currency picker on checkout.
+  getCurrencies: async (): Promise<{ code: string; name: string; symbol: string; exchange_rate_to_usd: string }[]> => {
+    return fetchWithAuth('/api/payments/currencies/');
   },
 
   // Stripe PaymentIntent for the viewing fee (amount computed server-side).

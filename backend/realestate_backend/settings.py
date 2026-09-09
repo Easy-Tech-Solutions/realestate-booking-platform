@@ -569,19 +569,30 @@ PAYMENT_GATEWAYS = {
         # currency below carries two independent API users, one per product
         # — never point both at the same credentials.
         'accounts': {
-            # LRD falls back to the original un-suffixed vars so a
-            # single-currency setup (from before dual-currency support)
-            # keeps working without renaming anything. No dedicated LRD
-            # collection account exists yet (see the LRD block in
-            # MTNMoMoGateway._account_for) so both products share these vars.
+            # MTN confirmed (2026-09-08) that an API user is NOT
+            # currency-locked — the same Collection/Disbursement accounts
+            # provisioned for USD work for LRD too. So LRD falls back to the
+            # exact same credentials as USD for each product, unless a truly
+            # separate LRD account is ever provisioned (MTN_MOMO_*_LRD /
+            # the legacy un-suffixed MTN_MOMO_USER_ID/API_SECRET vars still
+            # take priority if set, for backward compatibility).
+            # `or`-chained (not nested os.environ.get(key, default)) because
+            # backend/.env carries MTN_MOMO_USER_ID_LRD= / API_SECRET_LRD=
+            # as explicitly-blank (not absent) vars from the single-currency
+            # era — os.environ.get() would return that blank string as-is
+            # and never reach the fallback, silently breaking LRD.
             'LRD': {
                 'collection': {
-                    'user_id': os.environ.get('MTN_MOMO_USER_ID_LRD', os.environ.get('MTN_MOMO_USER_ID', '')),
-                    'api_secret': os.environ.get('MTN_MOMO_API_SECRET_LRD', os.environ.get('MTN_MOMO_API_SECRET', '')),
+                    'user_id': (os.environ.get('MTN_MOMO_USER_ID_LRD') or os.environ.get('MTN_MOMO_USER_ID')
+                                or os.environ.get('MTN_MOMO_COLLECTION_USER_ID_USD', '')),
+                    'api_secret': (os.environ.get('MTN_MOMO_API_SECRET_LRD') or os.environ.get('MTN_MOMO_API_SECRET')
+                                   or os.environ.get('MTN_MOMO_COLLECTION_API_SECRET_USD', '')),
                 },
                 'disbursement': {
-                    'user_id': os.environ.get('MTN_MOMO_USER_ID_LRD', os.environ.get('MTN_MOMO_USER_ID', '')),
-                    'api_secret': os.environ.get('MTN_MOMO_API_SECRET_LRD', os.environ.get('MTN_MOMO_API_SECRET', '')),
+                    'user_id': (os.environ.get('MTN_MOMO_USER_ID_LRD') or os.environ.get('MTN_MOMO_USER_ID')
+                                or os.environ.get('MTN_MOMO_USER_ID_USD', '')),
+                    'api_secret': (os.environ.get('MTN_MOMO_API_SECRET_LRD') or os.environ.get('MTN_MOMO_API_SECRET')
+                                   or os.environ.get('MTN_MOMO_API_SECRET_USD', '')),
                 },
             },
             'USD': {

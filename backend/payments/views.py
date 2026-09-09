@@ -6,7 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -16,13 +16,26 @@ logger = logging.getLogger(__name__)
 
 from rbac import dual_auth
 
-from .models import Payment, PaymentGateway, WebhookLog, SavedCard, Refund, PlatformFee
+from .models import Payment, PaymentGateway, WebhookLog, SavedCard, Refund, PlatformFee, Currency
 from .serializers import (
     PaymentInitiateSerializer, PaymentVerifySerializer, RefundSerializer,
     PaymentSerializer, RefundDetailSerializer, SavedCardSerializer,
     ViewingPaymentInitiateSerializer, PlatformFeeSerializer, TaxRateSerializer,
 )
 from .services import PaymentService
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def currencies_list(request):
+    """Public: active currencies + their USD exchange rate, so the checkout
+    page can offer a currency choice (e.g. USD/LRD) and preview the
+    converted amount before the guest commits to a payment method."""
+    qs = Currency.objects.filter(is_active=True).order_by('code')
+    return Response([
+        {'code': c.code, 'name': c.name, 'symbol': c.symbol, 'exchange_rate_to_usd': str(c.exchange_rate_to_usd)}
+        for c in qs
+    ])
 
 
 @api_view(['POST'])
@@ -40,9 +53,13 @@ def initiate_payment(request):
 
             # Listings are priced in USD; booking.total_price already
             # includes the guest-side service fee (set at booking creation
-            # by compute_listing_pricing). Use it directly — no FX needed.
+            # by compute_listing_pricing). Converted to the guest's chosen
+            # currency (e.g. LRD) via PaymentService.convert_from_usd — a
+            # no-op when currency_code is already USD.
             from decimal import Decimal as _D
-            amount_in_pay_currency = _D(str(booking.total_price or booking.total_amount))
+            amount_in_pay_currency = PaymentService.convert_from_usd(
+                _D(str(booking.total_price or booking.total_amount)), currency_code,
+            )
 
             payment = PaymentService.create_payment(
                 booking=booking,
@@ -130,7 +147,7 @@ def initiate_viewing_payment(request):
         currency_code = serializer.validated_data['currency']
 
         from decimal import Decimal as _D
-        amount = _D(str(viewing.viewing_fee))
+        amount = PaymentService.convert_from_usd(_D(str(viewing.viewing_fee)), currency_code)
 
         payment = PaymentService.create_payment(
             viewing=viewing,

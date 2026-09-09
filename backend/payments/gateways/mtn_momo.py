@@ -25,15 +25,17 @@ class MTNMoMoGateway(PaymentGatewayBase):
     to toggle from Django admin without a redeploy:
         MTN_MOMO_COLLECTION_KEY    → Collection product subscription key (Ocp-Apim-Subscription-Key) — shared across currencies
         MTN_MOMO_DISBURSEMENT_KEY  → Disbursement product subscription key — shared across currencies
-        MTN_MOMO_USER_ID_LRD/USD   → Collection API user ID — ONE PER CURRENCY (see below)
-        MTN_MOMO_API_SECRET_LRD/USD → Collection API key (Basic Auth) — ONE PER CURRENCY
+        MTN_MOMO_COLLECTION_USER_ID_USD / MTN_MOMO_USER_ID_USD → Collection / Disbursement API user IDs
+        MTN_MOMO_COLLECTION_API_SECRET_USD / MTN_MOMO_API_SECRET_USD → matching API keys (Basic Auth)
 
-    Dual-currency (LRD + USD): MTN ties the "API User" (user_id + api_secret)
-    to a specific account in their partner portal ("Account: LRD" or
-    "Account: USD" when creating an API user) — the subscription keys are
-    shared, but the API user is not. Every credential-dependent call below
-    takes a `currency` argument and resolves the right API user via
-    _account_for() — there is no single fixed self.user_id.
+    Dual-currency (LRD + USD): an API user is tied to one *product*
+    (Collection or Disbursement — see _account_for), NOT to one currency —
+    MTN confirmed the same account processes both LRD and USD amounts, so
+    LRD defaults to the same credentials as USD (settings.PAYMENT_GATEWAYS)
+    unless a genuinely separate LRD account is provisioned later. Every
+    credential-dependent call below still takes a `currency` argument and
+    resolves the right API user via _account_for() — there is no single
+    fixed self.user_id — since a dedicated LRD account may exist someday.
 
     Webhooks: MTN's callback POSTs are not signed (no HMAC, no shared secret
     — unlike Stripe). See mtn_momo_webhook() in payments/views.py — it treats
@@ -72,17 +74,9 @@ class MTNMoMoGateway(PaymentGatewayBase):
         error rather than a raw traceback."""
         key = 'SANDBOX' if self.is_sandbox else (currency or '').upper()
 
-        # TEMPORARY: MTN's partner portal only let us create one API user so
-        # far (the USD account) — LRD is suppressed in production until its
-        # own API user is provisioned there too. Delete this block (and the
-        # LRD entry stays ready to go) once MTN_MOMO_USER_ID_LRD /
-        # MTN_MOMO_API_SECRET_LRD are set in backend/.env.
-        if not self.is_sandbox and key == 'LRD':
-            raise ValueError(
-                'MTN MoMo payments in LRD are temporarily unavailable — only the USD '
-                'account is provisioned right now. Pay in USD instead.'
-            )
-
+        # MTN confirmed an API user is not currency-locked (2026-09-08) — LRD
+        # uses the same account as USD by default (see settings.PAYMENT_GATEWAYS),
+        # so there's no currency-based block here any more.
         account = (self._accounts.get(key) or {}).get(product) or {}
         if not account.get('user_id') or not account.get('api_secret'):
             if self.is_sandbox:
