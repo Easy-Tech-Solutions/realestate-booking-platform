@@ -20,7 +20,7 @@ from .models import Payment, PaymentGateway, WebhookLog, SavedCard, Refund, Plat
 from .serializers import (
     PaymentInitiateSerializer, PaymentVerifySerializer, RefundSerializer,
     PaymentSerializer, RefundDetailSerializer, SavedCardSerializer,
-    ViewingPaymentInitiateSerializer, PlatformFeeSerializer, TaxRateSerializer,
+    ViewingPaymentInitiateSerializer, PlatformFeeSerializer, TaxRateSerializer, CurrencySerializer,
 )
 from .services import PaymentService
 
@@ -1249,6 +1249,48 @@ def admin_escrow_release(request, hold_id):
     log_admin_action(request, 'escrow.release', target=hold)
 
     return Response({'id': hold.id, 'booking_id': hold.booking_id, 'released_at': hold.released_at.isoformat()})
+
+
+# ---------------------------------------------------------------------------
+# Admin: currency exchange rates (finances.currencies)
+# ---------------------------------------------------------------------------
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_currencies(request):
+    """Superadmin/finance: list every currency (including inactive ones) —
+    the public /api/payments/currencies/ only shows active ones."""
+    from rbac.permissions import has_permission
+    if not has_permission(request.user, 'finances.currencies', 'read'):
+        return Response({'error': 'finances.currencies access required'}, status=status.HTTP_403_FORBIDDEN)
+    return Response(CurrencySerializer(Currency.objects.all().order_by('code'), many=True).data)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def admin_currency_detail(request, pk):
+    """Superadmin/finance: update a currency's USD conversion rate, display
+    name/symbol, or active flag. Takes effect immediately — the next MTN
+    MoMo payment in this currency uses the new rate via
+    PaymentService.convert_from_usd(); `code` itself is never editable since
+    it's what selects the wire-format branch in mtn_momo.py."""
+    from rbac.permissions import has_permission
+    if not has_permission(request.user, 'finances.currencies', 'update'):
+        return Response({'error': 'finances.currencies access required'}, status=status.HTTP_403_FORBIDDEN)
+
+    currency = get_object_or_404(Currency, pk=pk)
+    serializer = CurrencySerializer(currency, data=request.data, partial=True)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    old_rate = currency.exchange_rate_to_usd
+    currency = serializer.save()
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(
+        request, 'currency.update', target=currency,
+        reason=f'{currency.code} rate {old_rate} -> {currency.exchange_rate_to_usd}',
+    )
+    return Response(CurrencySerializer(currency).data)
 
 
 # ---------------------------------------------------------------------------

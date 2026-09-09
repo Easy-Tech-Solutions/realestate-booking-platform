@@ -8,6 +8,7 @@ from .views import (
     hotel_rooms_collection, hotel_room_detail, hotel_room_availability,
     hotel_room_images, hotel_room_image_detail,
     my_drafts, pending_review_listings, approve_listing, reject_listing, my_listings,
+    bulk_template, bulk_export, bulk_import, listing_duplicate,
 )
 
 urlpatterns = [
@@ -17,8 +18,12 @@ urlpatterns = [
     path('my-drafts/', my_drafts, name='my_drafts'),
     path('my-listings/', my_listings, name='my_listings'),
     path('pending-review/', pending_review_listings, name='pending_review_listings'),
+    path('bulk/template/', bulk_template, name='bulk_template'),
+    path('bulk/export/', bulk_export, name='bulk_export'),
+    path('bulk/import/', bulk_import, name='bulk_import'),
     path('<int:id>/approve/', approve_listing, name='approve_listing'),
     path('<int:id>/reject/', reject_listing, name='reject_listing'),
+    path('<int:id>/duplicate/', listing_duplicate, name='listing_duplicate'),
     path('reviews/', all_reviews, name='all_reviews'),
     path('', listings_collection, name='listings_collection'),
     path('<int:id>/', listing_detail, name='listing_detail'),

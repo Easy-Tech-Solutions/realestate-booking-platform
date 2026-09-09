@@ -80,6 +80,7 @@ const AdminFraudFlags = lazyPage(() => import('./pages/AdminFraudFlags').then((m
 const AdminListingModeration = lazyPage(() => import('./pages/AdminListingModeration').then((module) => ({ default: module.AdminListingModeration })));
 const AdminFinance = lazyPage(() => import('./pages/AdminFinance').then((module) => ({ default: module.AdminFinance })));
 const AdminPayments = lazyPage(() => import('./pages/AdminPayments').then((module) => ({ default: module.AdminPayments })));
+const AdminEmployees = lazyPage(() => import('./pages/AdminEmployees').then((module) => ({ default: module.AdminEmployees })));
 const AdminLegalDocuments = lazyPage(() => import('./pages/AdminLegalDocuments').then((module) => ({ default: module.AdminLegalDocuments })));
 const AdminPlatformOps = lazyPage(() => import('./pages/AdminPlatformOps').then((module) => ({ default: module.AdminPlatformOps })));
 const AdminRoles = lazyPage(() => import('./pages/AdminRoles').then((module) => ({ default: module.AdminRoles })));
@@ -302,6 +303,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requireAdmin>
             <AdminPayments />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/employees',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminEmployees />
           </ProtectedRoute>
         ),
       },

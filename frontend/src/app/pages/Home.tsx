@@ -84,6 +84,24 @@ function CategorySvgIcon({ id, className = 'w-8 h-8' }: { id: string; className?
           <path d="M10 22v-5h4v5" />
         </svg>
       );
+    case 'resort':
+      return (
+        <svg {...s}>
+          {/* ground */}
+          <path d="M1 22h22" />
+          {/* low building */}
+          <rect x="2" y="15" width="10" height="7" rx="0.5" />
+          <rect x="4" y="17" width="2.5" height="2.5" rx="0.3" />
+          <rect x="8" y="17" width="2.5" height="2.5" rx="0.3" />
+          {/* palm trunk */}
+          <path d="M18 22V12" />
+          {/* palm fronds */}
+          <path d="M18 12q-4-3-6 0" />
+          <path d="M18 12q4-3 6 0" />
+          <path d="M18 12q-1-5 2-7" />
+          <path d="M18 12q1-5-2-7" />
+        </svg>
+      );
     case 'beaches':
       return (
         <svg {...s}>

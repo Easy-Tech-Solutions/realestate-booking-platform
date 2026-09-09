@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Wallet, Send, Plus, UserX } from 'lucide-react';
+import { ArrowLeft, Wallet, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { payoutsAPI } from '../../services/api/payouts';
 import type { Payout } from '../../core/types';
@@ -271,14 +271,11 @@ function PayEmployeeDialog({ employee, onDone }: { employee: Employee; onDone: (
 }
 
 function EmployeesSection() {
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payments, setPayments] = useState<EmployeePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [roleTitle, setRoleTitle] = useState('');
-  const [momoNumber, setMomoNumber] = useState('');
-  const [busy, setBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -296,63 +293,24 @@ function EmployeesSection() {
 
   useEffect(() => { load(); }, []);
 
-  const addEmployee = async () => {
-    if (!name.trim() || !momoNumber.trim()) {
-      toast.error('Name and MoMo number are required.');
-      return;
-    }
-    setBusy(true);
-    try {
-      await employeesAPI.adminCreate({ name: name.trim(), momo_number: momoNumber.trim(), role_title: roleTitle.trim() });
-      setName(''); setRoleTitle(''); setMomoNumber('');
-      toast.success('Employee added.');
-      load();
-    } catch (err) {
-      toast.error(getErrorMessage(err, 'Failed to add employee'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const deactivate = async (employee: Employee) => {
-    try {
-      await employeesAPI.adminDeactivate(employee.id);
-      toast.success(`${employee.name} deactivated.`);
-      load();
-    } catch (err) {
-      toast.error(getErrorMessage(err, 'Failed to deactivate employee'));
-    }
-  };
-
   if (error) {
     return <p className="text-sm text-muted-foreground">{error}</p>;
   }
 
   return (
     <section className="space-y-6">
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold">Add an employee</h3>
-        <Card>
-          <CardContent className="p-4 flex flex-wrap gap-2 items-end">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Name</label>
-              <Input className="w-48" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Role/title</label>
-              <Input className="w-40" value={roleTitle} onChange={(e) => setRoleTitle(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">MoMo number</label>
-              <Input className="w-40" value={momoNumber} onChange={(e) => setMomoNumber(e.target.value)} placeholder="0770123456" />
-            </div>
-            <Button disabled={busy} onClick={addEmployee}><Plus className="h-3.5 w-3.5 mr-1" /> Add</Button>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground max-w-md">
+          Adding, editing, or deactivating an employee is managed separately, outside Financial
+          Management.
+        </p>
+        <Button variant="outline" size="sm" onClick={() => navigate('/management/employees')}>
+          Manage employees
+        </Button>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold">Employees</h3>
+        <h3 className="text-sm font-semibold">Pay an employee</h3>
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -369,7 +327,9 @@ function EmployeesSection() {
                   {loading ? (
                     <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>
                   ) : employees.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No employees yet.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      No employees yet — add one under "Manage employees" first.
+                    </TableCell></TableRow>
                   ) : (
                     employees.map((e) => (
                       <TableRow key={e.id}>
@@ -377,12 +337,7 @@ function EmployeesSection() {
                         <TableCell className="text-sm text-muted-foreground">{e.role_title || '—'}</TableCell>
                         <TableCell>{e.momo_number}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <PayEmployeeDialog employee={e} onDone={load} />
-                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deactivate(e)}>
-                              <UserX className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                          <PayEmployeeDialog employee={e} onDone={load} />
                         </TableCell>
                       </TableRow>
                     ))

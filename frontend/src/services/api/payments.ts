@@ -78,6 +78,17 @@ export interface TaxReportBucket {
   booking_count: number;
 }
 
+export interface AdminCurrency {
+  id: number;
+  code: string;
+  name: string;
+  symbol: string;
+  exchange_rate_to_usd: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export const paymentAPI = {
   initiatePayment,
 
@@ -244,6 +255,18 @@ export const paymentAPI = {
     if (since) qs.set('since', since);
     if (until) qs.set('until', until);
     return fetchWithAuth(`/api/payments/admin/tax-report/?${qs.toString()}`);
+  },
+
+  // ── Currency exchange rates ───────────────────────────────────────────────
+  adminListCurrencies: async (): Promise<AdminCurrency[]> => {
+    return fetchWithAuth<AdminCurrency[]>('/api/payments/admin/currencies/');
+  },
+
+  adminUpdateCurrency: async (id: number, payload: Partial<{ exchange_rate_to_usd: string; name: string; symbol: string; is_active: boolean }>): Promise<AdminCurrency> => {
+    return fetchWithAuth<AdminCurrency>(`/api/payments/admin/currencies/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
   },
 
   // ── Stripe refunds ────────────────────────────────────────────────────────

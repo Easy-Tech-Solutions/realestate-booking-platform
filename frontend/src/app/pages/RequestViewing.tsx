@@ -63,6 +63,19 @@ function ViewingForm() {
     paymentAPI.getCurrencies().then(setCurrencies).catch(() => setCurrencies([]));
   }, []);
 
+  // Same approach as CompletePayment: when paying via MTN MoMo in a non-USD
+  // currency, the actual "what you're about to pay" figures switch to the
+  // converted amount instead of a USD number with an easy-to-miss footnote.
+  const payingInAlt = paymentMethod === 'mtn_momo' && momoCurrency !== 'USD';
+  const altCurrency = payingInAlt ? currencies.find((c) => c.code === momoCurrency) : undefined;
+  const displayFee = (usdAmount: number): string => {
+    if (altCurrency) {
+      const converted = Math.round(usdAmount * parseFloat(altCurrency.exchange_rate_to_usd));
+      return `${altCurrency.symbol}${converted.toLocaleString()}`;
+    }
+    return formatCurrency(usdAmount);
+  };
+
   useEffect(() => {
     if (!property) {
       propertiesAPI.getById(listingId).then(setProperty).catch(() => {});
@@ -317,16 +330,11 @@ function ViewingForm() {
                           ))}
                         </SelectContent>
                       </Select>
-                      {momoCurrency !== 'USD' && (() => {
-                        const c = currencies.find((cur) => cur.code === momoCurrency);
-                        if (!c) return null;
-                        const converted = Math.round(viewing.viewingFee * parseFloat(c.exchange_rate_to_usd));
-                        return (
-                          <p className="text-xs text-muted-foreground">
-                            You'll be charged ≈ {c.symbol}{converted.toLocaleString()} {c.code} (converted from ${viewing.viewingFee.toFixed(2)}).
-                          </p>
-                        );
-                      })()}
+                      {payingInAlt && altCurrency && (
+                        <p className="text-xs text-muted-foreground">
+                          Priced at {formatCurrency(viewing.viewingFee)} USD, converted to {altCurrency.code} at today's rate.
+                        </p>
+                      )}
                     </>
                   )}
 
@@ -351,7 +359,7 @@ function ViewingForm() {
               </div>
 
               <Button onClick={handlePay} disabled={isProcessing || momoStatus === 'awaiting'} className="w-full" size="lg">
-                {momoStatus === 'awaiting' ? 'Waiting for MoMo approval…' : isProcessing ? 'Processing…' : `Pay ${formatCurrency(viewing.viewingFee)} viewing fee`}
+                {momoStatus === 'awaiting' ? 'Waiting for MoMo approval…' : isProcessing ? 'Processing…' : `Pay ${displayFee(viewing.viewingFee)} viewing fee`}
               </Button>
             </div>
           )}

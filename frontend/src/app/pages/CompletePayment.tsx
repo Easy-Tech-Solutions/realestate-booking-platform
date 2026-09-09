@@ -106,6 +106,20 @@ function PaymentForm() {
   const total = booking.totalPrice || 0;
   const rent = Math.max(total - (booking.serviceFee || 0), 0);
 
+  // Everything is priced in USD; when paying via MTN MoMo in a non-USD
+  // currency, every displayed amount (button + breakdown) switches to the
+  // converted figure so the guest sees exactly what they're actually being
+  // charged, not a USD number next to an easy-to-miss conversion footnote.
+  const payingInAlt = paymentMethod === 'mtn_momo' && momoCurrency !== 'USD';
+  const altCurrency = payingInAlt ? currencies.find((c) => c.code === momoCurrency) : undefined;
+  const displayAmount = (usdAmount: number): string => {
+    if (altCurrency) {
+      const converted = Math.round(usdAmount * parseFloat(altCurrency.exchange_rate_to_usd));
+      return `${altCurrency.symbol}${converted.toLocaleString()}`;
+    }
+    return formatCurrency(usdAmount);
+  };
+
   const finish = () => {
     toast.success('Payment submitted! We\'ll confirm it shortly and share your host\'s contact details.');
     navigate('/trips');
@@ -293,16 +307,6 @@ function PaymentForm() {
                           ))}
                         </SelectContent>
                       </Select>
-                      {momoCurrency !== 'USD' && (() => {
-                        const c = currencies.find((cur) => cur.code === momoCurrency);
-                        if (!c) return null;
-                        const converted = Math.round(total * parseFloat(c.exchange_rate_to_usd));
-                        return (
-                          <p className="text-xs text-muted-foreground">
-                            You'll be charged ≈ {c.symbol}{converted.toLocaleString()} {c.code} (converted from ${total.toFixed(2)}).
-                          </p>
-                        );
-                      })()}
                     </>
                   )}
 
@@ -347,7 +351,7 @@ function PaymentForm() {
               )}
 
               <Button type="button" onClick={handlePayment} disabled={isProcessing || momoStatus === 'awaiting' || (!!lease && !agreedLease)} className="w-full" size="lg">
-                {momoStatus === 'awaiting' ? 'Waiting for MoMo approval…' : isProcessing ? 'Processing…' : `Pay ${formatCurrency(total)}`}
+                {momoStatus === 'awaiting' ? 'Waiting for MoMo approval…' : isProcessing ? 'Processing…' : `Pay ${displayAmount(total)}`}
               </Button>
             </div>
 
@@ -365,11 +369,16 @@ function PaymentForm() {
                 <div>
                   <h2 className="text-lg font-semibold mb-4">Payment due now</h2>
                   <div className="space-y-3 text-sm">
-                    <div className="flex justify-between"><span>Rent</span><span>{formatCurrency(rent)}</span></div>
-                    <div className="flex justify-between"><span>Service fee</span><span>{formatCurrency(booking.serviceFee || 0)}</span></div>
+                    <div className="flex justify-between"><span>Rent</span><span>{displayAmount(rent)}</span></div>
+                    <div className="flex justify-between"><span>Service fee</span><span>{displayAmount(booking.serviceFee || 0)}</span></div>
                   </div>
                   <Separator className="my-4" />
-                  <div className="flex justify-between font-semibold text-base"><span>Total</span><span>{formatCurrency(total)}</span></div>
+                  <div className="flex justify-between font-semibold text-base"><span>Total</span><span>{displayAmount(total)}</span></div>
+                  {payingInAlt && altCurrency && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Priced at {formatCurrency(total)} USD, converted to {altCurrency.code} at today's rate.
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-start gap-3 p-4 bg-secondary/30 rounded-lg">
                   <Shield className="w-5 h-5 flex-shrink-0 mt-0.5 text-primary" />

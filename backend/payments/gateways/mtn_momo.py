@@ -47,6 +47,7 @@ class MTNMoMoGateway(PaymentGatewayBase):
     # MTN MoMo API path segments
     COLLECTION_TOKEN_PATH = 'collection/token/'
     COLLECTION_REQUEST_PATH = 'collection/v1_0/requesttopay'
+    COLLECTION_ACCOUNT_HOLDER_PATH = 'collection/v1_0/accountholder/msisdn/{msisdn}/active'
     DISBURSEMENT_TOKEN_PATH = 'disbursement/token/'
     DISBURSEMENT_TRANSFER_PATH = 'disbursement/v1_0/transfer'
 
@@ -159,6 +160,46 @@ class MTNMoMoGateway(PaymentGatewayBase):
         return headers
 
     # ------------------------------------------------------------------ #
+    #  Account holder pre-flight check                                     #
+    # ------------------------------------------------------------------ #
+
+    def is_account_active(self, phone_number: str, currency: str) -> bool:
+        """
+        MTN's "Validate account holder status" endpoint — confirms the given
+        MSISDN is a real, registered MTN MoMo subscriber before we ever
+        submit a real request-to-pay. This is the one pre-flight check MTN
+        actually exposes to merchants; a subscriber's balance and spending
+        limit are never exposed to us (or any merchant, by design — every
+        mobile money provider treats those as private to the subscriber).
+        Those two can only be inferred after the fact, from the FAILED
+        reason code returned by verify_payment().
+
+        Fails OPEN: if the check itself errors (network hiccup, unexpected
+        MTN response), this logs a warning and returns True so an unrelated
+        infra blip on this pre-check never blocks an otherwise-legitimate
+        payment attempt — the real request-to-pay call still has its own
+        error handling if something is genuinely wrong.
+        """
+        try:
+            formatted_phone = phone_number if self.is_sandbox else self._format_phone_number(phone_number)
+            url = self.get_api_url(self.COLLECTION_ACCOUNT_HOLDER_PATH.format(msisdn=formatted_phone))
+            response = requests.get(url, headers=self._collection_headers(currency), timeout=15)
+
+            if response.status_code == 404:
+                return False
+            if response.status_code == 200:
+                return bool(response.json().get('result'))
+
+            logger.warning(
+                'MTN MoMo account-holder check: unexpected status %s for %s — proceeding anyway',
+                response.status_code, formatted_phone,
+            )
+            return True
+        except Exception:
+            logger.exception('MTN MoMo account-holder check failed for %s — proceeding anyway', phone_number)
+            return True
+
+    # ------------------------------------------------------------------ #
     #  Core payment flow (Collection API)                                 #
     # ------------------------------------------------------------------ #
 
@@ -192,6 +233,14 @@ class MTNMoMoGateway(PaymentGatewayBase):
                 }
 
             formatted_phone = phone_number if self.is_sandbox else self._format_phone_number(phone_number)
+
+            if not self.is_sandbox and not self.is_account_active(phone_number, account_currency):
+                logger.warning('MTN MoMo requesttopay blocked: %s is not an active MoMo account', formatted_phone)
+                return {
+                    'success': False,
+                    'error': 'This phone number is not registered for MTN Mobile Money. '
+                             'Please check the number or use a different payment method.',
+                }
 
             # Use a fresh UUID as the MTN reference; store it as gateway_transaction_id
             momo_reference = str(uuid.uuid4())
