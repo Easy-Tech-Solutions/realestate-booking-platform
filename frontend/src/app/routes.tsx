@@ -86,6 +86,10 @@ const AdminApprovals = lazyPage(() => import('./pages/AdminApprovals').then((mod
 const AdminBreakGlass = lazyPage(() => import('./pages/AdminBreakGlass').then((module) => ({ default: module.AdminBreakGlass })));
 const AdminAircoverClaims = lazyPage(() => import('./pages/AdminAircoverClaims').then((module) => ({ default: module.AdminAircoverClaims })));
 const AdminDocs = lazyPage(() => import('./pages/AdminDocs').then((module) => ({ default: module.AdminDocs })));
+const AdminPropertyCategories = lazyPage(() => import('./pages/generic-admin/AdminPropertyCategories').then((module) => ({ default: module.AdminPropertyCategories })));
+const AdminCurrencies = lazyPage(() => import('./pages/generic-admin/AdminCurrencies').then((module) => ({ default: module.AdminCurrencies })));
+const AdminTestimonials = lazyPage(() => import('./pages/generic-admin/AdminTestimonials').then((module) => ({ default: module.AdminTestimonials })));
+const AdminSubscribers = lazyPage(() => import('./pages/generic-admin/AdminSubscribers').then((module) => ({ default: module.AdminSubscribers })));
 const Notifications = lazyPage(() => import('./pages/Notifications').then((module) => ({ default: module.Notifications })));
 const Login = lazyPage(() => import('./pages/Login').then((module) => ({ default: module.Login })));
 const VerifyEmail = lazyPage(() => import('./pages/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
@@ -146,7 +150,14 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      { path: 'wishlists', Component: Wishlists },
+      {
+        path: 'wishlists',
+        element: (
+          <ProtectedRoute>
+            <Wishlists />
+          </ProtectedRoute>
+        ),
+      },
       {
         path: 'messages',
         element: (
@@ -155,7 +166,14 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      { path: 'account', Component: Account },
+      {
+        path: 'account',
+        element: (
+          <ProtectedRoute>
+            <Account />
+          </ProtectedRoute>
+        ),
+      },
       {
         path: 'become-a-host',
         element: (
@@ -206,8 +224,22 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      { path: 'dashboard', Component: UserDashboard },
-      { path: 'notifications', Component: Notifications },
+      {
+        path: 'dashboard',
+        element: (
+          <ProtectedRoute>
+            <UserDashboard />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'notifications',
+        element: (
+          <ProtectedRoute>
+            <Notifications />
+          </ProtectedRoute>
+        ),
+      },
       { path: 'login', Component: Login },
       { path: 'verify-email', Component: VerifyEmail },
       { path: 'users/:id', Component: HostProfile },
@@ -348,6 +380,38 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requireAdmin>
             <AdminDocs />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/categories',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminPropertyCategories />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/currencies',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminCurrencies />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/testimonials',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminTestimonials />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/subscribers',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminSubscribers />
           </ProtectedRoute>
         ),
       },

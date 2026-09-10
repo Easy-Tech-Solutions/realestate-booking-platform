@@ -15,14 +15,7 @@ class HostApplicationCreateSerializer(serializers.ModelSerializer):
         model = HostApplication
         fields = [
             'full_name', 'address', 'phone', 'headshot', 'id_document', 'agreement_accepted',
-            'tax_clearance_receipt', 'next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone',
         ]
-        extra_kwargs = {
-            'tax_clearance_receipt': {'required': True},
-            'next_of_kin_name': {'required': True, 'allow_blank': False},
-            'next_of_kin_relationship': {'required': True, 'allow_blank': False},
-            'next_of_kin_phone': {'required': True, 'allow_blank': False},
-        }
 
     def validate_agreement_accepted(self, value):
         if not value:

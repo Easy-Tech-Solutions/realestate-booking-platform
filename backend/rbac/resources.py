@@ -38,6 +38,7 @@ RESOURCE_TREE = [
     ('listings.availability', 'Availability', True, 'Booking status, suspension state (inventory app).'),
     ('listings.compliance', 'Compliance', True, 'Local registration number + legal occupancy cap (Listing.local_registration_number/occupancy_cap) — enforced against the host\'s own max_guests. Set via PATCH /api/inventory/listings/<id>/compliance/.'),
     ('listings.settings', 'Listing Settings', True, 'Minimum listing price enforced at listing creation (listings.ListingSettings) — takes effect immediately, no deploy needed.'),
+    ('listings.categories', 'Property Categories', True, 'Category taxonomy used to tag/browse listings (listings.PropertyCategory) — managed via the generic admin CRUD system.'),
 
     ('reservations', 'Reservations', True, 'Wildcard — grants every reservation sub-resource below (transactional data, communications).'),
     ('reservations.transactional_data', 'Transactional Data', True, 'Booking dates, guest counts, payment confirmation (bookings app).'),
@@ -49,6 +50,7 @@ RESOURCE_TREE = [
     ('finances.taxes', 'Taxes', True, 'Per-jurisdiction occupancy tax rates (payments.TaxRate) + a computed liability report over confirmed bookings. No withholding/filing/remittance automation.'),
     ('finances.legal_documents', 'Legal Documents', True, 'Terms of Service / Privacy Policy version registry (legalops app).'),
     ('finances.platform_fee', 'Platform Fee', True, 'Booking/viewing/service fee configuration (payments.PlatformFee) — takes effect immediately, no deploy needed.'),
+    ('finances.currencies', 'Currencies', True, 'Supported currencies + USD exchange rates for pricing/payouts (payments.Currency) — managed via the generic admin CRUD system.'),
 
     ('trust_safety', 'Trust & Safety', True, 'Wildcard — grants every trust & safety sub-resource below (background checks, flags, bans).'),
     ('trust_safety.background_checks', 'Background Checks', True, 'Identity/ownership verification review is manual, not automated screening — this permission (execute) grants access to every stage of the KYC review queue (hostapplications/propertyverifications), additive to the existing per-stage Django model permissions.'),

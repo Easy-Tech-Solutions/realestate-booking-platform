@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.core.validators import validate_email
@@ -7,17 +7,6 @@ from django.core.exceptions import ValidationError
 
 from .models import Subscriber
 from .serializers import SubscribeSerializer, SubscriberSerializer
-
-
-def _is_admin(user):
-    """Full admins always pass; is_staff accounts need a custom role
-    granting marketing.newsletter directly. Being merely is_staff (e.g. a
-    finance-only admin) is not enough — that was the previous, overly
-    broad behavior here."""
-    if not user.is_authenticated:
-        return False
-    from rbac.permissions import is_full_admin, has_any_permission
-    return is_full_admin(user) or has_any_permission(user, 'marketing.newsletter')
 
 
 @api_view(['POST'])
@@ -87,27 +76,5 @@ def unsubscribe(request):
     sub.unsubscribe()
     return Response({'message': 'You have been unsubscribed successfully.'}, status=status.HTTP_200_OK)
 
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def subscriber_list(request):
-    """
-    GET /api/newsletter/subscribers/  — admin only
-    Query params: ?active=true|false
-    """
-    if not _is_admin(request.user):
-        return Response({'error': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
-
-    qs = Subscriber.objects.all()
-    active_param = request.query_params.get('active')
-    if active_param == 'true':
-        qs = qs.filter(is_active=True)
-    elif active_param == 'false':
-        qs = qs.filter(is_active=False)
-
-    return Response({
-        'total':       qs.count(),
-        'active':      Subscriber.objects.filter(is_active=True).count(),
-        'unsubscribed': Subscriber.objects.filter(is_active=False).count(),
-        'subscribers': SubscriberSerializer(qs[:200], many=True).data,
-    })
+# Admin subscriber listing moved to the generic admin CRUD system
+# (RBAC resource 'marketing.newsletter', see superadmin.generic_admin).

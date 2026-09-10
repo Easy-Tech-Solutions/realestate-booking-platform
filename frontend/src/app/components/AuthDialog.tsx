@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { X, Mail, Lock, User as UserIcon, Eye, EyeOff, Calendar } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
@@ -27,7 +27,7 @@ interface FormErrors {
   email?: string;
   password?: string;
   password2?: string;
-  date_of_birth?: string;
+  ageConfirmed?: string;
   agreedToTerms?: string;
 }
 
@@ -37,20 +37,6 @@ function validatePassword(password: string): string | undefined {
   if (!/[A-Z]/.test(password)) return 'Must contain an uppercase letter';
   if (!/[a-z]/.test(password)) return 'Must contain a lowercase letter';
   if (!/[0-9]/.test(password)) return 'Must contain a number';
-  return undefined;
-}
-
-// Business Policy §3.1 — users must be 18+ to register.
-function validateDateOfBirth(dob: string): string | undefined {
-  if (!dob) return 'Date of birth is required';
-  const parsed = new Date(dob);
-  if (Number.isNaN(parsed.getTime())) return 'Enter a valid date';
-  const today = new Date();
-  if (parsed > today) return 'Date of birth cannot be in the future';
-  let age = today.getFullYear() - parsed.getFullYear();
-  const monthDiff = today.getMonth() - parsed.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < parsed.getDate())) age--;
-  if (age < 18) return 'You must be at least 18 years old to sign up';
   return undefined;
 }
 
@@ -65,12 +51,14 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     password2: '',
     first_name: '',
     last_name: '',
-    date_of_birth: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  // Business Policy §3.1 — users must be 18+ to register. Self-certified via
+  // this checkbox rather than collecting an exact birthdate.
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   // Step-up MFA: set once login() reports the account requires a code.
   const [mfaToken, setMfaToken] = useState<string | null>(null);
@@ -82,9 +70,10 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
   }, [mode, open]);
 
   const resetForm = () => {
-    setFormData({ email: '', password: '', password2: '', first_name: '', last_name: '', date_of_birth: '' });
+    setFormData({ email: '', password: '', password2: '', first_name: '', last_name: '' });
     setErrors({});
     setAgreedToTerms(false);
+    setAgeConfirmed(false);
     setMfaToken(null);
     setMfaCode('');
   };
@@ -122,9 +111,8 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
       else if (formData.password !== formData.password2) newErrors.password2 = 'Passwords do not match';
     }
 
-    if (view === 'register') {
-      const dobErr = validateDateOfBirth(formData.date_of_birth);
-      if (dobErr) newErrors.date_of_birth = dobErr;
+    if (view === 'register' && !ageConfirmed) {
+      newErrors.ageConfirmed = 'You must confirm you are at least 18 years old';
     }
 
     if (view === 'register' && !agreedToTerms) {
@@ -160,7 +148,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
           password2: formData.password2,
           first_name: formData.first_name,
           last_name: formData.last_name,
-          date_of_birth: formData.date_of_birth,
+          age_confirmed: ageConfirmed,
         });
         toast.success(result.message || 'Account created! Check your email for the verification link.');
         onModeChange('login');
@@ -245,9 +233,6 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="w-full max-w-[95vw] sm:max-w-[420px] p-0 gap-0">
           <div className="relative border-b border-border p-6">
-            <button type="button" title="Close dialog" onClick={handleClose} className="absolute left-6 top-6 p-1 rounded-full hover:bg-muted">
-              <X className="w-4 h-4" />
-            </button>
             <h2 className="text-center font-semibold">Enter your code</h2>
           </div>
           <div className="p-6 space-y-4">
@@ -296,9 +281,6 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="w-full max-w-[95vw] sm:max-w-[480px] p-0 gap-0 max-h-[90vh] overflow-y-auto">
         <div className="relative border-b border-border p-6">
-          <button type="button" title="Close dialog" onClick={handleClose} className="absolute left-6 top-6 p-1 rounded-full hover:bg-muted">
-            <X className="w-4 h-4" />
-          </button>
           <h2 className="text-center font-semibold">
             {view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Forgot password'}
           </h2>
@@ -372,17 +354,6 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                 {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
               </div>
 
-              {view === 'register' && (
-                <div className="space-y-2">
-                  <Label htmlFor="date_of_birth">Date of birth</Label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input id="date_of_birth" type="date" className="pl-10" required {...field('date_of_birth')} />
-                  </div>
-                  {errors.date_of_birth && <p className="text-xs text-destructive">{errors.date_of_birth}</p>}
-                </div>
-              )}
-
               {view !== 'forgot-password' && (
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
@@ -421,6 +392,26 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                 <div className="space-y-1">
                   <div className="flex items-start gap-2">
                     <Checkbox
+                      id="ageConfirmed"
+                      checked={ageConfirmed}
+                      onCheckedChange={(checked) => {
+                        setAgeConfirmed(checked === true);
+                        if (errors.ageConfirmed) setErrors(prev => ({ ...prev, ageConfirmed: undefined }));
+                      }}
+                      className="mt-0.5"
+                    />
+                    <Label htmlFor="ageConfirmed" className="font-normal leading-snug cursor-pointer">
+                      I confirm I am at least 18 years old
+                    </Label>
+                  </div>
+                  {errors.ageConfirmed && <p className="text-xs text-destructive">{errors.ageConfirmed}</p>}
+                </div>
+              )}
+
+              {view === 'register' && (
+                <div className="space-y-1">
+                  <div className="flex items-start gap-2">
+                    <Checkbox
                       id="agreedToTerms"
                       checked={agreedToTerms}
                       onCheckedChange={(checked) => {
@@ -445,7 +436,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading || (view === 'register' && !agreedToTerms)}>
+              <Button type="submit" className="w-full" disabled={isLoading || (view === 'register' && (!ageConfirmed || !agreedToTerms))}>
                 {isLoading ? 'Please wait...' : view === 'login' ? 'Log in' : view === 'register' ? 'Sign up' : 'Send reset link'}
               </Button>
             </form>

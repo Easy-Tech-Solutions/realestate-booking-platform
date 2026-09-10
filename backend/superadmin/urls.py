@@ -1,8 +1,9 @@
-from django.urls import path
+from django.urls import path, include
 
 from . import views
 
 urlpatterns = [
+    path('generic/', include('superadmin.generic_admin.urls')),
     path('me/', views.me_view, name='superadmin_me'),
     path('mfa/setup/', views.mfa_setup, name='superadmin_mfa_setup'),
     path('mfa/confirm/', views.mfa_confirm, name='superadmin_mfa_confirm'),
