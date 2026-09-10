@@ -1,4 +1,4 @@
-import { fetchPublicJson, fetchWithAuth } from './shared/client';
+import { fetchPublicJson } from './shared/client';
 
 const BASE = '/api/newsletter';
 
@@ -19,9 +19,5 @@ export const newsletterAPI = {
       method: 'POST',
       body: JSON.stringify({ token }),
     });
-  },
-
-  getSubscribers: async (): Promise<any> => {
-    return fetchWithAuth(`${BASE}/subscribers/`);
   },
 };

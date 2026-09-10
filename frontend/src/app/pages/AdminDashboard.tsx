@@ -55,6 +55,7 @@ const navGroups: NavGroup[] = [
   { id: 'inventory', label: 'Property & Inventory', icon: Building2, items: [
     { type: 'section', id: 'properties', label: 'Property Management' },
     { type: 'route', path: '/management/listing-moderation', label: 'Listing Moderation' },
+    { type: 'route', path: '/management/categories', label: 'Property Categories' },
   ] },
   { id: 'bookings', label: 'Bookings', icon: Calendar, items: [
     { type: 'section', id: 'bookings', label: 'All Bookings' },
@@ -66,6 +67,7 @@ const navGroups: NavGroup[] = [
     { type: 'route', path: '/management/finance', label: 'Finance & Legal Center' },
     { type: 'route', path: '/management/payments', label: 'Pay Hosts, Agents & Employees' },
     { type: 'route', path: '/management/legal-documents', label: 'Legal Documents' },
+    { type: 'route', path: '/management/currencies', label: 'Currencies' },
   ] },
   { id: 'trust_safety', label: 'Trust & Safety', icon: ShieldCheck, items: [
     { type: 'section', id: 'trust_safety', label: 'Overview' },
@@ -97,6 +99,10 @@ const navGroups: NavGroup[] = [
   ] },
   { id: 'settings', label: 'Settings', icon: Settings, items: [
     { type: 'section', id: 'settings', label: 'Platform Settings' },
+  ] },
+  { id: 'marketing', label: 'Marketing', icon: Mail, items: [
+    { type: 'route', path: '/management/testimonials', label: 'Testimonials' },
+    { type: 'route', path: '/management/subscribers', label: 'Newsletter Subscribers' },
   ] },
 ];
 

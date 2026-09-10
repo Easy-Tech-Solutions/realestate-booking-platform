@@ -15,13 +15,12 @@ export interface AppStoreState {
   completeMfaLogin: (mfaToken: string, code: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<GoogleLoginResult>;
   register: (data: {
-    username: string;
     email: string;
     password: string;
     password2: string;
     first_name?: string;
     last_name?: string;
-    date_of_birth: string;
+    age_confirmed: boolean;
   }) => Promise<{ message: string; verification_url?: string; verification_token?: string }>;
   logout: () => Promise<void>;
   searchFilters: SearchFilters;

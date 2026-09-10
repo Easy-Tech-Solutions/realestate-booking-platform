@@ -39,7 +39,6 @@ export function Footer() {
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li><Link to="/search" className="hover:text-foreground">Browse listings</Link></li>
               <li><Link to="/reviews" className="hover:text-foreground">Guest reviews</Link></li>
-              <li><Link to="/privacy#anti-discrimination" className="hover:text-foreground">Anti-discrimination policy</Link></li>
               <li><Link to="/terms" className="hover:text-foreground">Terms of service</Link></li>
               <li><Link to="/privacy" className="hover:text-foreground">Privacy policy</Link></li>
             </ul>
@@ -75,8 +74,6 @@ export function Footer() {
             <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
             <span>·</span>
             <Link to="/terms" className="hover:text-foreground">Terms</Link>
-            <span>·</span>
-            <Link to="/search" className="hover:text-foreground">Sitemap</Link>
           </div>
           <div className="flex items-center gap-4">
             <button className="flex items-center gap-2 hover:text-foreground">

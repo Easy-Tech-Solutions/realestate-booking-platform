@@ -49,24 +49,6 @@ export const propertiesAPI = {
     return fetchWithAuth('/api/listings/categories/');
   },
 
-  createCategory: async (payload: { name: string; slug: string; is_active?: boolean; sort_order?: number }) => {
-    return fetchWithAuth('/api/listings/categories/', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
-
-  updateCategory: async (id: number, payload: Partial<{ name: string; slug: string; is_active: boolean; sort_order: number }>) => {
-    return fetchWithAuth(`/api/listings/categories/${id}/`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-  },
-
-  deleteCategory: async (id: number): Promise<void> => {
-    await fetchWithAuth(`/api/listings/categories/${id}/`, { method: 'DELETE' });
-  },
-
   getListingSettings: async (): Promise<ListingSettings> => {
     return fetchWithAuth('/api/listings/settings/');
   },

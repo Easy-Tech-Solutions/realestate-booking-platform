@@ -11,6 +11,15 @@ import {
   TicketIcon,
   ArrowLeft,
   MessageSquare,
+  User,
+  Calendar,
+  CreditCard,
+  Home,
+  ShieldAlert,
+  Settings,
+  Hotel,
+  HelpCircle,
+  type LucideIcon,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -24,20 +33,20 @@ import { supportAPI, type SearchResult } from '../../services/api/support';
 
 interface Category {
   id: string;
-  icon: string;
+  icon: LucideIcon;
   title: string;
   description: string;
 }
 
 const CATEGORIES: Category[] = [
-  { id: 'account', icon: '👤', title: 'Account & Profile', description: 'Login issues, profile updates, verification' },
-  { id: 'booking', icon: '📅', title: 'Booking Issue', description: "Can't book, booking errors, host problems" },
-  { id: 'payment', icon: '💳', title: 'Payment & Refunds', description: 'Charges, refunds, payment methods' },
-  { id: 'listing', icon: '🏠', title: 'Listing Problem', description: 'Inaccurate listing, missing amenities' },
-  { id: 'safety', icon: '🔒', title: 'Safety Concern', description: 'Feeling unsafe, fraudulent listings' },
-  { id: 'technical', icon: '⚙️', title: 'Technical Issue', description: 'App not working, bugs, errors' },
-  { id: 'host', icon: '🏨', title: 'Host Support', description: 'Managing listings, payouts, hosting tools' },
-  { id: 'other', icon: '❓', title: 'Other', description: 'Something else' },
+  { id: 'account', icon: User, title: 'Account & Profile', description: 'Login issues, profile updates, verification' },
+  { id: 'booking', icon: Calendar, title: 'Booking Issue', description: "Can't book, booking errors, host problems" },
+  { id: 'payment', icon: CreditCard, title: 'Payment & Refunds', description: 'Charges, refunds, payment methods' },
+  { id: 'listing', icon: Home, title: 'Listing Problem', description: 'Inaccurate listing, missing amenities' },
+  { id: 'safety', icon: ShieldAlert, title: 'Safety Concern', description: 'Feeling unsafe, fraudulent listings' },
+  { id: 'technical', icon: Settings, title: 'Technical Issue', description: 'App not working, bugs, errors' },
+  { id: 'host', icon: Hotel, title: 'Host Support', description: 'Managing listings, payouts, hosting tools' },
+  { id: 'other', icon: HelpCircle, title: 'Other', description: 'Something else' },
 ];
 
 // ── Step indicator ─────────────────────────────────────────────────────────────
@@ -298,7 +307,7 @@ export function Support() {
                       onClick={() => handleSelectCategory(cat)}
                       className="bg-card border border-border rounded-xl p-5 text-left hover:border-primary hover:shadow-md transition-all group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                     >
-                      <span className="text-3xl mb-3 block">{cat.icon}</span>
+                      <cat.icon className="w-7 h-7 mb-3 text-primary" />
                       <p className="font-semibold text-sm mb-1 group-hover:text-primary transition-colors">
                         {cat.title}
                       </p>
@@ -323,7 +332,7 @@ export function Support() {
                 </button>
 
                 <div className="flex items-center gap-2 mb-6">
-                  <span className="text-2xl">{category.icon}</span>
+                  <category.icon className="w-6 h-6 text-primary" />
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
                       Selected category
@@ -424,7 +433,7 @@ export function Support() {
                 </button>
 
                 <div className="flex items-center gap-2 mb-6">
-                  <span className="text-2xl">{category.icon}</span>
+                  <category.icon className="w-6 h-6 text-primary" />
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
                       Category

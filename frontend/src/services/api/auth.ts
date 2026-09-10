@@ -59,7 +59,7 @@ export const authAPI = {
     password2: string;
     first_name?: string;
     last_name?: string;
-    date_of_birth: string;
+    age_confirmed: boolean;
   }): Promise<{ message: string }> => {
     const fingerprint = await getDeviceFingerprint();
     return fetchPublicJson('/api/auth/register/', {
