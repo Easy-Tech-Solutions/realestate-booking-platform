@@ -25,15 +25,17 @@ class MTNMoMoGateway(PaymentGatewayBase):
     to toggle from Django admin without a redeploy:
         MTN_MOMO_COLLECTION_KEY    → Collection product subscription key (Ocp-Apim-Subscription-Key) — shared across currencies
         MTN_MOMO_DISBURSEMENT_KEY  → Disbursement product subscription key — shared across currencies
-        MTN_MOMO_USER_ID_LRD/USD   → Collection API user ID — ONE PER CURRENCY (see below)
-        MTN_MOMO_API_SECRET_LRD/USD → Collection API key (Basic Auth) — ONE PER CURRENCY
+        MTN_MOMO_COLLECTION_USER_ID_USD / MTN_MOMO_USER_ID_USD → Collection / Disbursement API user IDs
+        MTN_MOMO_COLLECTION_API_SECRET_USD / MTN_MOMO_API_SECRET_USD → matching API keys (Basic Auth)
 
-    Dual-currency (LRD + USD): MTN ties the "API User" (user_id + api_secret)
-    to a specific account in their partner portal ("Account: LRD" or
-    "Account: USD" when creating an API user) — the subscription keys are
-    shared, but the API user is not. Every credential-dependent call below
-    takes a `currency` argument and resolves the right API user via
-    _account_for() — there is no single fixed self.user_id.
+    Dual-currency (LRD + USD): an API user is tied to one *product*
+    (Collection or Disbursement — see _account_for), NOT to one currency —
+    MTN confirmed the same account processes both LRD and USD amounts, so
+    LRD defaults to the same credentials as USD (settings.PAYMENT_GATEWAYS)
+    unless a genuinely separate LRD account is provisioned later. Every
+    credential-dependent call below still takes a `currency` argument and
+    resolves the right API user via _account_for() — there is no single
+    fixed self.user_id — since a dedicated LRD account may exist someday.
 
     Webhooks: MTN's callback POSTs are not signed (no HMAC, no shared secret
     — unlike Stripe). See mtn_momo_webhook() in payments/views.py — it treats
@@ -45,6 +47,7 @@ class MTNMoMoGateway(PaymentGatewayBase):
     # MTN MoMo API path segments
     COLLECTION_TOKEN_PATH = 'collection/token/'
     COLLECTION_REQUEST_PATH = 'collection/v1_0/requesttopay'
+    COLLECTION_ACCOUNT_HOLDER_PATH = 'collection/v1_0/accountholder/msisdn/{msisdn}/active'
     DISBURSEMENT_TOKEN_PATH = 'disbursement/token/'
     DISBURSEMENT_TRANSFER_PATH = 'disbursement/v1_0/transfer'
 
@@ -59,33 +62,33 @@ class MTNMoMoGateway(PaymentGatewayBase):
         # (see MTN_MOMO_TARGET_ENVIRONMENT in settings.py — Liberia = "mtnliberia").
         self.target_env = 'sandbox' if self.is_sandbox else mtn_config.get('target_environment', 'production')
 
-    def _account_for(self, currency: str) -> dict:
+    def _account_for(self, currency: str, product: str = 'collection') -> dict:
         """Resolve the (user_id, api_secret) pair for a specific currency's
-        MTN account. Raises ValueError with a clear, actionable message if
-        that currency has no API user configured — callers already wrap
-        their public methods in try/except and surface this as a normal
-        {'success': False, ...} error rather than a raw traceback."""
+        MTN account AND product. MTN ties an API user to one product only —
+        a Disbursement-only API user authenticates fine on a Collection call
+        but gets rejected with NOT_ALLOWED once MTN checks the account's
+        actual authorization, so Collection and Disbursement never share
+        credentials here even within the same currency. Raises ValueError
+        with a clear, actionable message if that currency/product has no API
+        user configured — callers already wrap their public methods in
+        try/except and surface this as a normal {'success': False, ...}
+        error rather than a raw traceback."""
         key = 'SANDBOX' if self.is_sandbox else (currency or '').upper()
 
-        # TEMPORARY: MTN's partner portal only let us create one API user so
-        # far (the USD account) — LRD is suppressed in production until its
-        # own API user is provisioned there too. Delete this block (and the
-        # LRD entry stays ready to go) once MTN_MOMO_USER_ID_LRD /
-        # MTN_MOMO_API_SECRET_LRD are set in backend/.env.
-        if not self.is_sandbox and key == 'LRD':
-            raise ValueError(
-                'MTN MoMo payments in LRD are temporarily unavailable — only the USD '
-                'account is provisioned right now. Pay in USD instead.'
-            )
-
-        account = self._accounts.get(key) or {}
+        # MTN confirmed an API user is not currency-locked (2026-09-08) — LRD
+        # uses the same account as USD by default (see settings.PAYMENT_GATEWAYS),
+        # so there's no currency-based block here any more.
+        account = (self._accounts.get(key) or {}).get(product) or {}
         if not account.get('user_id') or not account.get('api_secret'):
             if self.is_sandbox:
                 raise ValueError('No MTN MoMo sandbox API user configured (MTN_MOMO_USER_ID_SANDBOX / MTN_MOMO_API_SECRET_SANDBOX, or the legacy MTN_MOMO_USER_ID / MTN_MOMO_API_SECRET).')
+            # Collection credentials are prefixed (MTN_MOMO_COLLECTION_USER_ID_USD);
+            # disbursement keeps the original un-prefixed names for backward compat.
+            var_prefix = 'MTN_MOMO_COLLECTION_' if product == 'collection' else 'MTN_MOMO_'
             raise ValueError(
-                f"No MTN MoMo API user configured for the {key} account. Create one in MTN's partner "
-                f"portal (Configure -> Create API user, Account: {key}) and set "
-                f"MTN_MOMO_USER_ID_{key} / MTN_MOMO_API_SECRET_{key} in backend/.env."
+                f"No MTN MoMo {product} API user configured for the {key} account. Create one in MTN's "
+                f"partner portal (Configure -> Create API user, Account: {key}, Product: {product}) and set "
+                f"{var_prefix}USER_ID_{key} / {var_prefix}API_SECRET_{key} in backend/.env."
             )
         return account
 
@@ -100,7 +103,7 @@ class MTNMoMoGateway(PaymentGatewayBase):
         API users, so they get different tokens). Tokens are cached for 50
         minutes (MTN tokens expire in 60 minutes).
         """
-        account = self._account_for(currency)
+        account = self._account_for(currency, product)
         cache_currency = 'SANDBOX' if self.is_sandbox else currency.upper()
         cache_key = f'mtn_momo_{self.target_env}_{cache_currency}_{product}_token'
         token = cache.get(cache_key)
@@ -157,6 +160,46 @@ class MTNMoMoGateway(PaymentGatewayBase):
         return headers
 
     # ------------------------------------------------------------------ #
+    #  Account holder pre-flight check                                     #
+    # ------------------------------------------------------------------ #
+
+    def is_account_active(self, phone_number: str, currency: str) -> bool:
+        """
+        MTN's "Validate account holder status" endpoint — confirms the given
+        MSISDN is a real, registered MTN MoMo subscriber before we ever
+        submit a real request-to-pay. This is the one pre-flight check MTN
+        actually exposes to merchants; a subscriber's balance and spending
+        limit are never exposed to us (or any merchant, by design — every
+        mobile money provider treats those as private to the subscriber).
+        Those two can only be inferred after the fact, from the FAILED
+        reason code returned by verify_payment().
+
+        Fails OPEN: if the check itself errors (network hiccup, unexpected
+        MTN response), this logs a warning and returns True so an unrelated
+        infra blip on this pre-check never blocks an otherwise-legitimate
+        payment attempt — the real request-to-pay call still has its own
+        error handling if something is genuinely wrong.
+        """
+        try:
+            formatted_phone = phone_number if self.is_sandbox else self._format_phone_number(phone_number)
+            url = self.get_api_url(self.COLLECTION_ACCOUNT_HOLDER_PATH.format(msisdn=formatted_phone))
+            response = requests.get(url, headers=self._collection_headers(currency), timeout=15)
+
+            if response.status_code == 404:
+                return False
+            if response.status_code == 200:
+                return bool(response.json().get('result'))
+
+            logger.warning(
+                'MTN MoMo account-holder check: unexpected status %s for %s — proceeding anyway',
+                response.status_code, formatted_phone,
+            )
+            return True
+        except Exception:
+            logger.exception('MTN MoMo account-holder check failed for %s — proceeding anyway', phone_number)
+            return True
+
+    # ------------------------------------------------------------------ #
     #  Core payment flow (Collection API)                                 #
     # ------------------------------------------------------------------ #
 
@@ -190,6 +233,14 @@ class MTNMoMoGateway(PaymentGatewayBase):
                 }
 
             formatted_phone = phone_number if self.is_sandbox else self._format_phone_number(phone_number)
+
+            if not self.is_sandbox and not self.is_account_active(phone_number, account_currency):
+                logger.warning('MTN MoMo requesttopay blocked: %s is not an active MoMo account', formatted_phone)
+                return {
+                    'success': False,
+                    'error': 'This phone number is not registered for MTN Mobile Money. '
+                             'Please check the number or use a different payment method.',
+                }
 
             # Use a fresh UUID as the MTN reference; store it as gateway_transaction_id
             momo_reference = str(uuid.uuid4())

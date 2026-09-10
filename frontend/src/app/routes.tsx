@@ -79,9 +79,12 @@ const AdminKycQueue = lazyPage(() => import('./pages/AdminKycQueue').then((modul
 const AdminFraudFlags = lazyPage(() => import('./pages/AdminFraudFlags').then((module) => ({ default: module.AdminFraudFlags })));
 const AdminListingModeration = lazyPage(() => import('./pages/AdminListingModeration').then((module) => ({ default: module.AdminListingModeration })));
 const AdminFinance = lazyPage(() => import('./pages/AdminFinance').then((module) => ({ default: module.AdminFinance })));
+const AdminPayments = lazyPage(() => import('./pages/AdminPayments').then((module) => ({ default: module.AdminPayments })));
+const AdminEmployees = lazyPage(() => import('./pages/AdminEmployees').then((module) => ({ default: module.AdminEmployees })));
 const AdminLegalDocuments = lazyPage(() => import('./pages/AdminLegalDocuments').then((module) => ({ default: module.AdminLegalDocuments })));
 const AdminPlatformOps = lazyPage(() => import('./pages/AdminPlatformOps').then((module) => ({ default: module.AdminPlatformOps })));
 const AdminRoles = lazyPage(() => import('./pages/AdminRoles').then((module) => ({ default: module.AdminRoles })));
+const AdminStaff = lazyPage(() => import('./pages/AdminStaff').then((module) => ({ default: module.AdminStaff })));
 const AdminApprovals = lazyPage(() => import('./pages/AdminApprovals').then((module) => ({ default: module.AdminApprovals })));
 const AdminBreakGlass = lazyPage(() => import('./pages/AdminBreakGlass').then((module) => ({ default: module.AdminBreakGlass })));
 const AdminAircoverClaims = lazyPage(() => import('./pages/AdminAircoverClaims').then((module) => ({ default: module.AdminAircoverClaims })));
@@ -328,6 +331,22 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'management/payments',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminPayments />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/employees',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminEmployees />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'management/legal-documents',
         element: (
           <ProtectedRoute requireAdmin>
@@ -348,6 +367,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requireAdmin>
             <AdminRoles />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'management/staff',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <AdminStaff />
           </ProtectedRoute>
         ),
       },

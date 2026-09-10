@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Building2, Sparkles, RadioTower, ShieldAlert, Search } from 'lucide-react';
+import { ArrowLeft, Building2, Sparkles, RadioTower, ShieldAlert, Search, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { inventoryAPI } from '../../services/api/inventory';
 import type { ListingFlag, InventoryListing } from '../../services/api/inventory';
+import { propertiesAPI } from '../../services/api.service';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -177,6 +178,95 @@ function ComplianceDialog({ listing, onDone }: { listing: InventoryListing; onDo
   );
 }
 
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function AdminBulkListingsSection() {
+  const [ownerId, setOwnerId] = useState('');
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTemplate = async () => {
+    try {
+      downloadBlob(await propertiesAPI.bulkDownloadTemplate(), 'homekonet-listings-template.xlsx');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to download template'));
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      downloadBlob(await propertiesAPI.bulkExport(ownerId.trim() || undefined), 'homekonet-listings-export.xlsx');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to export listings'));
+    }
+  };
+
+  const handleImportFile = async (file: File) => {
+    setImporting(true);
+    try {
+      const result = await propertiesAPI.bulkImport(file);
+      if (result.row_errors.length === 0) {
+        toast.success(`${result.created_count} listing(s) imported.`);
+      } else {
+        toast.warning(
+          `${result.created_count} listing(s) imported, ${result.row_errors.length} row(s) failed — ` +
+          result.row_errors.slice(0, 3).map((e) => `row ${e.row}: ${JSON.stringify(e.errors)}`).join('; ')
+        );
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Import failed'));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold flex items-center gap-2"><Upload className="h-4 w-4" /> Bulk import/export</h2>
+      <p className="text-xs text-muted-foreground max-w-2xl">
+        Import/export any owner's listings via XLSX (requires users.staff_management or full admin —
+        see listings/bulk.py for the exact format). Imported listings land as Pending Review, same as
+        one created through the normal wizard — no photos, no shortcut around ownership verification.
+      </p>
+      <Card>
+        <CardContent className="p-4 flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Owner ID (export only, blank = everyone)</label>
+            <Input className="w-40" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} placeholder="e.g. 42" />
+          </div>
+          <Button variant="outline" size="sm" onClick={handleTemplate}>
+            <Download className="h-3.5 w-3.5 mr-1" /> Template
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="h-3.5 w-3.5 mr-1" /> Export
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImportFile(file);
+              e.target.value = '';
+            }}
+          />
+          <Button variant="outline" size="sm" disabled={importing} onClick={() => fileInputRef.current?.click()}>
+            <Upload className="h-3.5 w-3.5 mr-1" /> {importing ? 'Importing…' : 'Import (with owner_email column)'}
+          </Button>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
 export function AdminListingModeration() {
   const navigate = useNavigate();
 
@@ -305,6 +395,8 @@ export function AdminListingModeration() {
         </Button>
         <h1 className="text-2xl font-semibold flex items-center gap-2"><Building2 className="h-5 w-5" /> Inventory & Listing Moderation</h1>
       </div>
+
+      <AdminBulkListingsSection />
 
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

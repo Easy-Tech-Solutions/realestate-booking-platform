@@ -393,9 +393,9 @@ export function CreateListing() {
   }, [propertyGroup, form.pricingModel]);
   const currentStep = steps[stepIndex];
   // Room-based listings share one wizard flow ('hotel' group) across property
-  // types (hotels, lodges) — swap in the right noun so a lodge host isn't
-  // told they're creating a "hotel listing".
-  const roomBasedNoun = form.propertyType === 'lodge' ? 'lodge' : 'hotel';
+  // types (hotels, lodges, resorts) — swap in the right noun so a lodge/resort
+  // host isn't told they're creating a "hotel listing".
+  const roomBasedNoun = form.propertyType === 'lodge' ? 'lodge' : form.propertyType === 'resort' ? 'resort' : 'hotel';
   const groupLabels = propertyGroup === 'hotel'
     ? { ...GROUP_LABELS.hotel, place: `${roomBasedNoun} / room`, title: `Give your ${roomBasedNoun} listing a name` }
     : GROUP_LABELS[propertyGroup];

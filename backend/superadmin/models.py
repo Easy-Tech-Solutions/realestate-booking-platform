@@ -63,6 +63,95 @@ class MFADevice(models.Model):
         return False
 
 
+class StaffProfile(models.Model):
+    """
+    Internal staff record — position/department for display, and a place
+    for the staff member to keep their own bio, contact number, and
+    education/legal history. Distinct from `payments.Employee` (which exists
+    purely to hold a MoMo number for paying someone) and from `rbac`'s
+    roles/permissions (which govern what a staff account can actually do
+    once onboarded) — this is identity/HR info, not access control.
+    """
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='staff_profile')
+    position = models.CharField(max_length=150, blank=True, default='')
+    department = models.CharField(max_length=100, blank=True, default='')
+    hire_date = models.DateField(null=True, blank=True)
+    phone_number = models.CharField(max_length=30, blank=True, default='')
+    bio = models.TextField(blank=True, default='')
+    is_active = models.BooleanField(default=True)
+
+    onboarded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='staff_onboarded',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.get_full_name() or self.user.username} — {self.position or "no position set"}'
+
+
+class StaffEducation(models.Model):
+    """One school/degree/certification entry on a staff member's profile —
+    self-reported, editable by the staff member themselves."""
+    staff = models.ForeignKey(StaffProfile, on_delete=models.CASCADE, related_name='education')
+    institution = models.CharField(max_length=255)
+    degree = models.CharField(max_length=150, blank=True, default='')
+    field_of_study = models.CharField(max_length=150, blank=True, default='')
+    start_year = models.PositiveIntegerField(null=True, blank=True)
+    end_year = models.PositiveIntegerField(null=True, blank=True)
+    description = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-end_year', '-start_year']
+
+    def __str__(self):
+        return f'{self.institution} — {self.degree}' if self.degree else self.institution
+
+
+def _staff_legal_document_storage():
+    if getattr(settings, 'CLOUDINARY_URL', ''):
+        from cloudinary_storage.storage import RawMediaCloudinaryStorage
+        return RawMediaCloudinaryStorage()
+    from django.core.files.storage import default_storage
+    return default_storage
+
+
+class StaffLegalRecord(models.Model):
+    """One legal document/record on a staff member's profile (national ID,
+    work permit, signed contract, professional certification, etc.) —
+    self-reported, editable by the staff member themselves. The document
+    itself is optional; some records are just informational."""
+    RECORD_TYPE_CHOICES = [
+        ('national_id', 'National ID'),
+        ('work_permit', 'Work Permit'),
+        ('contract', 'Employment Contract'),
+        ('certification', 'Professional Certification'),
+        ('other', 'Other'),
+    ]
+
+    staff = models.ForeignKey(StaffProfile, on_delete=models.CASCADE, related_name='legal_records')
+    record_type = models.CharField(max_length=20, choices=RECORD_TYPE_CHOICES, default='other')
+    title = models.CharField(max_length=255)
+    issuing_authority = models.CharField(max_length=255, blank=True, default='')
+    document_number = models.CharField(max_length=100, blank=True, default='')
+    issue_date = models.DateField(null=True, blank=True)
+    expiry_date = models.DateField(null=True, blank=True)
+    document = models.FileField(upload_to='staff_legal_records/', storage=_staff_legal_document_storage, null=True, blank=True)
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_record_type_display()}: {self.title}'
+
+
 class ImpersonationSession(models.Model):
     """Tracks every 'view as user' session for audit purposes."""
     admin = models.ForeignKey(

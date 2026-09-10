@@ -8,6 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import type { Booking, PaymentMethod } from '../../core/types';
@@ -37,6 +38,8 @@ function PaymentForm() {
   const [loading, setLoading] = useState(!booking);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [momoCurrency, setMomoCurrency] = useState<'USD' | 'LRD'>('USD');
+  const [currencies, setCurrencies] = useState<{ code: string; symbol: string; exchange_rate_to_usd: string }[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [momoStatus, setMomoStatus] = useState<'idle' | 'awaiting'>('idle');
   const [lease, setLease] = useState<LeaseAgreement | null>(null);
@@ -64,6 +67,12 @@ function PaymentForm() {
       .then((l) => { setLease(l); if (l?.is_accepted) setAgreedLease(true); })
       .catch(() => setLease(null));
   }, [bookingId]);
+
+  // Currencies available for MTN MoMo (USD, LRD, ...) — used for the
+  // currency picker and to preview the converted amount before paying.
+  useEffect(() => {
+    paymentAPI.getCurrencies().then(setCurrencies).catch(() => setCurrencies([]));
+  }, []);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
@@ -96,6 +105,20 @@ function PaymentForm() {
 
   const total = booking.totalPrice || 0;
   const rent = Math.max(total - (booking.serviceFee || 0), 0);
+
+  // Everything is priced in USD; when paying via MTN MoMo in a non-USD
+  // currency, every displayed amount (button + breakdown) switches to the
+  // converted figure so the guest sees exactly what they're actually being
+  // charged, not a USD number next to an easy-to-miss conversion footnote.
+  const payingInAlt = paymentMethod === 'mtn_momo' && momoCurrency !== 'USD';
+  const altCurrency = payingInAlt ? currencies.find((c) => c.code === momoCurrency) : undefined;
+  const displayAmount = (usdAmount: number): string => {
+    if (altCurrency) {
+      const converted = Math.round(usdAmount * parseFloat(altCurrency.exchange_rate_to_usd));
+      return `${altCurrency.symbol}${converted.toLocaleString()}`;
+    }
+    return formatCurrency(usdAmount);
+  };
 
   const finish = () => {
     toast.success('Payment submitted! We\'ll confirm it shortly and share your host\'s contact details.');
@@ -162,7 +185,7 @@ function PaymentForm() {
       }
 
       // MTN MoMo
-      const payment = await paymentAPI.initiateMomoPayment(bookingId!, phoneNumber);
+      const payment = await paymentAPI.initiateMomoPayment(bookingId!, phoneNumber, momoCurrency);
       const paymentId = payment?.id || payment?.payment?.id;
       if (!paymentId) {
         toast.error('Could not start MoMo payment. Please try again.');
@@ -272,6 +295,21 @@ function PaymentForm() {
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone number</Label>
                   <Input id="phone" placeholder="0880123456" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+
+                  {currencies.length > 1 && (
+                    <>
+                      <Label htmlFor="momo-currency">Pay in</Label>
+                      <Select value={momoCurrency} onValueChange={(v) => setMomoCurrency(v as 'USD' | 'LRD')}>
+                        <SelectTrigger id="momo-currency"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {currencies.map((c) => (
+                            <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
+
                   <p className="text-xs text-muted-foreground">MTN Mobile Money charges a 2% transaction fee on top of the amount above.</p>
                 </div>
               )}
@@ -313,7 +351,7 @@ function PaymentForm() {
               )}
 
               <Button type="button" onClick={handlePayment} disabled={isProcessing || momoStatus === 'awaiting' || (!!lease && !agreedLease)} className="w-full" size="lg">
-                {momoStatus === 'awaiting' ? 'Waiting for MoMo approval…' : isProcessing ? 'Processing…' : `Pay ${formatCurrency(total)}`}
+                {momoStatus === 'awaiting' ? 'Waiting for MoMo approval…' : isProcessing ? 'Processing…' : `Pay ${displayAmount(total)}`}
               </Button>
             </div>
 
@@ -331,11 +369,16 @@ function PaymentForm() {
                 <div>
                   <h2 className="text-lg font-semibold mb-4">Payment due now</h2>
                   <div className="space-y-3 text-sm">
-                    <div className="flex justify-between"><span>Rent</span><span>{formatCurrency(rent)}</span></div>
-                    <div className="flex justify-between"><span>Service fee</span><span>{formatCurrency(booking.serviceFee || 0)}</span></div>
+                    <div className="flex justify-between"><span>Rent</span><span>{displayAmount(rent)}</span></div>
+                    <div className="flex justify-between"><span>Service fee</span><span>{displayAmount(booking.serviceFee || 0)}</span></div>
                   </div>
                   <Separator className="my-4" />
-                  <div className="flex justify-between font-semibold text-base"><span>Total</span><span>{formatCurrency(total)}</span></div>
+                  <div className="flex justify-between font-semibold text-base"><span>Total</span><span>{displayAmount(total)}</span></div>
+                  {payingInAlt && altCurrency && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Priced at {formatCurrency(total)} USD, converted to {altCurrency.code} at today's rate.
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-start gap-3 p-4 bg-secondary/30 rounded-lg">
                   <Shield className="w-5 h-5 flex-shrink-0 mt-0.5 text-primary" />

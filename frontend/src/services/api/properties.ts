@@ -1,5 +1,5 @@
 import type { Property, Review, SearchFilters, HotelRoom, HotelRoomAvailability, HotelRoomImage } from '../../core/types';
-import { fetchWithAuth } from './shared/client';
+import { fetchWithAuth, fetchBlobWithAuth } from './shared/client';
 import { buildSearchParams, normalizeListing, normalizeReview, normalizeHotelRoom, normalizeHotelRoomAvailability } from './shared/normalizers';
 import type { AvailabilityResponse, ListingPricingResponse } from './shared/contracts';
 
@@ -93,6 +93,28 @@ export const propertiesAPI = {
 
   delete: async (id: string): Promise<void> => {
     await fetchWithAuth(`/api/listings/${id}/`, { method: 'DELETE' });
+  },
+
+  // Creates a fresh draft copy of an existing listing (gallery + room types
+  // included) so the host can tweak it instead of starting from scratch.
+  duplicate: async (id: string): Promise<Property> => {
+    const data = await fetchWithAuth(`/api/listings/${id}/duplicate/`, { method: 'POST' });
+    return normalizeListing(data);
+  },
+
+  // Bulk import/export (XLSX) — see backend listings/bulk.py for the format.
+  bulkDownloadTemplate: async (): Promise<Blob> => fetchBlobWithAuth('/api/listings/bulk/template/'),
+  bulkExport: async (ownerId?: string): Promise<Blob> =>
+    fetchBlobWithAuth(`/api/listings/bulk/export/${ownerId ? `?owner_id=${ownerId}` : ''}`),
+
+  bulkImport: async (file: File): Promise<{
+    created_count: number;
+    created_listing_ids: number[];
+    row_errors: { row: number; errors: Record<string, unknown> }[];
+  }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetchWithAuth('/api/listings/bulk/import/', { method: 'POST', body: formData });
   },
 
   getReviews: async (id: string): Promise<Review[]> => {

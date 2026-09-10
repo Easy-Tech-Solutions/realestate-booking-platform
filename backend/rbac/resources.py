@@ -32,6 +32,7 @@ RESOURCE_TREE = [
     ('users.pii', 'PII', True, 'Emails, phone numbers, government ID documents captured during KYC review.'),
     ('users.behavior_logs', 'Behavior Logs', False, 'Signup IPs and device fingerprints (trustsafety.AccountSignupEvent) — captured on signup, but there is no admin endpoint to browse them yet (Django admin only). Granting this does nothing until that endpoint exists.'),
     ('users.impersonation', 'Impersonation', True, '"Login as" another user for support/debugging (superadmin.impersonate_start/stop) — every action taken is logged under the real admin\'s identity.'),
+    ('users.staff_management', 'Staff Management', True, 'Onboard internal staff (position/department, linking or creating their account), view their profile and education/legal records (superadmin.StaffProfile). Role/permission assignment itself still goes through the RBAC engine (rbac.user-roles).'),
 
     ('listings', 'Listings', True, 'Wildcard — grants every listing sub-resource below (content, availability, compliance).'),
     ('listings.content', 'Content', True, 'Titles, descriptions, photos — approve/reject pending listings (listings app).'),
@@ -46,8 +47,11 @@ RESOURCE_TREE = [
 
     ('finances', 'Finances', True, 'Wildcard — grants every finance sub-resource below (escrow, payouts, taxes, legal documents, platform fees, vouchers).'),
     ('finances.escrow', 'Escrow', True, 'Bookings whose guest payment has landed but not yet been confirmed/disbursed (payments.EscrowHold can freeze one pending investigation, blocking admin_confirm_payment).'),
-    ('finances.payouts', 'Payouts', True, 'Host payout records — mark paid, cancel (payments.Payout), and confirming guest payments (which creates the payout).'),
+    ('finances.payouts', 'Payouts', True, 'Host payout records — mark paid, cancel, disburse via MTN MoMo (payments.Payout), and confirming guest payments (which creates the payout).'),
+    ('finances.agent_commissions', 'Agent Commissions', True, 'Sourcing-agent commission records — mark paid / disburse via MTN MoMo (agents.AgentCommission).'),
+    ('finances.employees', 'Employee Payments', True, 'Internal employee roster + ad-hoc MTN MoMo disbursements to them (payments.Employee / payments.EmployeePayment).'),
     ('finances.taxes', 'Taxes', True, 'Per-jurisdiction occupancy tax rates (payments.TaxRate) + a computed liability report over confirmed bookings. No withholding/filing/remittance automation.'),
+    ('finances.currencies', 'Currency Exchange Rates', True, 'USD conversion rate per non-USD currency (payments.Currency.exchange_rate_to_usd) — used to convert a booking/viewing-fee\'s USD price into whatever currency the guest chooses at MTN MoMo checkout. Takes effect immediately, no deploy needed.'),
     ('finances.legal_documents', 'Legal Documents', True, 'Terms of Service / Privacy Policy version registry (legalops app).'),
     ('finances.platform_fee', 'Platform Fee', True, 'Booking/viewing/service fee configuration (payments.PlatformFee) — takes effect immediately, no deploy needed.'),
     ('finances.currencies', 'Currencies', True, 'Supported currencies + USD exchange rates for pricing/payouts (payments.Currency) — managed via the generic admin CRUD system.'),

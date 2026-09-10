@@ -151,3 +151,34 @@ export async function fetchTextWithAuth(url: string, options: RequestInit = {}):
 
   return response.text();
 }
+
+// Same auth/refresh handling as fetchWithAuth, but for binary downloads
+// (XLSX exports, etc.) — the error path still tries to parse JSON since our
+// error responses are JSON even when a success response would be binary.
+export async function fetchBlobWithAuth(url: string, options: RequestInit = {}): Promise<Blob> {
+  const makeRequest = async (token: string | null) => {
+    const headers: Record<string, string> = {
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(options.headers as Record<string, string>),
+    };
+
+    return fetch(`${API_BASE_URL}${url}`, { ...options, headers, credentials: 'include' });
+  };
+
+  let response = await makeRequest(accessToken);
+
+  if (response.status === 401) {
+    const newToken = await attemptTokenRefresh();
+    if (newToken) {
+      response = await makeRequest(newToken);
+    }
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const message = body.error || body.detail || response.statusText || `Request failed (${response.status})`;
+    throw new ApiError(message, response.status, body);
+  }
+
+  return response.blob();
+}

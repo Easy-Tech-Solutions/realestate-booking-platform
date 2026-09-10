@@ -17,6 +17,7 @@ export const PROPERTY_CATEGORIES = [
   { id: 'airbnb', name: 'Air BnB', icon: '🛋️' },
   { id: 'hotels', name: 'Hotels', icon: '🏨' },
   { id: 'lodge', name: 'Lodge', icon: '🛖' },
+  { id: 'resort', name: 'Resort', icon: '🏝️' },
   { id: 'beaches', name: 'Beaches', icon: '🏖️' },
   { id: 'roadside', name: 'Roadside', icon: '🛣️' },
   { id: 'highway', name: 'Highway', icon: '🚗' },
@@ -29,7 +30,7 @@ export const PROPERTY_CATEGORIES = [
 // model) rather than as a single whole-listing stay. Drives the create-listing
 // wizard's room-based flow, the room picker on the listing detail page, and
 // the host dashboard's "Manage Rooms" link.
-export const ROOM_BASED_PROPERTY_TYPES = ['hotels', 'lodge'];
+export const ROOM_BASED_PROPERTY_TYPES = ['hotels', 'lodge', 'resort'];
 
 export const AMENITIES = [
   { id: 'wifi', name: 'Wifi', icon: 'Wifi', category: 'Basic' },

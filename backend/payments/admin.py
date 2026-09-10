@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
 from django.contrib import messages
-from .models import PaymentGateway, Currency, Payment, Refund, WebhookLog, PlatformFee, Payout, EscrowHold, TaxRate, StripeRefund
+from .models import PaymentGateway, Currency, Payment, Refund, WebhookLog, PlatformFee, Payout, EscrowHold, TaxRate, StripeRefund, Employee, EmployeePayment
 
 
 @admin.register(PaymentGateway)
@@ -179,6 +179,28 @@ class PayoutAdmin(admin.ModelAdmin):
                 notify_payout_paid(obj)
             except Exception:
                 pass
+
+
+@admin.register(Employee)
+class EmployeeAdmin(admin.ModelAdmin):
+    list_display = ['name', 'role_title', 'momo_number', 'is_active', 'created_at']
+    list_filter = ['is_active', 'momo_network']
+    search_fields = ['name', 'momo_number', 'role_title']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(EmployeePayment)
+class EmployeePaymentAdmin(admin.ModelAdmin):
+    list_display = ['employee', 'amount', 'currency', 'status', 'description', 'created_at']
+    list_filter = ['status', 'currency', 'created_at']
+    search_fields = ['employee__name', 'reference', 'description']
+    readonly_fields = ['employee', 'amount', 'currency', 'description', 'status', 'reference',
+                       'error_message', 'paid_by', 'created_at']
+
+    # Payments are only ever created through the disbursement flow (Finance
+    # dashboard or the admin_pay_employee API), never hand-entered.
+    def has_add_permission(self, request):
+        return False
 
     @admin.action(description='Mark selected payouts as paid')
     def mark_paid(self, request, queryset):
