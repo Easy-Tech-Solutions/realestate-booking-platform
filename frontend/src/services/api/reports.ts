@@ -21,8 +21,15 @@ export const reportsAPI = {
     return fetchWithAuth(`/api/reports/${id}/`);
   },
 
-  listAdmin: async (): Promise<any> => {
-    return fetchWithAuth('/api/reports/admin/');
+  listAdmin: async (params: { status?: string; report_type?: string; content_type?: string; limit?: number; offset?: number } = {}): Promise<any> => {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set('status', params.status);
+    if (params.report_type) qs.set('report_type', params.report_type);
+    if (params.content_type) qs.set('content_type', params.content_type);
+    if (params.limit != null) qs.set('limit', String(params.limit));
+    if (params.offset != null) qs.set('offset', String(params.offset));
+    const suffix = qs.toString();
+    return fetchWithAuth(`/api/reports/admin/${suffix ? `?${suffix}` : ''}`);
   },
 
   adminStats: async (): Promise<any> => {

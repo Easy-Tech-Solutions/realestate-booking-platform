@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -7,6 +8,7 @@ from rest_framework import status
 
 from .models import AgentApplication, AGENT_AGREEMENT_VERSION, is_approved_agent
 from .serializers import AgentApplicationCreateSerializer, AgentApplicationSerializer
+from .services import ps_decision, compliance_decision, supervisor_decision, InvalidTransition
 
 
 @api_view(['POST'])
@@ -54,6 +56,88 @@ def my_agent_application(request):
     if application is not None:
         payload['application'] = AgentApplicationSerializer(application, context={'request': request}).data
     return Response(payload)
+
+
+# ── Reviewer queue (superadmin KYC module) ──────────────────────────────────
+# Reuses the exact same service functions / Django permissions Django admin
+# already uses for this workflow — this is a second front door onto the same
+# real review pipeline, not a parallel implementation of it. Mirrors
+# hostapplications.views' review_queue/review_decision.
+
+STAGE_PERMISSION = {
+    AgentApplication.Stage.PRODUCT_SUPPORT: 'agents.review_agent_product_support',
+    AgentApplication.Stage.COMPLIANCE:      'agents.review_agent_compliance',
+    AgentApplication.Stage.SUPERVISOR:      'agents.review_agent_supervisor',
+}
+STAGE_STATUS = {
+    AgentApplication.Stage.PRODUCT_SUPPORT: AgentApplication.Status.SUBMITTED,
+    AgentApplication.Stage.COMPLIANCE:      AgentApplication.Status.PS_APPROVED,
+    AgentApplication.Stage.SUPERVISOR:      AgentApplication.Status.COMPLIANCE_APPROVED,
+}
+STAGE_SERVICE_FN = {
+    AgentApplication.Stage.PRODUCT_SUPPORT: ps_decision,
+    AgentApplication.Stage.COMPLIANCE:      compliance_decision,
+    AgentApplication.Stage.SUPERVISOR:      supervisor_decision,
+}
+
+
+def _has_background_checks_access(user):
+    """The trust_safety.background_checks RBAC resource — additive to the
+    per-stage Django permissions below, not a replacement."""
+    from rbac.permissions import has_permission
+    return has_permission(user, 'trust_safety.background_checks', 'execute')
+
+
+def reviewable_stages(user):
+    if _has_background_checks_access(user):
+        return list(STAGE_PERMISSION.keys())
+    return [stage for stage, perm in STAGE_PERMISSION.items() if user.has_perm(perm)]
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def agent_application_review_queue(request):
+    """GET /api/agents/applications/review-queue/ — applications awaiting
+    review at any stage the requesting officer has permission for."""
+    stages = reviewable_stages(request.user)
+    if not stages:
+        return Response({'error': 'You are not a reviewer for any stage of this queue.'}, status=status.HTTP_403_FORBIDDEN)
+    statuses = [STAGE_STATUS[s] for s in stages]
+    qs = (
+        AgentApplication.objects.filter(status__in=statuses)
+        .select_related('applicant').order_by('created_at')
+    )
+    return Response(AgentApplicationSerializer(qs, many=True, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def agent_application_review_decision(request, pk):
+    """POST /api/agents/applications/<pk>/review/ — approve or decline at
+    whichever stage this application is currently awaiting."""
+    application = get_object_or_404(AgentApplication, pk=pk)
+    stage = application.current_stage
+    if stage is None:
+        return Response({'error': 'This application is not awaiting review.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not (_has_background_checks_access(request.user) or request.user.has_perm(STAGE_PERMISSION[stage])):
+        return Response({'error': 'You are not authorized to review this stage.'}, status=status.HTTP_403_FORBIDDEN)
+
+    approve = bool(request.data.get('approve'))
+    reason = request.data.get('reason', '')
+    if not approve and not str(reason).strip():
+        return Response({'error': 'A reason is required when declining.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        STAGE_SERVICE_FN[stage](application, approve, request.user, reason)
+    except InvalidTransition as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    from superadmin.permissions import log_admin_action
+    log_admin_action(
+        request, 'agent_application.review', target=application, reason=reason,
+        approved=approve, stage=stage,
+    )
+    return Response(AgentApplicationSerializer(application, context={'request': request}).data)
 
 
 @api_view(['GET'])

@@ -8,7 +8,8 @@ export interface PropertyVerification {
   id: number;
   listing: number;
   listing_title: string;
-  ownership_type: 'owner' | 'non_owner';
+  ownership_type: 'owner' | 'non_owner' | 'agent';
+  owner_authorization_confirmed: boolean;
   owner_name: string;
   property_location: string;
   deed_volume_number: string;
@@ -75,6 +76,7 @@ export const propertyVerificationsAPI = {
       inspection_report?: File | null;
       inspection_latitude?: string;
       inspection_longitude?: string;
+      owner_authorization_confirmed?: boolean;
     },
   ): Promise<PropertyVerification> => {
     if (inspectionData) {
@@ -92,6 +94,9 @@ export const propertyVerificationsAPI = {
       }
       if (inspectionData.inspection_longitude) {
         formData.append('inspection_longitude', inspectionData.inspection_longitude);
+      }
+      if (inspectionData.owner_authorization_confirmed !== undefined) {
+        formData.append('owner_authorization_confirmed', String(inspectionData.owner_authorization_confirmed));
       }
       return fetchWithAuth<PropertyVerification>(`/api/property-verifications/${id}/review/`, {
         method: 'POST',

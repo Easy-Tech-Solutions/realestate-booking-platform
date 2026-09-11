@@ -256,16 +256,20 @@ export function GenericAdminPage<T extends { id: number }>({ config }: { config:
           </div>
           <Button variant="outline" size="sm" onClick={() => { setPage(1); load(); }}>Search</Button>
         </div>
-        <Button size="sm" onClick={() => { setEditingRow(null); setFormOpen(true); }}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> New
-        </Button>
+        {!config.readOnly && (
+          <Button size="sm" onClick={() => { setEditingRow(null); setFormOpen(true); }}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> New
+          </Button>
+        )}
       </div>
 
-      <BulkActionBar selectedCount={selected.size} onClear={clearSelection}>
-        <Button size="sm" variant="destructive" onClick={() => setBulkDeleteOpen(true)}>
-          <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete selected
-        </Button>
-      </BulkActionBar>
+      {!config.readOnly && (
+        <BulkActionBar selectedCount={selected.size} onClear={clearSelection}>
+          <Button size="sm" variant="destructive" onClick={() => setBulkDeleteOpen(true)}>
+            <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete selected
+          </Button>
+        </BulkActionBar>
+      )}
 
       <Card>
         <CardContent className="p-0">
@@ -273,50 +277,56 @@ export function GenericAdminPage<T extends { id: number }>({ config }: { config:
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox checked={rows.length > 0 && selected.size === rows.length} onCheckedChange={toggleAll} />
-                  </TableHead>
+                  {!config.readOnly && (
+                    <TableHead className="w-10">
+                      <Checkbox checked={rows.length > 0 && selected.size === rows.length} onCheckedChange={toggleAll} />
+                    </TableHead>
+                  )}
                   {tableFields.map((f) => <TableHead key={f.key}>{f.label}</TableHead>)}
-                  <TableHead>Actions</TableHead>
+                  {!config.readOnly && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
+                {(() => { const colCount = tableFields.length + (config.readOnly ? 0 : 2); return loading ? (
                   [...Array(5)].map((_, i) => (
                     <TableRow key={i}>
-                      {[...Array(tableFields.length + 2)].map((__, j) => (
+                      {[...Array(colCount)].map((__, j) => (
                         <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : error ? (
-                  <TableRow><TableCell colSpan={tableFields.length + 2} className="text-center text-muted-foreground py-8">{error}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={colCount} className="text-center text-muted-foreground py-8">{error}</TableCell></TableRow>
                 ) : rows.length === 0 ? (
-                  <TableRow><TableCell colSpan={tableFields.length + 2} className="text-center text-muted-foreground py-8">No records match.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={colCount} className="text-center text-muted-foreground py-8">No records match.</TableCell></TableRow>
                 ) : (
                   rows.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell>
-                        <Checkbox checked={selected.has(row.id)} onCheckedChange={() => toggleOne(row.id)} />
-                      </TableCell>
+                      {!config.readOnly && (
+                        <TableCell>
+                          <Checkbox checked={selected.has(row.id)} onCheckedChange={() => toggleOne(row.id)} />
+                        </TableCell>
+                      )}
                       {tableFields.map((f) => (
                         <TableCell key={f.key}>
                           {f.renderCell ? f.renderCell(row) : formatCellValue(f, (row as Record<string, unknown>)[f.key])}
                         </TableCell>
                       ))}
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => { setEditingRow(row); setFormOpen(true); }}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(row)}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {!config.readOnly && (
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => { setEditingRow(row); setFormOpen(true); }}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(row)}>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
-                )}
+                ); })()}
               </TableBody>
             </Table>
           </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Building2, CheckCircle, DollarSign, Home, TrendingUp, Users,
@@ -18,6 +18,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { formatCurrency } from '../../core/utils';
 import { toast } from 'sonner';
 import { usersAPI, propertiesAPI, bookingsAPI, payoutsAPI, paymentAPI, viewingsAPI } from '../../services/api';
+import { rbacAPI } from '../../services/api/rbac';
 import type { PlatformFee, EscrowBooking } from '../../services/api/payments';
 import type { ListingSettings } from '../../services/api/properties';
 import type { ViewingAppointment } from '../../core/types';
@@ -33,10 +34,18 @@ import {
   SidebarProvider, SidebarTrigger,
 } from '../components/ui/sidebar';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../components/ui/collapsible';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 
+// `resource` (an RBAC resource path, or any-of a list of them) gates whether
+// a nav item is shown at all — see rbac/resources.py for the resource tree.
+// Omit it for items every admin-dashboard user should see regardless of role
+// (the overview landing page, personal MFA settings, docs).
 type NavLeaf =
-  | { type: 'section'; id: string; label: string }
-  | { type: 'route'; path: string; label: string };
+  | { type: 'section'; id: string; label: string; resource?: string | string[] }
+  | { type: 'route'; path: string; label: string; resource?: string | string[] };
 
 interface NavGroup {
   id: string;
@@ -50,59 +59,64 @@ const navGroups: NavGroup[] = [
     { type: 'section', id: 'overview', label: 'Overview' },
   ] },
   { id: 'users', label: 'User Management', icon: Users, items: [
-    { type: 'route', path: '/management/users', label: 'All Users' },
+    { type: 'route', path: '/management/users', label: 'All Users', resource: 'users.profiles' },
   ] },
   { id: 'inventory', label: 'Property & Inventory', icon: Building2, items: [
-    { type: 'section', id: 'properties', label: 'Property Management' },
-    { type: 'route', path: '/management/listing-moderation', label: 'Listing Moderation' },
-    { type: 'route', path: '/management/categories', label: 'Property Categories' },
+    { type: 'section', id: 'properties', label: 'Property Management', resource: 'listings.content' },
+    { type: 'route', path: '/management/listing-moderation', label: 'Listing Moderation', resource: 'listings.availability' },
+    { type: 'route', path: '/management/categories', label: 'Property Categories', resource: 'listings.categories' },
   ] },
   { id: 'bookings', label: 'Bookings', icon: Calendar, items: [
-    { type: 'section', id: 'bookings', label: 'All Bookings' },
-    { type: 'section', id: 'viewings', label: 'Viewing Requests' },
+    { type: 'section', id: 'bookings', label: 'All Bookings', resource: 'reservations.transactional_data' },
+    { type: 'section', id: 'viewings', label: 'Viewing Requests', resource: 'reservations.transactional_data' },
   ] },
   { id: 'finance', label: 'Financial Management', icon: DollarSign, items: [
-    { type: 'section', id: 'payments', label: 'Payments' },
-    { type: 'section', id: 'payouts', label: 'Host Payouts' },
-    { type: 'route', path: '/management/finance', label: 'Finance & Legal Center' },
-    { type: 'route', path: '/management/payments', label: 'Pay Hosts, Agents & Employees' },
-    { type: 'route', path: '/management/legal-documents', label: 'Legal Documents' },
-    { type: 'route', path: '/management/currencies', label: 'Currencies' },
+    { type: 'section', id: 'payments', label: 'Payments', resource: 'finances.payouts' },
+    { type: 'section', id: 'payouts', label: 'Host Payouts', resource: 'finances.payouts' },
+    { type: 'route', path: '/management/finance', label: 'Finance & Legal Center', resource: ['finances.taxes', 'finances.legal_documents', 'finances.platform_fee', 'finances.escrow'] },
+    { type: 'route', path: '/management/payments', label: 'Pay Hosts, Agents & Employees', resource: ['finances.payouts', 'finances.agent_commissions', 'finances.employees'] },
+    { type: 'route', path: '/management/legal-documents', label: 'Legal Documents', resource: 'finances.legal_documents' },
+    { type: 'route', path: '/management/currencies', label: 'Currencies', resource: 'finances.currencies' },
   ] },
   { id: 'trust_safety', label: 'Trust & Safety', icon: ShieldCheck, items: [
-    { type: 'section', id: 'trust_safety', label: 'Overview' },
-    { type: 'route', path: '/management/kyc-queue', label: 'KYC Review Queue' },
-    { type: 'route', path: '/management/fraud-flags', label: 'Fraud & AML' },
-    { type: 'route', path: '/management/suspensions', label: 'Suspensions Center' },
+    { type: 'section', id: 'trust_safety', label: 'Overview', resource: 'trust_safety.background_checks' },
+    { type: 'route', path: '/management/kyc-queue', label: 'KYC Review Queue', resource: 'trust_safety.background_checks' },
+    { type: 'route', path: '/management/fraud-flags', label: 'Fraud & AML', resource: 'trust_safety.flags' },
+    { type: 'route', path: '/management/suspensions', label: 'Suspensions Center', resource: 'trust_safety.bans' },
   ] },
   { id: 'support', label: 'Support', icon: Headphones, items: [
-    { type: 'section', id: 'support', label: 'Support Tickets' },
-    { type: 'route', path: '/management/reports', label: 'Reports Center' },
-    { type: 'route', path: '/management/aircover-claims', label: 'AirCover Claims' },
+    { type: 'section', id: 'support', label: 'Support Tickets', resource: 'customer_support.tickets' },
+    { type: 'route', path: '/management/reports', label: 'Reports Center', resource: 'customer_support.disputes' },
+    { type: 'route', path: '/management/aircover-claims', label: 'AirCover Claims', resource: 'customer_support.aircover_claims' },
   ] },
   { id: 'employees', label: 'Employees', icon: Users, items: [
-    { type: 'route', path: '/management/employees', label: 'Employee Directory' },
+    { type: 'route', path: '/management/employees', label: 'Employee Directory', resource: 'finances.employees' },
   ] },
   { id: 'rbac', label: 'Roles & Permissions', icon: KeySquare, items: [
-    { type: 'route', path: '/management/staff', label: 'Staff Directory' },
-    { type: 'route', path: '/management/roles', label: 'Roles & Custom Roles' },
+    { type: 'route', path: '/management/staff', label: 'Staff Directory', resource: 'users.staff_management' },
+    { type: 'route', path: '/management/roles', label: 'Roles & Custom Roles', resource: 'rbac_engine' },
+    // No single resource gates this — it shows whatever dual-auth approvals
+    // the viewer is otherwise authorized to decide on, so it's left visible
+    // rather than guessing a single owning resource.
     { type: 'route', path: '/management/approvals', label: 'Pending Approvals' },
-    { type: 'route', path: '/management/break-glass', label: 'Break-Glass Access' },
+    { type: 'route', path: '/management/break-glass', label: 'Break-Glass Access', resource: 'infrastructure.break_glass' },
   ] },
   { id: 'security', label: 'Security', icon: Shield, items: [
+    // Personal MFA setup for the viewer's own account — always visible.
     { type: 'section', id: 'security', label: 'Overview & MFA' },
-    { type: 'route', path: '/management/audit-log', label: 'Audit Log' },
+    { type: 'route', path: '/management/audit-log', label: 'Audit Log', resource: 'audit_log' },
   ] },
   { id: 'platform', label: 'Platform & Engineering', icon: Cpu, items: [
-    { type: 'route', path: '/management/platform-ops', label: 'System Health & Errors' },
+    { type: 'route', path: '/management/platform-ops', label: 'System Health & Errors', resource: ['infrastructure.feature_flags', 'infrastructure.system_caches'] },
+    // Staff documentation — always visible.
     { type: 'route', path: '/management/docs', label: 'Documentation' },
   ] },
   { id: 'settings', label: 'Settings', icon: Settings, items: [
-    { type: 'section', id: 'settings', label: 'Platform Settings' },
+    { type: 'section', id: 'settings', label: 'Platform Settings', resource: ['listings.settings', 'finances.platform_fee', 'infrastructure.feature_flags'] },
   ] },
   { id: 'marketing', label: 'Marketing', icon: Mail, items: [
-    { type: 'route', path: '/management/testimonials', label: 'Testimonials' },
-    { type: 'route', path: '/management/subscribers', label: 'Newsletter Subscribers' },
+    { type: 'route', path: '/management/testimonials', label: 'Testimonials', resource: 'marketing.testimonials' },
+    { type: 'route', path: '/management/subscribers', label: 'Newsletter Subscribers', resource: 'marketing.newsletter' },
   ] },
 ];
 
@@ -110,6 +124,19 @@ const sectionLabels: Record<string, string> = navGroups
   .flatMap((g) => g.items)
   .filter((i): i is Extract<NavLeaf, { type: 'section' }> => i.type === 'section')
   .reduce((acc, i) => ({ ...acc, [i.id]: i.label }), {});
+
+// 'finances.currencies' -> ['finances.currencies', 'finances'] — a grant on
+// an ancestor path implies every descendant (mirrors rbac.resources.ancestors_of).
+function resourceAncestors(resource: string): string[] {
+  const parts = resource.split('.');
+  return parts.map((_, i) => parts.slice(0, parts.length - i).join('.'));
+}
+
+function canAccessResource(grantedResources: Set<string>, resource?: string | string[]): boolean {
+  if (!resource) return true; // ungated — visible to any admin-dashboard user
+  const resources = Array.isArray(resource) ? resource : [resource];
+  return resources.some((r) => resourceAncestors(r).some((a) => grantedResources.has(a)));
+}
 
 const statusColor: Record<string, string> = {
   confirmed:  'bg-primary/10 text-primary',
@@ -164,6 +191,24 @@ export function AdminDashboard() {
       return next;
     });
   };
+
+  // Full admins get every resource back from this endpoint already (see
+  // rbac.permissions.effective_grants), so no special-casing is needed here.
+  // `null` (not yet loaded) means "don't filter yet" — briefly showing every
+  // item until this resolves beats a flash of an empty sidebar.
+  const [grantedResources, setGrantedResources] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    rbacAPI.myPermissions()
+      .then((res) => setGrantedResources(new Set(res.grants.map((g) => g.resource))))
+      .catch(() => setGrantedResources(new Set())); // fail closed if the check itself fails
+  }, []);
+
+  const visibleNavGroups = useMemo(() => {
+    if (grantedResources === null) return navGroups;
+    return navGroups
+      .map((group) => ({ ...group, items: group.items.filter((item) => canAccessResource(grantedResources, item.resource)) }))
+      .filter((group) => group.items.length > 0);
+  }, [grantedResources]);
 
   // Data state
   const [stats, setStats]           = useState<any>(null);
@@ -283,13 +328,20 @@ export function AdminDashboard() {
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { loadPaymentsAndPayouts(); }, [loadPaymentsAndPayouts]);
 
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; title: string } | null>(null);
+  const [removingListing, setRemovingListing] = useState(false);
+
   const handleRemoveListing = async (listingId: string, title: string) => {
+    setRemovingListing(true);
     try {
       await usersAPI.deleteListing(listingId);
       toast.success(`"${title}" removed`);
       setProperties(prev => prev.filter(p => String(p.id) !== String(listingId)));
+      setRemoveTarget(null);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to remove listing');
+    } finally {
+      setRemovingListing(false);
     }
   };
 
@@ -498,7 +550,7 @@ export function AdminDashboard() {
                               </Button>
                               <Button
                                 variant="outline" size="sm" className="text-red-600"
-                                onClick={() => handleRemoveListing(String(p.id), p.title)}
+                                onClick={() => setRemoveTarget({ id: String(p.id), title: p.title })}
                               >
                                 <X className="h-3 w-3 mr-1" /> Remove
                               </Button>
@@ -583,7 +635,18 @@ export function AdminDashboard() {
   // ── Bookings ──────────────────────────────────────────────────────────────
   const renderBookings = () => (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold">Recent Bookings</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h2 className="text-2xl font-semibold">All Bookings</h2>
+        <Select value={allBookingsStatusFilter} onValueChange={setAllBookingsStatusFilter}>
+          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {Object.keys(statusColor).map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -600,22 +663,23 @@ export function AdminDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading
+                {allBookingsLoading
                   ? [...Array(5)].map((_, i) => (
                       <TableRow key={i}>
                         {[...Array(7)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
                       </TableRow>
                     ))
-                  : (stats?.recent_bookings ?? []).map((b: any) => (
+                  : allBookings.length === 0 ? (
+                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No bookings match.</TableCell></TableRow>
+                    ) : allBookings.map((b) => (
                       <TableRow key={b.id}>
                         <TableCell className="font-mono text-sm">#{b.id}</TableCell>
                         <TableCell>
                           <p className="font-medium">{b.customer_username}</p>
-                          <p className="text-xs text-muted-foreground">{b.customer_email}</p>
                         </TableCell>
                         <TableCell className="max-w-[180px] truncate">{b.listing_title}</TableCell>
                         <TableCell className="text-sm">{b.start_date} → {b.end_date}</TableCell>
-                        <TableCell>{formatCurrency(b.total_price)}</TableCell>
+                        <TableCell>{formatCurrency(Number(b.total_price))}</TableCell>
                         <TableCell>
                           <Badge className={statusColor[b.status] ?? ''}>{b.status}</Badge>
                         </TableCell>
@@ -628,6 +692,21 @@ export function AdminDashboard() {
               </TableBody>
             </Table>
           </div>
+          {allBookingsCount > 0 && (
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border">
+              <p className="text-sm text-muted-foreground">
+                {allBookingsCount} booking{allBookingsCount === 1 ? '' : 's'} · showing {allBookingsOffset + 1}-{Math.min(allBookingsOffset + ALL_BOOKINGS_LIMIT, allBookingsCount)}
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" disabled={allBookingsLoading || allBookingsOffset <= 0} onClick={() => loadAllBookings(Math.max(0, allBookingsOffset - ALL_BOOKINGS_LIMIT))}>
+                  Previous
+                </Button>
+                <Button size="sm" variant="outline" disabled={allBookingsLoading || allBookingsOffset + ALL_BOOKINGS_LIMIT >= allBookingsCount} onClick={() => loadAllBookings(allBookingsOffset + ALL_BOOKINGS_LIMIT)}>
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -1125,6 +1204,38 @@ export function AdminDashboard() {
     if (activeSection === 'support') loadSupport();
   }, [activeSection, loadSupport]);
 
+  const [allBookings, setAllBookings] = useState<Array<{
+    id: number; customer_username: string; listing_title: string;
+    start_date: string; end_date: string; total_price: string; status: string;
+  }>>([]);
+  const [allBookingsLoading, setAllBookingsLoading] = useState(true);
+  const [allBookingsCount, setAllBookingsCount] = useState(0);
+  const [allBookingsOffset, setAllBookingsOffset] = useState(0);
+  const [allBookingsStatusFilter, setAllBookingsStatusFilter] = useState('all');
+  const ALL_BOOKINGS_LIMIT = 25;
+
+  const loadAllBookings = useCallback(async (targetOffset = 0) => {
+    setAllBookingsLoading(true);
+    try {
+      const res = await bookingsAPI.adminList({
+        status: allBookingsStatusFilter === 'all' ? undefined : allBookingsStatusFilter,
+        limit: ALL_BOOKINGS_LIMIT,
+        offset: targetOffset,
+      });
+      setAllBookings(res.results);
+      setAllBookingsCount(res.count);
+      setAllBookingsOffset(targetOffset);
+    } catch {
+      toast.error('Failed to load bookings');
+    } finally {
+      setAllBookingsLoading(false);
+    }
+  }, [allBookingsStatusFilter]);
+
+  useEffect(() => {
+    if (activeSection === 'bookings') loadAllBookings(0);
+  }, [activeSection, loadAllBookings]);
+
   const loadPlatformFee = useCallback(async () => {
     setPlatformFeeLoading(true);
     try {
@@ -1617,6 +1728,7 @@ export function AdminDashboard() {
   };
 
   return (
+    <>
     <SidebarProvider>
       <div className="flex min-h-screen bg-background">
         <Sidebar>
@@ -1625,7 +1737,7 @@ export function AdminDashboard() {
               <SidebarGroupLabel>Admin Dashboard</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {navGroups.map((group) => {
+                  {visibleNavGroups.map((group) => {
                     const isGroupActive = group.items.some((item) => item.type === 'section' && item.id === activeSection);
                     return (
                       <Collapsible key={group.id} open={expandedGroups.has(group.id)} onOpenChange={() => toggleGroup(group.id)}>
@@ -1682,5 +1794,26 @@ export function AdminDashboard() {
         </main>
       </div>
     </SidebarProvider>
+    <AlertDialog open={!!removeTarget} onOpenChange={(open) => { if (!open) setRemoveTarget(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove listing?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {removeTarget && `This will permanently remove "${removeTarget.title}" from the platform. This cannot be undone.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={removingListing}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={removingListing}
+            className="bg-red-600 hover:bg-red-700"
+            onClick={() => removeTarget && handleRemoveListing(removeTarget.id, removeTarget.title)}
+          >
+            {removingListing ? 'Removing…' : 'Remove listing'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

@@ -10,6 +10,7 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { UserAutocomplete } from '../components/UserAutocomplete';
 import { getErrorMessage } from '../../services/api/shared/errors';
 
 // Flags are created instantly by the rule-based detectors in
@@ -74,6 +75,54 @@ function FraudFlagCard({ flag, onDecided }: { flag: FraudFlag; onDecided: () => 
           <Button size="sm" variant="destructive" disabled={busy} onClick={() => decide('confirmed')}>Confirm fraud</Button>
           <Button size="sm" variant="outline" disabled={busy} onClick={() => decide('dismissed')}>Dismiss</Button>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CreateManualFlagForm({ onCreated }: { onCreated: () => void }) {
+  const [userId, setUserId] = useState('');
+  const [details, setDetails] = useState('');
+  const [severity, setSeverity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [busy, setBusy] = useState(false);
+
+  const create = async () => {
+    const id = Number(userId);
+    if (!id || !details.trim()) {
+      toast.error('User ID and details are required.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await trustSafetyAPI.createManualFlag(id, details.trim(), severity);
+      setUserId('');
+      setDetails('');
+      toast.success('Manual fraud flag created.');
+      onCreated();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to create flag'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-base">Create manual flag</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid sm:grid-cols-[220px,1fr,140px] gap-2">
+          <UserAutocomplete value={userId} onChange={setUserId} />
+          <Input placeholder="Details" value={details} onChange={(e) => setDetails(e.target.value)} />
+          <Select value={severity} onValueChange={(v) => setSeverity(v as typeof severity)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button size="sm" disabled={busy} onClick={create}>Create flag</Button>
       </CardContent>
     </Card>
   );
@@ -335,6 +384,7 @@ export function AdminFraudFlags() {
             {flags.map((f) => <FraudFlagCard key={f.id} flag={f} onDecided={() => load()} />)}
           </div>
         )}
+        <CreateManualFlagForm onCreated={() => load()} />
       </section>
 
       <section className="grid lg:grid-cols-2 gap-6">

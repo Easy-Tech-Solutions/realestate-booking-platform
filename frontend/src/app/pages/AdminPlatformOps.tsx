@@ -325,10 +325,13 @@ function LogViewerPanel() {
                   )}
                   {e.logger && <span className="text-muted-foreground">{e.logger}</span>}
                 </div>
-                <span className="break-all">{e.msg ?? e.raw}</span>
-                {e.exception && (
+                <span className="break-all">{(e.msg ?? e.raw) as string}{e.truncated ? '…' : ''}</span>
+                {e.exception != null && (
                   <pre className="text-destructive text-[10px] whitespace-pre-wrap mt-0.5">{String(e.exception)}</pre>
                 )}
+                {e.truncated ? (
+                  <span className="text-muted-foreground text-[10px] italic">(truncated — full entry is longer than shown)</span>
+                ) : null}
               </div>
             ))}
           </div>

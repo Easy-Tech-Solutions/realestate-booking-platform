@@ -89,6 +89,54 @@ function ListingFlagCard({ flag, onDecided }: { flag: ListingFlag; onDecided: ()
   );
 }
 
+function CreateManualFlagForm({ onCreated }: { onCreated: () => void }) {
+  const [listingId, setListingId] = useState('');
+  const [details, setDetails] = useState('');
+  const [severity, setSeverity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [busy, setBusy] = useState(false);
+
+  const create = async () => {
+    const id = Number(listingId);
+    if (!id || !details.trim()) {
+      toast.error('Listing ID and details are required.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await inventoryAPI.createManualFlag(id, details.trim(), severity);
+      setListingId('');
+      setDetails('');
+      toast.success('Manual listing flag created.');
+      onCreated();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to create flag'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-base">Create manual flag</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid sm:grid-cols-[140px,1fr,140px] gap-2">
+          <Input placeholder="Listing ID" value={listingId} onChange={(e) => setListingId(e.target.value)} />
+          <Input placeholder="Details" value={details} onChange={(e) => setDetails(e.target.value)} />
+          <Select value={severity} onValueChange={(v) => setSeverity(v as typeof severity)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button size="sm" disabled={busy} onClick={create}>Create flag</Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function SuspendDialog({ listing, onDone }: { listing: InventoryListing; onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
@@ -285,6 +333,9 @@ export function AdminListingModeration() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkReason, setBulkReason] = useState('');
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [page, setPage] = useState(1);
+  const [listingsCount, setListingsCount] = useState(0);
+  const PAGE_SIZE = 25;
 
   const loadFlags = async (status = flagsStatusFilter) => {
     setFlagsLoading(true);
@@ -298,15 +349,17 @@ export function AdminListingModeration() {
     }
   };
 
-  const loadListings = async () => {
+  const loadListings = async (targetPage = page) => {
     setListingsLoading(true);
     try {
-      const page = await inventoryAPI.searchListings({
+      const result = await inventoryAPI.searchListings({
         status: statusFilter === 'all' ? undefined : statusFilter,
         search: search.trim() || undefined,
         flaggedOnly,
+        page: targetPage,
       });
-      setListings(page.results);
+      setListings(result.results);
+      setListingsCount(result.count);
       setListingsError(null);
     } catch (err) {
       setListingsError(getErrorMessage(err, 'You do not have Inventory & Listings access.'));
@@ -316,7 +369,15 @@ export function AdminListingModeration() {
   };
 
   useEffect(() => { loadFlags(flagsStatusFilter); }, [flagsStatusFilter]);
-  useEffect(() => { loadListings(); }, [statusFilter, flaggedOnly]);
+  useEffect(() => { setPage(1); setSelected(new Set()); loadListings(1); }, [statusFilter, flaggedOnly]);
+
+  const goToPage = (p: number) => {
+    setPage(p);
+    setSelected(new Set());
+    loadListings(p);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(listingsCount / PAGE_SIZE));
 
   const runScan = async () => {
     setScanning(true);
@@ -433,6 +494,7 @@ export function AdminListingModeration() {
             {flags.map((f) => <ListingFlagCard key={f.id} flag={f} onDecided={() => loadFlags()} />)}
           </div>
         )}
+        <CreateManualFlagForm onCreated={() => loadFlags()} />
       </section>
 
       <section className="space-y-4">
@@ -445,10 +507,10 @@ export function AdminListingModeration() {
               className="pl-10 w-64"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') loadListings(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') goToPage(1); }}
             />
           </div>
-          <Button variant="outline" size="sm" onClick={loadListings}>Search</Button>
+          <Button variant="outline" size="sm" onClick={() => goToPage(1)}>Search</Button>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -484,7 +546,11 @@ export function AdminListingModeration() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-10">
-                      <Checkbox checked={listings.length > 0 && selected.size === listings.length} onCheckedChange={toggleAll} />
+                      <Checkbox
+                        checked={listings.length > 0 && selected.size === listings.length}
+                        onCheckedChange={toggleAll}
+                        title="Select all on this page"
+                      />
                     </TableHead>
                     <TableHead>Listing</TableHead>
                     <TableHead>Host</TableHead>
@@ -537,6 +603,21 @@ export function AdminListingModeration() {
                 </TableBody>
               </Table>
             </div>
+            {listingsCount > 0 && (
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border">
+                <p className="text-sm text-muted-foreground">
+                  {listingsCount} listing{listingsCount === 1 ? '' : 's'} · page {page} of {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" disabled={listingsLoading || page <= 1} onClick={() => goToPage(page - 1)}>
+                    Previous
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={listingsLoading || page >= totalPages} onClick={() => goToPage(page + 1)}>
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>

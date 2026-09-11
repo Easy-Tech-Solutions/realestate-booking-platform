@@ -634,6 +634,7 @@ export function AdminUsers() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [staffFilter, setStaffFilter] = useState('all');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [roles, setRoles] = useState<Role[]>([]);
   const [bulkDialog, setBulkDialog] = useState<'assign' | 'remove' | null>(null);
@@ -650,6 +651,7 @@ export function AdminUsers() {
         search: search.trim() || undefined,
         role: roleFilter === 'all' ? undefined : roleFilter,
         is_active: activeFilter === 'all' ? undefined : activeFilter === 'active',
+        is_staff: staffFilter === 'all' ? undefined : staffFilter === 'staff',
         page, page_size: PAGE_SIZE,
       });
       setUsers(res.results);
@@ -662,7 +664,7 @@ export function AdminUsers() {
     }
   };
 
-  useEffect(() => { load(); }, [page, roleFilter, activeFilter]);
+  useEffect(() => { load(); }, [page, roleFilter, activeFilter, staffFilter]);
   useEffect(() => {
     // Superadmin is reference-only here (see Roles & Permissions for the
     // full list) — assigning it does nothing, since real superadmin status
@@ -777,6 +779,14 @@ export function AdminUsers() {
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={staffFilter} onValueChange={(v) => { setStaffFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Staff + non-staff</SelectItem>
+              <SelectItem value="staff">Staff only</SelectItem>
+              <SelectItem value="non_staff">Non-staff only</SelectItem>
             </SelectContent>
           </Select>
         </div>

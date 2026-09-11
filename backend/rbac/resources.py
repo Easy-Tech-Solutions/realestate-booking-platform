@@ -40,6 +40,7 @@ RESOURCE_TREE = [
     ('listings.compliance', 'Compliance', True, 'Local registration number + legal occupancy cap (Listing.local_registration_number/occupancy_cap) — enforced against the host\'s own max_guests. Set via PATCH /api/inventory/listings/<id>/compliance/.'),
     ('listings.settings', 'Listing Settings', True, 'Minimum listing price enforced at listing creation (listings.ListingSettings) — takes effect immediately, no deploy needed.'),
     ('listings.categories', 'Property Categories', True, 'Category taxonomy used to tag/browse listings (listings.PropertyCategory) — managed via the generic admin CRUD system.'),
+    ('listings.bulk_import', 'Bulk Import/Export', True, 'Bulk-create or export listings via XLSX on behalf of any owner (listings.bulk) — a normal host only ever imports/exports their own.'),
 
     ('reservations', 'Reservations', True, 'Wildcard — grants every reservation sub-resource below (transactional data, communications).'),
     ('reservations.transactional_data', 'Transactional Data', True, 'Booking dates, guest counts, payment confirmation (bookings app).'),
@@ -51,10 +52,9 @@ RESOURCE_TREE = [
     ('finances.agent_commissions', 'Agent Commissions', True, 'Sourcing-agent commission records — mark paid / disburse via MTN MoMo (agents.AgentCommission).'),
     ('finances.employees', 'Employee Payments', True, 'Internal employee roster + ad-hoc MTN MoMo disbursements to them (payments.Employee / payments.EmployeePayment).'),
     ('finances.taxes', 'Taxes', True, 'Per-jurisdiction occupancy tax rates (payments.TaxRate) + a computed liability report over confirmed bookings. No withholding/filing/remittance automation.'),
-    ('finances.currencies', 'Currency Exchange Rates', True, 'USD conversion rate per non-USD currency (payments.Currency.exchange_rate_to_usd) — used to convert a booking/viewing-fee\'s USD price into whatever currency the guest chooses at MTN MoMo checkout. Takes effect immediately, no deploy needed.'),
+    ('finances.currencies', 'Currency Exchange Rates', True, 'USD conversion rate per non-USD currency (payments.Currency.exchange_rate_to_usd) — used to convert a booking/viewing-fee\'s USD price into whatever currency the guest chooses at MTN MoMo checkout. Takes effect immediately, no deploy needed. Rate/name/symbol/active-status editing only — currency codes themselves are not editable and currencies cannot be created or deleted here (see payments.admin.CurrencyAdmin for that, Django-admin only, deliberately harder to reach).'),
     ('finances.legal_documents', 'Legal Documents', True, 'Terms of Service / Privacy Policy version registry (legalops app).'),
     ('finances.platform_fee', 'Platform Fee', True, 'Booking/viewing/service fee configuration (payments.PlatformFee) — takes effect immediately, no deploy needed.'),
-    ('finances.currencies', 'Currencies', True, 'Supported currencies + USD exchange rates for pricing/payouts (payments.Currency) — managed via the generic admin CRUD system.'),
 
     ('trust_safety', 'Trust & Safety', True, 'Wildcard — grants every trust & safety sub-resource below (background checks, flags, bans).'),
     ('trust_safety.background_checks', 'Background Checks', True, 'Identity/ownership verification review is manual, not automated screening — this permission (execute) grants access to every stage of the KYC review queue (hostapplications/propertyverifications), additive to the existing per-stage Django model permissions.'),

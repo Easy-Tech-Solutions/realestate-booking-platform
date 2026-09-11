@@ -13,6 +13,10 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import { getErrorMessage } from '../../services/api/shared/errors';
 
 function OnboardForm({ onDone }: { onDone: () => void }) {
@@ -182,6 +186,7 @@ function StaffRow({ staff, onChange }: { staff: StaffProfile; onChange: () => vo
   const [department, setDepartment] = useState(staff.department);
   const [hireDate, setHireDate] = useState(staff.hire_date || '');
   const [busy, setBusy] = useState(false);
+  const [confirmOffboard, setConfirmOffboard] = useState(false);
 
   const save = async () => {
     setBusy(true);
@@ -197,12 +202,29 @@ function StaffRow({ staff, onChange }: { staff: StaffProfile; onChange: () => vo
   };
 
   const offboard = async () => {
+    setBusy(true);
     try {
       await staffAPI.adminOffboard(staff.id);
       toast.success(`${staff.full_name} offboarded.`);
+      setConfirmOffboard(false);
       onChange();
     } catch (err) {
       toast.error(getErrorMessage(err, 'Failed to offboard'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reactivate = async () => {
+    setBusy(true);
+    try {
+      await staffAPI.adminUpdate(staff.id, { is_active: true });
+      toast.success(`${staff.full_name} reactivated.`);
+      onChange();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to reactivate'));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -236,10 +258,32 @@ function StaffRow({ staff, onChange }: { staff: StaffProfile; onChange: () => vo
               </div>
               <div className="flex gap-2">
                 <Button size="sm" disabled={busy} onClick={save}>Save</Button>
-                {staff.is_active && (
-                  <Button size="sm" variant="outline" className="text-destructive" onClick={offboard}>Offboard</Button>
+                {staff.is_active ? (
+                  <Button size="sm" variant="outline" className="text-destructive" disabled={busy} onClick={() => setConfirmOffboard(true)}>Offboard</Button>
+                ) : (
+                  <Button size="sm" variant="outline" disabled={busy} onClick={reactivate}>Reactivate</Button>
                 )}
               </div>
+              <AlertDialog open={confirmOffboard} onOpenChange={setConfirmOffboard}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Offboard {staff.full_name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This deactivates their staff profile (their account and roles are untouched, and they can be reactivated later).
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={busy}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={offboard}
+                    >
+                      {busy ? 'Offboarding…' : 'Offboard'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
               <RoleAssignment userId={staff.user} />
 

@@ -56,11 +56,14 @@ export const superadminAPI = {
       body: JSON.stringify({ code }),
     }),
 
-  getAuditLog: (params: { page?: number; action?: string; target_type?: string } = {}): Promise<AuditLogPage> => {
+  getAuditLog: (params: { page?: number; action?: string; target_type?: string; actor?: string; date_from?: string; date_to?: string } = {}): Promise<AuditLogPage> => {
     const qs = new URLSearchParams();
     if (params.page) qs.set('page', String(params.page));
     if (params.action) qs.set('action', params.action);
     if (params.target_type) qs.set('target_type', params.target_type);
+    if (params.actor) qs.set('actor', params.actor);
+    if (params.date_from) qs.set('date_from', params.date_from);
+    if (params.date_to) qs.set('date_to', params.date_to);
     const query = qs.toString();
     return fetchWithAuth(`/api/superadmin/audit-log/${query ? `?${query}` : ''}`);
   },
