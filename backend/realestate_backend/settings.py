@@ -561,23 +561,67 @@ PAYMENT_GATEWAYS = {
         # a prompt to the payer's phone. Sandbox is unaffected — it always
         # uses the literal "sandbox" value regardless of this setting.
         'target_environment': os.environ.get('MTN_MOMO_TARGET_ENVIRONMENT', 'production'),
+        # MTN ties an API User to ONE product only (Collection OR
+        # Disbursement) — an API user created for Disbursement authenticates
+        # fine on a Collection call (right key, right OAuth token) but MTN's
+        # core system rejects the actual transaction with NOT_ALLOWED, since
+        # that account was never authorized for Collections. So every
+        # currency below carries two independent API users, one per product
+        # — never point both at the same credentials.
         'accounts': {
-            # LRD falls back to the original un-suffixed vars so a
-            # single-currency setup (from before dual-currency support)
-            # keeps working without renaming anything.
+            # MTN confirmed (2026-09-08) that an API user is NOT
+            # currency-locked — the same Collection/Disbursement accounts
+            # provisioned for USD work for LRD too. So LRD falls back to the
+            # exact same credentials as USD for each product, unless a truly
+            # separate LRD account is ever provisioned (MTN_MOMO_*_LRD /
+            # the legacy un-suffixed MTN_MOMO_USER_ID/API_SECRET vars still
+            # take priority if set, for backward compatibility).
+            # `or`-chained (not nested os.environ.get(key, default)) because
+            # backend/.env carries MTN_MOMO_USER_ID_LRD= / API_SECRET_LRD=
+            # as explicitly-blank (not absent) vars from the single-currency
+            # era — os.environ.get() would return that blank string as-is
+            # and never reach the fallback, silently breaking LRD.
             'LRD': {
-                'user_id': os.environ.get('MTN_MOMO_USER_ID_LRD', os.environ.get('MTN_MOMO_USER_ID', '')),
-                'api_secret': os.environ.get('MTN_MOMO_API_SECRET_LRD', os.environ.get('MTN_MOMO_API_SECRET', '')),
+                'collection': {
+                    'user_id': (os.environ.get('MTN_MOMO_USER_ID_LRD') or os.environ.get('MTN_MOMO_USER_ID')
+                                or os.environ.get('MTN_MOMO_COLLECTION_USER_ID_USD', '')),
+                    'api_secret': (os.environ.get('MTN_MOMO_API_SECRET_LRD') or os.environ.get('MTN_MOMO_API_SECRET')
+                                   or os.environ.get('MTN_MOMO_COLLECTION_API_SECRET_USD', '')),
+                },
+                'disbursement': {
+                    'user_id': (os.environ.get('MTN_MOMO_USER_ID_LRD') or os.environ.get('MTN_MOMO_USER_ID')
+                                or os.environ.get('MTN_MOMO_USER_ID_USD', '')),
+                    'api_secret': (os.environ.get('MTN_MOMO_API_SECRET_LRD') or os.environ.get('MTN_MOMO_API_SECRET')
+                                   or os.environ.get('MTN_MOMO_API_SECRET_USD', '')),
+                },
             },
             'USD': {
-                'user_id': os.environ.get('MTN_MOMO_USER_ID_USD', ''),
-                'api_secret': os.environ.get('MTN_MOMO_API_SECRET_USD', ''),
+                # Dedicated Collection-only API user (FRI:42130073/MM),
+                # provisioned by MTN after the original USD account turned
+                # out to be Disbursement-only.
+                'collection': {
+                    'user_id': os.environ.get('MTN_MOMO_COLLECTION_USER_ID_USD', ''),
+                    'api_secret': os.environ.get('MTN_MOMO_COLLECTION_API_SECRET_USD', ''),
+                },
+                # Original USD API user — Disbursement-only. Used for host/
+                # agent/employee payouts, never for customer requesttopay.
+                'disbursement': {
+                    'user_id': os.environ.get('MTN_MOMO_USER_ID_USD', ''),
+                    'api_secret': os.environ.get('MTN_MOMO_API_SECRET_USD', ''),
+                },
             },
             # MTN's sandbox is one shared test environment with no LRD/USD
-            # split — also falls back to the un-suffixed vars.
+            # or Collection/Disbursement split — also falls back to the
+            # un-suffixed vars for both products.
             'SANDBOX': {
-                'user_id': os.environ.get('MTN_MOMO_USER_ID_SANDBOX', os.environ.get('MTN_MOMO_USER_ID', '')),
-                'api_secret': os.environ.get('MTN_MOMO_API_SECRET_SANDBOX', os.environ.get('MTN_MOMO_API_SECRET', '')),
+                'collection': {
+                    'user_id': os.environ.get('MTN_MOMO_USER_ID_SANDBOX', os.environ.get('MTN_MOMO_USER_ID', '')),
+                    'api_secret': os.environ.get('MTN_MOMO_API_SECRET_SANDBOX', os.environ.get('MTN_MOMO_API_SECRET', '')),
+                },
+                'disbursement': {
+                    'user_id': os.environ.get('MTN_MOMO_USER_ID_SANDBOX', os.environ.get('MTN_MOMO_USER_ID', '')),
+                    'api_secret': os.environ.get('MTN_MOMO_API_SECRET_SANDBOX', os.environ.get('MTN_MOMO_API_SECRET', '')),
+                },
             },
         },
     },

@@ -19,7 +19,9 @@ const statusColor: Record<string, string> = {
 
 const ACTION_LABELS: Record<string, string> = {
   'payment.refund': 'Refund payment',
+  'stripe_refund': 'Refund payment (Stripe)',
   'user.suspend': 'Suspend user',
+  'user.hard_delete': 'Permanently delete user',
 };
 
 function ApprovalCard({ approval, onDecided }: { approval: PendingApproval; onDecided: () => void }) {

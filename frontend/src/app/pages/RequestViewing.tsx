@@ -8,6 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { formatCurrency, formatDate } from '../../core/utils';
 import { toast } from 'sonner';
 import type { PaymentMethod, Property, ViewingAppointment } from '../../core/types';
@@ -53,8 +54,27 @@ function ViewingForm() {
   const [viewing, setViewing] = useState<ViewingAppointment | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [momoCurrency, setMomoCurrency] = useState<'USD' | 'LRD'>('USD');
+  const [currencies, setCurrencies] = useState<{ code: string; symbol: string; exchange_rate_to_usd: string }[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [momoStatus, setMomoStatus] = useState<'idle' | 'awaiting'>('idle');
+
+  useEffect(() => {
+    paymentAPI.getCurrencies().then(setCurrencies).catch(() => setCurrencies([]));
+  }, []);
+
+  // Same approach as CompletePayment: when paying via MTN MoMo in a non-USD
+  // currency, the actual "what you're about to pay" figures switch to the
+  // converted amount instead of a USD number with an easy-to-miss footnote.
+  const payingInAlt = paymentMethod === 'mtn_momo' && momoCurrency !== 'USD';
+  const altCurrency = payingInAlt ? currencies.find((c) => c.code === momoCurrency) : undefined;
+  const displayFee = (usdAmount: number): string => {
+    if (altCurrency) {
+      const converted = Math.round(usdAmount * parseFloat(altCurrency.exchange_rate_to_usd));
+      return `${altCurrency.symbol}${converted.toLocaleString()}`;
+    }
+    return formatCurrency(usdAmount);
+  };
 
   useEffect(() => {
     if (!property) {
@@ -131,7 +151,7 @@ function ViewingForm() {
         return;
       }
 
-      const payment = await paymentAPI.initiateViewingMomoPayment(viewing.id, phoneNumber);
+      const payment = await paymentAPI.initiateViewingMomoPayment(viewing.id, phoneNumber, momoCurrency);
       const paymentId = payment?.id || payment?.payment?.id;
       if (!paymentId) {
         toast.error('Could not start MoMo payment. Please try again.');
@@ -298,6 +318,26 @@ function ViewingForm() {
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone number</Label>
                   <Input id="phone" placeholder="0880123456" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+
+                  {currencies.length > 1 && (
+                    <>
+                      <Label htmlFor="momo-currency">Pay in</Label>
+                      <Select value={momoCurrency} onValueChange={(v) => setMomoCurrency(v as 'USD' | 'LRD')}>
+                        <SelectTrigger id="momo-currency"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {currencies.map((c) => (
+                            <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {payingInAlt && altCurrency && (
+                        <p className="text-xs text-muted-foreground">
+                          Priced at {formatCurrency(viewing.viewingFee)} USD, converted to {altCurrency.code} at today's rate.
+                        </p>
+                      )}
+                    </>
+                  )}
+
                   <p className="text-xs text-muted-foreground">MTN Mobile Money charges a 2% transaction fee on top of the amount above.</p>
                 </div>
               )}
@@ -319,7 +359,7 @@ function ViewingForm() {
               </div>
 
               <Button onClick={handlePay} disabled={isProcessing || momoStatus === 'awaiting'} className="w-full" size="lg">
-                {momoStatus === 'awaiting' ? 'Waiting for MoMo approval…' : isProcessing ? 'Processing…' : `Pay ${formatCurrency(viewing.viewingFee)} viewing fee`}
+                {momoStatus === 'awaiting' ? 'Waiting for MoMo approval…' : isProcessing ? 'Processing…' : `Pay ${displayFee(viewing.viewingFee)} viewing fee`}
               </Button>
             </div>
           )}

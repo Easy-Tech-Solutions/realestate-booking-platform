@@ -28,4 +28,10 @@ export interface GenericAdminConfig<T extends { id: number }> {
   searchPlaceholder?: string;
   defaultOrdering?: string;
   confirmDeleteLabel?: (row: T) => string;
+  // View-only: hides New/Edit/Delete/bulk-select entirely. Must match the
+  // backend ModelConfig's `read_only=True` for this model_key — this flag
+  // only controls whether the UI *offers* mutation, the backend is what
+  // actually enforces it (a read-only page pointed at a mutable backend
+  // registration would just be misleading, not actually safe).
+  readOnly?: boolean;
 }

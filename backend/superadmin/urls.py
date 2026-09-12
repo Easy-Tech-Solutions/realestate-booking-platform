@@ -13,4 +13,12 @@ urlpatterns = [
     path('audit-log/', views.audit_log_list, name='superadmin_audit_log'),
     path('impersonate/<int:user_id>/start/', views.impersonate_start, name='superadmin_impersonate_start'),
     path('impersonate/stop/', views.impersonate_stop, name='superadmin_impersonate_stop'),
+
+    path('staff/', views.admin_staff_list, name='superadmin_staff_list'),
+    path('staff/<int:pk>/', views.admin_staff_detail, name='superadmin_staff_detail'),
+    path('staff/me/', views.staff_me, name='superadmin_staff_me'),
+    path('staff/me/education/', views.staff_me_education, name='superadmin_staff_me_education'),
+    path('staff/me/education/<int:pk>/', views.staff_me_education_detail, name='superadmin_staff_me_education_detail'),
+    path('staff/me/legal/', views.staff_me_legal, name='superadmin_staff_me_legal'),
+    path('staff/me/legal/<int:pk>/', views.staff_me_legal_detail, name='superadmin_staff_me_legal_detail'),
 ]

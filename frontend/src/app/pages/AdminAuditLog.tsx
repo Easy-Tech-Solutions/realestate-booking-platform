@@ -18,6 +18,9 @@ export function AdminAuditLog() {
   const [pageSize, setPageSize] = useState(50);
   const [actionFilter, setActionFilter] = useState('');
   const [targetTypeFilter, setTargetTypeFilter] = useState('');
+  const [actorFilter, setActorFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const load = async (p = page) => {
     setLoading(true);
@@ -26,6 +29,9 @@ export function AdminAuditLog() {
         page: p,
         action: actionFilter || undefined,
         target_type: targetTypeFilter || undefined,
+        actor: actorFilter || undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
       });
       setEntries(data.results);
       setCount(data.count);
@@ -61,6 +67,18 @@ export function AdminAuditLog() {
           <div>
             <label className="text-xs text-muted-foreground">Target type</label>
             <Input value={targetTypeFilter} onChange={(e) => setTargetTypeFilter(e.target.value)} placeholder="e.g. user" className="w-40" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Actor user ID</label>
+            <Input value={actorFilter} onChange={(e) => setActorFilter(e.target.value)} placeholder="e.g. 42" className="w-28" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">From date</label>
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">To date</label>
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" />
           </div>
           <Button size="sm" onClick={() => load(1)}>Apply</Button>
         </CardContent>

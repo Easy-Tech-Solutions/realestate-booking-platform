@@ -220,4 +220,20 @@ class TaxRateSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaxRate
         fields = ['id', 'jurisdiction', 'rate_percent', 'is_active', 'created_by', 'created_by_username', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_by', 'created_by_username', 'created_at', 'updated_at']  
+        read_only_fields = ['id', 'created_by', 'created_by_username', 'created_at', 'updated_at']
+
+
+class CurrencySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Currency
+        fields = ['id', 'code', 'name', 'symbol', 'exchange_rate_to_usd', 'is_active', 'created_at', 'updated_at']
+        # `code` identifies which real-world currency this is (and which MTN
+        # wire-format branch it maps to in mtn_momo.py) — never editable via
+        # this API. Everything else (display name/symbol, and critically the
+        # conversion rate a non-USD payment uses) is superadmin-settable.
+        read_only_fields = ['id', 'code', 'created_at', 'updated_at']
+
+    def validate_exchange_rate_to_usd(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('Exchange rate must be greater than zero.')
+        return value  

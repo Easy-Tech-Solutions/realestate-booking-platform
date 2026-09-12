@@ -81,4 +81,22 @@ export const bookingsAPI = {
       body: JSON.stringify({ new_deadline: newDeadline, reason }),
     });
   },
+
+  // Admin: every booking, paginated + filterable — unlike the dashboard stats
+  // endpoint's `recent_bookings`, which is hard-capped at 10.
+  adminList: async (params: { status?: string; search?: string; limit?: number; offset?: number } = {}): Promise<{
+    count: number; limit: number; offset: number;
+    results: Array<{
+      id: number; customer_username: string; listing_title: string;
+      start_date: string; end_date: string; total_price: string; status: string;
+    }>;
+  }> => {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set('status', params.status);
+    if (params.search) qs.set('search', params.search);
+    if (params.limit != null) qs.set('limit', String(params.limit));
+    if (params.offset != null) qs.set('offset', String(params.offset));
+    const suffix = qs.toString();
+    return fetchWithAuth(`/api/bookings/admin/list/${suffix ? `?${suffix}` : ''}`);
+  },
 };

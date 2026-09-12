@@ -40,16 +40,26 @@ export function AdminReports() {
   const [draftNotes, setDraftNotes] = useState<Record<number, string>>({});
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [count, setCount] = useState(0);
+  const LIMIT = 20;
 
-  const loadData = async () => {
+  const loadData = async (targetOffset = offset) => {
     setLoading(true);
     try {
       const [statsRes, listRes] = await Promise.all([
         reportsAPI.adminStats(),
-        reportsAPI.listAdmin(),
+        reportsAPI.listAdmin({
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          limit: LIMIT,
+          offset: targetOffset,
+        }),
       ]);
       setStats(statsRes);
       setReports(listRes.results || []);
+      setCount(listRes.count ?? 0);
+      setOffset(targetOffset);
+      setSelected(new Set());
     } catch (err: any) {
       toast.error(err?.message || 'Failed to load reports');
     } finally {
@@ -58,8 +68,9 @@ export function AdminReports() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
 
   const updateStatus = async (report: AdminReport) => {
     const nextStatus = draftStatus[report.id];
@@ -90,9 +101,7 @@ export function AdminReports() {
     }
   };
 
-  const visibleReports = statusFilter === 'all'
-    ? reports
-    : reports.filter(r => r.status === statusFilter);
+  const visibleReports = reports;
 
   const toggleOne = (id: number) => {
     setSelected((prev) => {
@@ -260,6 +269,21 @@ export function AdminReports() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+            {count > 0 && (
+              <div className="flex items-center justify-between gap-2 pt-4">
+                <p className="text-sm text-muted-foreground">
+                  {count} report{count === 1 ? '' : 's'} · showing {offset + 1}-{Math.min(offset + LIMIT, count)}
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" disabled={loading || offset <= 0} onClick={() => loadData(Math.max(0, offset - LIMIT))}>
+                    Previous
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={loading || offset + LIMIT >= count} onClick={() => loadData(offset + LIMIT)}>
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

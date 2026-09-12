@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Building2, Sparkles, RadioTower, ShieldAlert, Search } from 'lucide-react';
+import { ArrowLeft, Building2, Sparkles, RadioTower, ShieldAlert, Search, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { inventoryAPI } from '../../services/api/inventory';
 import type { ListingFlag, InventoryListing } from '../../services/api/inventory';
+import { propertiesAPI } from '../../services/api.service';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -83,6 +84,54 @@ function ListingFlagCard({ flag, onDecided }: { flag: ListingFlag; onDecided: ()
           <Button size="sm" variant="destructive" disabled={busy} onClick={() => decide('confirmed')}>Confirm violation</Button>
           <Button size="sm" variant="outline" disabled={busy} onClick={() => decide('dismissed')}>Dismiss</Button>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CreateManualFlagForm({ onCreated }: { onCreated: () => void }) {
+  const [listingId, setListingId] = useState('');
+  const [details, setDetails] = useState('');
+  const [severity, setSeverity] = useState<'low' | 'medium' | 'high'>('medium');
+  const [busy, setBusy] = useState(false);
+
+  const create = async () => {
+    const id = Number(listingId);
+    if (!id || !details.trim()) {
+      toast.error('Listing ID and details are required.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await inventoryAPI.createManualFlag(id, details.trim(), severity);
+      setListingId('');
+      setDetails('');
+      toast.success('Manual listing flag created.');
+      onCreated();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to create flag'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-base">Create manual flag</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid sm:grid-cols-[140px,1fr,140px] gap-2">
+          <Input placeholder="Listing ID" value={listingId} onChange={(e) => setListingId(e.target.value)} />
+          <Input placeholder="Details" value={details} onChange={(e) => setDetails(e.target.value)} />
+          <Select value={severity} onValueChange={(v) => setSeverity(v as typeof severity)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button size="sm" disabled={busy} onClick={create}>Create flag</Button>
       </CardContent>
     </Card>
   );
@@ -177,6 +226,95 @@ function ComplianceDialog({ listing, onDone }: { listing: InventoryListing; onDo
   );
 }
 
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function AdminBulkListingsSection() {
+  const [ownerId, setOwnerId] = useState('');
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTemplate = async () => {
+    try {
+      downloadBlob(await propertiesAPI.bulkDownloadTemplate(), 'homekonet-listings-template.xlsx');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to download template'));
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      downloadBlob(await propertiesAPI.bulkExport(ownerId.trim() || undefined), 'homekonet-listings-export.xlsx');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to export listings'));
+    }
+  };
+
+  const handleImportFile = async (file: File) => {
+    setImporting(true);
+    try {
+      const result = await propertiesAPI.bulkImport(file);
+      if (result.row_errors.length === 0) {
+        toast.success(`${result.created_count} listing(s) imported.`);
+      } else {
+        toast.warning(
+          `${result.created_count} listing(s) imported, ${result.row_errors.length} row(s) failed — ` +
+          result.row_errors.slice(0, 3).map((e) => `row ${e.row}: ${JSON.stringify(e.errors)}`).join('; ')
+        );
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Import failed'));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold flex items-center gap-2"><Upload className="h-4 w-4" /> Bulk import/export</h2>
+      <p className="text-xs text-muted-foreground max-w-2xl">
+        Import/export any owner's listings via XLSX (requires users.staff_management or full admin —
+        see listings/bulk.py for the exact format). Imported listings land as Pending Review, same as
+        one created through the normal wizard — no photos, no shortcut around ownership verification.
+      </p>
+      <Card>
+        <CardContent className="p-4 flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Owner ID (export only, blank = everyone)</label>
+            <Input className="w-40" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} placeholder="e.g. 42" />
+          </div>
+          <Button variant="outline" size="sm" onClick={handleTemplate}>
+            <Download className="h-3.5 w-3.5 mr-1" /> Template
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="h-3.5 w-3.5 mr-1" /> Export
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImportFile(file);
+              e.target.value = '';
+            }}
+          />
+          <Button variant="outline" size="sm" disabled={importing} onClick={() => fileInputRef.current?.click()}>
+            <Upload className="h-3.5 w-3.5 mr-1" /> {importing ? 'Importing…' : 'Import (with owner_email column)'}
+          </Button>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
 export function AdminListingModeration() {
   const navigate = useNavigate();
 
@@ -195,6 +333,9 @@ export function AdminListingModeration() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkReason, setBulkReason] = useState('');
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [page, setPage] = useState(1);
+  const [listingsCount, setListingsCount] = useState(0);
+  const PAGE_SIZE = 25;
 
   const loadFlags = async (status = flagsStatusFilter) => {
     setFlagsLoading(true);
@@ -208,15 +349,17 @@ export function AdminListingModeration() {
     }
   };
 
-  const loadListings = async () => {
+  const loadListings = async (targetPage = page) => {
     setListingsLoading(true);
     try {
-      const page = await inventoryAPI.searchListings({
+      const result = await inventoryAPI.searchListings({
         status: statusFilter === 'all' ? undefined : statusFilter,
         search: search.trim() || undefined,
         flaggedOnly,
+        page: targetPage,
       });
-      setListings(page.results);
+      setListings(result.results);
+      setListingsCount(result.count);
       setListingsError(null);
     } catch (err) {
       setListingsError(getErrorMessage(err, 'You do not have Inventory & Listings access.'));
@@ -226,7 +369,15 @@ export function AdminListingModeration() {
   };
 
   useEffect(() => { loadFlags(flagsStatusFilter); }, [flagsStatusFilter]);
-  useEffect(() => { loadListings(); }, [statusFilter, flaggedOnly]);
+  useEffect(() => { setPage(1); setSelected(new Set()); loadListings(1); }, [statusFilter, flaggedOnly]);
+
+  const goToPage = (p: number) => {
+    setPage(p);
+    setSelected(new Set());
+    loadListings(p);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(listingsCount / PAGE_SIZE));
 
   const runScan = async () => {
     setScanning(true);
@@ -306,6 +457,8 @@ export function AdminListingModeration() {
         <h1 className="text-2xl font-semibold flex items-center gap-2"><Building2 className="h-5 w-5" /> Inventory & Listing Moderation</h1>
       </div>
 
+      <AdminBulkListingsSection />
+
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold flex items-center gap-2"><ShieldAlert className="h-4 w-4" /> Listing flags</h2>
@@ -341,6 +494,7 @@ export function AdminListingModeration() {
             {flags.map((f) => <ListingFlagCard key={f.id} flag={f} onDecided={() => loadFlags()} />)}
           </div>
         )}
+        <CreateManualFlagForm onCreated={() => loadFlags()} />
       </section>
 
       <section className="space-y-4">
@@ -353,10 +507,10 @@ export function AdminListingModeration() {
               className="pl-10 w-64"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') loadListings(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') goToPage(1); }}
             />
           </div>
-          <Button variant="outline" size="sm" onClick={loadListings}>Search</Button>
+          <Button variant="outline" size="sm" onClick={() => goToPage(1)}>Search</Button>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -392,7 +546,11 @@ export function AdminListingModeration() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-10">
-                      <Checkbox checked={listings.length > 0 && selected.size === listings.length} onCheckedChange={toggleAll} />
+                      <Checkbox
+                        checked={listings.length > 0 && selected.size === listings.length}
+                        onCheckedChange={toggleAll}
+                        title="Select all on this page"
+                      />
                     </TableHead>
                     <TableHead>Listing</TableHead>
                     <TableHead>Host</TableHead>
@@ -445,6 +603,21 @@ export function AdminListingModeration() {
                 </TableBody>
               </Table>
             </div>
+            {listingsCount > 0 && (
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border">
+                <p className="text-sm text-muted-foreground">
+                  {listingsCount} listing{listingsCount === 1 ? '' : 's'} · page {page} of {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" disabled={listingsLoading || page <= 1} onClick={() => goToPage(page - 1)}>
+                    Previous
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={listingsLoading || page >= totalPages} onClick={() => goToPage(page + 1)}>
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>

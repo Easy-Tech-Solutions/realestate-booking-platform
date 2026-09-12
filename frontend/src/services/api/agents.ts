@@ -65,4 +65,17 @@ export const agentsAPI = {
   listProperty: async (formData: FormData): Promise<unknown> => {
     return fetchWithAuth('/api/agents/list-property/', { method: 'POST', body: formData });
   },
+
+  /** Agent applications awaiting review at any stage the caller is a reviewer for. */
+  reviewQueue: async (): Promise<AgentApplication[]> => {
+    return fetchWithAuth<AgentApplication[]>('/api/agents/applications/review-queue/');
+  },
+
+  /** Approve or decline at whichever stage this application is currently awaiting. */
+  review: async (id: number, approve: boolean, reason = ''): Promise<AgentApplication> => {
+    return fetchWithAuth<AgentApplication>(`/api/agents/applications/${id}/review/`, {
+      method: 'POST',
+      body: JSON.stringify({ approve, reason }),
+    });
+  },
 };

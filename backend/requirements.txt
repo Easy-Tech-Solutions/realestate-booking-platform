@@ -24,3 +24,4 @@ qrcode[pil]>=7.4,<8.0
 llama-cpp-python>=0.3,<0.4
 psutil>=5.9
 weasyprint>=60,<66
+openpyxl>=3.1,<4.0

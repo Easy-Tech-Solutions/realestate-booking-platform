@@ -354,6 +354,15 @@ def log_viewer(request):
                 if search not in haystack:
                     continue
 
+            # Cap long fields (a full stack trace can be tens of KB) so one
+            # noisy entry doesn't balloon the whole page's response size.
+            MAX_FIELD_LEN = 4000
+            for field in ('msg', 'raw', 'exception'):
+                value = entry.get(field)
+                if isinstance(value, str) and len(value) > MAX_FIELD_LEN:
+                    entry[field] = value[:MAX_FIELD_LEN]
+                    entry['truncated'] = True
+
             entries.append(entry)
             if len(entries) >= limit:
                 break

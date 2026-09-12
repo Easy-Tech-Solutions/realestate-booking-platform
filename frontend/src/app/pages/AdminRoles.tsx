@@ -9,6 +9,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
+import { UserAutocomplete } from '../components/UserAutocomplete';
 import { getErrorMessage } from '../../services/api/shared/errors';
 
 function CreateRoleForm({ onCreated }: { onCreated: () => void }) {
@@ -130,6 +131,8 @@ function AssignRolePanel({ roles }: { roles: Role[] }) {
     }
   };
 
+  useEffect(() => { load(); }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const assign = async () => {
     if (!userId.trim() || !roleId) {
       toast.error('User ID and role are required.');
@@ -162,13 +165,12 @@ function AssignRolePanel({ roles }: { roles: Role[] }) {
       <CardHeader><CardTitle>Assign a role to a user</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap gap-2">
-          <Input placeholder="User ID" className="w-28" value={userId} onChange={(e) => setUserId(e.target.value)} onBlur={load} />
+          <UserAutocomplete value={userId} onChange={setUserId} className="w-64" />
           <select className="text-sm border border-border rounded-lg px-2 bg-background" value={roleId} onChange={(e) => setRoleId(e.target.value)} title="Role">
             <option value="">Select a role…</option>
             {roles.filter((r) => r.slug !== 'superadmin').map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
           <Button size="sm" disabled={busy} onClick={assign}>Assign</Button>
-          <Button size="sm" variant="outline" onClick={load}>Look up user's roles</Button>
         </div>
         {assignments.length > 0 && (
           <div className="space-y-1.5">

@@ -489,6 +489,13 @@ def admin_bulk_user_action(request):
             elif action == 'hard_delete':
                 if is_full_admin(target):
                     raise ValueError('Cannot delete a superadmin account.')
+                protected = _protected_record_counts(target)
+                if protected:
+                    raise ValueError(
+                        'Has related records (bookings/payments/listings/etc.) — bulk hard delete only '
+                        'covers accounts with zero history. Use the single-user hard delete action instead, '
+                        'which supports force=true plus second-admin dual-authorization.'
+                    )
                 target.delete()
             elif action == 'assign_role':
                 from rbac.models import Role, UserRoleAssignment

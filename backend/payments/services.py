@@ -186,6 +186,42 @@ class PaymentService:
         )
 
     @classmethod
+    def disburse_to_phone(cls, phone_number: str, amount, currency: str, note: str) -> Dict[str, Any]:
+        """
+        Generic MTN MoMo disbursement to any phone number — used by the
+        Finance dashboard's payout / agent-commission / employee-payment
+        "Pay" actions. Always goes through the Disbursement API user (see
+        MTNMoMoGateway._account_for), never Collection.
+        """
+        gateway = cls.get_gateway('mtn_momo')
+        if not gateway:
+            return {'success': False, 'error': 'Payment gateway not available'}
+        if not phone_number:
+            return {'success': False, 'error': 'No MoMo number on file for this recipient.'}
+        return gateway.transfer_to_owner(
+            owner_phone=phone_number,
+            amount=float(amount),
+            currency=currency,
+            booking_ref=note,
+        )
+
+    @classmethod
+    def convert_from_usd(cls, amount_usd: Decimal, currency_code: str) -> Decimal:
+        """
+        Listings/bookings are always priced in USD (see listings pricing) —
+        this converts that USD amount into whatever currency the guest chose
+        to pay in, using the admin-configured Currency.exchange_rate_to_usd.
+        Non-USD amounts are rounded to a whole unit: MTN MoMo's API requires
+        a whole-number amount anyway (see MTNMoMoGateway.process_payment),
+        and LRD has no meaningful sub-unit in practice.
+        """
+        amount_usd = Decimal(str(amount_usd))
+        if currency_code == 'USD':
+            return amount_usd
+        rate = Currency.objects.get(code=currency_code, is_active=True).exchange_rate_to_usd
+        return (amount_usd * rate).quantize(Decimal('1'))
+
+    @classmethod
     def refund_payment(cls, payment: Payment, amount: float, reason: str, reason_code: str = '') -> Dict[str, Any]:
         gateway = cls.get_gateway(payment.gateway.name)
         if not gateway:

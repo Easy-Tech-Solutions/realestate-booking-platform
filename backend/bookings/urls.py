@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     bookings_collection, booking_detail, pending_bookings,
     confirm_booking, decline_booking, admin_confirm_payment,
-    admin_payment_received_bookings, admin_booking_communications, admin_extend_reservation,
+    admin_payment_received_bookings, admin_bookings_list,
+    admin_booking_communications, admin_extend_reservation,
     request_payment, my_payment_requests,
     viewing_slots, viewings_collection, reserve_from_viewing,
     admin_viewings_collection, admin_update_viewing_status,
@@ -20,6 +21,7 @@ urlpatterns = [
     path('<int:id>/decline/', decline_booking, name='decline_booking'),
     path('<int:id>/confirm-payment/', admin_confirm_payment, name='admin_confirm_payment'),
     path('admin/payment-received/', admin_payment_received_bookings, name='admin_payment_received_bookings'),
+    path('admin/list/', admin_bookings_list, name='admin_bookings_list'),
     path('admin/<int:id>/communications/', admin_booking_communications, name='admin_booking_communications'),
     path('admin/<int:id>/extend-reservation/', admin_extend_reservation, name='admin_extend_reservation'),
     path('<int:id>/request-payment/', request_payment, name='request_payment'),

@@ -4,8 +4,10 @@ import { ArrowLeft, ShieldCheck, Sparkles, FileText, ImageIcon } from 'lucide-re
 import { toast } from 'sonner';
 import { hostApplicationsAPI } from '../../services/api/hostApplications';
 import { propertyVerificationsAPI } from '../../services/api/propertyVerifications';
+import { agentsAPI } from '../../services/api/agents';
 import type { HostApplication } from '../../services/api/hostApplications';
 import type { PropertyVerification } from '../../services/api/propertyVerifications';
+import type { AgentApplication } from '../../services/api/agents';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
@@ -116,6 +118,8 @@ function PropertyVerificationCard({ v, onDecided }: { v: PropertyVerification; o
   const [inspectionReport, setInspectionReport] = useState<File | null>(null);
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [ownerAuthConfirmed, setOwnerAuthConfirmed] = useState(v.owner_authorization_confirmed ?? false);
+  const isAgentSourced = v.ownership_type === 'agent';
 
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -140,6 +144,10 @@ function PropertyVerificationCard({ v, onDecided }: { v: PropertyVerification; o
       toast.error('Due diligence must be confirmed and an inspection report uploaded before approving at Compliance.');
       return;
     }
+    if (isCompliance && decision === 'approve' && isAgentSourced && !ownerAuthConfirmed) {
+      toast.error('For agent-sourced properties, you must confirm the owner authorized this agent before approving.');
+      return;
+    }
     setBusy(true);
     try {
       const inspectionData = isCompliance
@@ -148,6 +156,7 @@ function PropertyVerificationCard({ v, onDecided }: { v: PropertyVerification; o
             inspection_report: inspectionReport,
             inspection_latitude: latitude || undefined,
             inspection_longitude: longitude || undefined,
+            ...(isAgentSourced ? { owner_authorization_confirmed: ownerAuthConfirmed } : {}),
           }
         : undefined;
       await propertyVerificationsAPI.review(v.id, decision, notes.trim(), inspectionData);
@@ -166,7 +175,13 @@ function PropertyVerificationCard({ v, onDecided }: { v: PropertyVerification; o
         <div>
           <CardTitle className="text-base">{v.listing_title}</CardTitle>
           <p className="text-sm text-muted-foreground">{v.owner_name} · {v.property_location}</p>
-          <p className="text-sm text-muted-foreground">Deed/volume #: {v.deed_volume_number} · {v.ownership_type === 'owner' ? 'Owner' : 'Non-owner (MOU)'}</p>
+          <p className="text-sm text-muted-foreground">
+            Deed/volume #: {v.deed_volume_number} · {
+              v.ownership_type === 'owner' ? 'Owner'
+              : v.ownership_type === 'agent' ? 'Agent-sourced'
+              : 'Non-owner (MOU)'
+            }
+          </p>
         </div>
         <Badge variant="secondary">{v.status_display}</Badge>
       </CardHeader>
@@ -210,6 +225,18 @@ function PropertyVerificationCard({ v, onDecided }: { v: PropertyVerification; o
               </div>
             </div>
             <Button type="button" size="sm" variant="outline" onClick={useCurrentLocation}>Use my current location</Button>
+            {isAgentSourced && (
+              <div className="flex items-start gap-2 pt-1 border-t border-border">
+                <Checkbox
+                  id={`auth-${v.id}`}
+                  checked={ownerAuthConfirmed}
+                  onCheckedChange={(checked) => setOwnerAuthConfirmed(checked === true)}
+                />
+                <Label htmlFor={`auth-${v.id}`} className="font-normal cursor-pointer">
+                  Owner confirmed (by phone) that they authorized this agent to list the property and the payout number
+                </Label>
+              </div>
+            )}
           </div>
         )}
         <Textarea
@@ -228,22 +255,82 @@ function PropertyVerificationCard({ v, onDecided }: { v: PropertyVerification; o
   );
 }
 
+function AgentApplicationCard({ app, onDecided }: { app: AgentApplication; onDecided: () => void }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const decide = async (approve: boolean) => {
+    if (!approve && !reason.trim()) {
+      toast.error('A reason is required when declining.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await agentsAPI.review(app.id, approve, reason.trim());
+      toast.success(approve ? 'Approved — advanced to the next stage.' : 'Declined.');
+      onDecided();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to record decision'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle className="text-base">{app.full_name}</CardTitle>
+          <p className="text-sm text-muted-foreground">{app.email} · {app.phone}</p>
+          <p className="text-sm text-muted-foreground">{app.address}</p>
+        </div>
+        <Badge variant="secondary">{app.status_display}</Badge>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1"><FileText className="h-3 w-3" /> ID document</p>
+          {app.id_document_url ? (
+            <a href={app.id_document_url} target="_blank" rel="noopener noreferrer">
+              <img src={app.id_document_url} alt="ID document" className="h-32 w-32 rounded-lg object-cover border border-border" />
+            </a>
+          ) : <p className="text-sm text-muted-foreground">Not provided</p>}
+        </div>
+        <Textarea
+          placeholder="Reason (required if declining)"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={2}
+        />
+        <div className="flex gap-2">
+          <Button size="sm" disabled={busy} onClick={() => decide(true)}>Approve</Button>
+          <Button size="sm" variant="destructive" disabled={busy} onClick={() => decide(false)}>Decline</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function AdminKycQueue() {
   const navigate = useNavigate();
   const [apps, setApps] = useState<HostApplication[]>([]);
+  const [agentApps, setAgentApps] = useState<AgentApplication[]>([]);
   const [verifications, setVerifications] = useState<PropertyVerification[]>([]);
   const [loading, setLoading] = useState(true);
   const [appsError, setAppsError] = useState<string | null>(null);
+  const [agentAppsError, setAgentAppsError] = useState<string | null>(null);
   const [verifsError, setVerifsError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
-    const [appsResult, verifsResult] = await Promise.allSettled([
+    const [appsResult, agentAppsResult, verifsResult] = await Promise.allSettled([
       hostApplicationsAPI.reviewQueue(),
+      agentsAPI.reviewQueue(),
       propertyVerificationsAPI.reviewQueue(),
     ]);
     if (appsResult.status === 'fulfilled') { setApps(appsResult.value); setAppsError(null); }
     else setAppsError(getErrorMessage(appsResult.reason, 'You are not a reviewer for this queue.'));
+    if (agentAppsResult.status === 'fulfilled') { setAgentApps(agentAppsResult.value); setAgentAppsError(null); }
+    else setAgentAppsError(getErrorMessage(agentAppsResult.reason, 'You are not a reviewer for this queue.'));
     if (verifsResult.status === 'fulfilled') { setVerifications(verifsResult.value); setVerifsError(null); }
     else setVerifsError(getErrorMessage(verifsResult.reason, 'You are not a reviewer for this queue.'));
     setLoading(false);
@@ -271,6 +358,21 @@ export function AdminKycQueue() {
         ) : (
           <div className="grid lg:grid-cols-2 gap-4">
             {apps.map((app) => <HostApplicationCard key={app.id} app={app} onDecided={load} />)}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Sourcing agent applications</h2>
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : agentAppsError ? (
+          <p className="text-sm text-muted-foreground">{agentAppsError}</p>
+        ) : agentApps.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No agent applications awaiting your review.</p>
+        ) : (
+          <div className="grid lg:grid-cols-2 gap-4">
+            {agentApps.map((app) => <AgentApplicationCard key={app.id} app={app} onDecided={load} />)}
           </div>
         )}
       </section>

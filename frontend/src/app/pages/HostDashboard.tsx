@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
   Calendar,
@@ -20,6 +20,9 @@ import {
   Hotel,
   XCircle,
   FileText,
+  Copy,
+  Upload,
+  Download,
 } from 'lucide-react';
 import { ListingVerificationCell } from '../components/ListingVerificationCell';
 import { LeaseDownloadLink } from '../components/LeaseDownloadLink';
@@ -735,6 +738,67 @@ export function HostDashboard() {
     }
   };
 
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const bulkFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBulkTemplate = async () => {
+    try {
+      downloadBlob(await propertiesAPI.bulkDownloadTemplate(), 'homekonet-listings-template.xlsx');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to download template'));
+    }
+  };
+
+  const handleBulkExport = async () => {
+    try {
+      downloadBlob(await propertiesAPI.bulkExport(), 'homekonet-listings-export.xlsx');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to export listings'));
+    }
+  };
+
+  const handleBulkImportFile = async (file: File) => {
+    setBulkImporting(true);
+    try {
+      const result = await propertiesAPI.bulkImport(file);
+      if (result.created_count > 0) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.me });
+      }
+      if (result.row_errors.length === 0) {
+        toast.success(`${result.created_count} listing(s) imported. Add photos and complete verification on each to publish.`);
+      } else {
+        toast.warning(
+          `${result.created_count} listing(s) imported, ${result.row_errors.length} row(s) failed — ` +
+          result.row_errors.slice(0, 3).map((e) => `row ${e.row}: ${JSON.stringify(e.errors)}`).join('; ')
+        );
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Import failed'));
+    } finally {
+      setBulkImporting(false);
+    }
+  };
+
+  const handleDuplicateProperty = async (property: Property) => {
+    try {
+      const duplicate = await propertiesAPI.duplicate(property.id);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.me });
+      toast.success('Listing duplicated — edit the copy below.');
+      setEditingProperty(duplicate);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to duplicate listing'));
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!selectedMessage || !messageReply.trim()) return;
 
@@ -946,11 +1010,33 @@ export function HostDashboard() {
 
       {/* Published listings */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
           <CardTitle>Your Properties</CardTitle>
-          <Button onClick={() => navigate('/host/new')}>
-            <Plus className="w-4 h-4 mr-2" /> Add new property
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={handleBulkTemplate}>
+              <Download className="w-3.5 h-3.5 mr-1" /> Template
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleBulkExport}>
+              <Download className="w-3.5 h-3.5 mr-1" /> Export
+            </Button>
+            <input
+              ref={bulkFileInputRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleBulkImportFile(file);
+                e.target.value = '';
+              }}
+            />
+            <Button variant="outline" size="sm" disabled={bulkImporting} onClick={() => bulkFileInputRef.current?.click()}>
+              <Upload className="w-3.5 h-3.5 mr-1" /> {bulkImporting ? 'Importing…' : 'Bulk import'}
+            </Button>
+            <Button onClick={() => navigate('/host/new')}>
+              <Plus className="w-4 h-4 mr-2" /> Add new property
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -1005,6 +1091,9 @@ export function HostDashboard() {
                   )}
                   <Button variant="outline" size="sm" onClick={() => navigate(`/rooms/${property.id}`)}>
                     <Eye className="w-3 h-3 mr-1" /> View
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleDuplicateProperty(property)}>
+                    <Copy className="w-3 h-3 mr-1" /> Duplicate
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

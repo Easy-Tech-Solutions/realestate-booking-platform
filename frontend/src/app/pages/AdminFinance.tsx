@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, DollarSign, Download, ScrollText, Lock, Unlock } from 'lucide-react';
+import { ArrowLeft, DollarSign, Download, ScrollText, Lock, Unlock, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { paymentAPI, REFUND_REASON_OPTIONS } from '../../services/api/payments';
-import type { EscrowBooking, TaxRate, TaxReportBucket, RefundReasonCode } from '../../services/api/payments';
+import type { EscrowBooking, TaxRate, TaxReportBucket, RefundReasonCode, AdminCurrency } from '../../services/api/payments';
 import { bookingsAPI } from '../../services/api/bookings';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -315,6 +315,121 @@ function TaxRatesSection() {
   );
 }
 
+function CurrencyRatesSection() {
+  const [currencies, setCurrencies] = useState<AdminCurrency[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [rateDrafts, setRateDrafts] = useState<Record<number, string>>({});
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await paymentAPI.adminListCurrencies();
+      setCurrencies(data);
+      setRateDrafts(Object.fromEntries(data.map((c) => [c.id, c.exchange_rate_to_usd])));
+      setError(null);
+    } catch (err) {
+      setError(getErrorMessage(err, 'You do not have finances.currencies access.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const saveRate = async (currency: AdminCurrency) => {
+    const rate = parseFloat(rateDrafts[currency.id]);
+    if (!rate || rate <= 0) {
+      toast.error('Exchange rate must be a positive number.');
+      return;
+    }
+    setBusyId(currency.id);
+    try {
+      await paymentAPI.adminUpdateCurrency(currency.id, { exchange_rate_to_usd: String(rate) });
+      toast.success(`${currency.code} rate updated.`);
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to update rate'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const toggleActive = async (currency: AdminCurrency) => {
+    try {
+      await paymentAPI.adminUpdateCurrency(currency.id, { is_active: !currency.is_active });
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to update currency'));
+    }
+  };
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-lg font-semibold">Currency exchange rates</h2>
+      <p className="text-xs text-muted-foreground">
+        USD is always the base — every listing/viewing fee is priced in USD. The rate below is what
+        converts that USD amount into the currency at MTN MoMo checkout when a guest chooses to pay
+        in something other than USD. Only active currencies show up as a payment option; USD itself
+        can't be deactivated.
+      </p>
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : error ? (
+        <p className="text-sm text-muted-foreground">{error}</p>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Currency</TableHead>
+                    <TableHead>1 USD =</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currencies.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell>{c.name} ({c.code})</TableCell>
+                      <TableCell>
+                        {c.code === 'USD' ? (
+                          <span className="text-sm text-muted-foreground">1.0000 (fixed)</span>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              className="w-28 h-8"
+                              value={rateDrafts[c.id] ?? ''}
+                              onChange={(e) => setRateDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                            />
+                            <span className="text-sm text-muted-foreground">{c.code}</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell><Badge className={c.is_active ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-600'}>{c.is_active ? 'active' : 'inactive'}</Badge></TableCell>
+                      <TableCell>
+                        {c.code !== 'USD' && (
+                          <div className="flex gap-2">
+                            <Button size="sm" disabled={busyId === c.id} onClick={() => saveRate(c)}>Save rate</Button>
+                            <Button size="sm" variant="ghost" onClick={() => toggleActive(c)}>{c.is_active ? 'Deactivate' : 'Activate'}</Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </section>
+  );
+}
+
 function StripeRefundSection() {
   const [bookingId, setBookingId] = useState('');
   const [amount, setAmount] = useState('');
@@ -493,9 +608,14 @@ export function AdminFinance() {
           </Button>
           <h1 className="text-2xl font-semibold flex items-center gap-2"><DollarSign className="h-5 w-5" /> Finance & Legal Center</h1>
         </div>
-        <Button variant="outline" onClick={() => navigate('/management/legal-documents')}>
-          <ScrollText className="h-3.5 w-3.5 mr-1" /> Legal Documents
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/management/payments')}>
+            <Wallet className="h-3.5 w-3.5 mr-1" /> Payments
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/management/legal-documents')}>
+            <ScrollText className="h-3.5 w-3.5 mr-1" /> Legal Documents
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -583,6 +703,7 @@ export function AdminFinance() {
           <ExtendReservationSection />
           <EscrowSection />
           <TaxRatesSection />
+          <CurrencyRatesSection />
         </>
       )}
     </div>

@@ -27,4 +27,10 @@ export const payoutsAPI = {
     });
     return normalizePayout(data);
   },
+
+  // Admin: pay a pending payout via a live MTN MoMo disbursement.
+  adminDisburse: async (id: string): Promise<Payout> => {
+    const data = await fetchWithAuth(`/api/payments/admin/payouts/${id}/disburse/`, { method: 'POST' });
+    return normalizePayout(data);
+  },
 };

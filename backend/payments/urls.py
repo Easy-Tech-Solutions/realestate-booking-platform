@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('currencies/', views.currencies_list, name='currencies_list'),
     path('initiate/', views.initiate_payment, name='initiate_payment'),
     path('viewing/initiate/', views.initiate_viewing_payment, name='initiate_viewing_payment'),
     path('verify/', views.verify_payment, name='verify_payment'),
@@ -10,6 +11,13 @@ urlpatterns = [
     path('admin/payouts/', views.admin_payouts, name='admin_payouts'),
     path('admin/payouts/<uuid:payout_id>/mark-paid/', views.admin_mark_payout_paid, name='admin_mark_payout_paid'),
     path('admin/payouts/<uuid:payout_id>/cancel/', views.admin_cancel_payout, name='admin_cancel_payout'),
+    path('admin/payouts/<uuid:payout_id>/disburse/', views.admin_disburse_payout, name='admin_disburse_payout'),
+    path('admin/agent-commissions/', views.admin_agent_commissions, name='admin_agent_commissions'),
+    path('admin/agent-commissions/<int:commission_id>/disburse/', views.admin_disburse_agent_commission, name='admin_disburse_agent_commission'),
+    path('admin/employees/', views.admin_employees, name='admin_employees'),
+    path('admin/employees/<int:employee_id>/', views.admin_employee_detail, name='admin_employee_detail'),
+    path('admin/employees/<int:employee_id>/pay/', views.admin_pay_employee, name='admin_pay_employee'),
+    path('admin/employee-payments/', views.admin_employee_payments, name='admin_employee_payments'),
     path('admin/refund/', views.admin_refund_payment, name='admin_refund_payment'),
     path('admin/stripe-refund/', views.admin_stripe_refund, name='admin_stripe_refund'),
     path('admin/platform-fee/', views.admin_platform_fee, name='admin_platform_fee'),
@@ -21,6 +29,8 @@ urlpatterns = [
     path('admin/escrow/<int:hold_id>/release/', views.admin_escrow_release, name='admin_escrow_release'),
     path('admin/tax-rates/', views.admin_tax_rates, name='admin_tax_rates'),
     path('admin/tax-rates/<int:pk>/', views.admin_tax_rate_detail, name='admin_tax_rate_detail'),
+    path('admin/currencies/', views.admin_currencies, name='admin_currencies'),
+    path('admin/currencies/<int:pk>/', views.admin_currency_detail, name='admin_currency_detail'),
     path('admin/tax-report/', views.admin_tax_report, name='admin_tax_report'),
     path('<uuid:payment_id>/', views.payment_detail, name='payment_detail'),
     path('webhooks/mtn_momo/', views.mtn_momo_webhook, name='mtn_momo_webhook'),

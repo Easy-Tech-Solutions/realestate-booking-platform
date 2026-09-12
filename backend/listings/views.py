@@ -1139,3 +1139,140 @@ def reject_listing(request, id):
     except Exception:
         pass
     return Response({"status": "rejected", "reason": reason})
+
+
+# ── Bulk import/export (XLSX) ───────────────────────────────────────────────
+
+_MAX_IMPORT_BYTES = 5 * 1024 * 1024  # 5 MB — a spreadsheet, not a media file
+
+
+def _xlsx_response(workbook, filename):
+    from django.http import HttpResponse
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    workbook.save(response)
+    return response
+
+
+@api_view(["GET"])
+def bulk_template(request):
+    """Download a blank XLSX template for bulk-importing listings."""
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    from .bulk import build_template_workbook
+    return _xlsx_response(build_template_workbook(), 'homekonet-listings-template.xlsx')
+
+
+@api_view(["GET"])
+def bulk_export(request):
+    """
+    Export listings to XLSX — a host gets their own; an admin can pass
+    ?owner_id=<id> for one owner's listings, or omit it for everyone's
+    (capped at 1000 rows so an unfiltered export can't hang the request).
+    """
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    from .bulk import build_export_workbook
+
+    owner_id = request.query_params.get('owner_id')
+    if _is_admin(request.user, 'listings.bulk_import'):
+        qs = Listing.objects.filter(deleted_at__isnull=True)
+        if owner_id:
+            qs = qs.filter(owner_id=owner_id)
+    else:
+        qs = Listing.objects.filter(owner=request.user, deleted_at__isnull=True)
+
+    qs = qs.select_related('owner').order_by('-created_at')[:1000]
+    return _xlsx_response(build_export_workbook(qs), 'homekonet-listings-export.xlsx')
+
+
+@api_view(["POST"])
+@parser_classes([MultiPartParser, FormParser])
+def bulk_import(request):
+    """
+    Bulk-create listings from an uploaded XLSX workbook (see listings/bulk.py
+    for the exact format). Creates brand-new listings only — never updates
+    existing ones. Valid rows import even if others in the same file fail;
+    the response lists per-row errors so a partial success is still useful.
+    """
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    upload = request.FILES.get('file')
+    if not upload:
+        return Response({"error": "No file uploaded (expected form field 'file')."}, status=status.HTTP_400_BAD_REQUEST)
+    if upload.size > _MAX_IMPORT_BYTES:
+        return Response({"error": "File is too large. Maximum allowed is 5 MB."}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+    if not upload.name.lower().endswith('.xlsx'):
+        return Response({"error": "Please upload the .xlsx template file."}, status=status.HTTP_400_BAD_REQUEST)
+
+    is_admin = _is_admin(request.user, 'listings.bulk_import')
+
+    from .bulk import import_workbook
+    try:
+        created_listings, row_errors = import_workbook(upload, request.user, is_admin)
+    except KeyError:
+        return Response(
+            {"error": "This file is missing the expected 'Listings' sheet — did you edit the downloaded template?"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    except Exception as e:
+        return Response({"error": f"Could not read this file: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if created_listings:
+        log_admin_action(
+            request, 'listings.bulk_import',
+            reason=f'{len(created_listings)} listing(s) imported, {len(row_errors)} row error(s)',
+        )
+
+    return Response({
+        "created_count": len(created_listings),
+        "created_listing_ids": [l.id for l in created_listings],
+        "row_errors": row_errors,
+    }, status=status.HTTP_201_CREATED if created_listings else status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["POST"])
+def listing_duplicate(request, id):
+    """
+    Duplicate a listing so the host can tweak the copy instead of starting
+    from scratch. The duplicate is a fresh draft — new gallery images copied
+    over, but no bookings/reviews/verification/compliance data (those are
+    specific to the original listing, not automatically valid for a copy).
+    """
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+    original = get_object_or_404(Listing, pk=id)
+    if original.owner != request.user and not _is_admin(request.user):
+        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    skip_fields = {
+        'id', 'created_at', 'updated_at', 'status', 'deleted_at', 'is_available',
+        'suspended_by', 'suspended_at', 'suspension_reason',
+        'local_registration_number', 'occupancy_cap', 'claimed_by_user',
+    }
+    copy_kwargs = {
+        f.name: getattr(original, f.name)
+        for f in Listing._meta.concrete_fields
+        if f.name not in skip_fields
+    }
+    copy_kwargs['title'] = f'{original.title} (Copy)'
+    duplicate = Listing.objects.create(**copy_kwargs, status='draft', is_available=False)
+
+    for image in original.gallery_images.all():
+        ListingImage.objects.create(listing=duplicate, image=image.image, caption=image.caption, order=image.order)
+
+    for room in original.hotel_rooms.all():
+        HotelRoom.objects.create(
+            listing=duplicate, name=room.name, room_type=room.room_type,
+            description=room.description, price_per_night=room.price_per_night,
+            max_occupancy=room.max_occupancy, beds=room.beds, bed_type=room.bed_type,
+            bathrooms=room.bathrooms, amenities=room.amenities, total_count=room.total_count,
+            is_active=room.is_active,
+        )
+
+    log_admin_action(request, 'listing.duplicate', target=duplicate, reason=f'Duplicated from listing #{original.id}')
+    return Response(ListingSerializer(duplicate, context={"request": request}).data, status=status.HTTP_201_CREATED)

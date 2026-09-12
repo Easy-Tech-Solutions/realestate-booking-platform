@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
+import { UserAutocomplete } from '../components/UserAutocomplete';
 import { toast } from 'sonner';
 
 interface SuspensionItem {
@@ -37,15 +38,28 @@ export function AdminSuspensions() {
   const [endsAt, setEndsAt] = useState('');
   const [revokeReason, setRevokeReason] = useState<Record<number, string>>({});
 
-  const loadData = async () => {
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [offset, setOffset] = useState(0);
+  const [count, setCount] = useState(0);
+  const LIMIT = 20;
+
+  const loadData = async (targetOffset = offset) => {
     setLoading(true);
     try {
       const [statsRes, listRes] = await Promise.all([
         suspensionsAPI.stats(),
-        suspensionsAPI.list(),
+        suspensionsAPI.list({
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          suspension_type: typeFilter === 'all' ? undefined : typeFilter,
+          limit: LIMIT,
+          offset: targetOffset,
+        }),
       ]);
       setStats(statsRes);
       setItems(listRes.results || []);
+      setCount(listRes.count ?? 0);
+      setOffset(targetOffset);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to load suspensions');
     } finally {
@@ -54,8 +68,9 @@ export function AdminSuspensions() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, typeFilter]);
 
   const createSuspension = async () => {
     if (!userId || !reason.trim()) {
@@ -70,7 +85,7 @@ export function AdminSuspensions() {
 
     setCreating(true);
     try {
-      await suspensionsAPI.create({
+      const result = await suspensionsAPI.create({
         user: Number(userId),
         suspension_type: type,
         reason,
@@ -80,7 +95,11 @@ export function AdminSuspensions() {
       setUserId('');
       setReason('');
       setEndsAt('');
-      toast.success('Suspension created');
+      if (result?.pending_approval) {
+        toast.success(result.message || 'Submitted — a second admin must approve before this suspension takes effect.');
+      } else {
+        toast.success('Suspension created');
+      }
       await loadData();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to create suspension');
@@ -127,8 +146,8 @@ export function AdminSuspensions() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>User ID</Label>
-              <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="e.g. 12" />
+              <Label>User</Label>
+              <UserAutocomplete value={userId} onChange={setUserId} />
             </div>
             <div className="space-y-2">
               <Label>Type</Label>
@@ -161,7 +180,27 @@ export function AdminSuspensions() {
           <CardHeader>
             <CardTitle>Suspension Records</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-3">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="revoked">Revoked</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="temporary">Temporary</SelectItem>
+                  <SelectItem value="indefinite">Indefinite</SelectItem>
+                  <SelectItem value="permanent">Permanent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {loading ? (
               <p className="text-muted-foreground">Loading...</p>
             ) : items.length === 0 ? (
@@ -196,6 +235,21 @@ export function AdminSuspensions() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+            {count > 0 && (
+              <div className="flex items-center justify-between gap-2 pt-2">
+                <p className="text-sm text-muted-foreground">
+                  {count} record{count === 1 ? '' : 's'} · showing {offset + 1}-{Math.min(offset + LIMIT, count)}
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" disabled={loading || offset <= 0} onClick={() => loadData(Math.max(0, offset - LIMIT))}>
+                    Previous
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={loading || offset + LIMIT >= count} onClick={() => loadData(offset + LIMIT)}>
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

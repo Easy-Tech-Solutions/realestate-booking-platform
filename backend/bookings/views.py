@@ -396,6 +396,44 @@ def admin_payment_received_bookings(request):
     return Response(BookingSerializer(bookings, many=True, context={'request': request}).data)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_bookings_list(request):
+    """Admin: every booking, paginated — unlike the dashboard stats endpoint's
+    `recent_bookings` (hard-capped at 10 for the Overview widget), this
+    supports paging through the full table plus status/search filters, for
+    the "All Bookings" section of the admin dashboard."""
+    if not _require_reservations_data(request):
+        return Response({'error': 'Permission Denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    qs = Booking.objects.select_related('listing', 'customer').order_by('-requested_at')
+
+    status_filter = request.query_params.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+
+    search = request.query_params.get('search', '').strip()
+    if search:
+        qs = qs.filter(
+            Q(customer__username__icontains=search)
+            | Q(customer__email__icontains=search)
+            | Q(listing__title__icontains=search)
+        )
+
+    try:
+        limit = max(1, min(int(request.query_params.get('limit', 25)), 100))
+        offset = max(0, int(request.query_params.get('offset', 0)))
+    except (ValueError, TypeError):
+        limit, offset = 25, 0
+
+    total = qs.count()
+    page = qs[offset:offset + limit]
+    return Response({
+        'count': total, 'limit': limit, 'offset': offset,
+        'results': BookingSerializer(page, many=True, context={'request': request}).data,
+    })
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def request_payment(request, id):
