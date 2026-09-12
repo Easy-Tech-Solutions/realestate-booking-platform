@@ -59,7 +59,7 @@ function HostApplicationCard({ app, onDecided }: { app: HostApplication; onDecid
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
           <CardTitle className="text-base">{app.full_name}</CardTitle>
-          <p className="text-sm text-muted-foreground">{app.email} · {app.phone}</p>
+          <p className="text-sm text-muted-foreground">{app.email} · MoMo {app.momo_number}</p>
           <p className="text-sm text-muted-foreground">{app.address}</p>
         </div>
         <Badge variant="secondary">{app.status_display}</Badge>

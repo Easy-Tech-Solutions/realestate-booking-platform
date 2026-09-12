@@ -54,11 +54,11 @@ class HostApplicationAdmin(admin.ModelAdmin):
 
     list_display  = ['id', 'applicant', 'full_name', 'colored_status', 'current_stage_display', 'created_at']
     list_filter   = ['status', 'created_at']
-    search_fields = ['applicant__username', 'applicant__email', 'full_name', 'phone']
+    search_fields = ['applicant__username', 'applicant__email', 'full_name', 'momo_number']
     date_hierarchy = 'created_at'
 
     readonly_fields = [
-        'applicant', 'full_name', 'address', 'phone', 'email_display',
+        'applicant', 'full_name', 'address', 'momo_number', 'momo_network', 'email_display',
         'headshot_preview', 'id_document_preview',
         'status', 'current_stage_display',
         'ps_reviewed_by', 'ps_reviewed_at',
@@ -68,7 +68,7 @@ class HostApplicationAdmin(admin.ModelAdmin):
     ]
     fieldsets = (
         ('Applicant', {
-            'fields': ('applicant', 'email_display', 'full_name', 'address', 'phone'),
+            'fields': ('applicant', 'email_display', 'full_name', 'address', 'momo_number', 'momo_network'),
         }),
         ('Documents', {
             'fields': ('headshot_preview', 'id_document_preview'),

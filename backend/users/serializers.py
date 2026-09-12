@@ -5,8 +5,10 @@ from .models import User, Profile
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        fields = ['image', 'bio', 'momo_number', 'is_superhost', 'last_seen']
-        read_only_fields = ['user']
+        fields = ['image', 'bio', 'phone_number', 'is_superhost', 'last_seen']
+        # phone_number is changed only through the OTP-verified phone-change
+        # flow (users.views.initiate/verify_phone_change), never a direct PATCH.
+        read_only_fields = ['user', 'phone_number']
 
 
 class PublicProfileSerializer(serializers.ModelSerializer):
@@ -53,6 +55,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
     """Full account view for the staff-facing User Management dashboard —
     includes fields (email, is_active, deleted_at, is_superuser) that the
     public-facing serializers deliberately omit."""
+    phone_number = serializers.SerializerMethodField()
     momo_number = serializers.SerializerMethodField()
     has_password = serializers.SerializerMethodField()
 
@@ -61,12 +64,24 @@ class AdminUserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'role',
             'is_staff', 'is_superuser', 'is_active', 'email_verified',
-            'is_archived', 'deleted_at', 'date_joined', 'momo_number', 'has_password',
+            'is_archived', 'deleted_at', 'date_joined',
+            'phone_number', 'momo_number', 'has_password',
         ]
 
-    def get_momo_number(self, obj):
+    def get_phone_number(self, obj):
+        """Contact phone number (from the Profile)."""
         try:
-            return obj.profile.momo_number
+            return obj.profile.phone_number
+        except Exception:
+            return ''
+
+    def get_momo_number(self, obj):
+        """Payout MoMo number — now lives on the approved host application, not
+        the profile. Blank for users who aren't approved hosts."""
+        try:
+            from hostapplications.models import HostApplication
+            app = HostApplication.approved_for(obj)
+            return app.momo_number if app else ''
         except Exception:
             return ''
 

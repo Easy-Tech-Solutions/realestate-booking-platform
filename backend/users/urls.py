@@ -8,6 +8,9 @@ from .views import (
     initiate_phone_change,
     verify_phone_change,
     cancel_phone_change,
+    initiate_momo_change,
+    verify_momo_change,
+    cancel_momo_change,
     admin_stats,
 )
 from .mfa_views import mfa_status, mfa_setup, mfa_confirm, mfa_disable
@@ -42,10 +45,15 @@ urlpatterns = [
     path('me/profile/', update_profile, name='update_profile'),
     path('me/delete/',  delete_my_account, name='delete_my_account'),
 
-    # Phone number change — 2-step verification
+    # Contact phone number change — 2-step verification
     path('phone-change/initiate/', initiate_phone_change, name='phone_change_initiate'),
     path('phone-change/verify/',   verify_phone_change,   name='phone_change_verify'),
     path('phone-change/cancel/',   cancel_phone_change,   name='phone_change_cancel'),
+
+    # Host payout MoMo number change — 2-step verification (approved hosts only)
+    path('momo-change/initiate/', initiate_momo_change, name='momo_change_initiate'),
+    path('momo-change/verify/',   verify_momo_change,   name='momo_change_verify'),
+    path('momo-change/cancel/',   cancel_momo_change,   name='momo_change_cancel'),
 
     # Self-service two-factor authentication (any authenticated user)
     path('mfa/status/',  mfa_status,  name='mfa_status'),

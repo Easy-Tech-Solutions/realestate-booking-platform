@@ -18,11 +18,11 @@ const STAGES = [
 interface FormState {
   fullName: string;
   address: string;
-  phone: string;
+  momoNumber: string;
 }
 
 const INITIAL_FORM: FormState = {
-  fullName: '', address: '', phone: '',
+  fullName: '', address: '', momoNumber: '',
 };
 
 export function BecomeAHost() {
@@ -59,7 +59,7 @@ export function BecomeAHost() {
     const errs: typeof errors = {};
     if (!form.fullName.trim()) errs.fullName = 'Full name is required';
     if (!form.address.trim()) errs.address = 'Address is required';
-    if (!form.phone.trim()) errs.phone = 'Phone number is required';
+    if (!form.momoNumber.trim()) errs.momoNumber = 'Mobile Money number is required';
     if (!headshot) errs.headshot = 'A headshot / passport photo is required';
     if (!idDocument) errs.idDocument = 'A photo of your national ID / passport is required';
     if (!agreed) errs.agreement = 'You must agree to the Property Owner Agreement to continue';
@@ -75,7 +75,7 @@ export function BecomeAHost() {
       const payload = new FormData();
       payload.append('full_name', form.fullName.trim());
       payload.append('address', form.address.trim());
-      payload.append('phone', form.phone.trim());
+      payload.append('momo_number', form.momoNumber.trim());
       if (headshot) payload.append('headshot', headshot);
       if (idDocument) payload.append('id_document', idDocument);
       payload.append('agreement_accepted', 'true');
@@ -86,7 +86,6 @@ export function BecomeAHost() {
       setForm(INITIAL_FORM);
       setHeadshot(null);
       setIdDocument(null);
-      setTaxClearanceReceipt(null);
       setAgreed(false);
       toast.success('Application submitted — we’ll review it shortly.');
     } catch (err: unknown) {
@@ -223,17 +222,19 @@ export function BecomeAHost() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              {/* Phone */}
+              {/* Mobile Money number — used to pay out this host's booking earnings */}
               <div className="space-y-1.5">
-                <Label htmlFor="ha-phone">Phone number <span className="text-destructive">*</span></Label>
+                <Label htmlFor="ha-momo">Mobile Money number <span className="text-destructive">*</span></Label>
                 <Input
-                  id="ha-phone"
-                  placeholder="0880 000 000"
-                  value={form.phone}
-                  onChange={(e) => set('phone', e.target.value)}
-                  className={errors.phone ? 'border-destructive' : ''}
+                  id="ha-momo"
+                  placeholder="e.g. 0880123456"
+                  value={form.momoNumber}
+                  onChange={(e) => set('momoNumber', e.target.value)}
+                  className={errors.momoNumber ? 'border-destructive' : ''}
                 />
-                {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+                {errors.momoNumber
+                  ? <p className="text-xs text-destructive">{errors.momoNumber}</p>
+                  : <p className="text-xs text-muted-foreground">Your MTN Mobile Money number. This is where we send your booking payouts.</p>}
               </div>
 
               {/* Email (read-only) */}

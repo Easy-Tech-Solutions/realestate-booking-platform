@@ -44,12 +44,27 @@ class HostApplication(models.Model):
         related_name='host_applications',
     )
 
-    # Snapshot of the details submitted on the form (kept independent of the
-    # user's live profile so the record reflects what was reviewed). The email
-    # is read-only on the form and taken from the account server-side.
+    # full_name/address are a snapshot of what was submitted for review. The
+    # email is read-only on the form and taken from the account server-side.
     full_name = models.CharField(max_length=255)
     address   = models.CharField(max_length=500)
-    phone     = models.CharField(max_length=30)
+
+    # The host's MTN Mobile Money number — the destination for their booking
+    # payouts. Unlike the snapshot fields above, the number on the APPROVED
+    # application is a *live* value: it's the canonical payout destination and
+    # can be changed later from the host dashboard via an OTP-verified flow
+    # (see users.MomoChangeRequest / users.views.*_momo_change). Only MTN is
+    # payable today (payments/gateways/mtn_momo.py), so momo_network defaults to
+    # 'mtn' and is not exposed on the frontend — kept for when Orange
+    # disbursement is added.
+    NETWORK_MTN    = 'mtn'
+    NETWORK_ORANGE = 'orange'
+    NETWORK_CHOICES = [
+        (NETWORK_MTN,    'MTN Mobile Money'),
+        (NETWORK_ORANGE, 'Orange Money'),
+    ]
+    momo_number  = models.CharField(max_length=30)
+    momo_network = models.CharField(max_length=10, choices=NETWORK_CHOICES, default=NETWORK_MTN)
 
     # Sensitive PII — identity documents.
     headshot    = models.ImageField(upload_to='host_applications/headshots/')
@@ -126,6 +141,22 @@ class HostApplication(models.Model):
     @property
     def is_active(self):
         return self.status in self.ACTIVE_STATUSES
+
+    @classmethod
+    def approved_for(cls, user):
+        """The user's approved host application (their host record), or None.
+
+        The momo_number on this row is the canonical destination for the host's
+        booking payouts. If a user somehow has more than one approved
+        application, the most recently updated one wins.
+        """
+        if user is None or not getattr(user, 'pk', None):
+            return None
+        return (
+            cls.objects.filter(applicant=user, status=cls.Status.APPROVED)
+            .order_by('-updated_at')
+            .first()
+        )
 
 
 class AgreementAcceptance(models.Model):

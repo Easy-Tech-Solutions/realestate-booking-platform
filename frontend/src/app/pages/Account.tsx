@@ -600,9 +600,9 @@ export function Account() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Mobile Money number</Label>
+                  <Label>Phone number</Label>
                   <Input value={phone || 'No number added yet'} disabled className="bg-muted border-border text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">Use the section below to add or change your MoMo number.</p>
+                  <p className="text-xs text-muted-foreground">Use the section below to add or change your phone number.</p>
                 </div>
                 <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
                   {saving ? 'Saving…' : 'Save changes'}
@@ -649,9 +649,9 @@ export function Account() {
             )}
           </div>
 
-          {/* Change MoMo Number */}
+          {/* Change Phone Number */}
           <div className="border border-border rounded-xl p-6">
-            <h2 className="text-xl font-semibold mb-2">Change Mobile Money Number</h2>
+            <h2 className="text-xl font-semibold mb-2">Change Phone Number</h2>
             <p className="text-sm text-muted-foreground mb-6">
               {user?.hasPassword === false
                 ? '2-step security flow: we send a 6-digit code to your email and new number → enter it to confirm.'
@@ -683,7 +683,7 @@ export function Account() {
                   </div>
                 )}
                 <div className="space-y-1.5">
-                  <Label htmlFor="newPhone">New MoMo number</Label>
+                  <Label htmlFor="newPhone">New phone number</Label>
                   <Input id="newPhone" value={newPhoneNumber} onChange={e => setNewPhoneNumber(e.target.value)} placeholder="e.g. 0880123456" className="bg-card border-border" />
                 </div>
               </div>

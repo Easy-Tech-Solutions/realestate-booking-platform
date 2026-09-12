@@ -75,6 +75,31 @@ export const usersAPI = {
     });
   },
 
+  // Host payout MoMo number change — 2-step verification (approved hosts only).
+  // network is fixed to MTN server-side, so it is not sent from the frontend.
+  initiateMomoChange: async (payload: {
+    password?: string;
+    new_momo_number: string;
+  }): Promise<{ message: string }> => {
+    return fetchWithAuth('/api/users/momo-change/initiate/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  verifyMomoChange: async (otp: string): Promise<{ message: string }> => {
+    return fetchWithAuth('/api/users/momo-change/verify/', {
+      method: 'POST',
+      body: JSON.stringify({ otp }),
+    });
+  },
+
+  cancelMomoChange: async (): Promise<{ message: string }> => {
+    return fetchWithAuth('/api/users/momo-change/cancel/', {
+      method: 'DELETE',
+    });
+  },
+
   // Self-service two-factor authentication (any authenticated user)
   mfaStatus: (): Promise<{ mfa_enabled: boolean }> => fetchWithAuth('/api/users/mfa/status/'),
 

@@ -95,7 +95,7 @@ def delete_account(user) -> tuple[bool, Optional[str]]:
         user.deleted_at = now
         user.save()
 
-        # 3. Wipe profile PII (image, bio, momo number).
+        # 3. Wipe profile PII (image, bio, contact phone number).
         try:
             profile = user.profile
         except Exception:
@@ -103,8 +103,15 @@ def delete_account(user) -> tuple[bool, Optional[str]]:
         if profile is not None:
             profile.bio = ''
             profile.image = None
-            profile.momo_number = ''
+            profile.phone_number = ''
             profile.save()
+
+        # 3b. Wipe the payout MoMo number held on the user's host applications.
+        try:
+            from hostapplications.models import HostApplication
+            HostApplication.objects.filter(applicant=user).update(momo_number='')
+        except Exception:
+            pass
 
         # 4. Invalidate any refresh tokens so existing sessions stop working.
         try:

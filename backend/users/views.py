@@ -16,7 +16,7 @@ from bookings.serializers import BookingSerializer
 from django.contrib.auth import get_user_model, authenticate
 from django.utils import timezone
 from datetime import timedelta
-from .models import PhoneChangeRequest, Profile
+from .models import PhoneChangeRequest, MomoChangeRequest, Profile
 from .utils import generate_otp, send_phone_change_email_otp, send_phone_change_sms_otp
 from .deletion import delete_account
 from authapp.throttles import PhoneChangeRateThrottle
@@ -130,7 +130,7 @@ def user_detail(request, id):
 # Step 2  POST /api/users/phone-change/verify/
 #   Body: { "otp": "123456" }
 #   • Validates the OTP (expiry checked server-side).
-#   • Updates Profile.momo_number with the new number.
+#   • Updates Profile.phone_number (the contact number) with the new value.
 #   • Deletes the PhoneChangeRequest row.
 #   • Fires a PHONE_NUMBER_CHANGED in-app + email notification.
 #
@@ -178,7 +178,7 @@ def initiate_phone_change(request):
     # Prevent linking the same number that's already on the profile
     try:
         profile = user.profile
-        if profile.momo_number == new_phone_number:
+        if profile.phone_number == new_phone_number:
             return Response(
                 {'error': 'That number is already linked to your account.'},
                 status=400,
@@ -207,14 +207,14 @@ def initiate_phone_change(request):
     )
 
     try:
-        send_phone_change_email_otp(user, otp)
+        send_phone_change_email_otp(user, otp, purpose_label='phone number')
     except Exception:
         logger.exception("initiate_phone_change: failed to send email OTP")
         return Response(
             {'error': 'Could not send the verification code. Please try again in a moment.'},
             status=503,
         )
-    send_phone_change_sms_otp(new_phone_number, otp, network_provider)
+    send_phone_change_sms_otp(new_phone_number, otp, network_provider, purpose_label='phone number')
 
     return Response({
         'message': (
@@ -258,8 +258,8 @@ def verify_phone_change(request):
     network_provider = req.network_provider
 
     profile, _ = request.user.profile.__class__.objects.get_or_create(user=request.user)
-    old_number = profile.momo_number
-    profile.momo_number = new_number
+    old_number = profile.phone_number
+    profile.phone_number = new_number
     profile.save()
 
     req.delete()
@@ -270,9 +270,8 @@ def verify_phone_change(request):
     except Exception:
         pass  # Never block the response due to a notification failure
 
-    network_label = 'MTN Mobile Money' if network_provider == 'mtn' else 'Orange Money'
     return Response({
-        'message': f'Your {network_label} number has been updated to {new_number}.',
+        'message': f'Your phone number has been updated to {new_number}.',
     }, status=200)
 
 
@@ -286,6 +285,167 @@ def cancel_phone_change(request):
     if deleted:
         return Response({'message': 'Phone change request cancelled.'}, status=200)
     return Response({'message': 'No pending phone change request found.'}, status=200)
+
+
+# ── Host MoMo (payout) Number Change — 2-step verification ────────────────────
+#
+# Same OTP mechanics as the phone-change flow above, but the number is
+# money-bearing, so:
+#   • Only an APPROVED host may change it.
+#   • The new number is written to the host's approved HostApplication.momo_number
+#     (the canonical payout destination) — never the Profile.
+#   • network is fixed to 'mtn' (only MTN is payable) and not collected on the
+#     frontend; the number is validated as an MTN wallet.
+#
+#   POST   /api/users/momo-change/initiate/  { password?, new_momo_number }
+#   POST   /api/users/momo-change/verify/    { otp }
+#   DELETE /api/users/momo-change/cancel/
+
+
+def _approved_host_application(user):
+    from hostapplications.models import HostApplication
+    return HostApplication.approved_for(user)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([PhoneChangeRateThrottle])
+def initiate_momo_change(request):
+    """Step 1: confirm the caller is an approved host, (optionally) verify the
+    password, validate the new MTN number, and send email + SMS OTPs."""
+    from rest_framework import serializers as drf_serializers
+    from hostapplications.serializers import validate_mtn_momo_number
+
+    application = _approved_host_application(request.user)
+    if application is None:
+        return Response(
+            {'error': 'Only approved hosts can change their payout number.'},
+            status=403,
+        )
+
+    password        = request.data.get('password', '').strip()
+    new_momo_number = request.data.get('new_momo_number', '').strip()
+
+    if not new_momo_number:
+        return Response({'error': 'new_momo_number is required.'}, status=400)
+
+    try:
+        validate_mtn_momo_number(new_momo_number)
+    except drf_serializers.ValidationError as exc:
+        detail = exc.detail[0] if isinstance(exc.detail, (list, tuple)) else exc.detail
+        return Response({'error': str(detail)}, status=400)
+
+    user = request.user
+    if user.has_usable_password():
+        if not password:
+            return Response(
+                {'error': 'Current password is required.', 'code': 'password_required'},
+                status=400,
+            )
+        if authenticate(request, username=user.username, password=password) is None:
+            return Response({'error': 'Incorrect password.'}, status=400)
+
+    if application.momo_number == new_momo_number:
+        return Response({'error': 'That is already your payout number.'}, status=400)
+
+    # Same OTP delivered via email and SMS; the host uses whichever arrives.
+    otp    = generate_otp()
+    expiry = timezone.now() + timedelta(minutes=OTP_VALID_MINUTES)
+
+    MomoChangeRequest.objects.update_or_create(
+        user=user,
+        defaults={
+            'new_momo_number':    new_momo_number,
+            'network_provider':   MomoChangeRequest.NETWORK_MTN,
+            'password_verified':  True,
+            'email_otp':          otp,
+            'email_otp_expiry':   expiry,
+            'email_otp_verified': False,
+            'sms_otp':            otp,
+            'sms_otp_expiry':     expiry,
+            'sms_otp_verified':   False,
+        },
+    )
+
+    try:
+        send_phone_change_email_otp(user, otp, purpose_label='Mobile Money number')
+    except Exception:
+        logger.exception("initiate_momo_change: failed to send email OTP")
+        return Response(
+            {'error': 'Could not send the verification code. Please try again in a moment.'},
+            status=503,
+        )
+    send_phone_change_sms_otp(new_momo_number, otp, MomoChangeRequest.NETWORK_MTN,
+                              purpose_label='Mobile Money number')
+
+    return Response({
+        'message': (
+            f'A verification code has been sent to your email and to '
+            f'{new_momo_number}. It expires in {OTP_VALID_MINUTES} minutes.'
+        ),
+    }, status=200)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([PhoneChangeRateThrottle])
+def verify_momo_change(request):
+    """Step 2: validate the OTP → write the new number to the approved
+    application's momo_number → notify the host."""
+    otp = request.data.get('otp', '').strip()
+    if not otp:
+        return Response({'error': 'otp is required.'}, status=400)
+
+    try:
+        req = MomoChangeRequest.objects.get(user=request.user)
+    except MomoChangeRequest.DoesNotExist:
+        return Response(
+            {'error': 'No pending MoMo number change request. Please start from Step 1.'},
+            status=400,
+        )
+
+    if req.is_email_otp_expired():
+        req.delete()
+        return Response({'error': 'Verification code has expired. Please start over.'}, status=400)
+
+    if req.email_otp != otp:
+        return Response({'error': 'Invalid verification code.'}, status=400)
+
+    application = _approved_host_application(request.user)
+    if application is None:
+        req.delete()
+        return Response(
+            {'error': 'Only approved hosts can change their payout number.'},
+            status=403,
+        )
+
+    new_number = req.new_momo_number
+    old_number = application.momo_number
+    application.momo_number  = new_number
+    application.momo_network = req.network_provider
+    application.save(update_fields=['momo_number', 'momo_network', 'updated_at'])
+
+    req.delete()
+
+    try:
+        from notifications.services import notify_phone_number_changed
+        notify_phone_number_changed(request.user, old_number, new_number, req.network_provider)
+    except Exception:
+        pass  # Never block the response due to a notification failure
+
+    return Response({
+        'message': f'Your Mobile Money payout number has been updated to {new_number}.',
+    }, status=200)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def cancel_momo_change(request):
+    """Cancel any pending MoMo change request for the authenticated user."""
+    deleted, _ = MomoChangeRequest.objects.filter(user=request.user).delete()
+    if deleted:
+        return Response({'message': 'MoMo change request cancelled.'}, status=200)
+    return Response({'message': 'No pending MoMo change request found.'}, status=200)
 
 
 #User dashboard view

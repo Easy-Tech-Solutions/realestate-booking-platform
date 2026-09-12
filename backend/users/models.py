@@ -80,9 +80,10 @@ class Profile(models.Model):
     bio = models.TextField(blank=True)
     is_superhost = models.BooleanField(default=False)
     last_seen = models.DateTimeField(null=True, blank=True)
-    momo_number = models.CharField(
+    phone_number = models.CharField(
         max_length=20, blank=True,
-        help_text='MTN Mobile Money number for receiving payouts (Liberian format, e.g. 0880123456)'
+        help_text='Contact phone number (NOT used for payouts — that is the host '
+                  'application MoMo number). Liberian format, e.g. 0880123456.'
     )
 
     def __str__(self):
@@ -143,3 +144,56 @@ class PhoneChangeRequest(models.Model):
 
     def __str__(self):
         return f'{self.user.username} → {self.new_phone_number} ({self.get_network_provider_display()})'
+
+
+class MomoChangeRequest(models.Model):
+    """
+    Pending change of a host's payout MoMo number, verified through the same
+    2-step (email + SMS OTP) flow as PhoneChangeRequest — but the number is
+    money-bearing, so the change is gated to approved hosts and, on success,
+    written to their APPROVED HostApplication.momo_number (not the Profile).
+
+    Kept as a separate model from PhoneChangeRequest so the money-changing flow
+    stays isolated and independently permission-gated. One active request per
+    user (OneToOneField); the row is deleted once committed or cancelled.
+    """
+    NETWORK_MTN    = 'mtn'
+    NETWORK_ORANGE = 'orange'
+    NETWORK_CHOICES = [
+        (NETWORK_MTN,    'MTN Mobile Money'),
+        (NETWORK_ORANGE, 'Orange Money'),
+    ]
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='momo_change_request',
+    )
+    new_momo_number = models.CharField(max_length=30)
+    network_provider = models.CharField(
+        max_length=10,
+        choices=NETWORK_CHOICES,
+        default=NETWORK_MTN,
+        help_text='Which wallet this number belongs to (only MTN is payable today)',
+    )
+
+    password_verified = models.BooleanField(default=False)
+
+    email_otp          = models.CharField(max_length=6)
+    email_otp_expiry   = models.DateTimeField()
+    email_otp_verified = models.BooleanField(default=False)
+
+    sms_otp          = models.CharField(max_length=6, blank=True)
+    sms_otp_expiry   = models.DateTimeField(null=True, blank=True)
+    sms_otp_verified = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_email_otp_expired(self):
+        return timezone.now() > self.email_otp_expiry
+
+    def is_sms_otp_expired(self):
+        return self.sms_otp_expiry is None or timezone.now() > self.sms_otp_expiry
+
+    def __str__(self):
+        return f'{self.user.username} → MoMo {self.new_momo_number} ({self.get_network_provider_display()})'

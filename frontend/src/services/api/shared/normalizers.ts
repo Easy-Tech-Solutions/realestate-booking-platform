@@ -13,7 +13,7 @@ export function normalizeUser(u: any): User {
     lastName,
     avatar: u.profile?.image || undefined,
     bio: u.profile?.bio || undefined,
-    phone: u.profile?.momo_number || undefined,
+    phone: u.profile?.phone_number || undefined,
     isHost: u.role === 'agent' || u.role === 'admin' || u.role === 'superadmin',
     // Approved sourcing-agent capability — independent of role (a host or a
     // plain user can also be an agent). Backend: UserSerializer.is_agent.
