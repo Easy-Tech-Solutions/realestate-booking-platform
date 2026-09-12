@@ -270,8 +270,8 @@ function PaymentForm() {
 
               {paymentMethod === 'mtn_momo' && (
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone number</Label>
-                  <Input id="phone" placeholder="0880123456" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+                  <Label htmlFor="phone">Mobile Money number</Label>
+                  <Input id="phone" placeholder="0880-XXX-XXX" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
                   <p className="text-xs text-muted-foreground">MTN Mobile Money charges a 2% transaction fee on top of the amount above.</p>
                 </div>
               )}

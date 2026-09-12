@@ -154,15 +154,20 @@ class PaymentService:
     def transfer_to_owner(cls, payment: Payment) -> Dict[str, Any]:
         """
         Disburse the booking amount to the property owner's registered MoMo number.
-        Requires the owner's Profile to have a momo_number set.
+        Requires the owner's approved host application to have a momo_number set.
         """
         gateway = cls.get_gateway(payment.gateway.name)
         if not gateway:
             return {'success': False, 'error': 'Payment gateway not available'}
 
         owner = payment.booking.listing.owner
+        # The payout destination is the number on the host's APPROVED host
+        # application (the canonical, OTP-changeable payout number) — not the
+        # Profile, which now holds only a contact phone number.
         try:
-            owner_momo = owner.profile.momo_number
+            from hostapplications.models import HostApplication
+            app = HostApplication.approved_for(owner)
+            owner_momo = app.momo_number if app else None
         except Exception:
             owner_momo = None
 

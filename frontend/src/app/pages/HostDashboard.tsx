@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { ListingVerificationCell } from '../components/ListingVerificationCell';
 import { LeaseDownloadLink } from '../components/LeaseDownloadLink';
+import { MomoChangeCard } from '../components/MomoChangeCard';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../hooks/queries/keys';
@@ -1351,6 +1352,7 @@ export function HostDashboard() {
     const pendingTotal = pending.reduce((sum, p) => sum + p.netAmount, 0);
     const paidTotal = paid.reduce((sum, p) => sum + p.netAmount, 0);
     return (
+      <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Earnings &amp; Payouts</CardTitle>
@@ -1405,6 +1407,8 @@ export function HostDashboard() {
           )}
         </CardContent>
       </Card>
+      <MomoChangeCard />
+      </div>
     );
   };
 

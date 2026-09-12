@@ -35,16 +35,20 @@ def generate_otp(length=6):
 
 # ── Email OTP ──────────────────────────────────────────────────────────────────
 
-def send_phone_change_email_otp(user, otp):
+def send_phone_change_email_otp(user, otp, purpose_label='Mobile Money number'):
     """
     Send the verification OTP to the user's registered email address.
     The OTP expires in 10 minutes (enforced in the view/model).
+
+    `purpose_label` names what's being changed ('phone number' for the contact
+    number, 'Mobile Money number' for the host payout number) so the same
+    helper serves both OTP flows with correct wording.
     """
     site_name = getattr(settings, 'SITE_NAME', 'Real Estate Platform')
-    subject = f"[{site_name}] Verify your Mobile Money number change"
+    subject = f"[{site_name}] Verify your {purpose_label} change"
     message = (
         f"Hi {user.get_short_name() or user.username},\n\n"
-        f"We received a request to change the Mobile Money number on your account.\n\n"
+        f"We received a request to change the {purpose_label} on your account.\n\n"
         f"Your verification code is:  {otp}\n\n"
         f"This code expires in 10 minutes.\n\n"
         f"If you did not request this change, please secure your account "
@@ -61,12 +65,13 @@ def send_phone_change_email_otp(user, otp):
 
 # ── SMS OTP ────────────────────────────────────────────────────────────────────
 
-def send_phone_change_sms_otp(phone_number, otp, network_provider):
+def send_phone_change_sms_otp(phone_number, otp, network_provider, purpose_label='Mobile Money number'):
     """
     Send the Step-3 SMS OTP to `phone_number` (the *new* number being verified).
 
     `network_provider` is 'mtn' or 'orange' — useful for provider-specific
-    SMS gateway routing if needed.
+    SMS gateway routing if needed. `purpose_label` names what's being changed
+    (contact 'phone number' vs 'Mobile Money number') for logging/messaging.
 
     Development: print to console.
     Production:  fill in Twilio credentials via environment variables and

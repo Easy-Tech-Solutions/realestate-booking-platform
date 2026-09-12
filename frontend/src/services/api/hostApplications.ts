@@ -4,7 +4,10 @@ export interface HostApplication {
   id: number;
   full_name: string;
   address: string;
-  phone: string;
+  /** Host payout MoMo number (renamed from the old `phone` field). */
+  momo_number: string;
+  /** Which wallet momo_number belongs to — 'mtn' today (hidden on the frontend). */
+  momo_network: 'mtn' | 'orange';
   email: string;
   headshot_url: string | null;
   id_document_url: string | null;

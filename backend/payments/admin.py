@@ -156,7 +156,13 @@ class PayoutAdmin(admin.ModelAdmin):
 
     @admin.display(description='Host MoMo #')
     def host_momo(self, obj):
-        return getattr(getattr(obj.host, 'profile', None), 'momo_number', '') or '—'
+        # Prefer the number stamped on the payout; otherwise fall back to the
+        # host's approved application (the canonical payout number).
+        if obj.recipient_momo_number:
+            return obj.recipient_momo_number
+        from hostapplications.models import HostApplication
+        app = HostApplication.approved_for(obj.host)
+        return (app.momo_number if app else '') or '—'
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         # "Paid by" should only ever be a staff/admin user.

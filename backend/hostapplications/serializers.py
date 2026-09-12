@@ -1,6 +1,23 @@
+import re
+
 from rest_framework import serializers
 
 from .models import HostApplication
+
+
+# MTN Liberia MoMo numbers (077/088 prefixes), accepting local, bare, and
+# international forms after stripping separators. Mirrors the gateway's
+# _validate_liberian_phone — only MTN numbers can be paid out today.
+_MTN_MOMO_RE = re.compile(r'^(231)?0?(77|88)\d{7}$')
+
+
+def validate_mtn_momo_number(value):
+    cleaned = re.sub(r'\D', '', value or '')
+    if not _MTN_MOMO_RE.match(cleaned):
+        raise serializers.ValidationError(
+            'Enter a valid MTN Mobile Money number (e.g. 0880123456).'
+        )
+    return value
 
 
 class HostApplicationCreateSerializer(serializers.ModelSerializer):
@@ -14,8 +31,13 @@ class HostApplicationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = HostApplication
         fields = [
-            'full_name', 'address', 'phone', 'headshot', 'id_document', 'agreement_accepted',
+            'full_name', 'address', 'momo_number', 'headshot', 'id_document', 'agreement_accepted',
         ]
+
+    def validate_momo_number(self, value):
+        # momo_network stays 'mtn' (the model default) — not collected on the
+        # form — so the number must be an MTN wallet to be payable.
+        return validate_mtn_momo_number(value)
 
     def validate_agreement_accepted(self, value):
         if not value:
@@ -52,7 +74,7 @@ class HostApplicationSerializer(serializers.ModelSerializer):
     class Meta:
         model = HostApplication
         fields = [
-            'id', 'full_name', 'address', 'phone', 'email',
+            'id', 'full_name', 'address', 'momo_number', 'momo_network', 'email',
             'headshot_url', 'id_document_url', 'tax_clearance_receipt_url',
             'next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone',
             'status', 'status_display', 'current_stage',
