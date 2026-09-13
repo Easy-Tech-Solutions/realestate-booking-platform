@@ -12,6 +12,9 @@ export interface HostApplication {
   headshot_url: string | null;
   id_document_url: string | null;
   tax_clearance_receipt_url: string | null;
+  /** Personalized Property Owner Agreement PDF, generated on approval. */
+  agreement_document_url: string | null;
+  agreement_version: string;
   next_of_kin_name: string;
   next_of_kin_relationship: string;
   next_of_kin_phone: string;

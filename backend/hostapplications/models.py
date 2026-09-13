@@ -3,6 +3,19 @@ from django.conf import settings
 from django.utils import timezone
 
 
+def _agreement_storage():
+    """
+    Generated Property Owner Agreement PDFs are documents. Use Cloudinary's raw
+    backend in production if configured (the image backend rejects PDFs) and the
+    default (filesystem) storage otherwise. Mirrors leaseagreements._document_storage.
+    """
+    if getattr(settings, 'CLOUDINARY_URL', ''):
+        from cloudinary_storage.storage import RawMediaCloudinaryStorage
+        return RawMediaCloudinaryStorage()
+    from django.core.files.storage import default_storage
+    return default_storage
+
+
 # ---------------------------------------------------------------------------
 # Group names — the three reviewer roles. Defined here so the data migration,
 # the admin, and the notification layer all reference the same strings.
@@ -81,6 +94,14 @@ class HostApplication(models.Model):
     next_of_kin_name = models.CharField(max_length=255, blank=True, default='')
     next_of_kin_relationship = models.CharField(max_length=100, blank=True, default='')
     next_of_kin_phone = models.CharField(max_length=30, blank=True, default='')
+
+    # Personalized Property Owner Agreement PDF, generated on FINAL approval —
+    # emailed to the new host and downloadable from their dashboard. The version
+    # records which agreement version the stored PDF was rendered from.
+    agreement_document = models.FileField(
+        upload_to='host_agreements/', storage=_agreement_storage, null=True, blank=True,
+    )
+    agreement_version = models.CharField(max_length=20, blank=True, default='')
 
     status = models.CharField(
         max_length=25,

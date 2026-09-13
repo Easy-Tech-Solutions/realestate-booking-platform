@@ -81,6 +81,7 @@ import type { Booking, BookingStatus, Conversation, Property } from '../../core/
 import { bookingStatusMeta } from '../../core/bookingStatus';
 import { toast } from 'sonner';
 import { getErrorMessage } from '../../services/api/shared/errors';
+import { hostApplicationsAPI } from '../../services/api/hostApplications';
 import { useSendMessage } from '../../hooks/queries/useMessages';
 import { useQuery } from '@tanstack/react-query';
 import { useDeleteHostProperty, useHostDashboardData, useRespondToHostReview, useUpdateHostProperty } from '../../hooks/queries/useHostDashboard';
@@ -1577,6 +1578,26 @@ export function HostDashboard() {
               >
                 <FileText />
                 <span>Owner Agreement</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={async () => {
+                  try {
+                    const app = await hostApplicationsAPI.getMine();
+                    if (app?.agreement_document_url) {
+                      window.open(app.agreement_document_url, '_blank', 'noopener');
+                    } else {
+                      toast.error('Your signed agreement isn’t available yet.');
+                    }
+                  } catch {
+                    toast.error('Could not load your agreement document.');
+                  }
+                }}
+                tooltip="Download your Property Owner Agreement (PDF)"
+              >
+                <Download />
+                <span>Agreement PDF</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>

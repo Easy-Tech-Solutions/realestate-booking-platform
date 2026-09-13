@@ -79,13 +79,13 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
 
     list_display  = ['id', 'listing_link', 'applicant', 'ownership_type', 'colored_status', 'current_stage_display', 'created_at']
     list_filter   = ['status', 'ownership_type', 'created_at']
-    search_fields = ['listing__title', 'applicant__username', 'applicant__email', 'owner_name', 'deed_volume_number']
+    search_fields = ['listing__title', 'applicant__username', 'applicant__email', 'owner_name', 'deed_volume_number', 'page_number']
     date_hierarchy = 'created_at'
 
     readonly_fields = [
         'listing_link', 'applicant', 'ownership_type', 'owner_name',
         'owner_phone', 'owner_email', 'owner_payout',
-        'property_location', 'deed_volume_number', 'mou_link',
+        'property_location', 'deed_volume_number', 'page_number', 'mou_link',
         'status', 'current_stage_display', 'resubmission_count',
         'ps_reviewed_by', 'ps_reviewed_at',
         'compliance_reviewed_by', 'compliance_reviewed_at',
@@ -93,7 +93,7 @@ class PropertyVerificationAdmin(admin.ModelAdmin):
         'outcome_stage', 'created_at', 'updated_at',
     ]
     fieldsets = (
-        ('Property', {'fields': ('listing_link', 'applicant', 'ownership_type', 'owner_name', 'property_location', 'deed_volume_number', 'mou_link')}),
+        ('Property', {'fields': ('listing_link', 'applicant', 'ownership_type', 'owner_name', 'property_location', 'deed_volume_number', 'page_number', 'mou_link')}),
         ('Review status', {
             'fields': (
                 'status', 'current_stage_display', 'resubmission_count', 'outcome_stage',

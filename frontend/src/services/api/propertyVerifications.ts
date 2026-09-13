@@ -13,6 +13,7 @@ export interface PropertyVerification {
   owner_name: string;
   property_location: string;
   deed_volume_number: string;
+  page_number: string;
   mou_document_url: string | null;
   status: VerificationStatus;
   status_display: string;

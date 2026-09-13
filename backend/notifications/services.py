@@ -1147,7 +1147,10 @@ def notify_host_application_declined(application):
 
 
 def notify_host_application_approved(application):
-    """Notify the applicant that they are now a host and can list properties."""
+    """Notify the applicant that they are now a host and can list properties.
+
+    Attaches the personalized Property Owner Agreement PDF when it was generated
+    on approval (see hostapplications.services._generate_agreement_safely)."""
     create_notification(
         user=application.applicant,
         notification_type='host_application_approved',
@@ -1156,7 +1159,12 @@ def notify_host_application_approved(application):
             'Congratulations! Your application has been approved and your account '
             'is now a host account. You can start listing your properties.'
         ),
-        data={'application_id': application.id},
+        data={
+            'application_id': application.id,
+            'attach_owner_agreement_application_id': (
+                application.id if application.agreement_document else None
+            ),
+        },
     )
 
 

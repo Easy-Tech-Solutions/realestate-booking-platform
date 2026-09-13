@@ -176,7 +176,7 @@ function PropertyVerificationCard({ v, onDecided }: { v: PropertyVerification; o
           <CardTitle className="text-base">{v.listing_title}</CardTitle>
           <p className="text-sm text-muted-foreground">{v.owner_name} · {v.property_location}</p>
           <p className="text-sm text-muted-foreground">
-            Deed/volume #: {v.deed_volume_number} · {
+            Deed/volume #: {v.deed_volume_number} · Page #: {v.page_number} · {
               v.ownership_type === 'owner' ? 'Owner'
               : v.ownership_type === 'agent' ? 'Agent-sourced'
               : 'Non-owner (MOU)'
