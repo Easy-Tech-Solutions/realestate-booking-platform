@@ -7,9 +7,8 @@ const categories = [
   {
     title: 'Booking & Reservations',
     faqs: [
-      { q: 'How do I book a property?', a: 'Browse listings, select your dates and guests, then click Reserve. You\'ll be guided through the payment process.' },
+      { q: 'How do I book a property?', a: 'Browse listings, select your dates and guests, then click Reserve. The host reviews and approves your reservation (they have up to 7 days to respond) — nothing is charged until it\'s confirmed and you complete the separate payment step. If the host doesn\'t respond in time, the request expires with no charge.' },
       { q: 'Can I modify my booking after confirmation?', a: 'Yes, you can modify dates or guest count subject to host approval and availability. Go to My Bookings > Manage booking.' },
-      { q: 'What is instant booking?', a: 'Instant booking allows you to book without waiting for host approval. Look for the lightning bolt icon on listings.' },
       { q: 'How far in advance can I book?', a: 'Most hosts allow bookings up to 12 months in advance. Check the individual listing for specific availability.' },
     ],
   },

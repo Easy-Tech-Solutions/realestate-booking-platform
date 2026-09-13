@@ -14,6 +14,9 @@ import { useApp } from '../../hooks/useApp';
 import { AuthDialog } from './AuthDialog';
 import { SearchDialog } from './SearchDialog';
 import { getInitials } from '../../core/utils';
+import { useQuery } from '@tanstack/react-query';
+import { notificationsAPI } from '../../services/api.service';
+import { queryKeys } from '../../hooks/queries/keys';
 
 export function Header() {
   const navigate = useNavigate();
@@ -24,6 +27,21 @@ export function Header() {
   // Remember a "become a host" intent so we can route the user after they
   // finish logging in / signing up via the dialog.
   const [pendingHostRedirect, setPendingHostRedirect] = useState(false);
+
+  // Unread notification count for the bell badge. The notification WebSocket
+  // (useNotificationSocket) invalidates the `notifications` query key on new
+  // notifications, so this refetches in realtime; the interval + focus refetch
+  // catch reads made elsewhere.
+  const { data: unreadData } = useQuery({
+    queryKey: queryKeys.notifications.unreadCount,
+    queryFn: () => notificationsAPI.getUnreadCount(),
+    enabled: isAuthenticated,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+  });
+  const unreadCount = unreadData?.unread_count ?? 0;
+  const badgeLabel = unreadCount > 99 ? '99+' : String(unreadCount);
 
   useEffect(() => {
     if (pendingHostRedirect && isAuthenticated && user) {
@@ -115,10 +133,16 @@ export function Header() {
                   <button
                     type="button"
                     title="View notifications"
+                    aria-label={unreadCount > 0 ? `View notifications (${unreadCount} unread)` : 'View notifications'}
                     onClick={() => navigate('/notifications')}
                     className="hidden sm:flex p-2 rounded-full hover:bg-muted relative"
                   >
                     <Bell className="w-5 h-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none flex items-center justify-center ring-2 ring-background">
+                        {badgeLabel}
+                      </span>
+                    )}
                   </button>
                 )}
 
@@ -167,6 +191,11 @@ export function Header() {
                       <DropdownMenuItem onClick={() => navigate('/notifications')}>
                         <Bell className="w-4 h-4 mr-2" />
                         Notifications
+                        {unreadCount > 0 && (
+                          <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none flex items-center justify-center">
+                            {badgeLabel}
+                          </span>
+                        )}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                         <LayoutDashboard className="w-4 h-4 mr-2" />
