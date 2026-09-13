@@ -67,6 +67,10 @@ class PropertyVerification(models.Model):
     owner_name         = models.CharField(max_length=255)
     property_location  = models.CharField(max_length=500)
     deed_volume_number = models.CharField(max_length=100)
+    # Blank/default at the DB level so adding this column doesn't break the
+    # existing (already-populated) verification rows; it's enforced as REQUIRED
+    # for new submissions in PropertyVerificationCreateSerializer instead.
+    page_number        = models.CharField(max_length=100, blank=True, default='')
     # Non-owner only: the notarized MOU document (PDF or image).
     mou_document       = models.FileField(
         upload_to='property_verifications/mou/', storage=_mou_storage, null=True, blank=True,

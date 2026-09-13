@@ -27,6 +27,7 @@ export function PropertyVerificationForm({ listingId, defaultLocation = '', onSu
   const [ownerName, setOwnerName] = useState('');
   const [location, setLocation] = useState(defaultLocation);
   const [deedVolume, setDeedVolume] = useState('');
+  const [pageNumber, setPageNumber] = useState('');
   const [mou, setMou] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -36,6 +37,7 @@ export function PropertyVerificationForm({ listingId, defaultLocation = '', onSu
     if (!ownerName.trim()) e.ownerName = ownership === 'owner' ? 'Property owner name is required' : 'Actual owner name is required';
     if (!location.trim()) e.location = 'Property location is required';
     if (!deedVolume.trim()) e.deedVolume = 'Deed volume number is required';
+    if (!pageNumber.trim()) e.pageNumber = 'Deed page number is required';
     if (ownership === 'non_owner' && !mou) e.mou = 'A notarized MOU is required when you are not the owner';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -51,6 +53,7 @@ export function PropertyVerificationForm({ listingId, defaultLocation = '', onSu
       fd.append('owner_name', ownerName.trim());
       fd.append('property_location', location.trim());
       fd.append('deed_volume_number', deedVolume.trim());
+      fd.append('page_number', pageNumber.trim());
       if (ownership === 'non_owner' && mou) fd.append('mou_document', mou);
       const verification = await propertyVerificationsAPI.create(fd);
       onSubmitted(verification);
@@ -134,6 +137,13 @@ export function PropertyVerificationForm({ listingId, defaultLocation = '', onSu
           value={deedVolume}
           onChange={(v) => { setDeedVolume(v); setErrors((p) => ({ ...p, deedVolume: '' })); }}
           error={errors.deedVolume}
+        />
+        <Field
+          id="pv-page"
+          label="Deed Page Number"
+          value={pageNumber}
+          onChange={(v) => { setPageNumber(v); setErrors((p) => ({ ...p, pageNumber: '' })); }}
+          error={errors.pageNumber}
         />
 
         {!isOwner && (

@@ -259,6 +259,7 @@ def agent_list_property(request):
         owner_name=owner_name,
         property_location=listing.address or (request.data.get('property_location') or ''),
         deed_volume_number=(request.data.get('deed_volume_number') or ''),
+        page_number=(request.data.get('page_number') or ''),
     )
 
     try:

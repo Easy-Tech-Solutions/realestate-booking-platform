@@ -105,6 +105,18 @@ def send_notification_email(self, notification_id: int):
             except Exception:
                 logger.exception('Could not attach lease for booking %s', lease_booking_id)
 
+        # Attach the personalized Property Owner Agreement PDF on host approval.
+        owner_agreement_app_id = (notification.data or {}).get('attach_owner_agreement_application_id')
+        if owner_agreement_app_id:
+            try:
+                from hostapplications.models import HostApplication
+                app = HostApplication.objects.filter(id=owner_agreement_app_id).first()
+                if app and app.agreement_document:
+                    with app.agreement_document.open('rb') as fh:
+                        email.attach('Property-Owner-Agreement.pdf', fh.read(), 'application/pdf')
+            except Exception:
+                logger.exception('Could not attach owner agreement for application %s', owner_agreement_app_id)
+
         email.send()
 
         notification.email_sent = True

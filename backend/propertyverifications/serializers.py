@@ -29,9 +29,14 @@ class PropertyVerificationCreateSerializer(serializers.ModelSerializer):
         model = PropertyVerification
         fields = [
             'listing', 'ownership_type', 'owner_name',
-            'property_location', 'deed_volume_number', 'mou_document',
+            'property_location', 'deed_volume_number', 'page_number', 'mou_document',
         ]
-        extra_kwargs = {'mou_document': {'required': False}}
+        extra_kwargs = {
+            'mou_document': {'required': False},
+            # Required on new submissions even though the model column is blank
+            # (blank only so existing rows survive the migration).
+            'page_number': {'required': True, 'allow_blank': False},
+        }
 
     def validate_mou_document(self, value):
         return validate_mou_file(value)
@@ -59,11 +64,12 @@ class PropertyVerificationResubmitSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PropertyVerification
-        fields = ['owner_name', 'property_location', 'deed_volume_number', 'mou_document']
+        fields = ['owner_name', 'property_location', 'deed_volume_number', 'page_number', 'mou_document']
         extra_kwargs = {
             'owner_name':         {'required': False},
             'property_location':  {'required': False},
             'deed_volume_number': {'required': False},
+            'page_number':        {'required': False},
             'mou_document':       {'required': False},
         }
 
@@ -84,7 +90,7 @@ class PropertyVerificationSerializer(serializers.ModelSerializer):
         model = PropertyVerification
         fields = [
             'id', 'listing', 'listing_title', 'ownership_type',
-            'owner_name', 'property_location', 'deed_volume_number', 'mou_document_url',
+            'owner_name', 'property_location', 'deed_volume_number', 'page_number', 'mou_document_url',
             'status', 'status_display', 'current_stage',
             'outcome_stage', 'review_notes', 'can_resubmit', 'resubmission_count',
             'created_at', 'updated_at',

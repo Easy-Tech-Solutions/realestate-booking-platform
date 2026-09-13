@@ -68,6 +68,7 @@ class HostApplicationSerializer(serializers.ModelSerializer):
     headshot_url      = serializers.SerializerMethodField()
     id_document_url   = serializers.SerializerMethodField()
     tax_clearance_receipt_url = serializers.SerializerMethodField()
+    agreement_document_url = serializers.SerializerMethodField()
     can_reapply       = serializers.SerializerMethodField()
     email             = serializers.EmailField(source='applicant.email', read_only=True)
 
@@ -76,6 +77,7 @@ class HostApplicationSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'full_name', 'address', 'momo_number', 'momo_network', 'email',
             'headshot_url', 'id_document_url', 'tax_clearance_receipt_url',
+            'agreement_document_url', 'agreement_version',
             'next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone',
             'status', 'status_display', 'current_stage',
             'declined_stage', 'decline_reason', 'can_reapply',
@@ -100,6 +102,9 @@ class HostApplicationSerializer(serializers.ModelSerializer):
 
     def get_tax_clearance_receipt_url(self, obj):
         return self._abs_url(obj.tax_clearance_receipt)
+
+    def get_agreement_document_url(self, obj):
+        return self._abs_url(obj.agreement_document)
 
     def get_can_reapply(self, obj):
         return obj.status == HostApplication.Status.DECLINED

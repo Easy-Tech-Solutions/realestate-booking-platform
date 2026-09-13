@@ -136,7 +136,7 @@ const HOTEL_AMENITIES = [
   { id: 'ac', name: 'Air conditioning' },
   { id: 'tv', name: 'TV' },
   { id: 'parking', name: 'Free parking' },
-  { id: 'ev-charger', name: 'EV charger' },
+  //{ id: 'ev-charger', name: 'EV charger' },
 ];
 
 const COMMERCIAL_AMENITIES = [

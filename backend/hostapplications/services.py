@@ -28,6 +28,17 @@ def _safe_notify(fn_name, application):
         logger.exception('Host-application notification %s failed for #%s', fn_name, application.pk)
 
 
+def _generate_agreement_safely(application):
+    """Render + store the personalized Property Owner Agreement PDF on final
+    approval. Never blocks approval if generation fails (e.g. WeasyPrint's system
+    libraries aren't installed) — the host is still approved and notified."""
+    try:
+        from . import agreements
+        agreements.generate_and_store_owner_agreement(application)
+    except Exception:
+        logger.exception('Owner-agreement PDF generation failed for host application #%s', application.pk)
+
+
 def _decline(application, stage, reason, officer):
     application.status = HostApplication.Status.DECLINED
     application.declined_stage = stage
@@ -96,6 +107,9 @@ def supervisor_decision(application, approve, officer, reason=''):
             'status', 'supervisor_reviewed_by', 'supervisor_reviewed_at', 'updated_at',
         ])
         _promote_to_host(application.applicant)
+        # Generate the personalized agreement BEFORE notifying, so the approval
+        # email can attach it and the dashboard can offer the download.
+        _generate_agreement_safely(application)
         _safe_notify('notify_host_application_approved', application)
         return application
 

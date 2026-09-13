@@ -107,6 +107,7 @@ def score_property_verification(verification) -> dict:
         f'Ownership type: {verification.get_ownership_type_display()}\n'
         f'Owner name: {verification.owner_name}\n'
         f'Property location: {verification.property_location}\n'
-        f'Deed/volume number: {verification.deed_volume_number}'
+        f'Deed/volume number: {verification.deed_volume_number}\n'
+        f'Page number: {verification.page_number}'
     )
     return _run_prompt(prompt)
