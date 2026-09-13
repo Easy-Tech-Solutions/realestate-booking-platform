@@ -22,12 +22,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I book a property on HomeKonet?',
         answer:
-          'Search for a property using the search bar or browse by category. Once you find a place you like, select your dates, number of guests, and click "Book now." You\'ll be guided through a secure checkout process. Some properties support instant booking, while others require host approval first.',
-      },
-      {
-        question: 'What is the difference between Instant Book and Request to Book?',
-        answer:
-          'Instant Book properties confirm your reservation right away. Request to Book properties require the host to manually review and approve your reservation — hosts have up to 7 days to respond. Either way, nothing is charged until the reservation is confirmed and you complete the separate payment step; if a host doesn\'t respond in time, the request simply expires with no charge.',
+          'Search for a property using the search bar or browse by category. Once you find a place you like, select your dates, number of guests, and click \"Reserve\". The host will manually review and approve your reservation. Hosts have up to 7 days to respond. Nothing is charged until the reservation is confirmed and you complete the separate payment step; if a host doesn\'t respond in time, the request simply expires with no charge.',
       },
       {
         question: 'Can I modify my booking after it\'s confirmed?',
@@ -53,17 +48,17 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'What payment methods does HomeKonet accept?',
         answer:
-          'We accept credit/debit cards (via Stripe) and MTN Mobile Money (MoMo). All transactions are processed through secure, licensed financial institutions.',
+          'We accept MTN Mobile Money (MoMo) payments. All transactions are processed through secure, licensed financial institutions.',
       },
       {
         question: 'When am I charged for a booking?',
         answer:
-          'Never at the moment you request a booking — that step is free. Once your reservation is confirmed (instantly for Instant Book, or after host approval for Request to Book), you have 10 days to complete payment before the reservation expires.',
+          'Never at the moment you request a booking — that step is free. Once the host approves your reservation, you have 10 days to complete payment before the reservation expires.',
       },
       {
         question: 'Is my payment information safe?',
         answer:
-          'Yes. We never store your full card number or CVV. Only the last 4 digits and card type are saved for display purposes. All payments are encrypted and processed through PCI-compliant payment gateways.',
+          'Yes. All payments are encrypted and processed through PCI-compliant payment gateways.',
       },
       {
         question: 'Are there any service fees?',
@@ -110,7 +105,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I create an account?',
         answer:
-          'Click "Sign up" on the homepage and enter your first name, last name, email address, and a strong password. You can also sign up quickly using Google. After registering, you\'ll receive a verification email — click the link to activate your account.',
+          'Click "Sign up" on the homepage and enter your first name, last name, email address, and a strong password. You can also sign up quickly using Google. After registering, you\'ll receive a verification email. Click the link to activate your account.',
       },
       {
         question: 'I forgot my password. How do I reset it?',
@@ -120,7 +115,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I update my phone number?',
         answer:
-          'Go to Account → scroll to the Phone & MoMo section → enter your new number and mobile provider → click "Send verification code." Enter the 6-digit code sent to your email and phone to confirm the change.',
+          'Go to Account → scroll to the Change Phone Number section → enter your current password, new phone number and network provider → click "Send verification code." Enter the 6-digit code sent to your email and new phone number to confirm the change.',
       },
       {
         question: 'Can I use HomeKonet without creating an account?',
@@ -141,7 +136,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I list my property on HomeKonet?',
         answer:
-          'Click "List your property" or go to your Host Dashboard and click "Add listing." You\'ll be guided through steps to add your property type, photos, location, pricing, house rules, and availability. Your listing goes live once submitted and reviewed.',
+          'Click "List your property" or go to your Host Dashboard and click "Add new property." You\'ll be guided through steps to add your property type, photos, location, pricing, house rules, and availability. Your listing goes live once submitted, reviewed and approved.',
       },
       {
         question: 'How do I get paid as a host?',
@@ -161,7 +156,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I manage hotel rooms for a hotel listing?',
         answer:
-          'For properties listed as "Hotel," go to your Host Dashboard → find the hotel listing → click "Manage Rooms." You can add different room types (Standard, Deluxe, Suite, etc.) with individual prices, photos, bed configurations, and inventory counts.',
+          'For properties listed as "Hotel," go to your Host Dashboard → Properties → click "Manage Rooms." You can add different room types (Standard, Deluxe, Suite, etc.) with individual prices, photos, bed configurations, and inventory counts.',
       },
     ],
   },
@@ -182,7 +177,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do I report a problem with a listing or host?',
         answer:
-          'Use the "Report listing" button on any property page, or contact us directly at homekonnet@gmail.com. All reports are reviewed by our Trust & Safety team within 24 hours.',
+          'Use the "Report <host name>" button on any property page, or contact us directly at homekonnet@gmail.com. All reports are reviewed by our Trust & Safety team within 24 hours.',
       },
       {
         question: 'Are reviews verified?',

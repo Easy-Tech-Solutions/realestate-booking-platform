@@ -9,6 +9,8 @@ import { cn } from '../../core/utils';
 import { notificationsAPI } from '../../services/api.service';
 import { toast } from 'sonner';
 import { formatDistanceToNow, parseISO } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../hooks/queries/keys';
 
 interface ApiNotification {
   id: string;
@@ -37,7 +39,10 @@ function targetHref(n: ApiNotification): string | null {
   if (t.startsWith('booking_') || t.startsWith('payment_')) {
     return '/trips';
   }
-  if ((t === 'price_changed' || t === 'listing_available' || t === 'new_review') && d.listing_id != null) {
+  if (
+    (t === 'price_changed' || t === 'listing_available' || t === 'new_review' ||
+      t === 'property_verification_published') && d.listing_id != null
+  ) {
     return `/rooms/${d.listing_id}`;
   }
   return null;
@@ -71,10 +76,16 @@ const colorMap: Record<string, string> = {
 
 export function Notifications() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [busy, setBusy] = useState<Set<string>>(new Set());
+
+  // Keep the header bell badge (a `notifications.unreadCount` query) in sync
+  // after any read/unread/delete action performed here.
+  const refreshUnreadBadge = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
 
   useEffect(() => {
     notificationsAPI.getAll()
@@ -95,6 +106,7 @@ export function Notifications() {
           ? await notificationsAPI.markUnread(n.id)
           : await notificationsAPI.markRead(n.id);
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, ...updated } : x));
+        refreshUnreadBadge();
       } catch {
         toast.error('Failed to update notification');
       }
@@ -106,6 +118,7 @@ export function Notifications() {
       try {
         await notificationsAPI.deleteOne(id);
         setNotifications(prev => prev.filter(x => x.id !== id));
+        refreshUnreadBadge();
         toast.success('Notification deleted');
       } catch {
         toast.error('Failed to delete notification');
@@ -119,6 +132,7 @@ export function Notifications() {
       // Fire-and-forget; UI updates optimistically and we don't block navigation.
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true, read_at: new Date().toISOString() } : x));
       notificationsAPI.markRead(n.id).catch(() => { /* ignore — backend will catch up */ });
+      refreshUnreadBadge();
     }
     if (href) navigate(href);
   };
@@ -127,6 +141,7 @@ export function Notifications() {
     try {
       await notificationsAPI.markAllRead();
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() })));
+      refreshUnreadBadge();
       toast.success('All notifications marked as read');
     } catch {
       toast.error('Failed to mark all as read');
@@ -226,8 +241,8 @@ export function Notifications() {
                     </div>
                     <p className="text-sm text-muted-foreground mt-0.5 leading-snug">{n.message}</p>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Actions — always visible on touch (no hover), hover/focus-reveal on desktop. */}
+                    <div className="flex items-center gap-2 mt-2 transition-opacity opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); handleToggleRead(n); }}
