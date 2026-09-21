@@ -99,6 +99,15 @@ export const authAPI = {
     });
   },
 
+  // Re-send the email-verification link for a pending (unverified) account —
+  // used when the original link expired. Always resolves to a generic message.
+  resendVerification: async (email: string): Promise<{ message: string }> => {
+    return fetchPublicJson('/api/auth/resend-verification/', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
   passwordResetConfirm: async (token: string, password: string, password2: string): Promise<{ message: string }> => {
     return fetchPublicJson('/api/auth/password-reset-confirm/', {
       method: 'POST',

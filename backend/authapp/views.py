@@ -19,6 +19,7 @@ from .throttles import (
     RegisterRateThrottle,
     PasswordResetRateThrottle,
     VerifyEmailRateThrottle,
+    ResendVerificationRateThrottle,
     GoogleLoginRateThrottle,
 )
 from .models import SocialAccount
@@ -152,8 +153,45 @@ def register(request):
     if len(password) < 8:
         return Response({"error": "password must be at least 8 characters long"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if User.objects.filter(email=email).exists():
-        return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+    # An email that already belongs to an account normally blocks registration.
+    # BUT a verification link expires after 24h, and the (unverified) account it
+    # created still occupies the email — which would leave the user unable to
+    # re-register OR log in, with no way out. So when the ONLY account(s) on this
+    # email are unverified, never-activated LOCAL signups, treat this as
+    # re-registering that pending signup: refresh its details and send a fresh
+    # verification link instead of a dead-end error. Verified accounts and
+    # Google-SSO accounts (no usable password) still block.
+    existing = list(User.objects.filter(email__iexact=email))
+    if existing:
+        verify_required = settings.AUTH_REQUIRE_EMAIL_VERIFICATION
+        pending = [
+            u for u in existing
+            if verify_required and not u.email_verified and u.has_usable_password()
+        ]
+        blocking = [u for u in existing if u not in pending]
+        if blocking or not pending:
+            return Response({"error": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = pending[-1]  # most recent pending signup
+        user.first_name = first_name
+        user.last_name = last_name
+        user.set_password(password)
+        user.is_active = False
+        user.save(update_fields=['first_name', 'last_name', 'password', 'is_active'])
+        try:
+            from .utils import send_verification_email
+            send_verification_email(user)  # regenerates token + 24h expiry, re-sends
+        except Exception:
+            logger.exception("register: failed to resend verification for pending account %s", user.id)
+            return Response(
+                {"error": "We couldn't send the verification email just now. Please try again in a moment."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        log_activity(request, 'user_registration_resent', resource_type='user', resource_id=user.id)
+        return Response(
+            {"message": "This email is already registered but not yet verified. We've sent a fresh verification link — please check your inbox."},
+            status=status.HTTP_200_OK,
+        )
 
     username = _unique_username_from_email(email)
 
@@ -213,7 +251,11 @@ def verify_email(request):
         if request.method == "GET":
             html = render_to_string("auth/verification_failure.html", {
                 "heading": "Link expired",
-                "message": "This verification link has expired. Please request a new one.",
+                "message": (
+                    "This verification link has expired. Sign in with your email and password "
+                    "and we'll offer to send you a new link — or just sign up again with the same "
+                    "email to receive a fresh one."
+                ),
                 "login_url": login_url,
                 "site_name": settings.SITE_NAME,
             })
@@ -232,6 +274,35 @@ def verify_email(request):
         })
         return HttpResponse(html)
     return Response({"message": "Email verified successfully"}, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@throttle_classes([ResendVerificationRateThrottle])
+def resend_verification(request):
+    """Re-send the email-verification link for a pending (unverified) account.
+
+    Always returns the same generic 200 so it can't be used to probe which
+    emails have accounts. Only unverified LOCAL accounts (usable password) are
+    sent a link; verified and Google-SSO accounts are silently ignored.
+    """
+    email = (request.data.get("email") or "").strip().lower()
+    generic = Response(
+        {"message": "If an account with that email still needs verification, we've sent a new link. Please check your inbox."},
+        status=status.HTTP_200_OK,
+    )
+    if not email or not settings.AUTH_REQUIRE_EMAIL_VERIFICATION:
+        return generic
+
+    from .utils import send_verification_email
+    for user in User.objects.filter(email__iexact=email, email_verified=False):
+        if user.has_usable_password():
+            try:
+                send_verification_email(user)
+            except Exception:
+                logger.exception("resend_verification: failed to send for user %s", user.id)
+    return generic
+
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -266,7 +337,11 @@ def login_view(request):
         return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
     if settings.AUTH_REQUIRE_EMAIL_VERIFICATION and not user.email_verified:
-        return Response({"error": "Please verify your email before logging in. Check your email for the verification link."}, status=status.HTTP_403_FORBIDDEN)
+        return Response(
+            {"error": "Please verify your email before logging in. Check your email for the verification link.",
+             "code": "email_not_verified"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     if not user.is_active:
         return Response({"error": "This account has been deactivated."}, status=status.HTTP_403_FORBIDDEN)

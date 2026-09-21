@@ -292,6 +292,7 @@ REST_FRAMEWORK = {
         "register": "100/hour" if DEBUG else "5/hour",
         "password_reset": "3/hour",
         "verify_email": "10/hour",
+        "resend_verification": "3/hour",
         "phone_change": "5/hour",
         "google_login": "20/min" if DEBUG else "10/min",
         "mfa_verify_login": "10/hour",

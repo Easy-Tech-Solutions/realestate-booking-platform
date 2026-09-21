@@ -157,6 +157,24 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     } catch (error: any) {
       if (error instanceof MfaRequiredError) {
         setMfaToken(error.mfaToken);
+      } else if (
+        view === 'login' &&
+        (error?.data?.code === 'email_not_verified' || /verify your email/i.test(error?.message || ''))
+      ) {
+        // The account exists but its verification link expired / was never used.
+        // Offer to re-send it straight from the error toast so the user isn't stuck.
+        const emailForResend = formData.email;
+        toast.error(error.message || 'Please verify your email before logging in.', {
+          duration: 10000,
+          action: {
+            label: 'Resend link',
+            onClick: () => {
+              authAPI.resendVerification(emailForResend)
+                .then((r) => toast.success(r.message || 'Verification link sent — check your inbox.'))
+                .catch(() => toast.error('Could not resend the link. Please try again.'));
+            },
+          },
+        });
       } else {
         toast.error(
           error.message ||
