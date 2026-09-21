@@ -17,6 +17,12 @@ class VerifyEmailRateThrottle(AnonRateThrottle):
     scope = "verify_email"
 
 
+class ResendVerificationRateThrottle(AnonRateThrottle):
+    """Limits how often the verification link can be re-sent, to prevent using
+    the endpoint to spam an inbox. Rate set in DEFAULT_THROTTLE_RATES."""
+    scope = "resend_verification"
+
+
 class GoogleLoginRateThrottle(AnonRateThrottle):
     scope = "google_login"
 
