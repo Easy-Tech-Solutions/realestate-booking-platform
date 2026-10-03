@@ -1,5 +1,14 @@
 # HomeKonet — Migrating from Neon to a Self-Hosted PostgreSQL VM on GCP
 
+> **Superseded.** This plan was executed (production ran self-hosted
+> Postgres on a dedicated GCP VM, `homekonet-db-svr`), and has since been
+> superseded again: as of 2026-10-03 the whole stack — including Postgres,
+> now a `db` service inside `docker-compose.yml` — runs consolidated on a
+> single Hostinger VPS. See **`docs/migration-to-hostinger.md`** for the
+> current architecture and **`CLAUDE.md`** for a quick orientation. Kept
+> here for history/reasoning (why self-hosted over managed, the GCP-specific
+> provisioning steps), not as current instructions to follow.
+
 **Status:** Planning document
 **Trigger:** Production outage on 2026-07-26 — Neon returned `ERROR: Your account or
 project has exceeded the compute time quota. Upgrade your plan to increase limits.`

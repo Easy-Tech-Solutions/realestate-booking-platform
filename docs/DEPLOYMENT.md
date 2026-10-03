@@ -886,22 +886,30 @@ At minimum, set up an uptime check on your domain (UptimeRobot free tier covers 
 
 ## 17. Backup and Restore
 
-This deployment runs Postgres on Neon rather than in a local container, so
-database backup and server backup are two separate concerns.
+By default this deployment runs Postgres in the `db` Compose service (a
+local container, own named volume) — unlike a managed provider, there's no
+automatic off-box backup happening for you, so the backup mechanism below
+covers the database too, not just media/secrets.
 
 ### Database
 
-Neon takes continuous backups and supports point-in-time restore and
-branching out of the box — no manual `pg_dump` cron job needed. See the
-[Neon docs](https://neon.tech/docs/introduction/backup-restore) for
-point-in-time recovery.
+`scripts/backup.sh` (below) includes a `pg_dump --format=custom` of the
+database as part of its single encrypted archive — this is the actual
+backup mechanism, whether Postgres is the local `db` container (the
+default) or an external managed provider configured via `DATABASE_URL`. If
+you're using a managed provider like Neon instead, it likely also offers
+its own continuous/point-in-time backup independent of this — check that
+provider's docs — but don't rely on that alone if you've removed the `db`
+service per this guide's "Using Neon or another managed database?" notes;
+confirm which mechanism is actually protecting your data.
 
 ### Media files and secrets
 
-Everything else this server holds that isn't in git or in Neon — uploaded
-media, `.env` secrets, the TLS cert — is covered by `scripts/backup.sh` /
-`scripts/restore.sh`. See **[MIGRATION.md](../MIGRATION.md)** for full usage,
-including a crontab snippet for scheduled off-box backups.
+Everything else this server holds that isn't in git — uploaded media,
+`.env` secrets, the TLS cert, pgAdmin's saved connections — is covered by
+the same `scripts/backup.sh` / `scripts/restore.sh` archive. See
+**[MIGRATION.md](../MIGRATION.md)** for full usage, including a crontab
+snippet for scheduled off-box backups.
 
 ```bash
 cd /opt/homekonet
@@ -911,9 +919,11 @@ bash scripts/backup.sh   # -> backups/homekonet-backup-<timestamp>.tar.gz.gpg (e
 ### Full server migration
 
 To move this deployment to a different server entirely (new VPS, provider
-change, etc.), see **[MIGRATION.md](../MIGRATION.md)** — it covers what needs
-to move (media, secrets, TLS) versus what doesn't (the database, since Neon
-is already off-server).
+change, etc.), see **[MIGRATION.md](../MIGRATION.md)** — it covers what
+needs to move (database, media, secrets, TLS) and how, including the case
+where the database moves along with everything else (the normal case when
+using the local `db` container, since there's no external provider holding
+it separately).
 
 ---
 

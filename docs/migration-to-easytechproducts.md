@@ -1,7 +1,17 @@
 # Migrating HomeKonet to the `easytechproducts` GCP Project
 
-**Status:** New servers provisioned and readiness-verified. Data cutover not yet
-performed — the steps below pick up from here. See `MIGRATION.md` for the
+> **Superseded.** This migration completed (production ran on
+> `easytech-svr01` + `homekonet-db-svr` in the `easytechproducts` GCP
+> project), and that environment has since been superseded: as of
+> 2026-10-03 production runs on a single Hostinger VPS instead — see
+> **`docs/migration-to-hostinger.md`**. The two GCP VMs described here are
+> being kept temporarily as a rollback fallback post-cutover, not actively
+> developed against; check that doc's §9 before assuming they're still
+> relevant or still exist.
+
+**Status:** Completed (data cutover was performed after this doc was
+written — the "not yet performed" note below is stale, kept for history).
+See `MIGRATION.md` for the
 general, reusable runbook this follows; this doc has the concrete values for
 *this specific* move (old `eventhub-and-homekonet` project → new
 `easytechproducts` project) and records exactly what's already been done.

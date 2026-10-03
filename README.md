@@ -115,6 +115,9 @@ Backend default: http://localhost:8000
 - Integration guide: [docs/integration.md](docs/integration.md)
 - Backend production infrastructure: [docs/backend/infrastructure-production.md](docs/backend/infrastructure-production.md)
 - Frontend production infrastructure: [docs/frontend/infrastructure-production.md](docs/frontend/infrastructure-production.md)
+- General deployment guide: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- Server migration runbook: [MIGRATION.md](MIGRATION.md)
+- **Current production infrastructure** (as of 2026-10-03): [docs/migration-to-hostinger.md](docs/migration-to-hostinger.md) — also see the quick orientation in [CLAUDE.md](CLAUDE.md)
 
 ## Pre-Release Gate
 

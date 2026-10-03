@@ -157,7 +157,7 @@
           </div>
           <div class="arrow">↓ reads/writes</div>
           <div class="row">
-            <div class="box">Postgres<small>External / managed (Neon) — no local db container or volume; reached over <code class="inline">DATABASE_URL</code></small></div>
+            <div class="box">Postgres<small>Local <code class="inline">db</code> container (<code class="inline">postgres:16</code>, own named volume) — reached via <code class="inline">POSTGRES_HOST=db</code>, Docker Compose service-name DNS</small></div>
             <div class="box">Redis<small>One instance, three jobs: Celery broker+result backend, Django cache, Channels layer</small></div>
             <div class="box">pgAdmin<small>Standalone DB-admin UI, own <code class="inline">pgadmin_data</code> volume — not in the request path, published directly on port 5050 (not proxied through <code class="inline">nginx</code>)</small></div>
           </div>
@@ -177,9 +177,9 @@
           </div>
         </div>
 
-        <div class="callout warn">
-          <span class="callout-label">No Postgres container in the real compose file</span>
-          <code class="inline">docker-compose.yml</code> at the repo root has no <code class="inline">db</code> service — Postgres is expected to be an external managed database (e.g. Neon), configured via <code class="inline">DATABASE_URL</code>. The example compose file embedded in <code class="inline">docs/DEPLOYMENT.md</code> does include a local <code class="inline">db</code> service and omits <code class="inline">celery-ai</code>/<code class="inline">ai_models</code> — that doc describes an alternate/earlier topology. Don't copy it verbatim; treat the root <code class="inline">docker-compose.yml</code> as the source of truth.
+        <div class="callout tip">
+          <span class="callout-label">Postgres moved into Compose on 2026-10-03</span>
+          The root <code class="inline">docker-compose.yml</code> now includes a <code class="inline">db</code> service (<code class="inline">postgres:16</code>) — added during the migration off two separate GCP VMs onto one consolidated Hostinger VPS. Before that date this section described Postgres as external/managed (Neon, then later a dedicated self-hosted GCP VM); both are now historical. See <code class="inline">docs/migration-to-hostinger.md</code> for the full record, including why the containerized approach was chosen over a repeat of the bare-metal pattern. Settings.py still supports <code class="inline">DATABASE_URL</code> for a managed provider as an alternative — nothing about the code requires the containerized approach, it's just what production actually runs today.
         </div>
 
         <h3>Request path — a browser hitting <code class="inline">/api/...</code></h3>
@@ -202,17 +202,17 @@
             <tr><td><code class="inline">celery-beat</code></td><td><code class="inline">celery -A realestate_backend beat</code></td><td>same as <code class="inline">celery</code></td><td>Scheduler only — ticks jobs onto the broker, never executes them itself.</td></tr>
             <tr><td><code class="inline">celery-ai</code></td><td><code class="inline">download_ai_model &amp;&amp; celery ... --concurrency=1 --pool=solo -Q ai_scoring</code></td><td>same as <code class="inline">celery</code></td><td>Own <code class="inline">ai_models</code> volume (persists the ~3GB GGUF file across restarts). Pinned to one process/one pool so exactly one copy of the model is ever resident in memory.</td></tr>
             <tr><td><code class="inline">frontend</code></td><td><code class="inline">nginx -g "daemon off;"</code></td><td><code class="inline">backend</code> (start order only, no health condition)</td><td>Published ports <code class="inline">80:80</code>, <code class="inline">443:443</code>. Mounts <code class="inline">nginx.conf</code> and TLS certs read-only, plus the shared <code class="inline">static_files</code> volume and the same <code class="inline">./backend/media</code> bind mount as <code class="inline">backend</code> (read-only here).</td></tr>
-            <tr><td><code class="inline">pgadmin</code></td><td><code class="inline">dpage/pgadmin4</code> (official image, not built from a local Dockerfile)</td><td>—</td><td>Published port <code class="inline">5050:80</code>, reachable directly (not proxied through <code class="inline">nginx</code>/TLS-terminated). Credentials come from <code class="inline">PGADMIN_DEFAULT_EMAIL</code>/<code class="inline">PGADMIN_DEFAULT_PASSWORD</code> in the root <code class="inline">.env</code>. <strong>Check the current GCP firewall rule for this port before assuming it's only reachable internally</strong> — see the callout below.</td></tr>
+            <tr><td><code class="inline">pgadmin</code></td><td><code class="inline">dpage/pgadmin4</code> (official image, not built from a local Dockerfile)</td><td>—</td><td>Published as <code class="inline">127.0.0.1:5050:80</code> — host-loopback only, not reachable from outside the server at all. Credentials come from <code class="inline">PGADMIN_DEFAULT_EMAIL</code>/<code class="inline">PGADMIN_DEFAULT_PASSWORD</code> in the root <code class="inline">.env</code>. Reach it via an SSH tunnel: <code class="inline">ssh -L 5050:localhost:5050 &lt;user&gt;@&lt;server&gt;</code>, then browse to <code class="inline">localhost:5050</code>.</td></tr>
           </tbody>
         </table>
-        <div class="callout danger">
-          <span class="callout-label">Verify pgAdmin's firewall exposure before relying on this table alone</span>
-          <code class="inline">docker-compose.yml</code> publishes pgAdmin on <code class="inline">5050:80</code>, and nothing in Compose itself restricts who can reach that port — that's entirely down to whatever firewall sits in front of the host (GCP firewall rules, <code class="inline">ufw</code>, etc.), and those two can disagree with each other. On this host specifically, GCP firewall rules are the actual authority: check <code class="inline">gcloud compute firewall-rules list</code> for a rule targeting this instance's network tags on port 5050, and confirm its <code class="inline">sourceRanges</code> is restricted to specific trusted IPs, not <code class="inline">0.0.0.0/0</code> — a full database-admin UI reachable from the entire internet, protected by only a login password, is a real production risk, not a hypothetical one.
+        <div class="callout tip">
+          <span class="callout-label">Verify the binding, don't assume it from this table</span>
+          <code class="inline">docker-compose.yml</code>'s port mapping is the actual authority for whether pgAdmin is reachable beyond the host — confirm with <code class="inline">docker compose ps pgadmin</code> (look for <code class="inline">127.0.0.1:5050-&gt;80</code> vs. a bare <code class="inline">0.0.0.0:5050-&gt;80</code>). The earlier GCP deployment published it on <code class="inline">0.0.0.0:5050</code> (reachable from the entire internet, protected only by a login password) — a real risk that was fixed when the stack moved to the current server; don't reintroduce it on a future move without deliberately deciding to.
         </div>
         <p>Every container built from <code class="inline">Dockerfile.backend</code> (<code class="inline">backend</code>, <code class="inline">celery</code>, <code class="inline">celery-beat</code>, <code class="inline">celery-ai</code>) shares <code class="inline">docker-entrypoint.sh</code> as its <code class="inline">ENTRYPOINT</code>: it runs <code class="inline">migrate --no-input</code>, then <code class="inline">collectstatic --no-input</code>, then <code class="inline">exec</code>s whatever <code class="inline">CMD</code>/<code class="inline">command</code> was set. That means migrations and static collection happen redundantly on all four container starts — harmless, since both commands are idempotent, but worth knowing so a slow redeploy of, say, <code class="inline">celery-beat</code> alone isn't surprising.</p>
 
         <h3>Data &amp; caching layer</h3>
-        <p><strong>Postgres</strong> resolves in three tiers, first one configured wins: a single <code class="inline">DATABASE_URL</code> (the managed-Neon path used in production) → discrete <code class="inline">POSTGRES_*</code> vars with <code class="inline">DB_ENGINE=postgres</code> (local dev against a real Postgres, <code class="inline">sslmode=require</code> by default) → SQLite at <code class="inline">db.sqlite3</code> as a last-resort fallback for a bare checkout with no DB config at all.</p>
+        <p><strong>Postgres</strong> resolves in three tiers, first one configured wins: a single <code class="inline">DATABASE_URL</code> (for a managed provider, e.g. Neon — supported in code, not what production uses today) → discrete <code class="inline">POSTGRES_*</code> vars with <code class="inline">DB_ENGINE=postgres</code> (the path actually used in production — <code class="inline">POSTGRES_HOST=db</code>, the Compose <code class="inline">db</code> container, <code class="inline">POSTGRES_SSLMODE=disable</code> since it's all internal Docker-network traffic; the same tier covers local dev against a real Postgres too) → SQLite at <code class="inline">db.sqlite3</code> as a last-resort fallback for a bare checkout with no DB config at all.</p>
         <p><strong>Redis does three unrelated jobs</strong> in this deployment, all off one instance:</p>
         <ul>
           <li><strong>Celery broker + result backend</strong> — always, whenever <code class="inline">REDIS_URL</code> is set.</li>
@@ -270,9 +270,9 @@
             <tr><td>Brevo (Sendinblue)</td><td>Transactional email (verification, password reset, notifications)</td><td>Via <code class="inline">django-anymail</code>. Defaults to a <code class="inline">console</code> backend (prints to stdout) when <code class="inline">DJANGO_DEBUG=true</code>; <code class="inline">EMAIL_BACKEND_MODE=smtp</code> is also available as a fallback.</td></tr>
             <tr><td>Google OAuth</td><td>"Sign in with Google"</td><td>Server-side ID token verification (<code class="inline">google-auth</code>), not a client-only integration — the backend independently checks issuer/audience/email-verified claims before trusting it.</td></tr>
             <tr><td>Web Push (VAPID)</td><td>Browser push notifications</td><td>Self-hosted protocol (<code class="inline">pywebpush</code> + a VAPID keypair we own), not a third-party SaaS — no external account/dashboard involved.</td></tr>
-            <tr><td>Neon</td><td>Managed Postgres</td><td>Reached purely via <code class="inline">DATABASE_URL</code> — no Neon-specific SDK or code path; any Postgres provider that hands out a connection string would work identically.</td></tr>
           </tbody>
         </table>
+        <p style="color:var(--muted-fg); font-size:.85rem;">Neon (managed Postgres) isn't in this table — it's no longer used in production (see the Postgres tiers note above and <code class="inline">docs/migration-to-hostinger.md</code>), though <code class="inline">DATABASE_URL</code> support remains in code for any managed provider that hands out a connection string.</p>
         <div class="callout tip">
           <span class="callout-label">Flutterwave / Orange Money env vars exist but aren't wired up</span>
           <code class="inline">.env.example</code> has placeholders for both, but no code anywhere references them — they're vestigial from an earlier plan, not a second live mobile-money gateway. MTN MoMo is the only mobile money integration that actually runs.
@@ -421,7 +421,7 @@ python manage.py createcachetable   # only needed if not using Redis cache
           <thead><tr><th></th><th>Application user (<code class="inline">users.User</code>)</th><th>Postgres role</th></tr></thead>
           <tbody>
             <tr><td>What it is</td><td>A row in the <code class="inline">users_user</code> table — a person who logs into HomeKonet</td><td>A login credential Postgres itself authenticates connections with (e.g. <code class="inline">homekonet_app</code>)</td></tr>
-            <tr><td>Where it's managed</td><td>Django admin, the Management Portal's Users screen, or <code class="inline">manage.py</code> commands below</td><td><code class="inline">psql</code>/<code class="inline">dbshell</code>, or the Neon console today (see <a href="#gcp-migration-note">below</a> for the self-hosted future)</td></tr>
+            <tr><td>Where it's managed</td><td>Django admin, the Management Portal's Users screen, or <code class="inline">manage.py</code> commands below</td><td><code class="inline">psql</code>/<code class="inline">dbshell</code> against the <code class="inline">db</code> container (see <a href="#gcp-migration-note">below</a> for the history of how Postgres got here)</td></tr>
             <tr><td>"Password reset" means</td><td>Changing what that person types into the login form</td><td>Changing the credential the whole Django app uses to open <em>every</em> connection to Postgres — rotating this requires updating <code class="inline">backend/.env</code> and redeploying, not a user-facing action</td></tr>
           </tbody>
         </table>
@@ -453,12 +453,12 @@ get_user_model().objects.filter(email='someone@example.com').update(is_active=Fa
         </div>
 
         <h4>Postgres roles — infrastructure level</h4>
-        <p>There is currently no local <code class="inline">db</code> container — the real database is external managed Postgres (Neon). Everything below runs by connecting directly to it.</p>
+        <p>Postgres runs as the <code class="inline">db</code> service in <code class="inline">docker-compose.yml</code> (<code class="inline">postgres:16</code>, own named volume) — not reachable from the host directly (no published port, matching the <code class="inline">redis</code> pattern), only from inside the Compose network.</p>
         <pre><code># Open a SQL shell using the app's own configured connection
 docker compose exec backend python manage.py dbshell
 
-# Equivalent, with the driver directly (useful outside the Django app context)
-psql "$DATABASE_URL"
+# Equivalent, directly against the db container (useful outside the Django app context)
+docker compose exec db psql -U homekonet_app -d homekonet
 
 # List roles and their privileges
 \du
@@ -473,10 +473,11 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO reporting_readonly;
 -- so future tables/migrations are covered too:
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO reporting_readonly;
 
-# Rotate the app's own role password (Neon: do this from the Neon console, not raw SQL,
-# so Neon's connection pooler picks up the change) — then update backend/.env's
-# DATABASE_URL and redeploy:
-docker compose up -d --force-recreate backend celery celery-beat celery-ai
+# Rotate the app's own role password — run against the db container, then update
+# backend/.env's POSTGRES_PASSWORD and the root .env's POSTGRES_PASSWORD (feeds
+# the db container's own POSTGRES_PASSWORD env var) to match, then recreate:
+ALTER ROLE homekonet_app WITH PASSWORD '&lt;new-strong-password&gt;';
+docker compose up -d --force-recreate db backend celery celery-beat celery-ai
 
 # See who/what is currently connected — useful when diagnosing a "too many connections" error
 SELECT pid, usename, client_addr, state, query, query_start
@@ -489,9 +490,9 @@ SELECT pg_terminate_backend(&lt;pid&gt;);
 SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) AS size
 FROM pg_catalog.pg_statio_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 15;
 SELECT pg_size_pretty(pg_database_size(current_database()));</code></pre>
-        <div class="callout danger" id="gcp-migration-note">
-          <span class="callout-label">Neon compute-quota outages — see the migration plan</span>
-          On 2026-07-26, Neon returned <code class="inline">ERROR: Your account or project has exceeded the compute time quota</code> for every single connection attempt — every endpoint that touched the DB (login, listings, health check) failed with a 500 simultaneously, with no local fix available since the database itself was refusing connections. See <a href="#common-errors">Common Errors #9</a> for the full incident, and <code class="inline">docs/gcp-postgres-migration.md</code> for the plan to move off Neon onto a self-hosted PostgreSQL VM we control, which removes this exact failure mode. Until that migration happens, the only mitigation is monitoring Neon's dashboard for compute-time usage trending toward the quota and upgrading the plan proactively.
+        <div class="callout tip" id="gcp-migration-note">
+          <span class="callout-label">Resolved: Neon compute-quota outages (history, not a current risk)</span>
+          On 2026-07-26, Neon returned <code class="inline">ERROR: Your account or project has exceeded the compute time quota</code> for every single connection attempt — every endpoint that touched the DB (login, listings, health check) failed with a 500 simultaneously, with no local fix available since the database itself was refusing connections. See <a href="#common-errors">Common Errors #9</a> for the full incident. This is what motivated moving off Neon entirely: first onto a dedicated self-hosted PostgreSQL VM on GCP (<code class="inline">docs/gcp-postgres-migration.md</code>), and later (2026-10-03) consolidated into the <code class="inline">db</code> Compose service described throughout this section (<code class="inline">docs/migration-to-hostinger.md</code>). Neon is not used anywhere in production today — this failure mode cannot recur unless a future change reintroduces a managed-Postgres dependency.
         </div>
       </section>
 
@@ -538,7 +539,7 @@ docker compose logs --tail=50 backend</code></pre>
 
       <section class="doc-section" id="backup-migration">
         <h2>🗂️ Backup &amp; Migration</h2>
-        <p class="section-intro">Everything needed to back up the whole stack — database, pgAdmin, media, secrets, TLS cert — and move it to a brand-new server with minimal downtime. The canonical, always-current runbook lives at <code class="inline">MIGRATION.md</code> in the repo root (open it directly when actually performing a migration); this section covers the same ground with the reasoning behind each piece. The database-specific deep dive (provisioning a dedicated self-hosted Postgres VM) lives in <code class="inline">docs/gcp-postgres-migration.md</code>.</p>
+        <p class="section-intro">Everything needed to back up the whole stack — database, pgAdmin, media, secrets, TLS cert — and move it to a brand-new server with minimal downtime. The canonical, always-current runbook lives at <code class="inline">MIGRATION.md</code> in the repo root (open it directly when actually performing a migration); this section covers the same ground with the reasoning behind each piece. For database-specific history: <code class="inline">docs/gcp-postgres-migration.md</code> covers provisioning a dedicated self-hosted Postgres VM (the pattern used before 2026-10-03); <code class="inline">docs/migration-to-hostinger.md</code> covers the current pattern — Postgres as a <code class="inline">db</code> service inside the same Compose stack as the app, simpler since there's no second host to secure a network path to.</p>
 
         <h3>What actually needs to move</h3>
         <table>
@@ -580,7 +581,7 @@ cd /opt/homekonet
 bash scripts/restore.sh /path/to/homekonet-backup-*.tar.gz.gpg</code></pre>
         <div class="callout warn">
           <span class="callout-label">The database is deliberately NOT auto-restored</span>
-          <code class="inline">restore.sh</code> extracts <code class="inline">backend/media/</code>, all three <code class="inline">.env</code> files, and <code class="inline">nginx/ssl/</code> directly into the repo tree and fixes their permissions — but it stages the database dump and pgAdmin export at <code class="inline">backups/database.dump</code> / <code class="inline">backups/pgadmin_data.tar.gz</code> <em>without</em> running <code class="inline">pg_restore</code> automatically. Whether to restore into a database is a judgment call the script can't safely make for you — is this a new app server pointed at the <em>same</em>, unchanged Neon project (skip the restore, nothing to do), or a genuinely new/empty database that needs populating (run the printed <code class="inline">pg_restore</code> command)? Guessing wrong here is either a silent no-op or a destructive overwrite — the script prints the exact command for your situation instead of picking for you.
+          <code class="inline">restore.sh</code> extracts <code class="inline">backend/media/</code>, all three <code class="inline">.env</code> files, and <code class="inline">nginx/ssl/</code> directly into the repo tree and fixes their permissions — but it stages the database dump and pgAdmin export at <code class="inline">backups/database.dump</code> / <code class="inline">backups/pgadmin_data.tar.gz</code> <em>without</em> running <code class="inline">pg_restore</code> automatically. Whether to restore into a database is a judgment call the script can't safely make for you — is this a new app server pointed at the <em>same</em>, unchanged database (skip the restore, nothing to do), or a genuinely new/empty database that needs populating (run the printed <code class="inline">pg_restore</code> command — this is the normal case when the database is moving too, e.g. into a new <code class="inline">db</code> Compose container on a new server)? Guessing wrong here is either a silent no-op or a destructive overwrite — the script prints the exact command for your situation instead of picking for you.
         </div>
 
         <h3>Restoring the database (when the database itself is moving too)</h3>
@@ -607,7 +608,7 @@ docker compose start pgadmin</code></pre>
         <p>See <code class="inline">MIGRATION.md</code> for the complete, always-current version with every command in full — this is the shape of it:</p>
         <ol class="steps">
           <li><strong>Old server:</strong> <code class="inline">bash scripts/backup.sh</code>, then <code class="inline">scp</code> the resulting archive to the new server.</li>
-          <li><strong>New server:</strong> provision it (<a href="#deployment">Deployment &amp; Infrastructure</a> for the app tier; <code class="inline">docs/gcp-postgres-migration.md</code> §6–11 first if the database is also moving to a new self-hosted VM), <code class="inline">git clone</code>, then <code class="inline">bash scripts/restore.sh &lt;archive&gt;</code>.</li>
+          <li><strong>New server:</strong> provision it (<a href="#deployment">Deployment &amp; Infrastructure</a> for the app tier). If the database is moving too, the current, simpler default is adding a <code class="inline">db</code> service to the new <code class="inline">docker-compose.yml</code> (see <code class="inline">docs/migration-to-hostinger.md</code> for a worked example) rather than provisioning a second dedicated VM (<code class="inline">docs/gcp-postgres-migration.md</code> §6–11, the older pattern). Then <code class="inline">git clone</code>, <code class="inline">bash scripts/restore.sh &lt;archive&gt;</code>.</li>
           <li>Review the restored <code class="inline">backend/.env</code> — update DB connection values if the database is moving too, and any domain/host-specific values.</li>
           <li>If the database moved: run the <code class="inline">pg_restore</code> command above <em>before</em> bringing the stack up.</li>
           <li><code class="inline">docker compose config --quiet &amp;&amp; docker compose build</code> — validate and build without starting yet (DNS still points at the old server).</li>
@@ -739,7 +740,7 @@ docker compose run --rm \
 # role='superadmin' — there is intentionally no dashboard control for this)
 docker compose exec backend python manage.py createsuperuser
 
-# Raw SQL shell against the real (Neon/Postgres) database
+# Raw SQL shell against the real database (the db container)
 docker compose exec backend python manage.py dbshell
 
 # Any other one-off management command follows the same pattern:
@@ -777,7 +778,7 @@ docker system prune            # asks for confirmation; read the summary before 
 docker system prune -a --volumes   # destructive — do not run on this host without explicit sign-off</code></pre>
         <div class="callout danger">
           <span class="callout-label">Never docker system prune -a --volumes casually</span>
-          This host has no separate <code class="inline">db</code> container — the real data lives in managed Postgres (Neon), so the risk here is narrower than on a self-hosted DB box, but <code class="inline">redis_data</code> (cache/session state) and <code class="inline">ai_models</code> (the ~3&nbsp;GB downloaded GGUF file, expensive to re-fetch) are still real losses. Always run a bare <code class="inline">docker system df</code> first and reclaim narrowly (image/builder prune) before ever reaching for the volume-destroying flags.
+          This host's <code class="inline">db</code> container holds the <strong>real database</strong> in a named volume (<code class="inline">postgres_data</code>) — <code class="inline">--volumes</code> would take that down with everything else, not just the lower-stakes <code class="inline">redis_data</code> (cache/session state) and <code class="inline">ai_models</code> (the ~3&nbsp;GB downloaded GGUF file, expensive to re-fetch but not real data loss). This is a meaningfully bigger blast radius than the earlier Neon-backed deployment, where the database itself lived outside Docker entirely. Always run a bare <code class="inline">docker system df</code> first and reclaim narrowly (image/builder prune) before ever reaching for the volume-destroying flags — and if in doubt, take a fresh <code class="inline">scripts/backup.sh</code> snapshot first.
         </div>
 
         <h3>General Linux commands used operating this box</h3>
@@ -923,7 +924,7 @@ docker compose up -d --build   # requires backend/.env to exist</code></pre>
         <ol class="steps">
           <li>Check the backend logs first — <code class="inline">docker compose logs --tail=100 backend</code> — a <code class="inline">django.db.utils.OperationalError</code> at the top means Postgres itself is unreachable, not an application bug. Don't start debugging application code until this is ruled out.</li>
           <li>If the error text mentions <strong>"exceeded the compute time quota"</strong> or similar plan-limit language, this is Neon (or whatever managed Postgres provider) refusing new connections at the account/project level — no amount of restarting the backend container fixes this. Check the provider's dashboard directly and either wait for the quota to reset or upgrade the plan. See <a href="#common-errors">Common Errors #9</a>.</li>
-          <li>If the error instead mentions <strong>connection refused</strong> or a timeout with no quota language, confirm the DB host is actually reachable from the app server: <code class="inline">nc -zv &lt;db-host&gt; 5432</code>. For a self-hosted Postgres box (see <code class="inline">docs/gcp-postgres-migration.md</code>), also check the firewall rule still allows the app server's specific IP and that the <code class="inline">postgresql</code> service is running (<code class="inline">systemctl status postgresql</code> on the DB VM).</li>
+          <li>If the error instead mentions <strong>connection refused</strong> or a timeout with no quota language: for the current setup, check the <code class="inline">db</code> container itself first — <code class="inline">docker compose ps db</code> (is it healthy?) and <code class="inline">docker compose logs db</code>. For a dedicated self-hosted Postgres VM (the older pattern, see <code class="inline">docs/gcp-postgres-migration.md</code>), confirm the DB host is reachable from the app server (<code class="inline">nc -zv &lt;db-host&gt; 5432</code>), that the firewall rule still allows the app server's specific IP, and that the <code class="inline">postgresql</code> service is running (<code class="inline">systemctl status postgresql</code> on the DB VM).</li>
           <li>If the error mentions <strong>"too many connections"</strong>, run the <code class="inline">pg_stat_activity</code> query from <a href="#database">Database user management</a> to see what's holding connections open, and check <code class="inline">POSTGRES_CONN_MAX_AGE</code> in <code class="inline">backend/.env</code> — a value that's too low relative to traffic can cause excessive reconnect churn under load.</li>
           <li>Once the database is reachable again, confirm recovery with <code class="inline">curl -sk https://homekonet.com/api/health/</code> before telling anyone the incident is resolved — the health check itself queries the DB, so it's a true end-to-end signal, not just "the container is up."</li>
         </ol>
@@ -1037,7 +1038,7 @@ if assignment.role.slug == 'admin' and target_user.role == 'admin':
 ERROR:  Your account or project has exceeded the compute time quota. Upgrade your plan to increase limits.</code></pre>
           <p><strong>Cause:</strong> the production database is external managed Postgres (Neon), billed/limited on compute-time. Once the quota was exhausted, Neon refused the TCP connection at its side entirely — this is not a Django, Docker, or application-level failure at all; every container (backend, celery, celery-beat, celery-ai) was healthy and running the whole time. <code class="inline">docker compose ps</code> even showed the backend as <code class="inline">unhealthy</code> only because its own healthcheck hits <code class="inline">/api/health/</code>, which itself queries the DB — a correct signal, but easy to misread as "the container crashed" rather than "the container's dependency is unreachable."</p>
           <p><strong>Fix:</strong> nothing fixable from the app server — this is a provider-side plan limit. Resolved by the Neon account owner addressing the quota (upgrade plan or wait for reset) from the Neon dashboard; the backend recovered on its own the moment connections were accepted again, no redeploy needed.</p>
-          <p><strong>Avoid it again:</strong> a self-hosted managed dependency you don't control the limits of is a single point of failure no amount of application-level error handling can route around. The real fix in progress is <code class="inline">docs/gcp-postgres-migration.md</code> — moving to a dedicated self-hosted PostgreSQL VM removes the "someone else's billing plan can 500 every endpoint" failure mode entirely. Until that lands, treat "every DB-touching endpoint 500s at once with the rest of the stack looking healthy" as the signature of this exact failure class — check the provider's dashboard before spending time in application code. See <a href="#troubleshooting">Troubleshooting</a> for the diagnostic checklist and <a href="#database">Database user management</a> for the connection-diagnostic queries.</p>
+          <p><strong>Avoid it again:</strong> a managed dependency you don't control the limits of is a single point of failure no amount of application-level error handling can route around. <strong>Resolved</strong> — first by moving to a dedicated self-hosted PostgreSQL VM (<code class="inline">docs/gcp-postgres-migration.md</code>), then (2026-10-03) by consolidating onto the <code class="inline">db</code> Compose container described throughout this doc (<code class="inline">docs/migration-to-hostinger.md</code>); either change removes the "someone else's billing plan can 500 every endpoint" failure mode entirely, since Postgres is no longer a managed third-party dependency at all. Keep "every DB-touching endpoint 500s at once with the rest of the stack looking healthy" in mind as the signature of this failure class if a managed provider is ever reintroduced — check the provider's dashboard before spending time in application code. See <a href="#troubleshooting">Troubleshooting</a> for the diagnostic checklist and <a href="#database">Database user management</a> for the connection-diagnostic queries.</p>
         </div>
 
         <div class="card">
