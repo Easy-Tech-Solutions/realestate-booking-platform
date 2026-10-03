@@ -10,7 +10,6 @@ npm-debug.log*
 .github/
 .clause/
 .agents/
-CLAUDE.md
 
 # Python virtual environments and cache
 python-backend/.venv/
