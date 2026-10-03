@@ -196,9 +196,10 @@
         <table>
           <thead><tr><th>Service</th><th>Runs</th><th>Depends on</th><th>Notable config</th></tr></thead>
           <tbody>
+            <tr><td><code class="inline">db</code></td><td><code class="inline">postgres:16</code> — the production database</td><td>—</td><td>Data in the <code class="inline">postgres_data</code> named volume. Healthcheck: <code class="inline">pg_isready</code>. No published port — reachable only by service name inside the Compose network (<code class="inline">docker compose exec db psql -U homekonet_app -d homekonet</code> from the host). Backed up nightly — see <a href="#backup-migration">Backup &amp; Migration</a>.</td></tr>
             <tr><td><code class="inline">redis</code></td><td><code class="inline">redis:7-alpine</code>, <code class="inline">--save 60 1</code> (RDB snapshot if ≥1 key changed in 60s)</td><td>—</td><td>Healthcheck: <code class="inline">redis-cli ping</code>. No published port — internal only.</td></tr>
-            <tr><td><code class="inline">backend</code></td><td><code class="inline">daphne -b 0.0.0.0 -p 8000 realestate_backend.asgi:application</code> (the Dockerfile's default <code class="inline">CMD</code>)</td><td><code class="inline">redis</code> (must be healthy first)</td><td>Healthcheck hits its own <code class="inline">/api/health/</code> with an explicit <code class="inline">Host: homekonet.com</code> header (needed since <code class="inline">localhost</code> isn't in prod <code class="inline">ALLOWED_HOSTS</code>). Port 8000 is <code class="inline">expose</code>d, not published — only reachable from other containers.</td></tr>
-            <tr><td><code class="inline">celery</code></td><td><code class="inline">celery -A realestate_backend worker --concurrency=2</code> (default queue)</td><td><code class="inline">redis</code> healthy, <code class="inline">backend</code> started</td><td>No healthcheck, no published port. Same image as <code class="inline">backend</code>, different <code class="inline">command</code>.</td></tr>
+            <tr><td><code class="inline">backend</code></td><td><code class="inline">daphne -b 0.0.0.0 -p 8000 realestate_backend.asgi:application</code> (the Dockerfile's default <code class="inline">CMD</code>)</td><td><code class="inline">db</code> and <code class="inline">redis</code> (both must be healthy first)</td><td>Healthcheck hits its own <code class="inline">/api/health/</code> with an explicit <code class="inline">Host: homekonet.com</code> header (needed since <code class="inline">localhost</code> isn't in prod <code class="inline">ALLOWED_HOSTS</code>). Port 8000 is <code class="inline">expose</code>d, not published — only reachable from other containers.</td></tr>
+            <tr><td><code class="inline">celery</code></td><td><code class="inline">celery -A realestate_backend worker --concurrency=2</code> (default queue)</td><td><code class="inline">db</code> + <code class="inline">redis</code> healthy, <code class="inline">backend</code> started</td><td>No healthcheck, no published port. Same image as <code class="inline">backend</code>, different <code class="inline">command</code>.</td></tr>
             <tr><td><code class="inline">celery-beat</code></td><td><code class="inline">celery -A realestate_backend beat</code></td><td>same as <code class="inline">celery</code></td><td>Scheduler only — ticks jobs onto the broker, never executes them itself.</td></tr>
             <tr><td><code class="inline">celery-ai</code></td><td><code class="inline">download_ai_model &amp;&amp; celery ... --concurrency=1 --pool=solo -Q ai_scoring</code></td><td>same as <code class="inline">celery</code></td><td>Own <code class="inline">ai_models</code> volume (persists the ~3GB GGUF file across restarts). Pinned to one process/one pool so exactly one copy of the model is ever resident in memory.</td></tr>
             <tr><td><code class="inline">frontend</code></td><td><code class="inline">nginx -g "daemon off;"</code></td><td><code class="inline">backend</code> (start order only, no health condition)</td><td>Published ports <code class="inline">80:80</code>, <code class="inline">443:443</code>. Mounts <code class="inline">nginx.conf</code> and TLS certs read-only, plus the shared <code class="inline">static_files</code> volume and the same <code class="inline">./backend/media</code> bind mount as <code class="inline">backend</code> (read-only here).</td></tr>
@@ -558,19 +559,19 @@ docker compose logs --tail=50 backend</code></pre>
         </table>
 
         <h3>The backup/restore mechanism</h3>
-        <p><code class="inline">scripts/backup.sh</code> bundles everything in the "Yes" rows above into <strong>one GPG-encrypted archive</strong>. It queries the <em>running</em> <code class="inline">backend</code> container's actual environment to find the database connection info, so it works unchanged whether the database is external managed Postgres (Neon, via <code class="inline">DATABASE_URL</code>) or self-hosted (via discrete <code class="inline">POSTGRES_*</code> vars):</p>
+        <p><code class="inline">scripts/backup.sh</code> bundles everything in the "Yes" rows above into <strong>one GPG-encrypted archive</strong>. It queries the <em>running</em> <code class="inline">backend</code> container's actual environment to find the database connection info, so it works unchanged whether the database is the local <code class="inline">db</code> Compose container (production today), external managed Postgres (Neon, via <code class="inline">DATABASE_URL</code>), or another self-hosted server (via discrete <code class="inline">POSTGRES_*</code> vars):</p>
         <pre><code>cd /opt/homekonet
 bash scripts/backup.sh                    # DB dump, pgAdmin data, media, secrets, TLS cert
 bash scripts/backup.sh --include-ai-models # + the ~3GB local LLM
 bash scripts/backup.sh --include-redis     # + cache/session/broker state
 bash scripts/backup.sh --full              # everything
 
-# Non-interactive (e.g. cron) — skips the passphrase prompt:
-BACKUP_PASSPHRASE="$(cat /root/.backup-passphrase)" bash scripts/backup.sh</code></pre>
+# Non-interactive — skips the passphrase prompt (same passphrase file the nightly job uses):
+BACKUP_PASSPHRASE="$(cat ~/.homekonet-backup-passphrase)" bash scripts/backup.sh</code></pre>
         <p>Produces <code class="inline">backups/homekonet-backup-&lt;timestamp&gt;.tar.gz.gpg</code> — gitignored (see the callout below) and encrypted with a passphrase you choose. <strong>Remember that passphrase</strong>; you need the identical one to decrypt on the new server. Internally it:</p>
         <ol class="steps">
           <li>Reads <code class="inline">DATABASE_URL</code> (or <code class="inline">POSTGRES_*</code>) from <code class="inline">docker compose exec -T backend env</code> — the container's real, in-effect configuration, not a re-parse of <code class="inline">backend/.env</code> that could drift from what's actually running.</li>
-          <li>Runs <code class="inline">pg_dump --format=custom --schema=public --no-owner --no-acl</code> against it. <code class="inline">--schema=public</code> matters on Neon specifically — its internal <code class="inline">neon_auth</code> schema is Neon's own metadata, and most app-level roles get <code class="inline">permission denied for schema neon_auth</code> if you try to dump the whole database including it. We don't need that schema backed up anyway; it isn't our data.</li>
+          <li>Runs <code class="inline">pg_dump --format=custom --schema=public --no-owner --no-acl</code> against it. If <code class="inline">POSTGRES_HOST</code> names a running service in this Compose project (e.g. <code class="inline">db</code>), the dump runs <em>inside</em> that container via <code class="inline">docker compose exec</code> — the service name doesn't resolve from the host and no port is published, and this also guarantees a matching <code class="inline">pg_dump</code> version. Otherwise it uses the host's <code class="inline">pg_dump</code>. <code class="inline">--schema=public</code> matters on Neon specifically — its internal <code class="inline">neon_auth</code> schema is Neon's own metadata, and most app-level roles get <code class="inline">permission denied for schema neon_auth</code> if you try to dump the whole database including it. We don't need that schema backed up anyway; it isn't our data.</li>
           <li>Exports the <code class="inline">pgadmin_data</code> Docker volume via a throwaway <code class="inline">alpine</code> container (<code class="inline">docker run --rm -v pgadmin_data:/data:ro ...</code> — volumes aren't a plain host path, so <code class="inline">tar</code> can't reach them directly).</li>
           <li>Tars all of it together (env files, <code class="inline">backend/media/</code>, <code class="inline">nginx/ssl/</code>, the DB dump, the pgAdmin export) and pipes straight into <code class="inline">gpg --symmetric --cipher-algo AES256</code> — the plaintext tarball never touches disk.</li>
         </ol>
@@ -595,6 +596,11 @@ source &lt;(grep -E '^POSTGRES_' backend/.env)
 PGPASSWORD="$POSTGRES_PASSWORD" pg_restore --no-owner --no-acl --clean --if-exists \
   -h "$POSTGRES_HOST" -p "${POSTGRES_PORT:-5432}" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
   backups/database.dump</code></pre>
+        <pre><code># Local db container (production today) — pg_restore runs inside the container:
+docker compose up -d db
+docker compose exec -T db pg_restore -U homekonet_app -d homekonet \
+  --no-owner --no-acl --clean --if-exists &lt; backups/database.dump</code></pre>
+        <p>Always keep <code class="inline">--clean --if-exists</code>, even into a brand-new database: because the dump is taken with <code class="inline">--schema=public</code> it contains <code class="inline">CREATE SCHEMA public</code>, which fails with <em>schema "public" already exists</em> without them.</p>
         <p><code class="inline">--clean --if-exists</code> drops existing objects before recreating them — safe against a genuinely empty/fresh database, <strong>destructive</strong> against one that already has different real data in it. Always re-read <code class="inline">backend/.env</code>'s DB connection values immediately before running this.</p>
 
         <h3>Restoring pgAdmin's saved servers</h3>
@@ -621,12 +627,13 @@ docker compose start pgadmin</code></pre>
 
         <h3>Backup CLI commands (<code class="inline">manage.py</code>)</h3>
         <p><code class="inline">scripts/backup.sh</code> is also wrapped as a Django management command, so it fits the same <code class="inline">manage.py &lt;command&gt;</code> convention as every other admin/maintenance task in this app (<code class="inline">reconcile_payments</code>, <code class="inline">backfill_payouts</code>, etc.):</p>
+        <p><strong>Note:</strong> the production server has no host virtualenv at <code class="inline">/opt/homekonet/.venv</code>, so there, call the scripts directly (<code class="inline">bash scripts/backup.sh</code>, <code class="inline">scripts/backup-cron.sh</code>). These wrappers are for hosts that do have one.</p>
         <pre><code>cd /opt/homekonet
 .venv/bin/python backend/manage.py backup                    # same as: bash scripts/backup.sh
 .venv/bin/python backend/manage.py backup --full              # --include-ai-models --include-redis
 .venv/bin/python backend/manage.py backup --passphrase 'xxx'  # non-interactive
 
-# Weekly cron setup
+# Nightly cron setup (per-user crontab — refuses if /etc/cron.d/homekonet-backup already exists)
 .venv/bin/python backend/manage.py schedule_backup            # print setup instructions + the cron line
 .venv/bin/python backend/manage.py schedule_backup --install  # install it (idempotent)
 .venv/bin/python backend/manage.py schedule_backup --remove   # remove it</code></pre>
@@ -635,22 +642,41 @@ docker compose start pgadmin</code></pre>
           Both commands <strong>must</strong> run via the host virtualenv at <code class="inline">/opt/homekonet/.venv</code> (the same one <code class="inline">scripts/prelaunch_check.py</code>-style tooling uses), not inside the <code class="inline">backend</code> container. The backend image only contains the <code class="inline">backend/</code> directory — <code class="inline">scripts/</code> doesn't exist inside it — and the container deliberately has no <code class="inline">docker</code>/<code class="inline">gpg</code>/<code class="inline">pg_dump</code> binaries or Docker-socket access (mounting the socket into a public-facing web container would let anyone who compromises it control the whole Docker daemon). <code class="inline">backup.sh</code> needs all of that to orchestrate the <em>other</em> containers and volumes, so this is a host-side operation by design. Running it the wrong way fails fast with a clear <code class="inline">CommandError</code> rather than a confusing low-level one — but the right invocation is always <code class="inline">cd /opt/homekonet &amp;&amp; .venv/bin/python backend/manage.py backup</code>.
         </div>
 
-        <h3>Weekly automated backup</h3>
-        <p>One-time setup on the host:</p>
-        <pre><code># 1. Store the GPG passphrase (used non-interactively by cron)
-echo "your-strong-passphrase" | sudo tee /root/.backup-passphrase
-sudo chmod 600 /root/.backup-passphrase
+        <h3>Nightly automated backup (live on the production server)</h3>
+        <p>Set up on 2026-10-03. Every night at <strong>03:00 UTC</strong>, <code class="inline">/etc/cron.d/homekonet-backup</code> runs <code class="inline">scripts/backup-cron.sh</code> as the <code class="inline">homekonet</code> user. The wrapper:</p>
+        <ul>
+          <li>reads the GPG passphrase from <code class="inline">~homekonet/.homekonet-backup-passphrase</code> (mode 600, never passed on a command line);</li>
+          <li>runs <code class="inline">backup.sh</code> with <code class="inline">BACKUP_REQUIRE_DB=1</code>, so a run that produced no database dump <strong>fails</strong> instead of quietly writing an archive without the database;</li>
+          <li>holds a lock (<code class="inline">backups/.backup.lock</code>) so a slow run can't overlap the next;</li>
+          <li>deletes local archives older than <code class="inline">BACKUP_RETENTION_DAYS</code> (default 14 — roughly 1.8&nbsp;GB at the current ~126&nbsp;MB per archive);</li>
+          <li>copies the new archive off-box with <code class="inline">rclone</code> if <code class="inline">BACKUP_RCLONE_REMOTE</code> is set.</li>
+        </ul>
+        <pre><code># /etc/cron.d/homekonet-backup
+0 3 * * * homekonet /opt/homekonet/scripts/backup-cron.sh >> /var/log/homekonet-backup.log 2>&amp;1
 
-# 2. Install the weekly cron entry (every Sunday 03:00 UTC)
-cd /opt/homekonet
-.venv/bin/python backend/manage.py schedule_backup --install
+# Check on it
+tail -n 20 /var/log/homekonet-backup.log    # each run ends with "Backup finished OK"
+ls -lh /opt/homekonet/backups/
 
-# 3. Verify after the first run
-tail -f /var/log/homekonet-backup.log
-ls -lh /opt/homekonet/backups/</code></pre>
-        <p>The installed cron entry runs <code class="inline">bash scripts/backup.sh</code> directly (not through <code class="inline">manage.py</code> — no Django import needed just to shell out), equivalent to:</p>
-        <pre><code>0 3 * * 0  cd /opt/homekonet &amp;&amp; BACKUP_PASSPHRASE="$(cat /root/.backup-passphrase)" bash scripts/backup.sh >> /var/log/homekonet-backup.log 2>&amp;1</code></pre>
-        <p>Copy the resulting archives off the server on the same schedule (<code class="inline">gsutil cp</code> to a GCS bucket, <code class="inline">rclone</code>, etc.) — a backup that only ever lives on the server it's backing up isn't a real backup if that server is lost entirely. <code class="inline">schedule_backup --remove</code> uninstalls the cron entry; re-running <code class="inline">--install</code> is idempotent (checks for its own marker comment first).</p>
+# Run one by hand (e.g. before a risky change)
+/opt/homekonet/scripts/backup-cron.sh</code></pre>
+        <p>The log is rotated monthly by <code class="inline">/etc/logrotate.d/homekonet-backup</code> (12 months kept).</p>
+        <div class="callout warn">
+          <span class="callout-label">Backups currently stay on this server only</span>
+          No off-box destination has been chosen yet, so each run logs <em>"BACKUP_RCLONE_REMOTE not set — this backup exists only on this server."</em> If the VPS is lost, these archives go with it. Once a destination is picked: configure an <code class="inline">rclone</code> remote for the <code class="inline">homekonet</code> user and add <code class="inline">BACKUP_RCLONE_REMOTE=&lt;remote:path&gt;</code> before the command in <code class="inline">/etc/cron.d/homekonet-backup</code> — no script changes needed. Also keep a copy of the passphrase off the server (a password manager); without it no archive can be decrypted.
+        </div>
+        <h3>Restore drill</h3>
+        <p>An untested backup is a hope, not a plan. Restore the latest archive's database into a throwaway database and compare it with live (last done 2026-10-03: 98 tables, identical row counts):</p>
+        <pre><code>cd /opt/homekonet
+D=$(mktemp -d) &amp;&amp; A=$(ls -1t backups/homekonet-backup-*.gpg | head -1)
+gpg --batch --quiet --passphrase-file ~/.homekonet-backup-passphrase -d "$A" | tar -xzf - -C "$D" database.dump
+docker compose exec -T db createdb -U homekonet_app restore_drill
+docker compose exec -T db pg_restore -U homekonet_app -d restore_drill \
+  --no-owner --no-acl --clean --if-exists --exit-on-error &lt; "$D/database.dump"
+Q="select (select count(*) from users_user), (select count(*) from listings_listing), (select count(*) from bookings_booking)"
+docker compose exec -T db psql -U homekonet_app -d homekonet     -tAc "$Q"
+docker compose exec -T db psql -U homekonet_app -d restore_drill -tAc "$Q"
+docker compose exec -T db dropdb -U homekonet_app restore_drill &amp;&amp; rm -rf "$D"</code></pre>
 
         <div class="callout danger">
           <span class="callout-label">Never <code class="inline">git add</code> a database dump, secret, or backup archive — even temporarily</span>
@@ -755,10 +781,10 @@ docker compose exec frontend sh             # nginx:alpine — sh only, no bash
 docker compose exec backend python3 -c "print('quick check')"</code></pre>
 
         <h3>pgAdmin access</h3>
-        <p>Reachable at <code class="inline">http://&lt;server-ip&gt;:5050/</code> — published directly by <code class="inline">docker-compose.yml</code>'s <code class="inline">pgadmin</code> service, <strong>not</strong> proxied through <code class="inline">nginx</code>/TLS. Login is <code class="inline">PGADMIN_DEFAULT_EMAIL</code>/<code class="inline">PGADMIN_DEFAULT_PASSWORD</code> from the root <code class="inline">.env</code> (not <code class="inline">backend/.env</code>). After logging in, register a server manually with whatever the app's actual DB connection details are (<code class="inline">DATABASE_URL</code>/<code class="inline">POSTGRES_*</code> in <code class="inline">backend/.env</code>) — pgAdmin doesn't pick these up automatically, it's a standalone tool pointed at the same database.</p>
+        <p>Published only on the server's loopback (<code class="inline">127.0.0.1:5050</code>), <strong>not</strong> proxied through <code class="inline">nginx</code>/TLS. Reach it through an SSH tunnel: <code class="inline">ssh -L 5050:localhost:5050 homekonet@179.198.215.152</code>, then browse to <code class="inline">http://localhost:5050/</code>. Login is <code class="inline">PGADMIN_DEFAULT_EMAIL</code>/<code class="inline">PGADMIN_DEFAULT_PASSWORD</code> from the root <code class="inline">.env</code> (not <code class="inline">backend/.env</code>). After logging in, register a server manually with whatever the app's actual DB connection details are (<code class="inline">DATABASE_URL</code>/<code class="inline">POSTGRES_*</code> in <code class="inline">backend/.env</code>) — pgAdmin doesn't pick these up automatically, it's a standalone tool pointed at the same database.</p>
         <div class="callout danger">
-          <span class="callout-label">Confirm who can actually reach port 5050 before trusting this is internal-only</span>
-          Whether this URL is reachable from the whole internet or only from trusted IPs depends entirely on the firewall in front of this host (GCP firewall rules on this deployment) — Compose publishing a port doesn't imply anything about who can reach it externally. Check <code class="inline">gcloud compute firewall-rules list</code> for a rule covering this instance's tags on <code class="inline">tcp:5050</code>, and make sure its <code class="inline">sourceRanges</code> is a short, specific allowlist (your office/VPN IP, not <code class="inline">0.0.0.0/0</code>). A full database-admin UI facing the open internet behind only a login password is a real, live risk — treat finding <code class="inline">0.0.0.0/0</code> here as an incident, not a backlog item.
+          <span class="callout-label">Keep pgAdmin off the public internet</span>
+          On this server pgAdmin is bound to <code class="inline">127.0.0.1:5050</code> and <code class="inline">ufw</code> only allows OpenSSH/80/443, so it isn't reachable from outside at all. Confirm with <code class="inline">docker compose ps pgadmin</code> (expect <code class="inline">127.0.0.1:5050-&gt;80</code>) and <code class="inline">sudo ufw status</code>. Never change the binding to a bare <code class="inline">5050:80</code> (which means <code class="inline">0.0.0.0</code>) — the old GCP deployment did exactly that, leaving a full database-admin UI facing the internet behind only a login password.
         </div>
 
         <h3>Database &amp; disk housekeeping</h3>
@@ -796,7 +822,7 @@ ss -tlnp | grep -E ':80|:443'
 kill &lt;pid&gt;
 kill -9 &lt;pid&gt;                              # only if a plain kill doesn't work
 
-# Certificates (static files on this host, no certbot auto-renew hook configured)
+# Certificates (Let's Encrypt; auto-renewed by certbot.timer + the hooks from scripts/install-certbot-hooks.sh)
 ls -la nginx/ssl/
 openssl x509 -in nginx/ssl/fullchain.pem -noout -enddate   # check expiry
 

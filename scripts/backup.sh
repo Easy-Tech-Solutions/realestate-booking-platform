@@ -36,10 +36,6 @@ done
 for bin in tar gpg docker; do
   command -v "$bin" >/dev/null || { echo "Required tool not found: $bin" >&2; exit 1; }
 done
-if ! command -v pg_dump >/dev/null; then
-  echo "==> WARNING: pg_dump not found on this host (install the 'postgresql-client' package)."
-  echo "    Continuing WITHOUT a database dump — everything else will still be backed up."
-fi
 
 # pg_dump's custom-format archive version is tied to its own major version,
 # not the server's — a newer pg_dump (e.g. 17) produces a dump pg_restore
@@ -83,10 +79,24 @@ done
 # matches what the app is really connected to — works unchanged whether
 # that's external managed Postgres (Neon: DATABASE_URL) or a self-hosted
 # instance (discrete POSTGRES_* vars, see docs/gcp-postgres-migration.md).
-if command -v pg_dump >/dev/null; then
-  BACKEND_ENV="$(docker compose exec -T backend env 2>/dev/null || true)"
-  env_var() { printf '%s\n' "$BACKEND_ENV" | grep -m1 "^$1=" | cut -d= -f2- || true; }
+#
+# When POSTGRES_HOST is a service in this Compose project (e.g. 'db', see
+# docs/migration-to-hostinger.md §3), that name only resolves inside the
+# Compose network and no port is published — so pg_dump runs *inside* that
+# container instead (which also guarantees a matching client version).
+BACKEND_ENV="$(docker compose exec -T backend env 2>/dev/null || true)"
+env_var() { printf '%s\n' "$BACKEND_ENV" | grep -m1 "^$1=" | cut -d= -f2- || true; }
+PGHOST_VAL="$(env_var POSTGRES_HOST)"
 
+if [[ -z "$(env_var DATABASE_URL)" && -n "$PGHOST_VAL" ]] \
+   && docker compose ps --services --status running 2>/dev/null | grep -qx "$PGHOST_VAL"; then
+  echo "==> Dumping database (Compose service '$PGHOST_VAL', pg_dump run inside the container)"
+  docker compose exec -T "$PGHOST_VAL" pg_dump --format=custom --no-owner --no-acl --schema=public \
+    -U "$(env_var POSTGRES_USER)" -d "$(env_var POSTGRES_DB)" > "$STAGE_DIR/database.dump"
+elif ! command -v pg_dump >/dev/null; then
+  echo "==> WARNING: pg_dump not found on this host (install the 'postgresql-client' package)."
+  echo "    Continuing WITHOUT a database dump — everything else will still be backed up."
+else
   DB_URL="$(env_var DATABASE_URL)"
   if [[ -n "$DB_URL" ]]; then
     PG_DUMP_BIN="$(pick_pg_dump "$DB_URL")"
@@ -94,7 +104,6 @@ if command -v pg_dump >/dev/null; then
     "$PG_DUMP_BIN" --format=custom --no-owner --no-acl --schema=public --dbname="$DB_URL" \
       --file="$STAGE_DIR/database.dump"
   else
-    PGHOST_VAL="$(env_var POSTGRES_HOST)"
     if [[ -n "$PGHOST_VAL" ]]; then
       export PGHOST="$PGHOST_VAL"
       export PGPORT="$(env_var POSTGRES_PORT)"
@@ -110,6 +119,13 @@ if command -v pg_dump >/dev/null; then
       echo "    (SQLite dev fallback, or the backend container isn't running?) — skipping DB dump."
     fi
   fi
+fi
+
+# An unattended backup that silently skipped the database looks like a
+# success but is useless — cron sets this so that case fails loudly instead.
+if [[ "${BACKUP_REQUIRE_DB:-0}" == "1" && ! -s "$STAGE_DIR/database.dump" ]]; then
+  echo "ERROR: BACKUP_REQUIRE_DB=1 but no database dump was produced — aborting." >&2
+  exit 1
 fi
 
 # ---- pgAdmin's saved server list / preferences -----------------------------

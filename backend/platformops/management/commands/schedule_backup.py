@@ -1,16 +1,21 @@
 """
 python manage.py schedule_backup
 
-Prints the crontab entry needed for weekly automated backups, and optionally
+Prints the crontab entry needed for nightly automated backups, and optionally
 installs it into the current user's crontab.
+
+On the production server this is already handled by /etc/cron.d/homekonet-backup
+(see MIGRATION.md); --install refuses to add a duplicate entry when that file
+exists.
 
 Usage:
   python manage.py schedule_backup            # print the cron line only
   python manage.py schedule_backup --install  # add it to crontab (idempotent)
   python manage.py schedule_backup --remove   # remove it from crontab
 
-The generated entry runs every Sunday at 03:00 UTC, stores the passphrase in
-/root/.backup-passphrase (600 permissions), and appends output to
+The generated entry runs scripts/backup-cron.sh every night at 03:00 UTC,
+which reads the passphrase from ~/.homekonet-backup-passphrase (600
+permissions), prunes archives older than 14 days, and appends output to
 /var/log/homekonet-backup.log.
 
 Run this from the host (not inside a container) since it needs access to
@@ -23,24 +28,24 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
-CRON_MARKER = '# homekonet-weekly-backup'
+CRON_MARKER = '# homekonet-nightly-backup'
 CRON_LINE = (
-    '0 3 * * 0  cd /opt/homekonet && '
-    'BACKUP_PASSPHRASE="$(cat /root/.backup-passphrase)" '
-    'bash scripts/backup.sh >> /var/log/homekonet-backup.log 2>&1  '
+    '0 3 * * *  /opt/homekonet/scripts/backup-cron.sh '
+    '>> /var/log/homekonet-backup.log 2>&1  '
     + CRON_MARKER
 )
+SYSTEM_CRON_FILE = Path('/etc/cron.d/homekonet-backup')
 
 
 class Command(BaseCommand):
-    help = 'Print (or install/remove) the weekly backup cron entry.'
+    help = 'Print (or install/remove) the nightly backup cron entry.'
 
     def add_arguments(self, parser):
         group = parser.add_mutually_exclusive_group()
         group.add_argument('--install', action='store_true',
-                           help='Add the weekly cron entry to the current user\'s crontab (idempotent).')
+                           help='Add the nightly cron entry to the current user\'s crontab (idempotent).')
         group.add_argument('--remove', action='store_true',
-                           help='Remove the weekly cron entry from the current user\'s crontab.')
+                           help='Remove the nightly cron entry from the current user\'s crontab.')
 
     def handle(self, *args, **options):
         if options['install']:
@@ -53,10 +58,14 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _print_instructions(self):
-        self.stdout.write(self.style.MIGRATE_HEADING('\n=== Weekly Backup — Setup Instructions ===\n'))
-        self.stdout.write('1. Store your GPG passphrase on the host (run once, as root):\n')
-        self.stdout.write('   echo "your-strong-passphrase" > /root/.backup-passphrase\n')
-        self.stdout.write('   chmod 600 /root/.backup-passphrase\n\n')
+        self.stdout.write(self.style.MIGRATE_HEADING('\n=== Nightly Backup — Setup Instructions ===\n'))
+        if SYSTEM_CRON_FILE.exists():
+            self.stdout.write(self.style.WARNING(
+                f'Already scheduled system-wide via {SYSTEM_CRON_FILE} — nothing else to set up.\n\n'
+            ))
+        self.stdout.write('1. Store your GPG passphrase on the host (run once, as the deploy user):\n')
+        self.stdout.write('   (umask 077; openssl rand -base64 32 > ~/.homekonet-backup-passphrase)\n')
+        self.stdout.write('   Keep a copy off the server too — without it the archives can\'t be decrypted.\n\n')
         self.stdout.write('2. Add this line to your crontab (crontab -e), or run with --install:\n\n')
         self.stdout.write(f'   {CRON_LINE}\n\n')
         self.stdout.write('3. Verify the log after the first run:\n')
@@ -76,9 +85,13 @@ class Command(BaseCommand):
         return ''
 
     def _install(self):
+        if SYSTEM_CRON_FILE.exists():
+            raise CommandError(
+                f'Backups are already scheduled via {SYSTEM_CRON_FILE} — not adding a duplicate crontab entry.'
+            )
         current = self._current_crontab()
         if CRON_MARKER in current:
-            self.stdout.write(self.style.WARNING('Weekly backup cron entry already present — nothing changed.'))
+            self.stdout.write(self.style.WARNING('Nightly backup cron entry already present — nothing changed.'))
             return
 
         new_crontab = current.rstrip('\n') + '\n' + CRON_LINE + '\n'
@@ -93,18 +106,19 @@ class Command(BaseCommand):
         finally:
             os.unlink(tmp)
 
-        self.stdout.write(self.style.SUCCESS('Weekly backup cron entry installed.'))
-        self.stdout.write(f'  Schedule: every Sunday at 03:00 UTC\n')
+        self.stdout.write(self.style.SUCCESS('Nightly backup cron entry installed.'))
+        self.stdout.write(f'  Schedule: every night at 03:00 UTC\n')
         self.stdout.write(f'  Log:      /var/log/homekonet-backup.log\n')
         self.stdout.write(f'  Archive:  /opt/homekonet/backups/\n')
         self.stdout.write(self.style.WARNING(
-            '\nMake sure /root/.backup-passphrase exists (chmod 600) before the first run.\n'
+            '\nMake sure ~/.homekonet-backup-passphrase exists (chmod 600) and /var/log/homekonet-backup.log\n'
+            'is writable by this user before the first run.\n'
         ))
 
     def _remove(self):
         current = self._current_crontab()
         if CRON_MARKER not in current:
-            self.stdout.write(self.style.WARNING('No weekly backup cron entry found — nothing to remove.'))
+            self.stdout.write(self.style.WARNING('No nightly backup cron entry found — nothing to remove.'))
             return
 
         new_lines = [line for line in current.splitlines() if CRON_MARKER not in line]
@@ -121,4 +135,4 @@ class Command(BaseCommand):
         finally:
             os.unlink(tmp)
 
-        self.stdout.write(self.style.SUCCESS('Weekly backup cron entry removed.'))
+        self.stdout.write(self.style.SUCCESS('Nightly backup cron entry removed.'))

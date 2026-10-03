@@ -245,16 +245,28 @@ well before the real cutover, so the final pass is fast.
 ## Backing up without a full server migration
 
 `scripts/backup.sh` also works as a plain, periodic backup on the *same*
-server — e.g. before a risky change, or as a nightly off-box backup via cron:
+server — e.g. before a risky change, or as a nightly backup via cron.
+For unattended runs use `scripts/backup-cron.sh`, a wrapper that reads the
+passphrase from a file, fails if no database dump was produced, holds a lock
+so runs can't overlap, prunes archives older than `BACKUP_RETENTION_DAYS`
+(default 14), and optionally copies each archive off-box with `rclone`:
 
 ```bash
-# crontab -e
-0 3 * * * cd /opt/homekonet && BACKUP_PASSPHRASE="$(cat /root/.backup-passphrase)" bash scripts/backup.sh >> /var/log/homekonet-backup.log 2>&1
+# /etc/cron.d/homekonet-backup
+0 3 * * * homekonet /opt/homekonet/scripts/backup-cron.sh >> /var/log/homekonet-backup.log 2>&1
+# with an off-box copy:
+# 0 3 * * * homekonet BACKUP_RCLONE_REMOTE=myremote:homekonet-backups /opt/homekonet/scripts/backup-cron.sh >> ...
 ```
 
-Copy the resulting archive off the server on the same schedule (e.g. `gsutil
-cp` to a GCS bucket, or `rclone`) — a backup that only ever lives on the
+The passphrase lives in `~homekonet/.homekonet-backup-passphrase` (mode
+600); keep a second copy in a password manager. Set up the off-box copy
+(`rclone`, or any other tool) too — a backup that only ever lives on the
 server it's backing up isn't a real backup if that server is lost entirely.
+
+If Postgres runs as a Compose service (`POSTGRES_HOST=db`), `backup.sh`
+runs `pg_dump` inside that container automatically. Note that the dump
+contains `CREATE SCHEMA public`, so restore it with `--clean --if-exists`
+(as `restore.sh` prints), not into a fresh database without them.
 
 ## Security note: never commit a database dump
 

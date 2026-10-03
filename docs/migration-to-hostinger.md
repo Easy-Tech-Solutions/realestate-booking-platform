@@ -130,6 +130,7 @@ actually works against them.
   network.
 - `fail2ban` + `unattended-upgrades` installed and enabled, matching the old
   server's baseline.
+- **Nightly encrypted backups** (added after cutover, same day): see §9.
 
 ## 6. Cutover sequence (what actually happened, in order)
 
@@ -203,8 +204,17 @@ before a rollback, the more this matters.
       freshly generated for this migration (not reused from the GCP
       database), a good moment also to rotate any other long-lived secret
       in `backend/.env` if desired.
-- [ ] **Automated backups on the new server**: this migration moved data
-      once; it did not set up a recurring backup cron
-      (`docs/gcp-postgres-migration.md` §16 / `MIGRATION.md`'s "Backing up
-      without a full server migration" section describe the pattern) — set
-      one up on the new VPS before relying on it long-term.
+- [x] **Automated backups on the new server** (done 2026-10-03): nightly
+      at 03:00 UTC via `/etc/cron.d/homekonet-backup` →
+      `scripts/backup-cron.sh` (runs as `homekonet`, logs to
+      `/var/log/homekonet-backup.log`, keeps 14 days of encrypted archives in
+      `backups/`). Passphrase: `~homekonet/.homekonet-backup-passphrase`
+      (mode 600). `scripts/backup.sh` was fixed to dump via
+      `docker compose exec db pg_dump` — its host-side `pg_dump` couldn't
+      resolve `POSTGRES_HOST=db`, so it would have aborted here. Restore
+      drill passed (98 tables, identical row counts in a scratch DB).
+- [ ] **Off-box copy of the nightly backups**: archives currently live only
+      on this VPS. Configure an `rclone` remote and set
+      `BACKUP_RCLONE_REMOTE` in the cron line. Also keep a copy of the
+      backup passphrase somewhere other than this server (a password
+      manager) — without it, the archives can't be decrypted.

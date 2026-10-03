@@ -118,6 +118,7 @@ Backend default: http://localhost:8000
 - General deployment guide: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 - Server migration runbook: [MIGRATION.md](MIGRATION.md)
 - **Current production infrastructure** (as of 2026-10-03): [docs/migration-to-hostinger.md](docs/migration-to-hostinger.md) — also see the quick orientation in [CLAUDE.md](CLAUDE.md)
+- **Backups**: nightly encrypted backups at 03:00 UTC via `scripts/backup-cron.sh` (stored on the server only for now) — see [MIGRATION.md](MIGRATION.md#backing-up-without-a-full-server-migration) and [docs/DEPLOYMENT.md §17](docs/DEPLOYMENT.md#17-backup-and-restore)
 
 ## Pre-Release Gate
 

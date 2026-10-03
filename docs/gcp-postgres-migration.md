@@ -566,6 +566,11 @@ before deleting the Neon project entirely — see §18.
 
 ## 16. Step 11 — Automated Backups
 
+> **Historical.** This GCS/snapshot setup applied to the GCP database VM.
+> The current server backs up with `scripts/backup-cron.sh` via
+> `/etc/cron.d/homekonet-backup` — see `docs/DEPLOYMENT.md` §17 and
+> `docs/migration-to-hostinger.md` §9.
+
 Neon previously handled this for you; it is now our responsibility.
 
 **Nightly `pg_dump` to Cloud Storage**, via cron on `homekonet-db`:

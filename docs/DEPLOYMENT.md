@@ -675,11 +675,11 @@ sudo cp /etc/letsencrypt/live/homekonet.com/privkey.pem   /opt/homekonet/nginx/s
 sudo chown -R homekonet:homekonet /opt/homekonet/nginx/ssl
 sudo chmod 600 /opt/homekonet/nginx/ssl/privkey.pem
 
-# Auto-renew certs (add to crontab)
-(crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet && \
-  cp /etc/letsencrypt/live/homekonet.com/fullchain.pem /opt/homekonet/nginx/ssl/ && \
-  cp /etc/letsencrypt/live/homekonet.com/privkey.pem   /opt/homekonet/nginx/ssl/ && \
-  docker compose -f /opt/homekonet/docker-compose.yml exec frontend nginx -s reload") | crontab -
+# Auto-renewal: the certbot package already schedules 'certbot renew' (certbot.timer).
+# Install the hooks that free port 80 during renewal and copy the new cert into
+# nginx/ssl/ — run as the deploy user, from the repo:
+cd /opt/homekonet && bash scripts/install-certbot-hooks.sh
+sudo certbot renew --dry-run     # verify the whole renewal path works
 ```
 
 ---
@@ -908,13 +908,55 @@ confirm which mechanism is actually protecting your data.
 Everything else this server holds that isn't in git — uploaded media,
 `.env` secrets, the TLS cert, pgAdmin's saved connections — is covered by
 the same `scripts/backup.sh` / `scripts/restore.sh` archive. See
-**[MIGRATION.md](../MIGRATION.md)** for full usage, including a crontab
-snippet for scheduled off-box backups.
+**[MIGRATION.md](../MIGRATION.md)** for full usage.
 
 ```bash
 cd /opt/homekonet
 bash scripts/backup.sh   # -> backups/homekonet-backup-<timestamp>.tar.gz.gpg (encrypted)
 ```
+
+If Postgres is the `db` Compose service, `backup.sh` runs `pg_dump` inside
+that container automatically (the `db` hostname doesn't resolve from the
+host). Restore the dump with `--clean --if-exists` — it contains
+`CREATE SCHEMA public`, so a restore without them fails even into a fresh
+database.
+
+### Automated nightly backups
+
+Set this up on every new server — nothing backs it up otherwise.
+
+```bash
+# 1. Passphrase file for the deploy user (generated, never typed on a command line).
+#    Also store a copy in a password manager — without it, archives can't be decrypted.
+(umask 077; openssl rand -base64 32 > ~/.homekonet-backup-passphrase)
+
+# 2. Log file + nightly job (03:00 UTC) + log rotation
+sudo install -o homekonet -g homekonet -m 640 /dev/null /var/log/homekonet-backup.log
+echo '0 3 * * * homekonet /opt/homekonet/scripts/backup-cron.sh >> /var/log/homekonet-backup.log 2>&1' \
+  | sudo tee /etc/cron.d/homekonet-backup
+sudo tee /etc/logrotate.d/homekonet-backup <<'EOF'
+/var/log/homekonet-backup.log {
+    su root syslog
+    monthly
+    rotate 12
+    compress
+    missingok
+    notifempty
+    create 640 homekonet homekonet
+}
+EOF
+
+# 3. Run once by hand and confirm it ends with "Backup finished OK"
+/opt/homekonet/scripts/backup-cron.sh
+```
+
+`scripts/backup-cron.sh` keeps 14 days of archives in `backups/`
+(`BACKUP_RETENTION_DAYS`), refuses to produce an archive without a database
+dump, and copies each archive off-box via `rclone` when
+`BACKUP_RCLONE_REMOTE=<remote:path>` is set on the cron line. Until an
+off-box destination is configured, backups exist only on the server itself.
+Do a restore drill (see `docs/developer-guide.html` → Backup & Migration)
+after setup and periodically after that.
 
 ### Full server migration
 
@@ -1019,10 +1061,17 @@ Before going live, verify **all** of the following:
 - [ ] `CLOUDINARY_URL` is set — verify by uploading a test image
 - [ ] `VAPID_PRIVATE_KEY` and `VAPID_PUBLIC_KEY` are set (required for web push notifications)
 
+### Backups
+
+- [ ] `/etc/cron.d/homekonet-backup` exists and the last run in `/var/log/homekonet-backup.log` ended with `Backup finished OK`
+- [ ] Backup passphrase is stored off the server
+- [ ] A restore drill has been done at least once
+- [ ] Off-box copy configured (`BACKUP_RCLONE_REMOTE`) — or knowingly deferred
+
 ### TLS
 
 - [ ] HTTPS enforced; HTTP redirects to HTTPS
-- [ ] Certificate auto-renewal cron job is active (`crontab -l`)
+- [ ] Certificate auto-renewal works (`systemctl list-timers certbot.timer`, hooks installed via `scripts/install-certbot-hooks.sh`, `sudo certbot renew --dry-run` passes)
 - [ ] TLSv1.2 and TLSv1.3 only (test with `ssl-checker.internet.nl` or `testssl.sh`)
 
 ### Frontend

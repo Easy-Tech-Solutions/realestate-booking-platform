@@ -552,7 +552,8 @@ Plus `use-mobile.ts` (mobile breakpoint hook) and `utils.ts` (`cn()` class-merge
 ## Scripts (`scripts/`)
 | File | Purpose |
 |---|---|
-| `backup.sh` | Bundles media, `.env` files, and `nginx/ssl` into a GPG-encrypted tarball. |
+| `backup.sh` | Bundles the database dump, media, `.env` files, `nginx/ssl`, and pgAdmin data into a GPG-encrypted tarball in `backups/`. |
+| `backup-cron.sh` | Unattended nightly wrapper for `backup.sh` (run from `/etc/cron.d/homekonet-backup`): passphrase from file, requires a DB dump, 14-day retention, optional `rclone` off-box copy. |
 | `restore.sh` | Restores a `backup.sh` archive onto a fresh clone (refuses to overwrite existing `backend/.env` without `--force`). |
 | `install-certbot-hooks.sh` | Installs Certbot renewal hooks to swap the cert and restart the frontend container. |
 | `release-check.sh` | Pre-release gate — Django checks + `prelaunch_check.py`, frontend lint/typecheck/build. |
