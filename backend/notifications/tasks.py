@@ -117,6 +117,18 @@ def send_notification_email(self, notification_id: int):
             except Exception:
                 logger.exception('Could not attach owner agreement for application %s', owner_agreement_app_id)
 
+        # Attach the personalized Agent Agreement PDF on agent approval.
+        agent_agreement_app_id = (notification.data or {}).get('attach_agent_agreement_application_id')
+        if agent_agreement_app_id:
+            try:
+                from agents.models import AgentApplication
+                app = AgentApplication.objects.filter(id=agent_agreement_app_id).first()
+                if app and app.agreement_document:
+                    with app.agreement_document.open('rb') as fh:
+                        email.attach('Home-Konet-Agent-Agreement.pdf', fh.read(), 'application/pdf')
+            except Exception:
+                logger.exception('Could not attach agent agreement for application %s', agent_agreement_app_id)
+
         email.send()
 
         notification.email_sent = True

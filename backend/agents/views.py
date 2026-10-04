@@ -179,8 +179,18 @@ def agent_dashboard(request):
 
     bookings_count = Booking.objects.filter(listing__sourced_by_agent=user).count()
 
+    # The personalized Agent Agreement PDF (generated on approval) for download.
+    agreement_url = None
+    approved_app = (
+        AgentApplication.objects.filter(applicant=user, status=AgentApplication.Status.APPROVED)
+        .order_by('-created_at').first()
+    )
+    if approved_app and approved_app.agreement_document:
+        agreement_url = request.build_absolute_uri(approved_app.agreement_document.url)
+
     return Response({
         'is_agent': is_approved_agent(user),
+        'agreement_document_url': agreement_url,
         'summary': {
             'properties_sourced': listings.count(),
             'published': listings.filter(status='published').count(),

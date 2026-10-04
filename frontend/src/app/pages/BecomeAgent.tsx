@@ -6,6 +6,7 @@ import { useApp } from '../../hooks/useApp';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Checkbox } from '../components/ui/checkbox';
 import { agentsAPI, type AgentApplicationState } from '../../services/api/agents';
 import { getErrorMessage } from '../../services/api/shared/errors';
 
@@ -174,12 +175,41 @@ export function BecomeAgent() {
             </div>
 
             <div className="pt-1 border-t border-border">
-              <label className="flex items-start gap-3 cursor-pointer mt-4">
-                <input type="checkbox" checked={agreed}
-                  onChange={(e) => { setAgreed(e.target.checked); setErrors((p) => ({ ...p, agreement: '' })); }}
-                  className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary shrink-0" />
-                <span className="text-sm text-foreground">I have read and agree to the Home Konet Agent Agreement.</span>
-              </label>
+              <p className="text-sm text-muted-foreground mt-4 mb-3">
+                By submitting this application, you agree to the{' '}
+                <Link
+                  to="/agent-agreement"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary font-medium hover:underline"
+                >
+                  Home Konet Agent Agreement
+                </Link>
+                .
+              </p>
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="agent-agreement"
+                  checked={agreed}
+                  onCheckedChange={(checked) => {
+                    setAgreed(checked === true);
+                    setErrors((p) => ({ ...p, agreement: '' }));
+                  }}
+                  className="mt-0.5"
+                />
+                <Label htmlFor="agent-agreement" className="text-sm font-normal leading-snug cursor-pointer">
+                  I have read and agree to the{' '}
+                  <Link
+                    to="/agent-agreement"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary font-semibold hover:underline"
+                  >
+                    Home Konet Agent Agreement
+                  </Link>
+                  .
+                </Label>
+              </div>
               {errors.agreement && <p className="text-xs text-destructive mt-1">{errors.agreement}</p>}
             </div>
 

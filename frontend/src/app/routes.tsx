@@ -68,6 +68,7 @@ const BecomeAHost = lazyPage(() => import('./pages/BecomeAHost').then((module) =
 const BecomeAgent = lazyPage(() => import('./pages/BecomeAgent').then((module) => ({ default: module.BecomeAgent })));
 const AgentDashboard = lazyPage(() => import('./pages/AgentDashboard').then((module) => ({ default: module.AgentDashboard })));
 const PropertyOwnerAgreement = lazyPage(() => import('./pages/PropertyOwnerAgreement').then((module) => ({ default: module.PropertyOwnerAgreement })));
+const AgentAgreement = lazyPage(() => import('./pages/AgentAgreement').then((module) => ({ default: module.AgentAgreement })));
 const CreateListing = lazyPage(() => import('./pages/CreateListing').then((module) => ({ default: module.CreateListing })));
 const UserDashboard = lazyPage(() => import('./pages/UserDashboard').then((module) => ({ default: module.UserDashboard })));
 const AdminDashboard = lazyPage(() => import('./pages/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
@@ -250,6 +251,7 @@ export const router = createBrowserRouter([
       { path: 'terms', Component: Terms },
       { path: 'privacy', Component: Privacy },
       { path: 'property-owner-agreement', Component: PropertyOwnerAgreement },
+      { path: 'agent-agreement', Component: AgentAgreement },
       { path: '*', Component: NotFound },
       { path: 'reset-password', Component: ResetPassword },
       { path: 'reviews', Component: AllReviews },

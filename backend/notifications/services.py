@@ -1266,7 +1266,10 @@ def notify_agent_application_declined(application):
 
 
 def notify_agent_application_approved(application):
-    """Notify the applicant they are now an approved sourcing agent."""
+    """Notify the applicant they are now an approved sourcing agent.
+
+    Attaches the personalized Agent Agreement PDF when it was generated on
+    approval (see agents.services._generate_agreement_safely)."""
     create_notification(
         user=application.applicant,
         notification_type='agent_application_approved',
@@ -1275,7 +1278,12 @@ def notify_agent_application_approved(application):
             'Congratulations! Your application has been approved. You can now source and '
             'list properties on behalf of owners and earn commission on their bookings.'
         ),
-        data={'application_id': application.id},
+        data={
+            'application_id': application.id,
+            'attach_agent_agreement_application_id': (
+                application.id if application.agreement_document else None
+            ),
+        },
     )
 
 

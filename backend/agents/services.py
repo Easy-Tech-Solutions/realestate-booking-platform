@@ -34,6 +34,17 @@ def _decline(application, stage, reason):
     return application
 
 
+def _generate_agreement_safely(application):
+    """Render + store the personalized Agent Agreement PDF on final approval.
+    Never blocks approval if generation fails (e.g. WeasyPrint's system libraries
+    aren't installed) — the agent is still approved and notified."""
+    try:
+        from . import agreements
+        agreements.generate_and_store_agent_agreement(application)
+    except Exception:
+        logger.exception('Agent-agreement PDF generation failed for application #%s', application.pk)
+
+
 def _grant_agent_capability(application):
     """Give the applicant the approved sourcing-agent capability (idempotent)."""
     profile, _ = AgentProfile.objects.get_or_create(user=application.applicant)
@@ -87,6 +98,9 @@ def supervisor_decision(application, approve, officer, reason=''):
             'status', 'supervisor_reviewed_by', 'supervisor_reviewed_at', 'updated_at',
         ])
         _grant_agent_capability(application)
+        # Generate the personalized agreement BEFORE notifying, so the approval
+        # email can attach it and the dashboard can offer the download.
+        _generate_agreement_safely(application)
         _safe_notify('notify_agent_application_approved', application)
         return application
     application.save(update_fields=['supervisor_reviewed_by', 'supervisor_reviewed_at'])

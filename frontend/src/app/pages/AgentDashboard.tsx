@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Loader2, Plus, Home as HomeIcon, DollarSign, CalendarCheck, Clock } from 'lucide-react';
+import { Loader2, Plus, Home as HomeIcon, DollarSign, CalendarCheck, Clock, Download } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { agentsAPI, type AgentDashboard as Dash } from '../../services/api/agents';
 
@@ -46,9 +46,20 @@ export function AgentDashboard() {
             <h1 className="text-3xl font-semibold">Agent Dashboard</h1>
             <p className="text-muted-foreground text-sm mt-1">Source properties for owners — Home Konet manages the rest.</p>
           </div>
-          <Button onClick={() => navigate('/host/new?mode=agent')}>
-            <Plus className="w-4 h-4 mr-2" /> Source a property
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            {dash.agreement_document_url && (
+              <Button
+                variant="outline"
+                onClick={() => window.open(dash.agreement_document_url!, '_blank', 'noopener')}
+                title="Download your Home Konet Agent Agreement (PDF)"
+              >
+                <Download className="w-4 h-4 mr-2" /> Agent Agreement
+              </Button>
+            )}
+            <Button onClick={() => navigate('/host/new?mode=agent')}>
+              <Plus className="w-4 h-4 mr-2" /> Source a property
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
