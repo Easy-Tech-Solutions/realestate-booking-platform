@@ -36,6 +36,7 @@ class AgentApplicationSerializer(serializers.ModelSerializer):
     status_display  = serializers.CharField(source='get_status_display', read_only=True)
     current_stage   = serializers.SerializerMethodField()
     id_document_url = serializers.SerializerMethodField()
+    agreement_document_url = serializers.SerializerMethodField()
     can_reapply     = serializers.SerializerMethodField()
     email           = serializers.EmailField(source='applicant.email', read_only=True)
 
@@ -43,6 +44,7 @@ class AgentApplicationSerializer(serializers.ModelSerializer):
         model = AgentApplication
         fields = [
             'id', 'full_name', 'address', 'phone', 'email', 'id_document_url',
+            'agreement_document_url', 'agreement_version',
             'status', 'status_display', 'current_stage',
             'declined_stage', 'decline_reason', 'can_reapply',
             'created_at', 'updated_at',
@@ -57,6 +59,12 @@ class AgentApplicationSerializer(serializers.ModelSerializer):
             return None
         request = self.context.get('request')
         return request.build_absolute_uri(obj.id_document.url) if request else obj.id_document.url
+
+    def get_agreement_document_url(self, obj):
+        if not obj.agreement_document:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.agreement_document.url) if request else obj.agreement_document.url
 
     def get_can_reapply(self, obj):
         return obj.status == AgentApplication.Status.DECLINED

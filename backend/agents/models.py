@@ -2,14 +2,27 @@ from django.db import models
 from django.conf import settings
 
 
+def _agreement_storage():
+    """Generated Agent Agreement PDFs are documents. Use Cloudinary's raw backend
+    in production if configured (the image backend rejects PDFs), else the default
+    (filesystem) storage. Mirrors hostapplications._agreement_storage."""
+    if getattr(settings, 'CLOUDINARY_URL', ''):
+        from cloudinary_storage.storage import RawMediaCloudinaryStorage
+        return RawMediaCloudinaryStorage()
+    from django.core.files.storage import default_storage
+    return default_storage
+
+
 # Reuse the SAME reviewer groups as host applications / property verifications.
 GROUP_PRODUCT_SUPPORT = 'Product Support Officers'
 GROUP_COMPLIANCE      = 'Compliance Officers'
 GROUP_SUPERVISOR      = 'Supervisors'
 
-# Placeholder version — the Agent Agreement document text is still TBD (the
-# acceptance gate is enforced now; bump this when the real document lands).
+# Agent Agreement version + effective date — the single source of truth for the
+# acceptance gate, the frontend page, and the generated PDF. Bump the version
+# when the agreement text materially changes (forces fresh acceptance).
 AGENT_AGREEMENT_VERSION = '1.0'
+AGENT_AGREEMENT_EFFECTIVE_DATE = '2026-10-04'
 
 
 class AgentApplication(models.Model):
@@ -48,9 +61,14 @@ class AgentApplication(models.Model):
     phone     = models.CharField(max_length=30)
     id_document = models.ImageField(upload_to='agent_applications/ids/')
 
-    # Agent Agreement acceptance (document TBD; the gate is enforced now).
+    # Agent Agreement acceptance — recorded at apply time. The personalized PDF
+    # is generated on FINAL approval (emailed to the agent + downloadable from
+    # their dashboard), mirroring the host Property Owner Agreement flow.
     agreement_version     = models.CharField(max_length=20, blank=True, default='')
     agreement_accepted_at = models.DateTimeField(null=True, blank=True)
+    agreement_document    = models.FileField(
+        upload_to='agent_agreements/', storage=_agreement_storage, null=True, blank=True,
+    )
 
     status = models.CharField(
         max_length=25, choices=Status.choices, default=Status.SUBMITTED, db_index=True,

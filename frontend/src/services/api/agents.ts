@@ -7,6 +7,9 @@ export interface AgentApplication {
   phone: string;
   email: string;
   id_document_url: string | null;
+  /** Personalized Agent Agreement PDF, generated on approval. */
+  agreement_document_url: string | null;
+  agreement_version: string;
   status: 'submitted' | 'ps_approved' | 'compliance_approved' | 'approved' | 'declined';
   status_display: string;
   current_stage: string | null;
@@ -24,6 +27,8 @@ export interface AgentApplicationState {
 
 export interface AgentDashboard {
   is_agent: boolean;
+  /** Personalized Agent Agreement PDF for download (null until approved). */
+  agreement_document_url: string | null;
   summary: {
     properties_sourced: number;
     published: number;
