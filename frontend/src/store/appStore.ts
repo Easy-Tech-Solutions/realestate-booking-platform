@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { toast } from 'sonner';
 import type { User, SearchFilters } from '../core/types';
-import { authAPI, propertiesAPI, clearTokens, attemptTokenRefresh, superadminAPI, getAccessToken, setTokens } from '../services/api.service';
+import { authAPI, propertiesAPI, clearTokens, attemptTokenRefresh, superadminAPI, getAccessToken, setTokens, setSessionExpiredHandler } from '../services/api.service';
 import type { GoogleLoginResult } from '../services/api/auth';
 import { queryClient } from '../providers/QueryProvider';
 import { queryKeys } from '../hooks/queries/keys';
@@ -11,9 +11,9 @@ export interface AppStoreState {
   user: User | null;
   setUser: (user: User | null) => void;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  completeMfaLogin: (mfaToken: string, code: string) => Promise<void>;
-  loginWithGoogle: (idToken: string) => Promise<GoogleLoginResult>;
+  login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
+  completeMfaLogin: (mfaToken: string, code: string, rememberMe?: boolean) => Promise<void>;
+  loginWithGoogle: (idToken: string, rememberMe?: boolean) => Promise<GoogleLoginResult>;
   register: (data: {
     email: string;
     password: string;
@@ -70,20 +70,20 @@ export const useAppStore = create<AppStoreState>()(
         }
       },
 
-      login: async (email, password) => {
-        const { user } = await authAPI.login(email, password);
+      login: async (email, password, rememberMe) => {
+        const { user } = await authAPI.login(email, password, rememberMe);
         set({ user, isAuthenticated: true });
         loadFavoritesIntoStore();
       },
 
-      completeMfaLogin: async (mfaToken, code) => {
-        const { user } = await authAPI.verifyMfaLogin(mfaToken, code);
+      completeMfaLogin: async (mfaToken, code, rememberMe) => {
+        const { user } = await authAPI.verifyMfaLogin(mfaToken, code, rememberMe);
         set({ user, isAuthenticated: true });
         loadFavoritesIntoStore();
       },
 
-      loginWithGoogle: async (idToken) => {
-        const result = await authAPI.loginWithGoogle(idToken);
+      loginWithGoogle: async (idToken, rememberMe) => {
+        const result = await authAPI.loginWithGoogle(idToken, rememberMe);
         set({ user: result.user, isAuthenticated: true });
         loadFavoritesIntoStore();
         return result;
@@ -156,6 +156,14 @@ export const useAppStore = create<AppStoreState>()(
     }
   )
 );
+
+// Session ended server-side (idle timeout / revoked): show the logged-out UI.
+setSessionExpiredHandler(() => {
+  if (!useAppStore.getState().isAuthenticated) return;
+  clearTokens();
+  useAppStore.setState({ user: null, isAuthenticated: false, wishlistIds: [] });
+  toast.info('Your session has expired. Please log in again.');
+});
 
 function loadFavoritesIntoStore() {
   propertiesAPI

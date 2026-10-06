@@ -60,6 +60,9 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
   // this checkbox rather than collecting an exact birthdate.
   const [ageConfirmed, setAgeConfirmed] = useState(false);
 
+  // "Keep me signed in" — off by default: the session then ends after 30 idle
+  // minutes or when the browser closes (enforced by the backend).
+  const [rememberMe, setRememberMe] = useState(false);
   // Step-up MFA: set once login() reports the account requires a code.
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState('');
@@ -138,7 +141,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
       }
 
       if (view === 'login') {
-        await login(formData.email, formData.password);
+        await login(formData.email, formData.password, rememberMe);
         toast.success('Welcome back!');
         handleClose();
       } else {
@@ -195,7 +198,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
     if (!mfaToken || mfaCode.trim().length < 6) return;
     setIsLoading(true);
     try {
-      await completeMfaLogin(mfaToken, mfaCode.trim());
+      await completeMfaLogin(mfaToken, mfaCode.trim(), rememberMe);
       toast.success('Welcome back!');
       handleClose();
     } catch (error: any) {
@@ -224,7 +227,7 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
 
     setIsLoading(true);
     try {
-      await loginWithGoogle(idToken);
+      await loginWithGoogle(idToken, rememberMe);
       toast.success('Welcome!');
       handleClose();
     } catch (error: any) {
@@ -387,7 +390,11 @@ export function AuthDialog({ open, onClose, mode, onModeChange }: AuthDialogProp
               )}
 
               {view === 'login' && (
-                <div className="flex justify-end">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="rememberMe" checked={rememberMe} onCheckedChange={(checked) => setRememberMe(checked === true)} />
+                    <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">Keep me signed in</Label>
+                  </div>
                   <button type="button" onClick={() => setView('forgot-password')} className="text-sm text-primary font-semibold hover:underline">Forgot password?</button>
                 </div>
               )}

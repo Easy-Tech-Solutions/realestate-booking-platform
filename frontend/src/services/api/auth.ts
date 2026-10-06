@@ -20,12 +20,14 @@ export class MfaRequiredError extends Error {
 }
 
 export const authAPI = {
-  login: async (email: string, password: string): Promise<{ user: User; access: string }> => {
+  // rememberMe = "Keep me signed in": without it the backend ends the session
+  // after 30 idle minutes and uses a browser-session cookie.
+  login: async (email: string, password: string, rememberMe = false): Promise<{ user: User; access: string }> => {
     clearTokens();
     const fingerprint = await getDeviceFingerprint();
     const data = await fetchPublicJson<AuthLoginResponse>('/api/auth/login/', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, remember_me: rememberMe }),
       headers: fingerprint ? { 'X-Device-Fingerprint': fingerprint } : {},
     });
     if (data.mfa_required) {
@@ -35,10 +37,10 @@ export const authAPI = {
     return { user: normalizeUser(data.user), access: data.access };
   },
 
-  verifyMfaLogin: async (mfaToken: string, code: string): Promise<{ user: User; access: string }> => {
+  verifyMfaLogin: async (mfaToken: string, code: string, rememberMe = false): Promise<{ user: User; access: string }> => {
     const data = await fetchPublicJson<AuthLoginResponse>('/api/superadmin/mfa/verify-login/', {
       method: 'POST',
-      body: JSON.stringify({ mfa_token: mfaToken, code }),
+      body: JSON.stringify({ mfa_token: mfaToken, code, remember_me: rememberMe }),
     });
     setTokens(data.access);
     return { user: normalizeUser(data.user), access: data.access };
@@ -115,12 +117,12 @@ export const authAPI = {
     });
   },
 
-  loginWithGoogle: async (idToken: string): Promise<GoogleLoginResult> => {
+  loginWithGoogle: async (idToken: string, rememberMe = false): Promise<GoogleLoginResult> => {
     clearTokens();
     const fingerprint = await getDeviceFingerprint();
     const data = await fetchPublicJson<AuthLoginResponse>('/api/auth/google/', {
       method: 'POST',
-      body: JSON.stringify({ id_token: idToken }),
+      body: JSON.stringify({ id_token: idToken, remember_me: rememberMe }),
       headers: fingerprint ? { 'X-Device-Fingerprint': fingerprint } : {},
     });
     setTokens(data.access);

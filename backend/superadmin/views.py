@@ -182,11 +182,10 @@ def mfa_verify_login(request):
 
     # Same token-issuing shape as authapp.views.login_view
     from authapp.serializers import UserSerializer
-    from authapp.views import _set_refresh_cookie
+    from authapp.views import _set_refresh_cookie, issue_refresh_token, wants_remember_me
     from realestate_backend.app_logging import log_activity
-    from rest_framework_simplejwt.tokens import RefreshToken
 
-    refresh = RefreshToken.for_user(user)
+    refresh = issue_refresh_token(user, wants_remember_me(request))
     access_token = str(refresh.access_token)
     log_activity(request, 'user_login', user=user)
     response = Response({'access': access_token, 'user': UserSerializer(user).data})
