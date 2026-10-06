@@ -14,6 +14,7 @@ export {
   propertiesAPI,
   reportsAPI,
   reviewsAPI,
+  setSessionExpiredHandler,
   setTokens,
   superadminAPI,
   suspensionsAPI,

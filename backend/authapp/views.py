@@ -35,13 +35,50 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+# "Keep me signed in". Recorded as a claim on the refresh token so it survives
+# rotation: every token minted by refresh_token_view inherits it.
+REMEMBER_CLAIM = "remember"
+
+
+def wants_remember_me(request):
+    """The login request's "Keep me signed in" choice. Absent means True, so
+    clients that predate the option keep the long-lived 14-day session."""
+    data = request.data if hasattr(request.data, "get") else {}
+    value = data.get("remember_me", True)
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("true", "1", "yes", "on")
+
+
+def issue_refresh_token(user, remember):
+    """RefreshToken.for_user, with the session policy applied:
+
+    - remember=True: the 14-day sliding session (SIMPLE_JWT lifetime, renewed
+      on every refresh) in a persistent cookie.
+    - remember=False: expires after settings.AUTH_SESSION_IDLE_TIMEOUT without
+      a refresh — i.e. that much inactivity signs the user out — and the
+      cookie is a browser-session cookie, gone when the browser closes.
+    """
+    refresh = RefreshToken.for_user(user)
+    refresh[REMEMBER_CLAIM] = bool(remember)
+    if not remember:
+        refresh.set_exp(lifetime=settings.AUTH_SESSION_IDLE_TIMEOUT)
+        # for_user() already recorded the OutstandingToken with the 14-day expiry.
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+        from rest_framework_simplejwt.utils import datetime_from_epoch
+        OutstandingToken.objects.filter(jti=refresh["jti"]).update(expires_at=datetime_from_epoch(refresh["exp"]))
+    return refresh
+
+
 def _set_refresh_cookie(response, refresh):
     """Attach the refresh token as an httpOnly, first-party cookie.
 
     The token is delivered ONLY via this cookie (never the JSON body) so it is
     not reachable by JavaScript — mitigates XSS token theft (TEST-AUTH-02).
     Cookie attributes are centralised in settings.AUTH_REFRESH_COOKIE_*.
+    Without "Keep me signed in" it's a session cookie (no Max-Age).
     """
+    remember = refresh.get(REMEMBER_CLAIM, True)
     response.set_cookie(
         settings.AUTH_REFRESH_COOKIE_NAME,
         str(refresh),
@@ -49,7 +86,7 @@ def _set_refresh_cookie(response, refresh):
         secure=settings.AUTH_REFRESH_COOKIE_SECURE,
         samesite=settings.AUTH_REFRESH_COOKIE_SAMESITE,
         domain=settings.AUTH_REFRESH_COOKIE_DOMAIN,
-        max_age=settings.AUTH_REFRESH_COOKIE_MAX_AGE,
+        max_age=settings.AUTH_REFRESH_COOKIE_MAX_AGE if remember else None,
         path=settings.AUTH_REFRESH_COOKIE_PATH,
     )
 
@@ -333,6 +370,21 @@ def login_view(request):
             break
 
     if user is None:
+        # ModelBackend refuses inactive accounts, and a signup that hasn't
+        # verified its email is inactive (register creates it with
+        # is_active=False) — so without this check a correct password on a
+        # pending signup got "invalid credentials" and the frontend never
+        # offered to resend the verification link. Only reached with the
+        # right password, so it reveals nothing to someone guessing.
+        if settings.AUTH_REQUIRE_EMAIL_VERIFICATION:
+            for candidate in candidates:
+                if (not candidate.is_active and not candidate.email_verified
+                        and candidate.check_password(password)):
+                    return Response(
+                        {"error": "Please verify your email before logging in. Check your email for the verification link.",
+                         "code": "email_not_verified"},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
         log_activity(request, 'user_login_failed', user_email=email)
         return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -364,7 +416,7 @@ def login_view(request):
         })
 
     #Geneate JWT tokens
-    refresh = RefreshToken.for_user(user)
+    refresh = issue_refresh_token(user, wants_remember_me(request))
     access_token = str(refresh.access_token)
 
     # The refresh token is delivered ONLY as an httpOnly cookie (never in the
@@ -429,15 +481,16 @@ def refresh_token_view(request):
         return Response(_suspension_response(suspension), status=status.HTTP_403_FORBIDDEN)
 
     # Rotate: blacklist the presented token and issue a fresh refresh token.
-    # This resets the 14-day sliding window on every refresh and guarantees the
-    # old token cannot be reused (the reuse check above will reject it).
+    # This resets the sliding window on every refresh (14 days, or the idle
+    # timeout without "Keep me signed in") and guarantees the old token cannot
+    # be reused (the reuse check above will reject it).
     try:
         old_refresh.blacklist()
     except AttributeError:
         # token_blacklist app not installed — degrade to a non-rotating refresh.
         pass
 
-    new_refresh = RefreshToken.for_user(user)
+    new_refresh = issue_refresh_token(user, old_refresh.get(REMEMBER_CLAIM, True))
     access_token = str(new_refresh.access_token)
     response = Response({"access": access_token, "access_token": access_token})
     _set_refresh_cookie(response, new_refresh)
@@ -574,8 +627,8 @@ def _unique_username_from_email(email):
     return candidate
 
 
-def _issue_tokens_for_user(user, http_status=200):
-    refresh = RefreshToken.for_user(user)
+def _issue_tokens_for_user(user, http_status=200, remember=True):
+    refresh = issue_refresh_token(user, remember)
     # Refresh token is delivered only as an httpOnly cookie (not in the body).
     response = Response(
         {
@@ -657,7 +710,7 @@ def google_login(request):
 
         social.last_login_at = timezone.now()
         social.save(update_fields=["last_login_at"])
-        return _issue_tokens_for_user(user, http_status=status.HTTP_200_OK)
+        return _issue_tokens_for_user(user, http_status=status.HTTP_200_OK, remember=wants_remember_me(request))
 
     # Case 2: email already owned by a local (password) account — no auto-link.
     if User.objects.filter(email__iexact=email).exists():
@@ -719,4 +772,4 @@ def google_login(request):
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
-    return _issue_tokens_for_user(user, http_status=status.HTTP_201_CREATED)
+    return _issue_tokens_for_user(user, http_status=status.HTTP_201_CREATED, remember=wants_remember_me(request))

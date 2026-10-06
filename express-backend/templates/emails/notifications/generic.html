@@ -1,0 +1,6 @@
+{% extends "emails/notifications/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 16px;color:#004406;font-size:22px;font-weight:700;">{{ notification.title }}</h2>
+<p style="margin:0 0 24px;color:#444444;font-size:15px;line-height:1.6;">{{ notification.message }}</p>
+<p style="margin:0;font-size:12px;color:#999999;">{{ notification.created_at|date:"N j, Y" }}</p>
+{% endblock %}

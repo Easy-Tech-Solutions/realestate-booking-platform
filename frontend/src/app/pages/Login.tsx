@@ -33,6 +33,9 @@ export function Login() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [showPassword2, setShowPassword2] = React.useState(false);
   const [agreedToTerms, setAgreedToTerms] = React.useState(false);
+  // "Keep me signed in" — off by default: the session then ends after 30 idle
+  // minutes or when the browser closes (enforced by the backend).
+  const [rememberMe, setRememberMe] = React.useState(false);
 
   // Keep the URL's ?mode= in sync with the toggle so deep-links stay accurate.
   const switchMode = (next: Mode) => {
@@ -57,7 +60,7 @@ export function Login() {
     if (!validateEmail() || !password) return;
     setIsLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       toast.success('Welcome back!');
       navigate(next, { replace: true });
     } catch (error: any) {
@@ -76,7 +79,7 @@ export function Login() {
     if (!mfaToken || mfaCode.trim().length < 6) return;
     setIsLoading(true);
     try {
-      await completeMfaLogin(mfaToken, mfaCode.trim());
+      await completeMfaLogin(mfaToken, mfaCode.trim(), rememberMe);
       toast.success('Welcome back!');
       navigate(next, { replace: true });
     } catch (error: any) {
@@ -149,7 +152,7 @@ export function Login() {
     }
     setIsLoading(true);
     try {
-      await loginWithGoogle(idToken);
+      await loginWithGoogle(idToken, rememberMe);
       toast.success('Welcome!');
       navigate(next, { replace: true });
     } catch (error: any) {
@@ -325,6 +328,13 @@ export function Login() {
               </button>
             </div>
           </div>
+
+          {!isSignup && (
+            <div className="flex items-center gap-2">
+              <Checkbox id="rememberMe" checked={rememberMe} onCheckedChange={(checked) => setRememberMe(checked === true)} />
+              <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">Keep me signed in</Label>
+            </div>
+          )}
 
           {isSignup && (
             <div className="space-y-2">

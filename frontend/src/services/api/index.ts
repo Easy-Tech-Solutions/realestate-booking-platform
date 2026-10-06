@@ -31,4 +31,4 @@ export type { LeaseAgreement } from './leaseAgreements';
 export { superadminAPI } from './superadmin';
 export type { SuperadminMe, MfaSetupResponse, AuditLogEntry, AuditLogPage } from './superadmin';
 export type { Testimonial } from './testimonials';
-export { clearTokens, getAccessToken, setTokens, attemptTokenRefresh } from './shared/client';
+export { clearTokens, getAccessToken, setTokens, attemptTokenRefresh, setSessionExpiredHandler } from './shared/client';

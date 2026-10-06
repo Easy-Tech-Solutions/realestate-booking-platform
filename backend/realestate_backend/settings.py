@@ -381,6 +381,12 @@ AUTH_REFRESH_COOKIE_DOMAIN = os.environ.get("AUTH_REFRESH_COOKIE_DOMAIN") or Non
 AUTH_REFRESH_COOKIE_SECURE = not DEBUG
 AUTH_REFRESH_COOKIE_MAX_AGE = int(SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
 
+# Sessions signed in WITHOUT "Keep me signed in" end after this much inactivity
+# (the refresh token expires unless it's used/rotated within the window) and
+# use a browser-session cookie. "Keep me signed in" keeps the 14-day sliding
+# session above. See authapp.views.issue_refresh_token.
+AUTH_SESSION_IDLE_TIMEOUT = timedelta(minutes=int(os.environ.get("AUTH_SESSION_IDLE_MINUTES", "30")))
+
 # Email transport selection.
 #   EMAIL_BACKEND_MODE picks the transport: 'console' (dev), 'smtp', or 'brevo'.
 #   Defaults to console in DEBUG, brevo otherwise (backwards compatible).

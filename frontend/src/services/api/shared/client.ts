@@ -20,6 +20,15 @@ export const clearTokens = () => {
 
 export const getAccessToken = () => accessToken;
 
+// Called when a signed-in user's session can no longer be renewed (the
+// refresh token expired — e.g. idle past the timeout without "Keep me signed
+// in" — or was revoked), so the app can drop to logged-out instead of showing
+// a signed-in UI whose requests all fail.
+let sessionExpiredHandler: (() => void) | null = null;
+export const setSessionExpiredHandler = (fn: (() => void) | null) => {
+  sessionExpiredHandler = fn;
+};
+
 export async function fetchPublicJson<T>(url: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     ...(!(options.body instanceof FormData) && { 'Content-Type': 'application/json' }),
@@ -88,12 +97,15 @@ export async function fetchWithAuth<T>(url: string, options: RequestInit = {}): 
     return fetch(`${API_BASE_URL}${url}`, { ...options, headers, credentials: 'include' });
   };
 
+  const hadSession = accessToken !== null;
   let response = await makeRequest(accessToken);
 
   if (response.status === 401) {
     const newToken = await attemptTokenRefresh();
     if (newToken) {
       response = await makeRequest(newToken);
+    } else if (hadSession) {
+      sessionExpiredHandler?.();
     }
   }
 
@@ -135,12 +147,15 @@ export async function fetchTextWithAuth(url: string, options: RequestInit = {}):
     return fetch(`${API_BASE_URL}${url}`, { ...options, headers, credentials: 'include' });
   };
 
+  const hadSession = accessToken !== null;
   let response = await makeRequest(accessToken);
 
   if (response.status === 401) {
     const newToken = await attemptTokenRefresh();
     if (newToken) {
       response = await makeRequest(newToken);
+    } else if (hadSession) {
+      sessionExpiredHandler?.();
     }
   }
 
@@ -165,12 +180,15 @@ export async function fetchBlobWithAuth(url: string, options: RequestInit = {}):
     return fetch(`${API_BASE_URL}${url}`, { ...options, headers, credentials: 'include' });
   };
 
+  const hadSession = accessToken !== null;
   let response = await makeRequest(accessToken);
 
   if (response.status === 401) {
     const newToken = await attemptTokenRefresh();
     if (newToken) {
       response = await makeRequest(newToken);
+    } else if (hadSession) {
+      sessionExpiredHandler?.();
     }
   }
 

@@ -1,0 +1,10 @@
+{% extends "emails/notifications/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">We Received Your Application</h2>
+<p style="margin:0 0 24px;color:#666666;font-size:14px;">Thanks for applying to become a host</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f9ff;border-radius:6px;padding:20px;margin:0 0 24px;border-left:4px solid #0284c7;">
+  <tr><td style="padding:5px 0;font-size:15px;color:#111111;">Your host application has been received and is now in review.</td></tr>
+</table>
+<p style="margin:0 0 24px;color:#444444;font-size:15px;line-height:1.6;">Our team reviews every application to keep Home Konet safe and trustworthy. We'll email you at each step, and you can check your status any time.</p>
+<a href="{{ site_url }}/become-a-host" style="display:inline-block;background:#004406;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">View Application Status</a>
+{% endblock %}

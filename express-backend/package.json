@@ -1,0 +1,62 @@
+{
+  "name": "homekonet-express-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standby Express clone of the HomeKonet Django backend (same API, same table layout).",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "worker": "node dist/worker.js",
+    "db:types": "./gen-db-types.sh",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@huggingface/jinja": "^0.5.10",
+    "bullmq": "^6.3.11",
+    "cookie-parser": "^1.4.7",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "google-auth-library": "^11.1.0",
+    "image-size": "^2.0.4",
+    "ioredis": "^6.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "kysely": "^0.29.6",
+    "multer": "^2.4.0",
+    "node-llama-cpp": "^3.22.1",
+    "nodemailer": "^10.0.14",
+    "otplib": "^13.5.0",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "puppeteer-core": "^25.12.0",
+    "qrcode": "^1.5.4",
+    "stripe": "^23.0.0",
+    "web-push": "^3.6.7",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^26.6.4",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
+    "@types/supertest": "^7.2.1",
+    "@types/web-push": "^3.6.4",
+    "@types/ws": "^8.18.2",
+    "kysely-codegen": "^0.20.0",
+    "supertest": "^7.3.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

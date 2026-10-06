@@ -152,6 +152,85 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
+  # ---------------------------------------------------------------------------
+  # Standby Express backend (express-backend/). Fully separate from the Django
+  # services above: own database, Redis, media, env file and network. Under the
+  # 'express' profile, so a plain `docker compose up -d` never starts them —
+  # use `docker compose --profile express ...`. nginx only sends traffic here
+  # after scripts/switch-backend.sh express. See express-backend/README.md.
+  # ---------------------------------------------------------------------------
+  express-db:
+    image: postgres:16
+    profiles: ["express"]
+    restart: unless-stopped
+    env_file:
+      - express-backend/.env.db
+    volumes:
+      - express_postgres_data:/var/lib/postgresql/data
+    networks: [express_internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homekonet_express -d homekonet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  express-redis:
+    image: redis:7-alpine
+    profiles: ["express"]
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - express_redis_data:/data
+    networks: [express_internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  express-api:
+    build:
+      context: express-backend
+    profiles: ["express"]
+    restart: unless-stopped
+    command: node dist/server.js
+    env_file:
+      - express-backend/.env
+    depends_on:
+      express-db:
+        condition: service_healthy
+      express-redis:
+        condition: service_healthy
+    volumes:
+      - ./express-backend/media:/app/media
+      - ./docs:/app/docs:ro   # platform-ops docs viewer (same mount as Django's backend)
+    # 'default' so the frontend nginx can reach it once switched; DB/Redis stay private.
+    networks: [default, express_internal]
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get({host:'localhost',port:8000,path:'/api/health/',headers:{Host:'homekonet.com'}},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  express-worker:
+    build:
+      context: express-backend
+    profiles: ["express"]
+    restart: unless-stopped
+    command: node dist/worker.js
+    env_file:
+      - express-backend/.env
+    depends_on:
+      express-db:
+        condition: service_healthy
+      express-redis:
+        condition: service_healthy
+    volumes:
+      - ./express-backend/media:/app/media
+    networks: [express_internal]
+
 volumes:
   redis_data:
   postgres_data:
@@ -159,3 +238,8 @@ volumes:
   static_files:
   ai_models:
   pgadmin_data:
+  express_postgres_data:
+  express_redis_data:
+
+networks:
+  express_internal:
