@@ -1,0 +1,21 @@
+{% extends "emails/notifications/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 16px;color:#004406;font-size:22px;font-weight:700;">Payment Received</h2>
+<p style="margin:0 0 16px;color:#444444;font-size:15px;line-height:1.6;">
+  Hi {{ user.get_full_name|default:user.username }}, a guest has paid for one of your properties.
+</p>
+
+<div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:0 0 24px;border-left:3px solid #004406;">
+  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Property:</strong> {{ data.listing_title }}</p>
+  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Booking amount:</strong> ${{ data.booking_amount }}</p>
+  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Service fee:</strong> ${{ data.host_service_fee }}</p>
+  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Amount you'll receive:</strong> ${{ data.amount_received }}</p>
+  <p style="margin:0;font-size:14px;color:#333333;line-height:1.6;"><strong>Reference:</strong> #{{ data.payment_id }}</p>
+</div>
+
+<p style="margin:0 0 24px;color:#666666;font-size:13px;line-height:1.6;">
+  Home Konet holds your payout until the guest checks in. We'll disburse the amount above to your registered Mobile Money number once check-in is confirmed.
+</p>
+
+<a href="{{ site_url }}/host?section=accepted" style="display:inline-block;background:#004406;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">View Booking</a>
+{% endblock %}

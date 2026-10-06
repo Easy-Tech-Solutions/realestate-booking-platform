@@ -1,0 +1,8 @@
+﻿{% extends "emails/notifications/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Account Reinstated</h2>
+<div style="background:#f0faf0;border-radius:6px;padding:20px;margin:0 0 24px;border-left:4px solid #22c55e;">
+  <p style="margin:0;font-size:15px;color:#444444;line-height:1.6;">{{ notification.message }}</p>
+</div>
+<a href="{{ site_url }}" style="display:inline-block;background:#111111;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">Log in Now</a>
+{% endblock %}

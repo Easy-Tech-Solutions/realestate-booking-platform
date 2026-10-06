@@ -116,3 +116,12 @@ tmp/
 *.sublime-project
 .agents/
 .claude/
+# Standby Express backend — secrets and synced media never committed
+express-backend/**/.env*
+!express-backend/.env.example
+express-backend/media/
+express-backend/dist-*/
+express-backend/.scratch-*/
+# Parity mock providers: throwaway test CA + leaf cert/key, generated at reset time
+express-backend/parity/mocks/certs/
+express-backend/parity/mocks/.certs.*/

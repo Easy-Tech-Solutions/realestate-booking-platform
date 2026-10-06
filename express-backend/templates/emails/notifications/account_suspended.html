@@ -1,0 +1,9 @@
+﻿{% extends "emails/notifications/base_email.html" %}
+{% block content %}
+<h2 style="margin:0 0 8px;color:#111111;font-size:22px;font-weight:700;">Account Suspended</h2>
+<div style="background:#fef2f2;border-radius:6px;padding:20px;margin:0 0 24px;border-left:4px solid #ef4444;">
+  <p style="margin:0;font-size:15px;color:#444444;line-height:1.6;">{{ notification.message }}</p>
+  {% if data.reason %}<p style="margin:12px 0 0;font-size:14px;color:#666666;"><strong>Reason:</strong> {{ data.reason }}</p>{% endif %}
+</div>
+<p style="margin:0;font-size:14px;color:#666666;line-height:1.6;">If you believe this is a mistake, please contact our support team.</p>
+{% endblock %}

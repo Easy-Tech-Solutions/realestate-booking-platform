@@ -1,0 +1,4990 @@
+[
+    {
+        "pattern": "api/health/",
+        "name": null,
+        "view": "realestate_backend.urls.health_check",
+        "methods": null
+    },
+    {
+        "pattern": "admin/search/",
+        "name": "search",
+        "view": "unfold.sites.search",
+        "methods": null
+    },
+    {
+        "pattern": "admin/",
+        "name": "index",
+        "view": "unfold.sites.index",
+        "methods": null
+    },
+    {
+        "pattern": "admin/login/",
+        "name": "login",
+        "view": "django.contrib.admin.sites.login",
+        "methods": null
+    },
+    {
+        "pattern": "admin/logout/",
+        "name": "logout",
+        "view": "django.contrib.admin.sites.logout",
+        "methods": null
+    },
+    {
+        "pattern": "admin/password_change/",
+        "name": "password_change",
+        "view": "unfold.sites.password_change",
+        "methods": null
+    },
+    {
+        "pattern": "admin/password_change/done/",
+        "name": "password_change_done",
+        "view": "django.contrib.admin.sites.password_change_done",
+        "methods": null
+    },
+    {
+        "pattern": "admin/autocomplete/",
+        "name": "autocomplete",
+        "view": "django.contrib.admin.sites.autocomplete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/jsi18n/",
+        "name": "jsi18n",
+        "view": "django.contrib.admin.sites.i18n_javascript",
+        "methods": null
+    },
+    {
+        "pattern": "admin/r/<path:content_type_id>/<path:object_id>/",
+        "name": "view_on_site",
+        "view": "django.contrib.contenttypes.views.shortcut",
+        "methods": null
+    },
+    {
+        "pattern": "admin/auth/group/",
+        "name": "auth_group_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/auth/group/add/",
+        "name": "auth_group_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/auth/group/<path:object_id>/history/",
+        "name": "auth_group_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/auth/group/<path:object_id>/delete/",
+        "name": "auth_group_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/auth/group/<path:object_id>/change/",
+        "name": "auth_group_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/auth/group/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/sites/site/",
+        "name": "sites_site_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/sites/site/add/",
+        "name": "sites_site_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/sites/site/<path:object_id>/history/",
+        "name": "sites_site_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/sites/site/<path:object_id>/delete/",
+        "name": "sites_site_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/sites/site/<path:object_id>/change/",
+        "name": "sites_site_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/sites/site/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/token_blacklist/outstandingtoken/",
+        "name": "token_blacklist_outstandingtoken_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/token_blacklist/outstandingtoken/add/",
+        "name": "token_blacklist_outstandingtoken_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/token_blacklist/outstandingtoken/<path:object_id>/history/",
+        "name": "token_blacklist_outstandingtoken_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/token_blacklist/outstandingtoken/<path:object_id>/delete/",
+        "name": "token_blacklist_outstandingtoken_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/token_blacklist/outstandingtoken/<path:object_id>/change/",
+        "name": "token_blacklist_outstandingtoken_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/token_blacklist/outstandingtoken/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/token_blacklist/blacklistedtoken/",
+        "name": "token_blacklist_blacklistedtoken_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/token_blacklist/blacklistedtoken/add/",
+        "name": "token_blacklist_blacklistedtoken_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/token_blacklist/blacklistedtoken/<path:object_id>/history/",
+        "name": "token_blacklist_blacklistedtoken_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/token_blacklist/blacklistedtoken/<path:object_id>/delete/",
+        "name": "token_blacklist_blacklistedtoken_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/token_blacklist/blacklistedtoken/<path:object_id>/change/",
+        "name": "token_blacklist_blacklistedtoken_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/token_blacklist/blacklistedtoken/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/authapp/blacklistedtoken/",
+        "name": "authapp_blacklistedtoken_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/authapp/blacklistedtoken/add/",
+        "name": "authapp_blacklistedtoken_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/authapp/blacklistedtoken/<path:object_id>/history/",
+        "name": "authapp_blacklistedtoken_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/authapp/blacklistedtoken/<path:object_id>/delete/",
+        "name": "authapp_blacklistedtoken_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/authapp/blacklistedtoken/<path:object_id>/change/",
+        "name": "authapp_blacklistedtoken_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/authapp/blacklistedtoken/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/authapp/socialaccount/",
+        "name": "authapp_socialaccount_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/authapp/socialaccount/add/",
+        "name": "authapp_socialaccount_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/authapp/socialaccount/<path:object_id>/history/",
+        "name": "authapp_socialaccount_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/authapp/socialaccount/<path:object_id>/delete/",
+        "name": "authapp_socialaccount_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/authapp/socialaccount/<path:object_id>/change/",
+        "name": "authapp_socialaccount_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/authapp/socialaccount/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/listings/propertycategory/",
+        "name": "listings_propertycategory_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/propertycategory/add/",
+        "name": "listings_propertycategory_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/propertycategory/<path:object_id>/history/",
+        "name": "listings_propertycategory_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/propertycategory/<path:object_id>/delete/",
+        "name": "listings_propertycategory_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/propertycategory/<path:object_id>/change/",
+        "name": "listings_propertycategory_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/propertycategory/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/listings/listingsettings/",
+        "name": "listings_listingsettings_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listingsettings/add/",
+        "name": "listings_listingsettings_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listingsettings/<path:object_id>/history/",
+        "name": "listings_listingsettings_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listingsettings/<path:object_id>/delete/",
+        "name": "listings_listingsettings_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listingsettings/<path:object_id>/change/",
+        "name": "listings_listingsettings_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listingsettings/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/listings/listing/",
+        "name": "listings_listing_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listing/add/",
+        "name": "listings_listing_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listing/<path:object_id>/history/",
+        "name": "listings_listing_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listing/<path:object_id>/delete/",
+        "name": "listings_listing_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listing/<path:object_id>/change/",
+        "name": "listings_listing_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listing/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/listings/listingimage/",
+        "name": "listings_listingimage_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listingimage/add/",
+        "name": "listings_listingimage_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listingimage/<path:object_id>/history/",
+        "name": "listings_listingimage_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listingimage/<path:object_id>/delete/",
+        "name": "listings_listingimage_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listingimage/<path:object_id>/change/",
+        "name": "listings_listingimage_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/listingimage/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/listings/favorite/",
+        "name": "listings_favorite_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/favorite/add/",
+        "name": "listings_favorite_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/favorite/<path:object_id>/history/",
+        "name": "listings_favorite_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/favorite/<path:object_id>/delete/",
+        "name": "listings_favorite_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/favorite/<path:object_id>/change/",
+        "name": "listings_favorite_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/listings/favorite/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/bookings/booking/",
+        "name": "bookings_booking_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/booking/add/",
+        "name": "bookings_booking_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/booking/<path:object_id>/history/",
+        "name": "bookings_booking_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/booking/<path:object_id>/delete/",
+        "name": "bookings_booking_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/booking/<path:object_id>/change/",
+        "name": "bookings_booking_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/booking/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/bookings/viewingappointment/",
+        "name": "bookings_viewingappointment_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/viewingappointment/add/",
+        "name": "bookings_viewingappointment_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/viewingappointment/<path:object_id>/history/",
+        "name": "bookings_viewingappointment_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/viewingappointment/<path:object_id>/delete/",
+        "name": "bookings_viewingappointment_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/viewingappointment/<path:object_id>/change/",
+        "name": "bookings_viewingappointment_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/viewingappointment/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/bookings/paymentrequest/",
+        "name": "bookings_paymentrequest_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/paymentrequest/add/",
+        "name": "bookings_paymentrequest_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/paymentrequest/<path:object_id>/history/",
+        "name": "bookings_paymentrequest_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/paymentrequest/<path:object_id>/delete/",
+        "name": "bookings_paymentrequest_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/paymentrequest/<path:object_id>/change/",
+        "name": "bookings_paymentrequest_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/bookings/paymentrequest/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/users/user/<id>/password/",
+        "name": "auth_user_password_change",
+        "view": "django.contrib.auth.admin.user_change_password",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/user/",
+        "name": "users_user_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/user/add/",
+        "name": "users_user_add",
+        "view": "django.contrib.auth.admin.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/user/<path:object_id>/history/",
+        "name": "users_user_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/user/<path:object_id>/delete/",
+        "name": "users_user_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/user/<path:object_id>/change/",
+        "name": "users_user_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/user/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/users/profile/",
+        "name": "users_profile_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/profile/add/",
+        "name": "users_profile_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/profile/<path:object_id>/history/",
+        "name": "users_profile_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/profile/<path:object_id>/delete/",
+        "name": "users_profile_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/profile/<path:object_id>/change/",
+        "name": "users_profile_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/users/profile/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/paymentgateway/",
+        "name": "payments_paymentgateway_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/paymentgateway/add/",
+        "name": "payments_paymentgateway_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/paymentgateway/<path:object_id>/history/",
+        "name": "payments_paymentgateway_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/paymentgateway/<path:object_id>/delete/",
+        "name": "payments_paymentgateway_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/paymentgateway/<path:object_id>/change/",
+        "name": "payments_paymentgateway_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/paymentgateway/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/currency/",
+        "name": "payments_currency_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/currency/add/",
+        "name": "payments_currency_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/currency/<path:object_id>/history/",
+        "name": "payments_currency_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/currency/<path:object_id>/delete/",
+        "name": "payments_currency_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/currency/<path:object_id>/change/",
+        "name": "payments_currency_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/currency/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/payment/",
+        "name": "payments_payment_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/payment/add/",
+        "name": "payments_payment_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/payment/<path:object_id>/history/",
+        "name": "payments_payment_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/payment/<path:object_id>/delete/",
+        "name": "payments_payment_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/payment/<path:object_id>/change/",
+        "name": "payments_payment_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/payment/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/refund/",
+        "name": "payments_refund_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/refund/add/",
+        "name": "payments_refund_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/refund/<path:object_id>/history/",
+        "name": "payments_refund_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/refund/<path:object_id>/delete/",
+        "name": "payments_refund_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/refund/<path:object_id>/change/",
+        "name": "payments_refund_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/refund/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/platformfee/",
+        "name": "payments_platformfee_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/platformfee/add/",
+        "name": "payments_platformfee_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/platformfee/<path:object_id>/history/",
+        "name": "payments_platformfee_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/platformfee/<path:object_id>/delete/",
+        "name": "payments_platformfee_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/platformfee/<path:object_id>/change/",
+        "name": "payments_platformfee_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/platformfee/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/payout/",
+        "name": "payments_payout_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/payout/add/",
+        "name": "payments_payout_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/payout/<path:object_id>/history/",
+        "name": "payments_payout_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/payout/<path:object_id>/delete/",
+        "name": "payments_payout_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/payout/<path:object_id>/change/",
+        "name": "payments_payout_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/payout/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/employee/",
+        "name": "payments_employee_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/employee/add/",
+        "name": "payments_employee_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/employee/<path:object_id>/history/",
+        "name": "payments_employee_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/employee/<path:object_id>/delete/",
+        "name": "payments_employee_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/employee/<path:object_id>/change/",
+        "name": "payments_employee_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/employee/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/employeepayment/",
+        "name": "payments_employeepayment_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/employeepayment/add/",
+        "name": "payments_employeepayment_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/employeepayment/<path:object_id>/history/",
+        "name": "payments_employeepayment_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/employeepayment/<path:object_id>/delete/",
+        "name": "payments_employeepayment_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/employeepayment/<path:object_id>/change/",
+        "name": "payments_employeepayment_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/employeepayment/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/webhooklog/",
+        "name": "payments_webhooklog_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/webhooklog/add/",
+        "name": "payments_webhooklog_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/webhooklog/<path:object_id>/history/",
+        "name": "payments_webhooklog_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/webhooklog/<path:object_id>/delete/",
+        "name": "payments_webhooklog_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/webhooklog/<path:object_id>/change/",
+        "name": "payments_webhooklog_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/webhooklog/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/escrowhold/",
+        "name": "payments_escrowhold_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/escrowhold/add/",
+        "name": "payments_escrowhold_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/escrowhold/<path:object_id>/history/",
+        "name": "payments_escrowhold_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/escrowhold/<path:object_id>/delete/",
+        "name": "payments_escrowhold_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/escrowhold/<path:object_id>/change/",
+        "name": "payments_escrowhold_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/escrowhold/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/taxrate/",
+        "name": "payments_taxrate_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/taxrate/add/",
+        "name": "payments_taxrate_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/taxrate/<path:object_id>/history/",
+        "name": "payments_taxrate_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/taxrate/<path:object_id>/delete/",
+        "name": "payments_taxrate_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/taxrate/<path:object_id>/change/",
+        "name": "payments_taxrate_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/taxrate/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/payments/striperefund/",
+        "name": "payments_striperefund_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/striperefund/add/",
+        "name": "payments_striperefund_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/striperefund/<path:object_id>/history/",
+        "name": "payments_striperefund_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/striperefund/<path:object_id>/delete/",
+        "name": "payments_striperefund_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/striperefund/<path:object_id>/change/",
+        "name": "payments_striperefund_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/payments/striperefund/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/messaging/conversation/",
+        "name": "messaging_conversation_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/conversation/add/",
+        "name": "messaging_conversation_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/conversation/<path:object_id>/history/",
+        "name": "messaging_conversation_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/conversation/<path:object_id>/delete/",
+        "name": "messaging_conversation_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/conversation/<path:object_id>/change/",
+        "name": "messaging_conversation_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/conversation/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/messaging/message/",
+        "name": "messaging_message_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/message/add/",
+        "name": "messaging_message_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/message/<path:object_id>/history/",
+        "name": "messaging_message_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/message/<path:object_id>/delete/",
+        "name": "messaging_message_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/message/<path:object_id>/change/",
+        "name": "messaging_message_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/message/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/messaging/messageattachment/",
+        "name": "messaging_messageattachment_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/messageattachment/add/",
+        "name": "messaging_messageattachment_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/messageattachment/<path:object_id>/history/",
+        "name": "messaging_messageattachment_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/messageattachment/<path:object_id>/delete/",
+        "name": "messaging_messageattachment_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/messageattachment/<path:object_id>/change/",
+        "name": "messaging_messageattachment_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/messaging/messageattachment/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/notifications/notification/",
+        "name": "notifications_notification_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/notifications/notification/add/",
+        "name": "notifications_notification_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/notifications/notification/<path:object_id>/history/",
+        "name": "notifications_notification_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/notifications/notification/<path:object_id>/delete/",
+        "name": "notifications_notification_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/notifications/notification/<path:object_id>/change/",
+        "name": "notifications_notification_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/notifications/notification/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/notifications/notificationpreference/",
+        "name": "notifications_notificationpreference_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/notifications/notificationpreference/add/",
+        "name": "notifications_notificationpreference_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/notifications/notificationpreference/<path:object_id>/history/",
+        "name": "notifications_notificationpreference_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/notifications/notificationpreference/<path:object_id>/delete/",
+        "name": "notifications_notificationpreference_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/notifications/notificationpreference/<path:object_id>/change/",
+        "name": "notifications_notificationpreference_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/notifications/notificationpreference/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/reports/report/",
+        "name": "reports_report_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/reports/report/add/",
+        "name": "reports_report_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/reports/report/<path:object_id>/history/",
+        "name": "reports_report_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/reports/report/<path:object_id>/delete/",
+        "name": "reports_report_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/reports/report/<path:object_id>/change/",
+        "name": "reports_report_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/reports/report/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/suspensions/suspension/",
+        "name": "suspensions_suspension_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/suspensions/suspension/add/",
+        "name": "suspensions_suspension_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/suspensions/suspension/<path:object_id>/history/",
+        "name": "suspensions_suspension_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/suspensions/suspension/<path:object_id>/delete/",
+        "name": "suspensions_suspension_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/suspensions/suspension/<path:object_id>/change/",
+        "name": "suspensions_suspension_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/suspensions/suspension/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/newsletter/subscriber/",
+        "name": "newsletter_subscriber_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/newsletter/subscriber/add/",
+        "name": "newsletter_subscriber_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/newsletter/subscriber/<path:object_id>/history/",
+        "name": "newsletter_subscriber_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/newsletter/subscriber/<path:object_id>/delete/",
+        "name": "newsletter_subscriber_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/newsletter/subscriber/<path:object_id>/change/",
+        "name": "newsletter_subscriber_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/newsletter/subscriber/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/testimonials/testimonial/",
+        "name": "testimonials_testimonial_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/testimonials/testimonial/add/",
+        "name": "testimonials_testimonial_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/testimonials/testimonial/<path:object_id>/history/",
+        "name": "testimonials_testimonial_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/testimonials/testimonial/<path:object_id>/delete/",
+        "name": "testimonials_testimonial_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/testimonials/testimonial/<path:object_id>/change/",
+        "name": "testimonials_testimonial_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/testimonials/testimonial/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/support/supportticket/",
+        "name": "support_supportticket_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/supportticket/add/",
+        "name": "support_supportticket_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/supportticket/<path:object_id>/history/",
+        "name": "support_supportticket_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/supportticket/<path:object_id>/delete/",
+        "name": "support_supportticket_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/supportticket/<path:object_id>/change/",
+        "name": "support_supportticket_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/supportticket/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/support/contactinquiry/",
+        "name": "support_contactinquiry_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/contactinquiry/add/",
+        "name": "support_contactinquiry_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/contactinquiry/<path:object_id>/history/",
+        "name": "support_contactinquiry_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/contactinquiry/<path:object_id>/delete/",
+        "name": "support_contactinquiry_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/contactinquiry/<path:object_id>/change/",
+        "name": "support_contactinquiry_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/contactinquiry/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/support/aircoverclaim/",
+        "name": "support_aircoverclaim_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/aircoverclaim/add/",
+        "name": "support_aircoverclaim_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/aircoverclaim/<path:object_id>/history/",
+        "name": "support_aircoverclaim_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/aircoverclaim/<path:object_id>/delete/",
+        "name": "support_aircoverclaim_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/aircoverclaim/<path:object_id>/change/",
+        "name": "support_aircoverclaim_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/support/aircoverclaim/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/hostapplications/hostapplication/",
+        "name": "hostapplications_hostapplication_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/hostapplications/hostapplication/add/",
+        "name": "hostapplications_hostapplication_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/hostapplications/hostapplication/<path:object_id>/history/",
+        "name": "hostapplications_hostapplication_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/hostapplications/hostapplication/<path:object_id>/delete/",
+        "name": "hostapplications_hostapplication_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/hostapplications/hostapplication/<path:object_id>/change/",
+        "name": "hostapplications_hostapplication_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/hostapplications/hostapplication/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/hostapplications/agreementacceptance/",
+        "name": "hostapplications_agreementacceptance_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/hostapplications/agreementacceptance/add/",
+        "name": "hostapplications_agreementacceptance_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/hostapplications/agreementacceptance/<path:object_id>/history/",
+        "name": "hostapplications_agreementacceptance_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/hostapplications/agreementacceptance/<path:object_id>/delete/",
+        "name": "hostapplications_agreementacceptance_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/hostapplications/agreementacceptance/<path:object_id>/change/",
+        "name": "hostapplications_agreementacceptance_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/hostapplications/agreementacceptance/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/propertyverifications/propertyverification/",
+        "name": "propertyverifications_propertyverification_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/propertyverifications/propertyverification/add/",
+        "name": "propertyverifications_propertyverification_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/propertyverifications/propertyverification/<path:object_id>/history/",
+        "name": "propertyverifications_propertyverification_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/propertyverifications/propertyverification/<path:object_id>/delete/",
+        "name": "propertyverifications_propertyverification_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/propertyverifications/propertyverification/<path:object_id>/change/",
+        "name": "propertyverifications_propertyverification_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/propertyverifications/propertyverification/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseagreement/",
+        "name": "leaseagreements_leaseagreement_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseagreement/add/",
+        "name": "leaseagreements_leaseagreement_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseagreement/<path:object_id>/history/",
+        "name": "leaseagreements_leaseagreement_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseagreement/<path:object_id>/delete/",
+        "name": "leaseagreements_leaseagreement_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseagreement/<path:object_id>/change/",
+        "name": "leaseagreements_leaseagreement_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseagreement/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseacceptance/",
+        "name": "leaseagreements_leaseacceptance_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseacceptance/add/",
+        "name": "leaseagreements_leaseacceptance_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseacceptance/<path:object_id>/history/",
+        "name": "leaseagreements_leaseacceptance_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseacceptance/<path:object_id>/delete/",
+        "name": "leaseagreements_leaseacceptance_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseacceptance/<path:object_id>/change/",
+        "name": "leaseagreements_leaseacceptance_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/leaseagreements/leaseacceptance/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/superadmin/adminauditlog/",
+        "name": "superadmin_adminauditlog_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/adminauditlog/add/",
+        "name": "superadmin_adminauditlog_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/adminauditlog/<path:object_id>/history/",
+        "name": "superadmin_adminauditlog_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/adminauditlog/<path:object_id>/delete/",
+        "name": "superadmin_adminauditlog_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/adminauditlog/<path:object_id>/change/",
+        "name": "superadmin_adminauditlog_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/adminauditlog/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/superadmin/mfadevice/",
+        "name": "superadmin_mfadevice_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/mfadevice/add/",
+        "name": "superadmin_mfadevice_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/mfadevice/<path:object_id>/history/",
+        "name": "superadmin_mfadevice_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/mfadevice/<path:object_id>/delete/",
+        "name": "superadmin_mfadevice_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/mfadevice/<path:object_id>/change/",
+        "name": "superadmin_mfadevice_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/mfadevice/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/superadmin/impersonationsession/",
+        "name": "superadmin_impersonationsession_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/impersonationsession/add/",
+        "name": "superadmin_impersonationsession_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/impersonationsession/<path:object_id>/history/",
+        "name": "superadmin_impersonationsession_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/impersonationsession/<path:object_id>/delete/",
+        "name": "superadmin_impersonationsession_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/impersonationsession/<path:object_id>/change/",
+        "name": "superadmin_impersonationsession_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/impersonationsession/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/superadmin/staffprofile/",
+        "name": "superadmin_staffprofile_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/staffprofile/add/",
+        "name": "superadmin_staffprofile_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/staffprofile/<path:object_id>/history/",
+        "name": "superadmin_staffprofile_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/staffprofile/<path:object_id>/delete/",
+        "name": "superadmin_staffprofile_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/staffprofile/<path:object_id>/change/",
+        "name": "superadmin_staffprofile_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/superadmin/staffprofile/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/trustsafety/fraudflag/",
+        "name": "trustsafety_fraudflag_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/fraudflag/add/",
+        "name": "trustsafety_fraudflag_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/fraudflag/<path:object_id>/history/",
+        "name": "trustsafety_fraudflag_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/fraudflag/<path:object_id>/delete/",
+        "name": "trustsafety_fraudflag_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/fraudflag/<path:object_id>/change/",
+        "name": "trustsafety_fraudflag_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/fraudflag/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/trustsafety/blockedfingerprint/",
+        "name": "trustsafety_blockedfingerprint_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/blockedfingerprint/add/",
+        "name": "trustsafety_blockedfingerprint_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/blockedfingerprint/<path:object_id>/history/",
+        "name": "trustsafety_blockedfingerprint_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/blockedfingerprint/<path:object_id>/delete/",
+        "name": "trustsafety_blockedfingerprint_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/blockedfingerprint/<path:object_id>/change/",
+        "name": "trustsafety_blockedfingerprint_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/blockedfingerprint/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/trustsafety/blacklistedlocation/",
+        "name": "trustsafety_blacklistedlocation_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/blacklistedlocation/add/",
+        "name": "trustsafety_blacklistedlocation_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/blacklistedlocation/<path:object_id>/history/",
+        "name": "trustsafety_blacklistedlocation_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/blacklistedlocation/<path:object_id>/delete/",
+        "name": "trustsafety_blacklistedlocation_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/blacklistedlocation/<path:object_id>/change/",
+        "name": "trustsafety_blacklistedlocation_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/blacklistedlocation/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/trustsafety/accountsignupevent/",
+        "name": "trustsafety_accountsignupevent_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/accountsignupevent/add/",
+        "name": "trustsafety_accountsignupevent_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/accountsignupevent/<path:object_id>/history/",
+        "name": "trustsafety_accountsignupevent_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/accountsignupevent/<path:object_id>/delete/",
+        "name": "trustsafety_accountsignupevent_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/accountsignupevent/<path:object_id>/change/",
+        "name": "trustsafety_accountsignupevent_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/trustsafety/accountsignupevent/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/inventory/listingflag/",
+        "name": "inventory_listingflag_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/inventory/listingflag/add/",
+        "name": "inventory_listingflag_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/inventory/listingflag/<path:object_id>/history/",
+        "name": "inventory_listingflag_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/inventory/listingflag/<path:object_id>/delete/",
+        "name": "inventory_listingflag_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/inventory/listingflag/<path:object_id>/change/",
+        "name": "inventory_listingflag_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/inventory/listingflag/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/legalops/legaldocument/",
+        "name": "legalops_legaldocument_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/legalops/legaldocument/add/",
+        "name": "legalops_legaldocument_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/legalops/legaldocument/<path:object_id>/history/",
+        "name": "legalops_legaldocument_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/legalops/legaldocument/<path:object_id>/delete/",
+        "name": "legalops_legaldocument_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/legalops/legaldocument/<path:object_id>/change/",
+        "name": "legalops_legaldocument_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/legalops/legaldocument/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/platformops/featureflag/",
+        "name": "platformops_featureflag_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/platformops/featureflag/add/",
+        "name": "platformops_featureflag_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/platformops/featureflag/<path:object_id>/history/",
+        "name": "platformops_featureflag_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/platformops/featureflag/<path:object_id>/delete/",
+        "name": "platformops_featureflag_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/platformops/featureflag/<path:object_id>/change/",
+        "name": "platformops_featureflag_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/platformops/featureflag/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/platformops/taskheartbeat/",
+        "name": "platformops_taskheartbeat_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/platformops/taskheartbeat/add/",
+        "name": "platformops_taskheartbeat_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/platformops/taskheartbeat/<path:object_id>/history/",
+        "name": "platformops_taskheartbeat_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/platformops/taskheartbeat/<path:object_id>/delete/",
+        "name": "platformops_taskheartbeat_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/platformops/taskheartbeat/<path:object_id>/change/",
+        "name": "platformops_taskheartbeat_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/platformops/taskheartbeat/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/rbac/role/",
+        "name": "rbac_role_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/role/add/",
+        "name": "rbac_role_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/role/<path:object_id>/history/",
+        "name": "rbac_role_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/role/<path:object_id>/delete/",
+        "name": "rbac_role_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/role/<path:object_id>/change/",
+        "name": "rbac_role_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/role/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/rbac/userroleassignment/",
+        "name": "rbac_userroleassignment_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/userroleassignment/add/",
+        "name": "rbac_userroleassignment_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/userroleassignment/<path:object_id>/history/",
+        "name": "rbac_userroleassignment_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/userroleassignment/<path:object_id>/delete/",
+        "name": "rbac_userroleassignment_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/userroleassignment/<path:object_id>/change/",
+        "name": "rbac_userroleassignment_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/userroleassignment/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/rbac/breakglasssession/",
+        "name": "rbac_breakglasssession_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/breakglasssession/add/",
+        "name": "rbac_breakglasssession_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/breakglasssession/<path:object_id>/history/",
+        "name": "rbac_breakglasssession_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/breakglasssession/<path:object_id>/delete/",
+        "name": "rbac_breakglasssession_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/breakglasssession/<path:object_id>/change/",
+        "name": "rbac_breakglasssession_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/breakglasssession/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/rbac/pendingapproval/",
+        "name": "rbac_pendingapproval_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/pendingapproval/add/",
+        "name": "rbac_pendingapproval_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/pendingapproval/<path:object_id>/history/",
+        "name": "rbac_pendingapproval_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/pendingapproval/<path:object_id>/delete/",
+        "name": "rbac_pendingapproval_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/pendingapproval/<path:object_id>/change/",
+        "name": "rbac_pendingapproval_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/rbac/pendingapproval/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/agents/agentapplication/",
+        "name": "agents_agentapplication_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentapplication/add/",
+        "name": "agents_agentapplication_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentapplication/<path:object_id>/history/",
+        "name": "agents_agentapplication_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentapplication/<path:object_id>/delete/",
+        "name": "agents_agentapplication_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentapplication/<path:object_id>/change/",
+        "name": "agents_agentapplication_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentapplication/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/agents/agentprofile/",
+        "name": "agents_agentprofile_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentprofile/add/",
+        "name": "agents_agentprofile_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentprofile/<path:object_id>/history/",
+        "name": "agents_agentprofile_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentprofile/<path:object_id>/delete/",
+        "name": "agents_agentprofile_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentprofile/<path:object_id>/change/",
+        "name": "agents_agentprofile_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentprofile/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/agents/agentcommission/",
+        "name": "agents_agentcommission_changelist",
+        "view": "django.contrib.admin.options.changelist_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentcommission/add/",
+        "name": "agents_agentcommission_add",
+        "view": "django.contrib.admin.options.add_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentcommission/<path:object_id>/history/",
+        "name": "agents_agentcommission_history",
+        "view": "django.contrib.admin.options.history_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentcommission/<path:object_id>/delete/",
+        "name": "agents_agentcommission_delete",
+        "view": "django.contrib.admin.options.delete_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentcommission/<path:object_id>/change/",
+        "name": "agents_agentcommission_change",
+        "view": "django.contrib.admin.options.change_view",
+        "methods": null
+    },
+    {
+        "pattern": "admin/agents/agentcommission/<path:object_id>/",
+        "name": null,
+        "view": "django.views.generic.base.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH",
+            "POST",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "admin/^(?P<app_label>auth|sites|token_blacklist|authapp|listings|bookings|users|payments|messaging|notifications|reports|suspensions|newsletter|testimonials|support|hostapplications|propertyverifications|leaseagreements|superadmin|trustsafety|inventory|legalops|platformops|rbac|agents)/$",
+        "name": "app_list",
+        "view": "django.contrib.admin.sites.app_index",
+        "methods": null
+    },
+    {
+        "pattern": "admin/(?P<url>.*)$",
+        "name": null,
+        "view": "django.contrib.admin.sites.catch_all_view",
+        "methods": null
+    },
+    {
+        "pattern": "api/auth/register/",
+        "name": "register",
+        "view": "authapp.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/auth/verify-email/",
+        "name": "verify_email",
+        "view": "authapp.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/auth/resend-verification/",
+        "name": "resend_verification",
+        "view": "authapp.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/auth/login/",
+        "name": "login",
+        "view": "authapp.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/auth/logout/",
+        "name": "logout",
+        "view": "authapp.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/auth/refresh-token/",
+        "name": "refresh_token",
+        "view": "authapp.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/auth/me/",
+        "name": "me",
+        "view": "authapp.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/auth/password-reset/",
+        "name": "password_reset_request",
+        "view": "authapp.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/auth/password-reset-confirm/",
+        "name": "password_reset_confirm",
+        "view": "authapp.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/auth/google/",
+        "name": "google_login",
+        "view": "authapp.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/categories/",
+        "name": "categories_collection",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/settings/",
+        "name": "listing_settings",
+        "view": "listings.views.view",
+        "methods": [
+            "GET",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/listings/my-drafts/",
+        "name": "my_drafts",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/my-listings/",
+        "name": "my_listings",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/pending-review/",
+        "name": "pending_review_listings",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/bulk/template/",
+        "name": "bulk_template",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/bulk/export/",
+        "name": "bulk_export",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/bulk/import/",
+        "name": "bulk_import",
+        "view": "listings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:id>/approve/",
+        "name": "approve_listing",
+        "view": "listings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:id>/reject/",
+        "name": "reject_listing",
+        "view": "listings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:id>/duplicate/",
+        "name": "listing_duplicate",
+        "view": "listings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/reviews/",
+        "name": "all_reviews",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/",
+        "name": "listings_collection",
+        "view": "listings.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:id>/",
+        "name": "listing_detail",
+        "view": "listings.views.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/images/",
+        "name": "listing_images",
+        "view": "listings.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/images/<int:image_id>/",
+        "name": "listing_image_detail",
+        "view": "listings.views.view",
+        "methods": [
+            "DELETE"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:id>/favorite/",
+        "name": "favorite_listing",
+        "view": "listings.views.view",
+        "methods": [
+            "DELETE",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/favorites/",
+        "name": "favorites_collection",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/reviews/",
+        "name": "listing_reviews",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/reviews/create/",
+        "name": "create_review",
+        "view": "listings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/reviews/<int:id>/",
+        "name": "review_detail",
+        "view": "listings.views.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "api/listings/users/<int:user_id>/reviews/",
+        "name": "user_reviews",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/stats/",
+        "name": "listing_stats",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/analytics/agent/",
+        "name": "agent_analytics",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/analytics/popular/",
+        "name": "popular_listings",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/nearby/",
+        "name": "nearby_listings",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/availability/",
+        "name": "listing_availability",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/pricing/",
+        "name": "listing_pricing",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/reviews/<int:id>/respond/",
+        "name": "review_response",
+        "view": "listings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/analytics/platform-stats/",
+        "name": "platform_stats",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/rooms/",
+        "name": "hotel_rooms_collection",
+        "view": "listings.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/rooms/<int:room_id>/",
+        "name": "hotel_room_detail",
+        "view": "listings.views.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/rooms/availability/",
+        "name": "hotel_room_availability",
+        "view": "listings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/rooms/<int:room_id>/images/",
+        "name": "hotel_room_images",
+        "view": "listings.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/listings/<int:listing_id>/rooms/<int:room_id>/images/<int:image_id>/",
+        "name": "hotel_room_image_detail",
+        "view": "listings.views.view",
+        "methods": [
+            "DELETE"
+        ]
+    },
+    {
+        "pattern": "api/bookings/",
+        "name": "bookings_collection",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/<int:id>/",
+        "name": "booking_detail",
+        "view": "bookings.views.view",
+        "methods": [
+            "DELETE",
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/pending/",
+        "name": "pending_bookings",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/<int:id>/confirm/",
+        "name": "confirm_booking",
+        "view": "bookings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/<int:id>/decline/",
+        "name": "decline_booking",
+        "view": "bookings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/<int:id>/confirm-payment/",
+        "name": "admin_confirm_payment",
+        "view": "bookings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/admin/payment-received/",
+        "name": "admin_payment_received_bookings",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/admin/list/",
+        "name": "admin_bookings_list",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/admin/<int:id>/communications/",
+        "name": "admin_booking_communications",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/admin/<int:id>/extend-reservation/",
+        "name": "admin_extend_reservation",
+        "view": "bookings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/<int:id>/request-payment/",
+        "name": "request_payment",
+        "view": "bookings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/payment-requests/",
+        "name": "my_payment_requests",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/viewings/",
+        "name": "viewings_collection",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/viewings/slots/<int:listing_id>/",
+        "name": "viewing_slots",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/viewings/admin/",
+        "name": "admin_viewings_collection",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/viewings/admin/<int:id>/status/",
+        "name": "admin_update_viewing_status",
+        "view": "bookings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/viewings/<int:viewing_id>/reserve/",
+        "name": "reserve_from_viewing",
+        "view": "bookings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/payouts/",
+        "name": "my_payouts",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/searches/",
+        "name": "saved_searches",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/searches/<int:id>/",
+        "name": "saved_search_detail",
+        "view": "bookings.views.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "api/bookings/searches/alerts/",
+        "name": "search_alerts",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/searches/test/",
+        "name": "test_search",
+        "view": "bookings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/comparisons/",
+        "name": "property_comparison",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/comparisons/<int:id>/",
+        "name": "comparison_detail",
+        "view": "bookings.views.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "api/bookings/comparisons/shared/<str:token>/",
+        "name": "shared_comparison",
+        "view": "bookings.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/bookings/comparisons/add/",
+        "name": "add_to_comparison",
+        "view": "bookings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/bookings/comparisons/remove/",
+        "name": "remove_from_comparison",
+        "view": "bookings.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/",
+        "name": "users_collection",
+        "view": "users.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/stats/",
+        "name": "admin_stats",
+        "view": "users.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/list/",
+        "name": "admin_user_list",
+        "view": "users.admin_views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/create/",
+        "name": "admin_create_user",
+        "view": "users.admin_views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/bulk/",
+        "name": "admin_bulk_user_action",
+        "view": "users.admin_views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/<int:id>/",
+        "name": "admin_user_detail",
+        "view": "users.admin_views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/<int:id>/update/",
+        "name": "admin_update_user",
+        "view": "users.admin_views.view",
+        "methods": [
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/<int:id>/email/",
+        "name": "admin_change_email",
+        "view": "users.admin_views.view",
+        "methods": [
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/<int:id>/reset-password/",
+        "name": "admin_reset_password",
+        "view": "users.admin_views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/<int:id>/toggle-active/",
+        "name": "admin_toggle_active",
+        "view": "users.admin_views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/<int:id>/soft-delete/",
+        "name": "admin_soft_delete_user",
+        "view": "users.admin_views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/admin/<int:id>/hard-delete/",
+        "name": "admin_hard_delete_user",
+        "view": "users.admin_views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/<int:id>/",
+        "name": "user_detail",
+        "view": "users.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/users/me/dashboard/",
+        "name": "me_dashboard",
+        "view": "users.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/users/me/profile/",
+        "name": "update_profile",
+        "view": "users.views.view",
+        "methods": [
+            "PATCH",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "api/users/me/delete/",
+        "name": "delete_my_account",
+        "view": "users.views.view",
+        "methods": [
+            "DELETE"
+        ]
+    },
+    {
+        "pattern": "api/users/phone-change/initiate/",
+        "name": "phone_change_initiate",
+        "view": "users.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/phone-change/verify/",
+        "name": "phone_change_verify",
+        "view": "users.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/phone-change/cancel/",
+        "name": "phone_change_cancel",
+        "view": "users.views.view",
+        "methods": [
+            "DELETE"
+        ]
+    },
+    {
+        "pattern": "api/users/momo-change/initiate/",
+        "name": "momo_change_initiate",
+        "view": "users.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/momo-change/verify/",
+        "name": "momo_change_verify",
+        "view": "users.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/momo-change/cancel/",
+        "name": "momo_change_cancel",
+        "view": "users.views.view",
+        "methods": [
+            "DELETE"
+        ]
+    },
+    {
+        "pattern": "api/users/mfa/status/",
+        "name": "mfa_status",
+        "view": "users.mfa_views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/users/mfa/setup/",
+        "name": "mfa_setup",
+        "view": "users.mfa_views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/mfa/confirm/",
+        "name": "mfa_confirm",
+        "view": "users.mfa_views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/users/mfa/disable/",
+        "name": "mfa_disable",
+        "view": "users.mfa_views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/currencies/",
+        "name": "currencies_list",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/initiate/",
+        "name": "initiate_payment",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/viewing/initiate/",
+        "name": "initiate_viewing_payment",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/verify/",
+        "name": "verify_payment",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/refund/",
+        "name": "process_refund",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/user/",
+        "name": "user_payments",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/payouts/",
+        "name": "admin_payouts",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/payouts/<uuid:payout_id>/mark-paid/",
+        "name": "admin_mark_payout_paid",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/payouts/<uuid:payout_id>/cancel/",
+        "name": "admin_cancel_payout",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/payouts/<uuid:payout_id>/disburse/",
+        "name": "admin_disburse_payout",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/agent-commissions/",
+        "name": "admin_agent_commissions",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/agent-commissions/<int:commission_id>/disburse/",
+        "name": "admin_disburse_agent_commission",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/employees/",
+        "name": "admin_employees",
+        "view": "payments.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/employees/<int:employee_id>/",
+        "name": "admin_employee_detail",
+        "view": "payments.views.view",
+        "methods": [
+            "DELETE",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/employees/<int:employee_id>/pay/",
+        "name": "admin_pay_employee",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/employee-payments/",
+        "name": "admin_employee_payments",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/refund/",
+        "name": "admin_refund_payment",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/stripe-refund/",
+        "name": "admin_stripe_refund",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/platform-fee/",
+        "name": "admin_platform_fee",
+        "view": "payments.views.view",
+        "methods": [
+            "GET",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/reports/summary/",
+        "name": "admin_financial_summary",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/transactions/",
+        "name": "admin_transactions_list",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/transactions/export/",
+        "name": "admin_transactions_export",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/escrow/",
+        "name": "admin_escrow_list",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/escrow/<int:booking_id>/hold/",
+        "name": "admin_escrow_hold",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/escrow/<int:hold_id>/release/",
+        "name": "admin_escrow_release",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/tax-rates/",
+        "name": "admin_tax_rates",
+        "view": "payments.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/tax-rates/<int:pk>/",
+        "name": "admin_tax_rate_detail",
+        "view": "payments.views.view",
+        "methods": [
+            "DELETE",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/currencies/",
+        "name": "admin_currencies",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/currencies/<int:pk>/",
+        "name": "admin_currency_detail",
+        "view": "payments.views.view",
+        "methods": [
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/payments/admin/tax-report/",
+        "name": "admin_tax_report",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/<uuid:payment_id>/",
+        "name": "payment_detail",
+        "view": "payments.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/payments/webhooks/mtn_momo/",
+        "name": "mtn_momo_webhook",
+        "view": "payments.views.mtn_momo_webhook",
+        "methods": null
+    },
+    {
+        "pattern": "api/payments/webhooks/stripe/",
+        "name": "stripe_webhook",
+        "view": "payments.views.stripe_webhook",
+        "methods": null
+    },
+    {
+        "pattern": "api/payments/stripe/payment-intent/",
+        "name": "stripe_payment_intent",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/stripe/booking-payment-intent/",
+        "name": "stripe_booking_payment_intent",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/stripe/viewing-fee-intent/",
+        "name": "stripe_viewing_fee_intent",
+        "view": "payments.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/cards/",
+        "name": "saved_cards",
+        "view": "payments.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/payments/cards/<int:card_id>/",
+        "name": "saved_card_detail",
+        "view": "payments.views.view",
+        "methods": [
+            "DELETE",
+            "PATCH",
+            "PUT"
+        ]
+    },
+    {
+        "pattern": "api/messaging/conversations/",
+        "name": "conversation-list",
+        "view": "messaging.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/messaging/conversations/start/",
+        "name": "conversation-start",
+        "view": "messaging.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/messaging/conversations/<int:conversation_id>/",
+        "name": "conversation-delete",
+        "view": "messaging.views.view",
+        "methods": [
+            "DELETE"
+        ]
+    },
+    {
+        "pattern": "api/messaging/conversations/<int:conversation_id>/messages/",
+        "name": "message-list",
+        "view": "messaging.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/messaging/conversations/<int:conversation_id>/messages/send/",
+        "name": "message-send",
+        "view": "messaging.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/messaging/messages/<int:message_id>/edit/",
+        "name": "message-edit",
+        "view": "messaging.views.view",
+        "methods": [
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/messaging/users/<int:user_id>/presence/",
+        "name": "user-presence",
+        "view": "messaging.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/messaging/unread-count/",
+        "name": "unread-count",
+        "view": "messaging.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/notifications/preferences/",
+        "name": "notification-preferences",
+        "view": "notifications.views.view",
+        "methods": [
+            "GET",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/notifications/device-token/",
+        "name": "device-token",
+        "view": "notifications.views.view",
+        "methods": [
+            "DELETE",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/notifications/vapid-public-key/",
+        "name": "vapid-public-key",
+        "view": "notifications.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^$",
+        "name": "notification-list",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^\\.(?P<format>[a-z0-9]+)/?$",
+        "name": "notification-list",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^read-all/$",
+        "name": "notification-read-all",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^read-all\\.(?P<format>[a-z0-9]+)/?$",
+        "name": "notification-read-all",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^unread-count/$",
+        "name": "notification-unread-count",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^unread-count\\.(?P<format>[a-z0-9]+)/?$",
+        "name": "notification-unread-count",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^(?P<pk>[^/.]+)/$",
+        "name": "notification-detail",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "DELETE",
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^(?P<pk>[^/.]+)\\.(?P<format>[a-z0-9]+)/?$",
+        "name": "notification-detail",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "DELETE",
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^(?P<pk>[^/.]+)/unread/$",
+        "name": "notification-mark-unread",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^(?P<pk>[^/.]+)/unread\\.(?P<format>[a-z0-9]+)/?$",
+        "name": "notification-mark-unread",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^(?P<pk>[^/.]+)/read/$",
+        "name": "notification-read",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/notifications/^(?P<pk>[^/.]+)/read\\.(?P<format>[a-z0-9]+)/?$",
+        "name": "notification-read",
+        "view": "notifications.views.NotificationViewSet",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/notifications/",
+        "name": "api-root",
+        "view": "rest_framework.routers.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/notifications/<drf_format_suffix:format>",
+        "name": "api-root",
+        "view": "rest_framework.routers.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/reports/",
+        "name": "reports-collection",
+        "view": "reports.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/reports/<int:pk>/",
+        "name": "report-detail",
+        "view": "reports.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/reports/admin/",
+        "name": "admin-reports-list",
+        "view": "reports.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/reports/admin/stats/",
+        "name": "admin-report-stats",
+        "view": "reports.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/reports/admin/bulk/",
+        "name": "admin-bulk-report-action",
+        "view": "reports.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/reports/admin/<int:pk>/status/",
+        "name": "admin-report-status",
+        "view": "reports.views.view",
+        "methods": [
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/reports/admin/<int:pk>/escalate/",
+        "name": "admin-report-escalate",
+        "view": "reports.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/suspensions/",
+        "name": "suspensions-collection",
+        "view": "suspensions.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/suspensions/<int:pk>/",
+        "name": "suspension-detail",
+        "view": "suspensions.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/suspensions/<int:pk>/revoke/",
+        "name": "suspension-revoke",
+        "view": "suspensions.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/suspensions/user/<int:user_id>/",
+        "name": "suspension-user-history",
+        "view": "suspensions.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/suspensions/stats/",
+        "name": "suspension-stats",
+        "view": "suspensions.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/newsletter/subscribe/",
+        "name": "newsletter-subscribe",
+        "view": "newsletter.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/newsletter/unsubscribe/",
+        "name": "newsletter-unsubscribe",
+        "view": "newsletter.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/testimonials/",
+        "name": "testimonials-collection",
+        "view": "testimonials.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/support/contact/",
+        "name": "support-contact-create",
+        "view": "support.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/support/tickets/",
+        "name": "support-ticket-list-create",
+        "view": "support.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/support/tickets/<int:pk>/",
+        "name": "support-ticket-detail",
+        "view": "support.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/support/tickets/<int:pk>/messages/",
+        "name": "support-ticket-add-message",
+        "view": "support.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/support/search/",
+        "name": "support-ticket-search",
+        "view": "support.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/support/aircover-claims/",
+        "name": "aircover-claims-collection",
+        "view": "support.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/support/admin/tickets/",
+        "name": "support-admin-ticket-list",
+        "view": "support.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/support/admin/tickets/<int:pk>/",
+        "name": "support-admin-ticket-update",
+        "view": "support.views.view",
+        "methods": [
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/support/admin/tickets/<int:pk>/escalate/",
+        "name": "support-admin-ticket-escalate",
+        "view": "support.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/support/admin/contact/",
+        "name": "support-admin-contact-list",
+        "view": "support.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/support/admin/contact/<int:pk>/",
+        "name": "support-admin-contact-update",
+        "view": "support.views.view",
+        "methods": [
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/support/admin/stats/",
+        "name": "support-admin-stats",
+        "view": "support.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/support/admin/aircover-claims/",
+        "name": "support-admin-aircover-claims-list",
+        "view": "support.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/support/admin/aircover-claims/<int:pk>/decide/",
+        "name": "support-admin-aircover-claim-decide",
+        "view": "support.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/host-applications/",
+        "name": "host-applications-collection",
+        "view": "hostapplications.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/host-applications/me/",
+        "name": "my-host-application",
+        "view": "hostapplications.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/host-applications/agreement/",
+        "name": "agreement-status",
+        "view": "hostapplications.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/host-applications/agreement/accept/",
+        "name": "agreement-accept",
+        "view": "hostapplications.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/host-applications/review-queue/",
+        "name": "host-application-review-queue",
+        "view": "hostapplications.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/host-applications/<int:pk>/review/",
+        "name": "host-application-review",
+        "view": "hostapplications.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/property-verifications/",
+        "name": "property-verifications-collection",
+        "view": "propertyverifications.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/property-verifications/for-listing/<int:listing_id>/",
+        "name": "verification-for-listing",
+        "view": "propertyverifications.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/property-verifications/<int:pk>/resubmit/",
+        "name": "verification-resubmit",
+        "view": "propertyverifications.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/property-verifications/review-queue/",
+        "name": "property-verification-review-queue",
+        "view": "propertyverifications.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/property-verifications/<int:pk>/review/",
+        "name": "property-verification-review",
+        "view": "propertyverifications.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/agents/applications/",
+        "name": "agent-applications-collection",
+        "view": "agents.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/agents/applications/me/",
+        "name": "my-agent-application",
+        "view": "agents.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/agents/applications/review-queue/",
+        "name": "agent-application-review-queue",
+        "view": "agents.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/agents/applications/<int:pk>/review/",
+        "name": "agent-application-review-decision",
+        "view": "agents.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/agents/dashboard/",
+        "name": "agent-dashboard",
+        "view": "agents.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/agents/list-property/",
+        "name": "agent-list-property",
+        "view": "agents.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/generic/<str:model_key>/",
+        "name": "generic_admin_list_create",
+        "view": "superadmin.generic_admin.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/generic/<str:model_key>/<int:pk>/",
+        "name": "generic_admin_detail",
+        "view": "superadmin.generic_admin.views.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/me/",
+        "name": "superadmin_me",
+        "view": "superadmin.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/mfa/setup/",
+        "name": "superadmin_mfa_setup",
+        "view": "superadmin.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/mfa/confirm/",
+        "name": "superadmin_mfa_confirm",
+        "view": "superadmin.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/mfa/disable/",
+        "name": "superadmin_mfa_disable",
+        "view": "superadmin.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/mfa/verify-login/",
+        "name": "superadmin_mfa_verify_login",
+        "view": "superadmin.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/mfa/send-email-code/",
+        "name": "superadmin_mfa_send_email_code",
+        "view": "superadmin.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/audit-log/",
+        "name": "superadmin_audit_log",
+        "view": "superadmin.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/impersonate/<int:user_id>/start/",
+        "name": "superadmin_impersonate_start",
+        "view": "superadmin.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/impersonate/stop/",
+        "name": "superadmin_impersonate_stop",
+        "view": "superadmin.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/staff/",
+        "name": "superadmin_staff_list",
+        "view": "superadmin.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/staff/<int:pk>/",
+        "name": "superadmin_staff_detail",
+        "view": "superadmin.views.view",
+        "methods": [
+            "DELETE",
+            "GET",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/staff/me/",
+        "name": "superadmin_staff_me",
+        "view": "superadmin.views.view",
+        "methods": [
+            "GET",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/staff/me/education/",
+        "name": "superadmin_staff_me_education",
+        "view": "superadmin.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/staff/me/education/<int:pk>/",
+        "name": "superadmin_staff_me_education_detail",
+        "view": "superadmin.views.view",
+        "methods": [
+            "DELETE",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/staff/me/legal/",
+        "name": "superadmin_staff_me_legal",
+        "view": "superadmin.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/superadmin/staff/me/legal/<int:pk>/",
+        "name": "superadmin_staff_me_legal_detail",
+        "view": "superadmin.views.view",
+        "methods": [
+            "DELETE",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/trust-safety/fraud-flags/",
+        "name": "fraud-flags-list",
+        "view": "trustsafety.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/trust-safety/fraud-flags/scan/",
+        "name": "fraud-flags-scan",
+        "view": "trustsafety.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/trust-safety/fraud-flags/manual/",
+        "name": "fraud-flag-create-manual",
+        "view": "trustsafety.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/trust-safety/fraud-flags/<int:pk>/review/",
+        "name": "fraud-flag-review",
+        "view": "trustsafety.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/trust-safety/blocked-fingerprints/",
+        "name": "blocked-fingerprints",
+        "view": "trustsafety.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/trust-safety/blocked-fingerprints/<int:pk>/",
+        "name": "blocked-fingerprint-detail",
+        "view": "trustsafety.views.view",
+        "methods": [
+            "DELETE"
+        ]
+    },
+    {
+        "pattern": "api/trust-safety/blacklisted-locations/",
+        "name": "blacklisted-locations",
+        "view": "trustsafety.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/trust-safety/blacklisted-locations/<int:pk>/",
+        "name": "blacklisted-location-detail",
+        "view": "trustsafety.views.view",
+        "methods": [
+            "DELETE"
+        ]
+    },
+    {
+        "pattern": "api/inventory/listings/",
+        "name": "inventory-listing-list",
+        "view": "inventory.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/inventory/listings/bulk/",
+        "name": "inventory-listing-bulk-action",
+        "view": "inventory.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/inventory/listings/<int:pk>/suspend/",
+        "name": "inventory-listing-suspend",
+        "view": "inventory.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/inventory/listings/<int:pk>/unsuspend/",
+        "name": "inventory-listing-unsuspend",
+        "view": "inventory.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/inventory/listings/<int:pk>/compliance/",
+        "name": "inventory-listing-compliance",
+        "view": "inventory.views.view",
+        "methods": [
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/inventory/flags/",
+        "name": "listing-flags-list",
+        "view": "inventory.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/inventory/flags/scan/",
+        "name": "listing-flags-scan",
+        "view": "inventory.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/inventory/flags/manual/",
+        "name": "listing-flag-create-manual",
+        "view": "inventory.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/inventory/flags/<int:pk>/review/",
+        "name": "listing-flag-review",
+        "view": "inventory.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/legal/documents/current/",
+        "name": "legal-documents-current",
+        "view": "legalops.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/legal/documents/",
+        "name": "legal-documents-collection",
+        "view": "legalops.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/platform-ops/feature-flags/",
+        "name": "feature-flags-collection",
+        "view": "platformops.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/platform-ops/feature-flags/<int:pk>/",
+        "name": "feature-flag-detail",
+        "view": "platformops.views.view",
+        "methods": [
+            "DELETE",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/platform-ops/system-health/",
+        "name": "system-health",
+        "view": "platformops.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/platform-ops/recent-errors/",
+        "name": "recent-errors",
+        "view": "platformops.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/platform-ops/flush-cache/",
+        "name": "flush-cache",
+        "view": "platformops.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/platform-ops/server-metrics/",
+        "name": "server-metrics",
+        "view": "platformops.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/platform-ops/log-viewer/",
+        "name": "log-viewer",
+        "view": "platformops.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/platform-ops/docs/<slug:slug>/",
+        "name": "docs-view",
+        "view": "platformops.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/rbac/resource-tree/",
+        "name": "rbac-resource-tree",
+        "view": "rbac.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/rbac/my-permissions/",
+        "name": "rbac-my-permissions",
+        "view": "rbac.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/rbac/roles/",
+        "name": "rbac-roles-collection",
+        "view": "rbac.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/rbac/roles/<int:pk>/",
+        "name": "rbac-role-detail",
+        "view": "rbac.views.view",
+        "methods": [
+            "DELETE",
+            "PATCH"
+        ]
+    },
+    {
+        "pattern": "api/rbac/roles/<int:pk>/permissions/",
+        "name": "rbac-role-add-permission",
+        "view": "rbac.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/rbac/roles/<int:pk>/permissions/<int:perm_id>/",
+        "name": "rbac-role-remove-permission",
+        "view": "rbac.views.view",
+        "methods": [
+            "DELETE"
+        ]
+    },
+    {
+        "pattern": "api/rbac/user-roles/",
+        "name": "rbac-user-roles-collection",
+        "view": "rbac.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/rbac/user-roles/<int:pk>/",
+        "name": "rbac-user-role-detail",
+        "view": "rbac.views.view",
+        "methods": [
+            "DELETE"
+        ]
+    },
+    {
+        "pattern": "api/rbac/break-glass/",
+        "name": "rbac-break-glass-collection",
+        "view": "rbac.views.view",
+        "methods": [
+            "GET",
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/rbac/break-glass/<int:pk>/revoke/",
+        "name": "rbac-break-glass-revoke",
+        "view": "rbac.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/rbac/approvals/",
+        "name": "rbac-approvals-list",
+        "view": "rbac.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/rbac/approvals/<int:pk>/approve/",
+        "name": "rbac-approval-approve",
+        "view": "rbac.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/rbac/approvals/<int:pk>/reject/",
+        "name": "rbac-approval-reject",
+        "view": "rbac.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/chatbot/chat/",
+        "name": "chatbot-chat",
+        "view": "chatbot.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/chatbot/status/<str:task_id>/",
+        "name": "chatbot-status",
+        "view": "chatbot.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/chatbot/handoff/",
+        "name": "chatbot-handoff",
+        "view": "chatbot.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "api/lease-agreements/for-booking/<int:booking_id>/",
+        "name": "lease-for-booking",
+        "view": "leaseagreements.views.view",
+        "methods": [
+            "GET"
+        ]
+    },
+    {
+        "pattern": "api/lease-agreements/<int:booking_id>/accept/",
+        "name": "lease-accept",
+        "view": "leaseagreements.views.view",
+        "methods": [
+            "POST"
+        ]
+    },
+    {
+        "pattern": "^media/(?P<path>.*)$",
+        "name": null,
+        "view": "django.views.static.serve",
+        "methods": null
+    }
+]

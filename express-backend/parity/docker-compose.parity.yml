@@ -1,0 +1,133 @@
+# Parity test environment: a Django instance and an Express instance, each on
+# its own copy of the same data snapshot, so the same request sequence can be
+# replayed against both and the responses compared. Separate Compose project
+# (homekonet-parity) — shares no network, volume or database with production.
+#
+# Every outbound side effect is disabled: email goes to the console, push keys
+# are blank, and no Celery worker or Express job runner runs.
+#
+# Payment providers: `parity-mocks` (parity/mocks/server.mjs) answers for
+# api.stripe.com / proxy.momoapi.mtn.com / sandbox.momodeveloper.mtn.com via
+# network aliases, over HTTPS with a cert from a throwaway test CA
+# (parity/mocks/gen-certs.sh, run by reset.sh; gitignored). Both backends trust
+# that CA — Express via NODE_EXTRA_CA_CERTS, Django via REQUESTS_CA_BUNDLE
+# (requests → MoMo) plus the CA-extended bundle mounted over stripe-python's
+# own data/ca-certificates.crt (stripe-python passes verify=<its bundle>
+# explicitly, so no env var reaches it). Provider credentials stay BLANK
+# (the "not configured" paths) unless PARITY_MOCK_PROVIDERS=1, which run.sh
+# sets for test files marked `@parity-mock-providers`; then both instances get
+# the identical fake test credentials below. Never put real keys here.
+#
+# Usage: bash express-backend/parity/run.sh   (see README.md)
+# PARITY_NAME (project suffix) and DIST (compiled output dir) let several
+# people/agents run isolated copies at once: PARITY_NAME=bookings DIST=dist-bookings.
+
+# Fake provider credentials (mock only). The mock always knows them; the two
+# backends get them only when PARITY_MOCK_PROVIDERS is set (else blank).
+x-mock-creds: &mock-creds
+  MOCK_STRIPE_SECRET_KEY: sk_test_parity_0000000000000000000000
+  MOCK_STRIPE_WEBHOOK_SECRET: whsec_parity_00000000000000000000000000
+  MOCK_MTN_MOMO_COLLECTION_KEY: parity-collection-subscription-key
+  MOCK_MTN_MOMO_DISBURSEMENT_KEY: parity-disbursement-subscription-key
+  MOCK_MTN_MOMO_COLLECTION_USER_ID_USD: 11111111-1111-4111-8111-111111111111
+  MOCK_MTN_MOMO_COLLECTION_API_SECRET_USD: parity-collection-api-secret
+  MOCK_MTN_MOMO_USER_ID_USD: 22222222-2222-4222-8222-222222222222
+  MOCK_MTN_MOMO_API_SECRET_USD: parity-disbursement-api-secret
+  MOCK_MTN_MOMO_USER_ID_SANDBOX: 33333333-3333-4333-8333-333333333333
+  MOCK_MTN_MOMO_API_SECRET_SANDBOX: parity-sandbox-api-secret
+  MOCK_MTN_MOMO_TARGET_ENVIRONMENT: mtnliberia
+
+x-no-side-effects: &no-side-effects
+  EMAIL_BACKEND_MODE: console
+  BREVO_API_KEY: ""
+  EMAIL_HOST_PASSWORD: ""
+  STRIPE_SECRET_KEY: ${PARITY_MOCK_PROVIDERS:+sk_test_parity_0000000000000000000000}
+  STRIPE_WEBHOOK_SECRET: ${PARITY_MOCK_PROVIDERS:+whsec_parity_00000000000000000000000000}
+  MTN_MOMO_COLLECTION_KEY: ${PARITY_MOCK_PROVIDERS:+parity-collection-subscription-key}
+  MTN_MOMO_DISBURSEMENT_KEY: ${PARITY_MOCK_PROVIDERS:+parity-disbursement-subscription-key}
+  MTN_MOMO_COLLECTION_USER_ID_USD: ${PARITY_MOCK_PROVIDERS:+11111111-1111-4111-8111-111111111111}
+  MTN_MOMO_COLLECTION_API_SECRET_USD: ${PARITY_MOCK_PROVIDERS:+parity-collection-api-secret}
+  MTN_MOMO_USER_ID_USD: ${PARITY_MOCK_PROVIDERS:+22222222-2222-4222-8222-222222222222}
+  MTN_MOMO_API_SECRET_USD: ${PARITY_MOCK_PROVIDERS:+parity-disbursement-api-secret}
+  MTN_MOMO_USER_ID_SANDBOX: ${PARITY_MOCK_PROVIDERS:+33333333-3333-4333-8333-333333333333}
+  MTN_MOMO_API_SECRET_SANDBOX: ${PARITY_MOCK_PROVIDERS:+parity-sandbox-api-secret}
+  MTN_MOMO_USER_ID_LRD: ""
+  MTN_MOMO_API_SECRET_LRD: ""
+  MTN_MOMO_USER_ID: ""
+  MTN_MOMO_API_SECRET: ""
+  MTN_MOMO_TARGET_ENVIRONMENT: mtnliberia
+  VAPID_PRIVATE_KEY: ""
+  POSTGRES_HOST: parity-db
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: parity
+  POSTGRES_SSLMODE: disable
+
+services:
+  parity-db:
+    image: postgres:16
+    env_file: [.env.parity]
+    environment:
+      POSTGRES_USER: parity
+      POSTGRES_DB: parity
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parity -d parity"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  parity-redis:
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no
+
+  parity-mocks:
+    image: node:22-bookworm-slim
+    working_dir: /mocks
+    command: node server.mjs
+    environment:
+      <<: *mock-creds
+      MOCK_CERT_DIR: /mocks/certs
+    volumes:
+      - ./mocks:/mocks:ro
+    networks:
+      default:
+        aliases: [api.stripe.com, proxy.momoapi.mtn.com, sandbox.momodeveloper.mtn.com]
+
+  parity-django:
+    image: homekonet-backend
+    env_file: [../../backend/.env, .env.parity]
+    environment:
+      <<: *no-side-effects
+      POSTGRES_DB: django_copy
+      REDIS_URL: redis://parity-redis:6379/1
+      CELERY_ALWAYS_EAGER: "False"
+      REQUESTS_CA_BUNDLE: /parity-certs/bundle.pem
+    volumes:
+      - ./mocks/certs:/parity-certs:ro
+      - ./mocks/certs/bundle.pem:/usr/local/lib/python3.12/site-packages/stripe/data/ca-certificates.crt:ro
+    tmpfs: [/app/media, /app/logs]
+    depends_on:
+      parity-db: { condition: service_healthy }
+      parity-redis: { condition: service_started }
+      parity-mocks: { condition: service_started }
+
+  parity-express:
+    # Runs straight from the compiled tree (no image rebuild per test run).
+    image: node:22-bookworm-slim
+    working_dir: /app
+    command: node ${DIST:-dist}/server.js
+    env_file: [../.env, .env.parity]
+    environment:
+      <<: *no-side-effects
+      POSTGRES_DB: express_copy
+      REDIS_URL: redis://parity-redis:6379/2
+      EXPRESS_JOBS_ENABLED: "false"
+      EXPRESS_APPS: ${EXPRESS_APPS:-}
+      NODE_EXTRA_CA_CERTS: /app/parity/mocks/certs/ca.pem
+    volumes:
+      - ..:/app:ro
+    tmpfs: [/app/media]
+    depends_on:
+      parity-db: { condition: service_healthy }
+      parity-redis: { condition: service_started }
+      parity-mocks: { condition: service_started }
