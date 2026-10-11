@@ -18,11 +18,12 @@ const STAGES = [
 interface FormState {
   fullName: string;
   address: string;
+  phoneNumber: string;
   momoNumber: string;
 }
 
 const INITIAL_FORM: FormState = {
-  fullName: '', address: '', momoNumber: '',
+  fullName: '', address: '', phoneNumber: '', momoNumber: '',
 };
 
 export function BecomeAHost() {
@@ -50,6 +51,14 @@ export function BecomeAHost() {
     return () => { active = false; };
   }, []);
 
+  // Pre-fill the contact phone from the account (the field writes back to the
+  // profile on submit). Don't clobber whatever the user has already typed.
+  useEffect(() => {
+    if (user?.phone) {
+      setForm((prev) => (prev.phoneNumber ? prev : { ...prev, phoneNumber: user.phone! }));
+    }
+  }, [user?.phone]);
+
   const set = (field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: '' }));
@@ -59,6 +68,7 @@ export function BecomeAHost() {
     const errs: typeof errors = {};
     if (!form.fullName.trim()) errs.fullName = 'Full name is required';
     if (!form.address.trim()) errs.address = 'Address is required';
+    if (!form.phoneNumber.trim()) errs.phoneNumber = 'Phone number is required';
     if (!form.momoNumber.trim()) errs.momoNumber = 'Mobile Money number is required';
     if (!headshot) errs.headshot = 'A headshot / passport photo is required';
     if (!idDocument) errs.idDocument = 'A photo of your national ID / passport is required';
@@ -75,6 +85,7 @@ export function BecomeAHost() {
       const payload = new FormData();
       payload.append('full_name', form.fullName.trim());
       payload.append('address', form.address.trim());
+      payload.append('phone_number', form.phoneNumber.trim());
       payload.append('momo_number', form.momoNumber.trim());
       if (headshot) payload.append('headshot', headshot);
       if (idDocument) payload.append('id_document', idDocument);
@@ -219,6 +230,23 @@ export function BecomeAHost() {
                 className={errors.address ? 'border-destructive' : ''}
               />
               {errors.address && <p className="text-xs text-destructive">{errors.address}</p>}
+            </div>
+
+            {/* Contact phone — saved to the user's account (profile). Editable here
+                without the OTP flow since it's a one-time application. */}
+            <div className="space-y-1.5">
+              <Label htmlFor="ha-phone">Phone number <span className="text-destructive">*</span></Label>
+              <Input
+                id="ha-phone"
+                type="tel"
+                placeholder="e.g. 0770000000"
+                value={form.phoneNumber}
+                onChange={(e) => set('phoneNumber', e.target.value)}
+                className={errors.phoneNumber ? 'border-destructive' : ''}
+              />
+              {errors.phoneNumber
+                ? <p className="text-xs text-destructive">{errors.phoneNumber}</p>
+                : <p className="text-xs text-muted-foreground">Your contact number saved to your account. We may call you about your application.</p>}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

@@ -58,7 +58,8 @@ class HostApplicationAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
 
     readonly_fields = [
-        'applicant', 'full_name', 'address', 'momo_number', 'momo_network', 'email_display',
+        'applicant', 'full_name', 'address', 'momo_number', 'momo_network',
+        'email_display', 'phone_display',
         'headshot_preview', 'id_document_preview',
         'status', 'current_stage_display',
         'ps_reviewed_by', 'ps_reviewed_at',
@@ -68,7 +69,7 @@ class HostApplicationAdmin(admin.ModelAdmin):
     ]
     fieldsets = (
         ('Applicant', {
-            'fields': ('applicant', 'email_display', 'full_name', 'address', 'momo_number', 'momo_network'),
+            'fields': ('applicant', 'email_display', 'phone_display', 'full_name', 'address', 'momo_number', 'momo_network'),
         }),
         ('Documents', {
             'fields': ('headshot_preview', 'id_document_preview'),
@@ -148,6 +149,15 @@ class HostApplicationAdmin(admin.ModelAdmin):
     @admin.display(description='Email')
     def email_display(self, obj):
         return obj.applicant.email
+
+    @admin.display(description='Phone number (contact)')
+    def phone_display(self, obj):
+        """Contact phone from the applicant's profile — the host form saves it
+        there (see hostapplications.serializers)."""
+        try:
+            return obj.applicant.profile.phone_number or '—'
+        except Exception:
+            return '—'
 
     @admin.display(description='Current stage')
     def current_stage_display(self, obj):
