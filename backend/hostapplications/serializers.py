@@ -28,10 +28,20 @@ class HostApplicationCreateSerializer(serializers.ModelSerializer):
     # the view so the client can't spoof the version.
     agreement_accepted = serializers.BooleanField(write_only=True)
 
+    # Contact phone — NOT a HostApplication field. Written straight to the
+    # applicant's Profile.phone_number (their account's single source of truth),
+    # deliberately WITHOUT the OTP phone-change flow: this is a one-time
+    # application edit of non-financial contact info. Distinct from momo_number
+    # (the payout wallet), which stays on the application.
+    phone_number = serializers.CharField(
+        write_only=True, required=True, allow_blank=False, max_length=20, trim_whitespace=True,
+    )
+
     class Meta:
         model = HostApplication
         fields = [
-            'full_name', 'address', 'momo_number', 'headshot', 'id_document', 'agreement_accepted',
+            'full_name', 'address', 'phone_number', 'momo_number',
+            'headshot', 'id_document', 'agreement_accepted',
         ]
 
     def validate_momo_number(self, value):
@@ -59,6 +69,20 @@ class HostApplicationCreateSerializer(serializers.ModelSerializer):
         attrs.pop('agreement_accepted', None)
         return attrs
 
+    def create(self, validated_data):
+        # phone_number isn't a HostApplication field — pop it before creating the
+        # application and write it to the applicant's profile (Option A: the
+        # profile is the single source of truth; no OTP for this one-time edit).
+        phone = (validated_data.pop('phone_number', '') or '').strip()
+        application = super().create(validated_data)
+        if phone:
+            from users.models import Profile
+            profile, _ = Profile.objects.get_or_create(user=application.applicant)
+            if profile.phone_number != phone:
+                profile.phone_number = phone
+                profile.save(update_fields=['phone_number'])
+        return application
+
 
 class HostApplicationSerializer(serializers.ModelSerializer):
     """Read serializer returned to the applicant (status / re-apply UI)."""
@@ -71,11 +95,12 @@ class HostApplicationSerializer(serializers.ModelSerializer):
     agreement_document_url = serializers.SerializerMethodField()
     can_reapply       = serializers.SerializerMethodField()
     email             = serializers.EmailField(source='applicant.email', read_only=True)
+    phone_number      = serializers.SerializerMethodField()
 
     class Meta:
         model = HostApplication
         fields = [
-            'id', 'full_name', 'address', 'momo_number', 'momo_network', 'email',
+            'id', 'full_name', 'address', 'phone_number', 'momo_number', 'momo_network', 'email',
             'headshot_url', 'id_document_url', 'tax_clearance_receipt_url',
             'agreement_document_url', 'agreement_version',
             'next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone',
@@ -87,6 +112,14 @@ class HostApplicationSerializer(serializers.ModelSerializer):
 
     def get_current_stage(self, obj):
         return obj.current_stage or None
+
+    def get_phone_number(self, obj):
+        """Contact phone from the applicant's profile (Option A — the profile is
+        the source of truth; the host form writes it there on submit)."""
+        try:
+            return obj.applicant.profile.phone_number
+        except Exception:
+            return ''
 
     def _abs_url(self, image):
         if not image:

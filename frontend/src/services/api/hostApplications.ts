@@ -4,6 +4,8 @@ export interface HostApplication {
   id: number;
   full_name: string;
   address: string;
+  /** Contact phone (from the applicant's account profile). */
+  phone_number: string;
   /** Host payout MoMo number (renamed from the old `phone` field). */
   momo_number: string;
   /** Which wallet momo_number belongs to — 'mtn' today (hidden on the frontend). */
