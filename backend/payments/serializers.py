@@ -198,7 +198,7 @@ class PlatformFeeSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlatformFee
         fields = [
-            'viewing_fee', 'service_fee_percent',
+            'viewing_fee', 'guest_service_fee_percent', 'host_service_fee_percent',
             'transaction_fee_type', 'transaction_fee_value',
             'transaction_fee_min', 'transaction_fee_max', 'updated_at',
         ]

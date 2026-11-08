@@ -277,7 +277,7 @@ def create_payout_for_booking(booking):
     fee     = platform commission deducted from the host (service_fee_rate)
     net     = what the host receives
     """
-    from payments.models import Payout, get_service_fee_rate
+    from payments.models import Payout, get_host_service_fee_rate
 
     if hasattr(booking, 'payout'):
         return booking.payout
@@ -289,7 +289,9 @@ def create_payout_for_booking(booking):
         gross = (Decimal(booking.total_price) - Decimal(booking.service_fee or 0)).quantize(Decimal('0.01'))
     else:
         gross = Decimal(booking.total_amount).quantize(Decimal('0.01'))
-    fee = (gross * get_service_fee_rate()).quantize(Decimal('0.01'))
+    # Host-side service fee (deducted from the host). Defaults to 0 — hosts keep
+    # the full amount — unless an admin sets host_service_fee_percent > 0.
+    fee = (gross * get_host_service_fee_rate()).quantize(Decimal('0.01'))
     net = (gross - fee).quantize(Decimal('0.01'))
 
     payout = Payout.objects.create(

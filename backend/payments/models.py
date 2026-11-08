@@ -424,12 +424,19 @@ class PlatformFee(models.Model):
         max_digits=8, decimal_places=2, default=Decimal('3.00'),
         help_text='Flat fee charged for a long-term property viewing appointment (USD). Non-refundable.',
     )
-    service_fee_percent = models.DecimalField(
+    guest_service_fee_percent = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal('4.00'),
         help_text=(
-            'Platform service fee, applied to BOTH sides of a booking: added on '
-            'top of what the guest pays AND deducted from what the host receives. '
-            'e.g. 4.00 means the platform earns 8% of the rent overall.'
+            'Service fee percentage added ON TOP of what the guest pays '
+            '(e.g. 4.00 charges the guest +4%).'
+        ),
+    )
+    host_service_fee_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('0.00'),
+        help_text=(
+            "Service fee percentage DEDUCTED from the host's payout. "
+            "0.00 means hosts keep the full booking amount; raise this to charge "
+            "hosts a service fee again (no code change needed)."
         ),
     )
     transaction_fee_type = models.CharField(
@@ -463,7 +470,11 @@ class PlatformFee(models.Model):
         verbose_name_plural = 'Platform Fee Configuration'
 
     def __str__(self):
-        return f'Service fee: {self.service_fee_percent}% | Transaction: {self.get_transaction_fee_type_display()}'
+        return (
+            f'Guest fee: {self.guest_service_fee_percent}% | '
+            f'Host fee: {self.host_service_fee_percent}% | '
+            f'Transaction: {self.get_transaction_fee_type_display()}'
+        )
 
     def save(self, *args, **kwargs):
         # Enforce singleton — only one configuration row allowed.
@@ -479,9 +490,16 @@ class PlatformFee(models.Model):
         return obj
 
     @property
-    def service_fee_rate(self) -> Decimal:
-        """The service fee as a fraction (e.g. 0.04 for 4%)."""
-        return (self.service_fee_percent or Decimal('0')) / Decimal('100')
+    def guest_service_fee_rate(self) -> Decimal:
+        """Guest-side service fee as a fraction (e.g. 0.04 for 4%) — added on
+        top of what the guest pays."""
+        return (self.guest_service_fee_percent or Decimal('0')) / Decimal('100')
+
+    @property
+    def host_service_fee_rate(self) -> Decimal:
+        """Host-side service fee as a fraction (e.g. 0.00 = no host deduction) —
+        deducted from the host's payout."""
+        return (self.host_service_fee_percent or Decimal('0')) / Decimal('100')
 
     @property
     def agent_commission_rate(self) -> Decimal:
@@ -507,16 +525,18 @@ class PlatformFee(models.Model):
         return Decimal('0')
 
 
-def get_service_fee_rate() -> Decimal:
-    """
-    The platform service fee as a fraction (e.g. Decimal('0.04')).
+def get_guest_service_fee_rate() -> Decimal:
+    """Guest-side service fee as a fraction (e.g. Decimal('0.04')) — added on top
+    of what the guest pays. Read from the admin-editable PlatformFee singleton
+    (single source of truth)."""
+    return PlatformFee.get_current().guest_service_fee_rate
 
-    Single source of truth for the fee, read from the admin-editable
-    PlatformFee singleton. The same rate is added on top of the guest's
-    total and deducted from the host's payout — so the platform earns
-    twice this rate overall.
-    """
-    return PlatformFee.get_current().service_fee_rate
+
+def get_host_service_fee_rate() -> Decimal:
+    """Host-side service fee as a fraction (e.g. Decimal('0.00')) — deducted from
+    the host's payout. Defaults to 0 (hosts keep the full amount); raise
+    host_service_fee_percent in the admin to charge hosts again."""
+    return PlatformFee.get_current().host_service_fee_rate
 
 
 def get_agent_commission_rate() -> Decimal:

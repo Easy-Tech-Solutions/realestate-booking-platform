@@ -694,9 +694,9 @@ def compute_listing_pricing(listing, start, end, room=None):
     The service fee (read from PlatformFee) is added on top either way.
     """
     from datetime import date as _date, timedelta as _td
-    from payments.models import get_service_fee_rate
+    from payments.models import get_guest_service_fee_rate
 
-    fee_rate = float(get_service_fee_rate())
+    fee_rate = float(get_guest_service_fee_rate())
 
     # ---- Long-term (monthly) pricing -------------------------------------
     # Hotel rooms are always nightly; only whole long-term listings price by month.

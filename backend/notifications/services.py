@@ -23,17 +23,18 @@ from channels.layers import get_channel_layer
 logger = logging.getLogger(__name__)
 
 
-def _service_fee_rate() -> Decimal:
-    """
-    Platform service fee as a fraction (e.g. Decimal('0.04')).
+def _guest_service_fee_rate() -> Decimal:
+    """Guest-side service fee as a fraction (e.g. Decimal('0.04')) — added on top
+    of what the guest pays. Lazy import to avoid a cycle with the payments app."""
+    from payments.models import get_guest_service_fee_rate
+    return get_guest_service_fee_rate()
 
-    Read from the admin-editable PlatformFee config so the rate lives in one
-    place. The same rate is added on top of what the guest pays AND deducted
-    from what the host receives, so the platform earns twice this rate overall.
-    Imported lazily to avoid an import cycle with the payments app.
-    """
-    from payments.models import get_service_fee_rate
-    return get_service_fee_rate()
+
+def _host_service_fee_rate() -> Decimal:
+    """Host-side service fee as a fraction (e.g. Decimal('0.00')) — deducted from
+    the host's payout. 0 by default (hosts keep the full amount)."""
+    from payments.models import get_host_service_fee_rate
+    return get_host_service_fee_rate()
 
 
 def _booking_amounts(booking):
@@ -46,17 +47,18 @@ def _booking_amounts(booking):
     listing on a 365-day lease would wrongly read $54,750. Falls back to
     ``total_amount`` only for legacy rows with no stored price.
     """
-    rate = _service_fee_rate()
+    guest_rate = _guest_service_fee_rate()
+    host_rate = _host_service_fee_rate()
     if booking.total_price:
         total = Decimal(str(booking.total_price))
         guest_fee = Decimal(str(booking.service_fee or 0))
     else:
         subtotal_legacy = Decimal(str(booking.total_amount))
-        guest_fee = (subtotal_legacy * rate).quantize(Decimal('0.01'))
+        guest_fee = (subtotal_legacy * guest_rate).quantize(Decimal('0.01'))
         total = subtotal_legacy + guest_fee
 
     subtotal = (total - guest_fee).quantize(Decimal('0.01'))
-    host_fee = (subtotal * rate).quantize(Decimal('0.01'))
+    host_fee = (subtotal * host_rate).quantize(Decimal('0.01'))
     host_received = (subtotal - host_fee).quantize(Decimal('0.01'))
     return {
         'subtotal': subtotal,                            # rent, excl. fees
@@ -486,8 +488,8 @@ def notify_host_payment_received(booking):
         title='Payment Received',
         message=(
             f'The guest has paid for "{booking.listing.title}". '
-            f"You'll receive {amounts['host_received']} after our commission — "
-            f"Home Konet's team will disburse it to your account shortly."
+            f"You'll receive {amounts['host_received']} — Home Konet's team will "
+            f"disburse it to your account shortly."
         ),
         data={
             'booking_id':       booking.id,
@@ -737,8 +739,8 @@ def notify_payment_received(payment):
             notification_type='payment_received_host',
             title='Payment Received',
             message=(
-                f'A guest has paid for "{listing_title}". You will receive '
-                f'{amount_received} {currency_code} after our {rate * 100:.0f}% commission.'
+                f'A guest has paid for "{listing_title}". '
+                f'You will receive {amount_received} {currency_code}.'
             ),
             data={
                 'payment_id':       str(payment.id),
