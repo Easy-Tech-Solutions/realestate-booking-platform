@@ -91,16 +91,17 @@ class RefundAdmin(admin.ModelAdmin):
 
 @admin.register(PlatformFee)
 class PlatformFeeAdmin(admin.ModelAdmin):
-    list_display = ['service_fee_percent', 'viewing_fee', 'transaction_fee_type', 'transaction_fee_value', 'updated_at']
+    list_display = ['guest_service_fee_percent', 'host_service_fee_percent', 'viewing_fee', 'transaction_fee_type', 'transaction_fee_value', 'updated_at']
     readonly_fields = ['updated_at']
     fieldsets = (
         ('Service Fee', {
-            'fields': ('service_fee_percent',),
+            'fields': ('guest_service_fee_percent', 'host_service_fee_percent'),
             'description': (
-                'Platform service fee percentage. Applied to BOTH sides of every booking: '
-                'added on top of what the guest pays AND deducted from what the host receives. '
-                'e.g. enter 4 to charge the guest +4% and pay the host −4% (the platform earns 8% overall). '
-                'Edit here any time — no code change needed.'
+                'Two independent service-fee percentages, each editable here any time '
+                '(no code change needed). '
+                'Guest: added ON TOP of what the guest pays (e.g. enter 4 to charge the guest +4%). '
+                'Host: DEDUCTED from the host payout (0 = hosts keep the full amount; '
+                'raise it to charge hosts a fee again).'
             ),
         }),
         ('Viewing Appointment Fee', {

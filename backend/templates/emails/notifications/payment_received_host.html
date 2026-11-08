@@ -8,7 +8,7 @@
 <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:0 0 24px;border-left:3px solid #004406;">
   <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Property:</strong> {{ data.listing_title }}</p>
   <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Booking amount:</strong> ${{ data.booking_amount }}</p>
-  <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Service fee:</strong> ${{ data.host_service_fee }}</p>
+  <!-- {% if data.host_service_fee and data.host_service_fee != "0.00" %}<p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Service fee:</strong> ${{ data.host_service_fee }}</p>{% endif %} -->
   <p style="margin:0 0 6px;font-size:14px;color:#333333;line-height:1.6;"><strong>Amount you'll receive:</strong> ${{ data.amount_received }}</p>
   <p style="margin:0;font-size:14px;color:#333333;line-height:1.6;"><strong>Reference:</strong> #{{ data.payment_id }}</p>
 </div>
